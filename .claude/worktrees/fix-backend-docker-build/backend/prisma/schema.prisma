@@ -1,0 +1,1073 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  location    String?
+  featuredImageUrl String?
+  galleryImages Json?
+  isArchived  Boolean  @default(false)
+  vatApplicable Boolean @default(true)
+  defaultCancellationChargeRate Decimal @default(0.1)
+  createdAt   DateTime @default(now())
+  blocks      ProjectBlock[]
+  bankAccounts BankAccount[]
+  accountAssignments ProjectAccountAssignment[]
+  taxRemittances TaxRemittance[]
+  amenities   ProjectAmenity[]
+}
+
+model ProjectBlock {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  blockName String
+  totalFloors Int
+  units     Unit[]
+  constructionStatus ConstructionStatus?
+  stageLogs   ConstructionStageLog[]
+  sitePhotos  SitePhoto[]
+  inspections SiteInspection[]
+}
+
+enum ConstructionStage {
+  PLANNING
+  FOUNDATION
+  STRUCTURE
+  ROOFING
+  FINISHING
+  HANDOVER
+}
+
+enum InspectionOutcome {
+  PASSED
+  FAILED
+  NEEDS_FOLLOW_UP
+}
+
+model ConstructionStatus {
+  id              String   @id @default(uuid())
+  block           ProjectBlock @relation(fields: [blockId], references: [id])
+  blockId         String   @unique
+  currentStage    ConstructionStage @default(PLANNING)
+  progressPercent Int      @default(0)
+  notes           String?
+  updatedAt       DateTime @updatedAt
+  updatedBy       String   @default("system")
+}
+
+model ConstructionStageLog {
+  id              String   @id @default(uuid())
+  block           ProjectBlock @relation(fields: [blockId], references: [id])
+  blockId         String
+  stage           ConstructionStage
+  progressPercent Int
+  notes           String?
+  photoUrls       Json?
+  recordedAt      DateTime @default(now())
+  recordedBy      String   @default("system")
+}
+
+model SitePhoto {
+  id         String   @id @default(uuid())
+  block      ProjectBlock @relation(fields: [blockId], references: [id])
+  blockId    String
+  stage      ConstructionStage?
+  url        String
+  objectKey  String?
+  caption    String?
+  uploadedAt DateTime @default(now())
+  uploadedBy String   @default("system")
+}
+
+model SiteInspection {
+  id             String   @id @default(uuid())
+  block          ProjectBlock @relation(fields: [blockId], references: [id])
+  blockId        String
+  stage          ConstructionStage
+  inspectorName  String
+  inspectionDate DateTime
+  outcome        InspectionOutcome
+  findings       String?
+  photoUrls      Json?
+  createdAt      DateTime @default(now())
+  createdBy      String   @default("system")
+}
+
+model Unit {
+  id           String   @id @default(uuid())
+  block        ProjectBlock @relation(fields: [blockId], references: [id])
+  blockId      String
+  unitNumber   String
+  floorNumber  Int
+  sizeSqm      Decimal
+  priceKes     Decimal
+  priceUsd     Decimal
+  status       UnitStatus @default(AVAILABLE)
+  bedrooms     Int @default(0)
+  parkingSlots Int @default(0)
+  hasBalcony   Boolean @default(false)
+  hasStore     Boolean @default(false)
+  featuredImageUrl String?
+  galleryImages Json?
+  floorPlanUrl String?
+  version      Int @default(1)
+  createdAt    DateTime @default(now())
+  ownerships   UnitOwnership[]
+  contracts    SalesContract[]
+  ownershipAudits OwnershipChangeAudit[]
+  tenancies    Tenancy[]
+  transfersFrom UnitTransfer[] @relation("UnitTransferFrom")
+  transfersTo   UnitTransfer[] @relation("UnitTransferTo")
+  amenities    UnitAmenity[]
+}
+
+model Amenity {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  icon        String?
+  category    String?
+  createdAt   DateTime @default(now())
+  projects    ProjectAmenity[]
+  units       UnitAmenity[]
+}
+
+model ProjectAmenity {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  amenity   Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  amenityId String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, amenityId])
+}
+
+model UnitAmenity {
+  id        String   @id @default(uuid())
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unitId    String
+  amenity   Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+  amenityId String
+  createdAt DateTime @default(now())
+
+  @@unique([unitId, amenityId])
+}
+
+enum UnitStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  RENTED
+  BLOCKED
+}
+
+model Customer {
+  id            String   @id @default(uuid())
+  firstName     String
+  lastName      String
+  email         String   @unique
+  phone         String
+  nationalIdPassport String
+  kraPin        String?
+  nextOfKinJson Json?
+  createdAt     DateTime @default(now())
+  ownerships    UnitOwnership[]
+  contracts     SalesContract[]
+  tenancies     Tenancy[]
+  documents     CustomerDocument[]
+  ownershipAuditsFrom OwnershipChangeAudit[] @relation("OwnershipAuditFromCustomer")
+  ownershipAuditsTo   OwnershipChangeAudit[] @relation("OwnershipAuditToCustomer")
+  invoices      Invoice[]
+  receipts      Receipt[]
+}
+
+model CustomerDocument {
+  id           String   @id @default(uuid())
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId   String
+  documentType CustomerDocumentType
+  fileName     String
+  objectKey    String
+  url          String
+  contentType  String?
+  fileSize     Int?
+  notes        String?
+  uploadedAt   DateTime @default(now())
+}
+
+enum CustomerDocumentType {
+  NATIONAL_ID
+  PASSPORT
+  KRA_PIN
+  PROOF_OF_ADDRESS
+  BANK_STATEMENT
+  SALE_CONTRACT
+  LEASE_AGREEMENT
+  NEXT_OF_KIN_ID
+  PHOTO
+  OTHER
+}
+
+model UnitOwnership {
+  id                String   @id @default(uuid())
+  unit              Unit     @relation(fields: [unitId], references: [id])
+  unitId            String
+  customer          Customer @relation(fields: [customerId], references: [id])
+  customerId        String
+  ownershipPercentage Decimal @default(100.0)
+  isPrimaryOwner    Boolean @default(true)
+  acquiredAt        DateTime @default(now())
+  transferredAt     DateTime?
+}
+
+model OwnershipChangeAudit {
+  id              String   @id @default(uuid())
+  unit            Unit     @relation(fields: [unitId], references: [id])
+  unitId          String
+  ownershipId     String?
+  action          OwnershipChangeAction
+  fromCustomer    Customer? @relation("OwnershipAuditFromCustomer", fields: [fromCustomerId], references: [id])
+  fromCustomerId  String?
+  toCustomer      Customer? @relation("OwnershipAuditToCustomer", fields: [toCustomerId], references: [id])
+  toCustomerId    String?
+  fromPercentage  Decimal?
+  toPercentage    Decimal?
+  fromIsPrimary   Boolean?
+  toIsPrimary     Boolean?
+  reason          String?
+  changedBy       String   @default("system")
+  timestamp       DateTime @default(now())
+}
+
+enum OwnershipChangeAction {
+  ASSIGNED
+  REASSIGNED
+  UPDATED
+  REMOVED
+}
+
+model Tenancy {
+  id            String   @id @default(uuid())
+  unit          Unit     @relation(fields: [unitId], references: [id])
+  unitId        String
+  tenant        Customer @relation(fields: [tenantId], references: [id])
+  tenantId      String
+  leaseStart    DateTime
+  leaseEnd      DateTime?
+  status        TenancyStatus @default(ACTIVE)
+  monthlyRent   Decimal
+  currency      String   @default("KES")
+  depositAmount Decimal?
+  notes         String?
+  createdAt     DateTime @default(now())
+  payments      RentalPayment[]
+}
+
+enum TenancyStatus {
+  PENDING
+  ACTIVE
+  ENDED
+}
+
+model RentalPayment {
+  id                   String   @id @default(uuid())
+  tenancy              Tenancy  @relation(fields: [tenancyId], references: [id])
+  tenancyId            String
+  receiptNumber        String   @unique
+  category             RentalPaymentCategory
+  amountPaid           Decimal
+  currency             String
+  paymentMethod        String
+  transactionReference String   @unique
+  billingPeriodStart   DateTime?
+  billingPeriodEnd     DateTime?
+  paymentDate          DateTime @default(now())
+  notes                String?
+}
+
+enum RentalPaymentCategory {
+  RENT
+  WATER
+  ELECTRICITY
+  GARBAGE
+  SECURITY
+  INTERNET
+  PARKING
+  SERVICE_CHARGE
+  OTHER
+}
+
+model SalesContract {
+  id               String   @id @default(uuid())
+  contractNumber   String   @unique
+  unit             Unit     @relation(fields: [unitId], references: [id])
+  unitId           String
+  primaryCustomer  Customer @relation(fields: [primaryCustomerId], references: [id])
+  primaryCustomerId String
+  currency         String   @default("KES")
+  totalAgreedPrice Decimal
+  contractStatus   String   @default("ACTIVE")
+  cancelledAt      DateTime?
+  cancelledReason  String?
+  cancelledBy      String?
+  cancellationChargeRate Decimal?
+  cancellationCharge Decimal?
+  createdAt        DateTime @default(now())
+  payments         CustomerPayment[]
+  installments     PaymentScheduleInstallment[]
+  transfersFrom    UnitTransfer[] @relation("UnitTransferContract")
+  amendments       SalesContractAmendment[]
+}
+
+model UnitTransfer {
+  id                String   @id @default(uuid())
+  contract          SalesContract @relation("UnitTransferContract", fields: [contractId], references: [id])
+  contractId        String
+  fromUnit          Unit     @relation("UnitTransferFrom", fields: [fromUnitId], references: [id])
+  fromUnitId        String
+  toUnit            Unit     @relation("UnitTransferTo", fields: [toUnitId], references: [id])
+  toUnitId          String
+  fromPrice         Decimal
+  toPrice           Decimal
+  paidToDateAtTransfer Decimal
+  excessAmount      Decimal  @default(0)
+  reason            String?
+  transferredBy     String   @default("system")
+  transferredAt     DateTime @default(now())
+}
+
+enum ContractAmendmentType {
+  UNIT_TRANSFER
+  PRICE_CHANGE
+  OWNERSHIP_TRANSFER
+  CANCELLATION
+  MANUAL_EDIT
+}
+
+model SalesContractAmendment {
+  id           String   @id @default(uuid())
+  contract     SalesContract @relation(fields: [contractId], references: [id])
+  contractId   String
+  type         ContractAmendmentType
+  fieldChanges Json
+  reason       String?
+  amendedBy    String   @default("system")
+  amendedAt    DateTime @default(now())
+
+  @@index([contractId])
+}
+
+model PaymentScheduleInstallment {
+  id             String   @id @default(uuid())
+  contract       SalesContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contractId     String
+  sequence       Int
+  dueDate        DateTime
+  amount         Decimal
+  invoiceId      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([contractId, sequence])
+  @@index([contractId])
+}
+
+model CustomerPayment {
+  id                 String   @id @default(uuid())
+  receiptNumber      String   @unique
+  contract           SalesContract @relation(fields: [contractId], references: [id])
+  contractId         String
+  amountPaid         Decimal
+  currency           String
+  paymentMethod      String
+  transactionReference String @unique
+  paymentDate        DateTime @default(now())
+  reallocationAudits PaymentReallocationAudit[]
+}
+
+model PaymentReallocationAudit {
+  id                 String   @id @default(uuid())
+  payment            CustomerPayment @relation(fields: [paymentId], references: [id])
+  paymentId          String
+  sourceContractId   String?
+  destinationContractId String?
+  reallocatedAmount  Decimal
+  reason             String
+  reallocatedBy      String
+  timestamp          DateTime @default(now())
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  name      String
+  role      String?
+  createdAt DateTime   @default(now())
+  roles     UserRole[]
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  action      String
+  subject     String
+  key         String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+
+  @@unique([subject, action])
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  assignedAt   DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+// ============================================================
+// ACCOUNTING MODULE
+// ============================================================
+
+model Currency {
+  code         String   @id
+  name         String
+  isBase       Boolean  @default(false)
+  symbol       String?
+  createdAt    DateTime @default(now())
+  exchangeRates ExchangeRate[]
+}
+
+model ExchangeRate {
+  id             String   @id @default(uuid())
+  currency       Currency @relation(fields: [currencyCode], references: [code])
+  currencyCode   String
+  rateToBase     Decimal
+  effectiveDate  DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([currencyCode, effectiveDate])
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+model ChartOfAccount {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  type         AccountType
+  subtype      String?
+  parent       ChartOfAccount? @relation("AccountHierarchy", fields: [parentId], references: [id])
+  parentId     String?
+  children     ChartOfAccount[] @relation("AccountHierarchy")
+  isSystem     Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  description  String?
+  createdAt    DateTime @default(now())
+  journalLines JournalLine[]
+  bankAccounts BankAccount[]
+  taxRates     TaxRate[]
+}
+
+enum BankAccountType {
+  BANK
+  MOBILE_MONEY
+}
+
+enum TaxApplication {
+  OUTPUT
+  INPUT
+  WITHHOLDING
+}
+
+model TaxRate {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  rate        Decimal
+  appliesTo   TaxApplication
+  glAccount   ChartOfAccount @relation(fields: [glAccountId], references: [id])
+  glAccountId String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  invoiceLines InvoiceLine[]
+  supplierInvoices SupplierInvoice[]
+  suppliersDefaultingHere Supplier[]
+  remittances TaxRemittance[]
+}
+
+model TaxRemittance {
+  id             String   @id @default(uuid())
+  remittanceNumber String @unique
+  taxRate        TaxRate  @relation(fields: [taxRateId], references: [id])
+  taxRateId      String
+  bankAccount    BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId  String?
+  project        Project? @relation(fields: [projectId], references: [id])
+  projectId      String?
+  amount         Decimal
+  periodStart    DateTime
+  periodEnd      DateTime
+  reference      String?
+  remittedBy     String   @default("system")
+  remittedAt     DateTime @default(now())
+  journalEntryId String?
+}
+
+model BankAccount {
+  id           String   @id @default(uuid())
+  type         BankAccountType @default(BANK)
+  name         String
+  accountNumber String
+  bankName     String
+  branch       String?
+  currencyCode String   @default("KES")
+  glAccount    ChartOfAccount @relation(fields: [glAccountId], references: [id])
+  glAccountId  String   @unique
+  project      Project? @relation(fields: [projectId], references: [id])
+  projectId    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  reconciliations BankReconciliation[]
+  purposeAssignments ProjectAccountAssignment[]
+  transfersOut AccountTransfer[] @relation("TransferFrom")
+  transfersIn  AccountTransfer[] @relation("TransferTo")
+  taxRemittances TaxRemittance[]
+  receipts     Receipt[]
+  refunds      Refund[]
+
+  @@index([projectId])
+}
+
+enum AccountPurpose {
+  SALES
+  RENT
+  UTILITIES
+  SUPPLIER_PAYMENTS
+  TAX_REMITTANCE
+  GENERAL
+}
+
+model ProjectAccountAssignment {
+  id            String   @id @default(uuid())
+  project       Project  @relation(fields: [projectId], references: [id])
+  projectId     String
+  purpose       AccountPurpose
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  bankAccountId String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([projectId, purpose])
+}
+
+model AccountTransfer {
+  id             String   @id @default(uuid())
+  transferNumber String   @unique
+  fromAccount    BankAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  fromAccountId  String
+  toAccount      BankAccount @relation("TransferTo", fields: [toAccountId], references: [id])
+  toAccountId    String
+  amount         Decimal
+  currency       String   @default("KES")
+  transferDate   DateTime @default(now())
+  memo           String?
+  journalEntryId String?
+  createdBy      String   @default("system")
+  createdAt      DateTime @default(now())
+}
+
+enum JournalSource {
+  MANUAL
+  AR
+  AP
+  PETTY_CASH
+  DEPRECIATION
+  BANK_RECON
+  ASSET_TRANSFER
+  ACCOUNT_TRANSFER
+  TAX_REMITTANCE
+}
+
+enum JournalStatus {
+  POSTED
+  REVERSED
+}
+
+model JournalEntry {
+  id            String   @id @default(uuid())
+  entryNumber   String   @unique
+  entryDate     DateTime @default(now())
+  memo          String?
+  source        JournalSource @default(MANUAL)
+  sourceId      String?
+  status        JournalStatus @default(POSTED)
+  reversalOf    JournalEntry? @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversalOfId  String?  @unique
+  reversedBy    JournalEntry? @relation("JournalReversal")
+  postedBy      String   @default("system")
+  createdAt     DateTime @default(now())
+  lines         JournalLine[]
+}
+
+model JournalLine {
+  id           String   @id @default(uuid())
+  entry        JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entryId      String
+  account      ChartOfAccount @relation(fields: [accountId], references: [id])
+  accountId    String
+  debit        Decimal  @default(0)
+  credit       Decimal  @default(0)
+  currencyCode String   @default("KES")
+  fxRate       Decimal  @default(1)
+  baseDebit    Decimal  @default(0)
+  baseCredit   Decimal  @default(0)
+  projectId    String?
+  unitId       String?
+  memo         String?
+
+  @@index([accountId])
+  @@index([projectId])
+}
+
+enum BankReconciliationStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model BankReconciliation {
+  id              String   @id @default(uuid())
+  bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id])
+  bankAccountId   String
+  statementDate   DateTime
+  statementBalance Decimal
+  systemBalance   Decimal
+  clearedJournalLineIds Json?
+  status          BankReconciliationStatus @default(IN_PROGRESS)
+  reconciledBy    String?
+  reconciledAt    DateTime?
+  createdAt       DateTime @default(now())
+}
+
+// -------------------- Accounts Receivable --------------------
+
+enum InvoiceSourceType {
+  SALES_CONTRACT
+  TENANCY
+  MANUAL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  OVERDUE
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  invoiceNumber String   @unique
+  customer      Customer @relation(fields: [customerId], references: [id])
+  customerId    String
+  sourceType    InvoiceSourceType
+  sourceId      String?
+  projectId     String?
+  journalEntryId String?
+  currency      String   @default("KES")
+  amount        Decimal
+  dueDate       DateTime
+  status        InvoiceStatus @default(DRAFT)
+  issuedAt      DateTime @default(now())
+  sentAt        DateTime?
+  cancelledAt   DateTime?
+  cancelledReason String?
+  cancelledBy   String?
+  createdBy     String   @default("system")
+  createdAt     DateTime @default(now())
+  lines         InvoiceLine[]
+  allocations   ReceiptAllocation[]
+  emailLogs     EmailLog[]
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  description String
+  amount      Decimal
+  glAccountId String?
+  taxRate     TaxRate? @relation(fields: [taxRateId], references: [id])
+  taxRateId   String?
+  taxAmount   Decimal  @default(0)
+}
+
+enum ReceiptStatus {
+  ACTIVE
+  CANCELLED
+  REFUNDED
+}
+
+model Receipt {
+  id             String   @id @default(uuid())
+  receiptNumber  String   @unique
+  customer       Customer @relation(fields: [customerId], references: [id])
+  customerId     String
+  amount         Decimal
+  currency       String   @default("KES")
+  paymentMethod  String
+  transactionReference String?
+  bankAccount    BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId  String?
+  status         ReceiptStatus @default(ACTIVE)
+  cancelledAt    DateTime?
+  cancelledReason String?
+  cancelledBy    String?
+  printedAt      DateTime?
+  printCount     Int      @default(0)
+  receivedAt     DateTime @default(now())
+  createdBy      String   @default("system")
+  journalEntryId String?
+  allocations    ReceiptAllocation[]
+  refunds        Refund[]
+}
+
+model ReceiptAllocation {
+  id              String   @id @default(uuid())
+  receipt         Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId       String
+  allocatedAmount Decimal
+  allocationType  String   @default("INSTALLMENT")
+  createdAt       DateTime @default(now())
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSED
+  REJECTED
+}
+
+model Refund {
+  id             String   @id @default(uuid())
+  receipt        Receipt  @relation(fields: [receiptId], references: [id])
+  receiptId      String
+  amount         Decimal
+  reason         String
+  method         String
+  bankAccount    BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId  String?
+  status         RefundStatus @default(PENDING)
+  requestedBy    String   @default("system")
+  processedBy    String?
+  processedAt    DateTime?
+  rejectedReason String?
+  journalEntryId String?
+  createdAt      DateTime @default(now())
+}
+
+enum EmailLogStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+model EmailLog {
+  id          String   @id @default(uuid())
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id])
+  invoiceId   String?
+  supplierInvoice SupplierInvoice? @relation(fields: [supplierInvoiceId], references: [id])
+  supplierInvoiceId String?
+  recipient   String
+  subject     String
+  status      EmailLogStatus @default(QUEUED)
+  errorMessage String?
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+}
+
+// -------------------- Accounts Payable --------------------
+
+model Supplier {
+  id           String   @id @default(uuid())
+  name         String
+  contactName  String?
+  email        String?
+  phone        String?
+  kraPin       String?
+  paymentTermsDays Int  @default(30)
+  isActive     Boolean  @default(true)
+  defaultWhtRate   TaxRate? @relation(fields: [defaultWhtRateId], references: [id])
+  defaultWhtRateId String?
+  createdAt    DateTime @default(now())
+  invoices     SupplierInvoice[]
+  payments     SupplierPayment[]
+  reconciliations SupplierStatementReconciliation[]
+}
+
+enum SupplierInvoiceStatus {
+  PENDING_APPROVAL
+  APPROVED
+  STAGED
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+model SupplierInvoice {
+  id             String   @id @default(uuid())
+  invoiceNumber  String
+  supplier       Supplier @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  invoiceDate    DateTime
+  dueDate        DateTime
+  currency       String   @default("KES")
+  amount         Decimal
+  status         SupplierInvoiceStatus @default(PENDING_APPROVAL)
+  projectId      String?
+  unitId         String?
+  glExpenseAccountId String?
+  taxRate        TaxRate? @relation(fields: [taxRateId], references: [id])
+  taxRateId      String?
+  taxAmount      Decimal  @default(0)
+  approvedBy     String?
+  approvedAt     DateTime?
+  createdBy      String   @default("system")
+  createdAt      DateTime @default(now())
+  attachments    SupplierInvoiceAttachment[]
+  payments       SupplierPaymentAllocation[]
+  emailLogs      EmailLog[]
+
+  @@unique([supplierId, invoiceNumber])
+}
+
+model SupplierInvoiceAttachment {
+  id            String   @id @default(uuid())
+  supplierInvoice SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id], onDelete: Cascade)
+  supplierInvoiceId String
+  fileName      String
+  url           String
+  objectKey     String?
+  uploadedAt    DateTime @default(now())
+  uploadedBy    String   @default("system")
+}
+
+enum SupplierPaymentStatus {
+  STAGED
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+model SupplierPayment {
+  id             String   @id @default(uuid())
+  paymentNumber  String   @unique
+  supplier       Supplier @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  bankAccountId  String?
+  whtRateId      String?
+  whtAmount      Decimal  @default(0)
+  amount         Decimal
+  currency       String   @default("KES")
+  status         SupplierPaymentStatus @default(STAGED)
+  stagedBy       String?
+  stagedAt       DateTime @default(now())
+  approvedBy     String?
+  approvedAt     DateTime?
+  paidAt         DateTime?
+  journalEntryId String?
+  allocations    SupplierPaymentAllocation[]
+}
+
+model SupplierPaymentAllocation {
+  id                String   @id @default(uuid())
+  payment           SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId         String
+  supplierInvoice   SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id])
+  supplierInvoiceId String
+  allocatedAmount   Decimal
+}
+
+enum ReconciliationStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model SupplierStatementReconciliation {
+  id              String   @id @default(uuid())
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  supplierId      String
+  periodStart     DateTime
+  periodEnd       DateTime
+  statementTotal  Decimal
+  systemTotal     Decimal
+  variance        Decimal  @default(0)
+  notes           String?
+  status          ReconciliationStatus @default(IN_PROGRESS)
+  reconciledBy    String?
+  reconciledAt    DateTime?
+  createdAt       DateTime @default(now())
+}
+
+// -------------------- Petty Cash --------------------
+
+model PettyCashBox {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  custodian    String
+  projectId    String?
+  currency     String   @default("KES")
+  floatAmount  Decimal  @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  vouchers     PettyCashVoucher[]
+  reconciliations PettyCashReconciliation[]
+}
+
+enum PettyCashVoucherType {
+  TOPUP
+  EXPENSE
+}
+
+enum PettyCashVoucherStatus {
+  DRAFT
+  APPROVED
+  VOID
+}
+
+model PettyCashVoucher {
+  id             String   @id @default(uuid())
+  voucherNumber  String   @unique
+  box            PettyCashBox @relation(fields: [boxId], references: [id])
+  boxId          String
+  type           PettyCashVoucherType
+  amount         Decimal
+  payee          String?
+  purpose        String
+  glAccountId    String?
+  receiptUrl     String?
+  status         PettyCashVoucherStatus @default(APPROVED)
+  printedAt      DateTime?
+  printCount     Int      @default(0)
+  journalEntryId String?
+  createdBy      String   @default("system")
+  createdAt      DateTime @default(now())
+}
+
+model PettyCashReconciliation {
+  id              String   @id @default(uuid())
+  box             PettyCashBox @relation(fields: [boxId], references: [id])
+  boxId           String
+  periodEnd       DateTime
+  expectedBalance Decimal
+  countedBalance  Decimal
+  variance        Decimal  @default(0)
+  notes           String?
+  reconciledBy    String?
+  reconciledAt    DateTime @default(now())
+}
+
+// -------------------- Fixed Assets --------------------
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+}
+
+enum FixedAssetStatus {
+  ACTIVE
+  DISPOSED
+  TRANSFERRED
+}
+
+model FixedAsset {
+  id                 String   @id @default(uuid())
+  assetCode          String   @unique
+  description        String
+  category           String
+  projectId          String?
+  blockId            String?
+  acquisitionDate    DateTime
+  acquisitionCost    Decimal
+  usefulLifeMonths   Int
+  depreciationMethod DepreciationMethod @default(STRAIGHT_LINE)
+  residualValue      Decimal  @default(0)
+  status             FixedAssetStatus @default(ACTIVE)
+  disposedAt         DateTime?
+  disposalProceeds   Decimal?
+  createdAt          DateTime @default(now())
+  depreciationSchedule AssetDepreciationSchedule[]
+  transfers          AssetTransfer[]
+}
+
+model AssetDepreciationSchedule {
+  id                    String   @id @default(uuid())
+  asset                 FixedAsset @relation(fields: [assetId], references: [id])
+  assetId               String
+  periodStart           DateTime
+  periodEnd             DateTime
+  depreciationAmount    Decimal
+  accumulatedDepreciation Decimal
+  netBookValue          Decimal
+  journalEntryId        String?
+  postedAt              DateTime @default(now())
+
+  @@unique([assetId, periodStart])
+}
+
+model AssetTransfer {
+  id             String   @id @default(uuid())
+  asset          FixedAsset @relation(fields: [assetId], references: [id])
+  assetId        String
+  fromProjectId  String?
+  toProjectId    String?
+  transferDate   DateTime @default(now())
+  reason         String?
+  transferredBy  String   @default("system")
+  journalEntryId String?
+}

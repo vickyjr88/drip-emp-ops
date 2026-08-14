@@ -1,0 +1,131 @@
+
+
+services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        # Next.js inlines NEXT_PUBLIC_* at build time, so these have to be build
+        # args. Setting them only at runtime leaves the browser bundle pointing at
+        # the localhost defaults and the deployed site cannot reach the API.
+        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3100}
+        # The site's own public origin, used for canonical URLs, Open Graph tags,
+        # sitemap.xml and robots.txt -- all of which are absolute. Left at the
+        # localhost default in production, every canonical would point at
+        # localhost and the site would effectively de-index itself.
+        - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3002}
+    ports:
+      - "3002:3002"
+    environment:
+      # Server-side rendering runs inside this container, where localhost is the
+      # web app itself. Server fetches must go to the backend service directly;
+      # the browser keeps using NEXT_PUBLIC_API_BASE_URL. Read at runtime, so it
+      # needs no rebuild to change.
+      - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://backend:3100}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3100:3100"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      # No default: auth falls back to a hardcoded dev key when this is unset,
+      # which would let anyone mint admin tokens against a deployed instance.
+      # Compose errors on an empty value, so a misconfigured host fails loudly.
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio}
+      - MINIO_PORT=${MINIO_PORT:-9000}
+      - MINIO_USE_SSL=${MINIO_USE_SSL:-false}
+      - MINIO_BUCKET=${MINIO_BUCKET:-project-media}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MEDIA_PUBLIC_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-}
+      - INQUIRY_FALLBACK_EMAIL=${INQUIRY_FALLBACK_EMAIL:-}
+      - ADMIN_SEED_EMAIL=${ADMIN_SEED_EMAIL:-}
+      - ADMIN_SEED_PASSWORD=${ADMIN_SEED_PASSWORD:-}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      # Africa's Talking. Blank key => reminder SMS is skipped and logged
+      # rather than failing the run, matching how Brevo behaves.
+      - AT_API_KEY=${AT_API_KEY:-}
+      - AT_USERNAME=${AT_USERNAME:-sandbox}
+      - AT_SENDER_ID=${AT_SENDER_ID:-}
+      # Set false on replicas so only one instance runs the scheduler.
+      - REMINDERS_ENABLED=${REMINDERS_ENABLED:-true}
+      - REMINDERS_CRON=${REMINDERS_CRON:-0 8 * * *}
+      - REMINDERS_TIMEZONE=${REMINDERS_TIMEZONE:-Africa/Nairobi}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # AOF so queued reminder jobs survive a restart rather than being lost.
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis-data:/data
+    ports:
+      - "16379:6379"
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "15432:5432"
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "19000:9000"
+      - "19001:9001"
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+volumes:
+  db-data:
+    driver: local
+  redis-data:
+    driver: local
+  minio-data:
+    driver: local

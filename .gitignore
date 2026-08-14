@@ -1,0 +1,11 @@
+**/node_modules/
+.env
+**/.env
+.DS_Store
+.prisma/
+**/dist/
+npm-debug.log
+stitch_realtor_landing_page/
+stitch_realtor_landing_page.zip
+**/.next/
+**/tsconfig.tsbuildinfo

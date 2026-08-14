@@ -1,0 +1,133 @@
+name: Deploy
+
+# Deploys to the Contabo VPS over SSH. Push-to-deploy on main, plus a manual
+# trigger for redeploying a chosen ref or replaying a failed run.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag to deploy
+        required: false
+        default: main
+      run_seed:
+        description: Insert DEMO data (projects, units, customers) - leave off for production
+        type: boolean
+        required: false
+        default: false
+
+# Never let two deploys touch the server at once; queue instead of cancelling,
+# since a half-applied migration is worse than a slow pipeline.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Build and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            web/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        # Puppeteer's Chromium is provided by the runtime image, not npm.
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: "true"
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Typecheck web
+        working-directory: web
+        run: npx tsc --noEmit
+
+      - name: Check tour anchors
+        working-directory: web
+        # Steps whose data-tour anchor has been renamed or deleted are skipped
+        # at runtime rather than crashing, so a broken tour degrades silently.
+        # This turns that into a build failure.
+        run: node app/portal/tours/check-anchors.mjs
+
+      - name: Build web
+        working-directory: web
+        # tsc alone does not catch everything `next build` does -- a bad import
+        # boundary, a server component using client-only APIs, a prerender that
+        # throws. Without this the failure lands on the VPS partway through a
+        # deploy instead of here, which is the whole point of the verify job.
+        # The NEXT_PUBLIC_* values only need to be well-formed: this build is
+        # thrown away, and the real one runs on the server with the real .env.
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:3100
+          NEXT_PUBLIC_SITE_URL: http://localhost:3002
+        run: npx next build
+
+  deploy:
+    name: Deploy to Contabo
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Open SSH connection
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CONTABO_SSH_KEY }}
+
+      - name: Trust host key
+        # Pinning the key fingerprint keeps the session from being silently
+        # redirected; StrictHostKeyChecking=no would accept any host.
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.CONTABO_SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Run deployment
+        env:
+          SSH_HOST: ${{ secrets.CONTABO_HOST }}
+          SSH_USER: ${{ secrets.CONTABO_USER }}
+          SSH_PORT: ${{ secrets.CONTABO_PORT || '22' }}
+          DEPLOY_PATH: ${{ secrets.CONTABO_DEPLOY_PATH }}
+          DEPLOY_REF: origin/${{ github.event.inputs.ref || 'main' }}
+          # Only ever true when explicitly requested via workflow_dispatch. On a
+          # push to main this input is empty, which must mean "no demo data".
+          RUN_SEED: ${{ github.event.inputs.run_seed == 'true' && 'true' || 'false' }}
+        run: |
+          # The script is run from the checkout already on the server, but it
+          # re-fetches and hard-resets itself to DEPLOY_REF as its first step,
+          # so the version that does the work is always the deployed one.
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "set -e; cd '$DEPLOY_PATH'; \
+             export DEPLOY_REF='$DEPLOY_REF' RUN_SEED='$RUN_SEED'; \
+             bash scripts/deploy.sh"
+
+      - name: Mark deployment complete
+        run: |
+          {
+            echo "### Deployment complete :rocket:"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo "| Ref | \`${{ github.event.inputs.ref || 'main' }}\` |"
+            echo "| Host | \`${{ secrets.CONTABO_HOST }}\` |"
+            echo "| Seeded | \`${{ github.event.inputs.run_seed == 'false' && 'no' || 'yes' }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

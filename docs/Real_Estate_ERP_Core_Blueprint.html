@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+    @page {
+        size: A4;
+        margin: 18mm 15mm 20mm 15mm;
+        @bottom-right {
+            content: "Page " counter(page) " of " counter(pages);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 8pt;
+            color: #718096;
+        }
+        @bottom-left {
+            content: "Real Estate ERP OS — Enterprise Pre-Development Specification";
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            font-size: 8pt;
+            color: #718096;
+        }
+    }
+
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        font-size: 9pt;
+        line-height: 1.45;
+        color: #2D3748;
+        background-color: #FFFFFF;
+        margin: 0;
+        padding: 0;
+    }
+
+    .header-banner {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        color: #FFFFFF;
+        padding: 20px 18px;
+        margin: -18mm -15mm 20px -15mm;
+        border-bottom: 4px solid #2563EB;
+    }
+
+    .header-banner h1 {
+        font-size: 18pt;
+        font-weight: 700;
+        margin: 0 0 4px 0;
+        letter-spacing: -0.5px;
+        color: #F8FAFC;
+    }
+
+    .header-banner .subtitle {
+        font-size: 10pt;
+        color: #94A3B8;
+        margin: 0 0 12px 0;
+        font-weight: 400;
+    }
+
+    .meta-grid {
+        display: table;
+        width: 100%;
+        font-size: 8pt;
+        color: #CBD5E1;
+        border-top: 1px solid #334155;
+        padding-top: 8px;
+    }
+
+    .meta-cell {
+        display: table-cell;
+        width: 33.33%;
+    }
+
+    .meta-label {
+        font-weight: 600;
+        color: #60A5FA;
+        text-transform: uppercase;
+        font-size: 7pt;
+        letter-spacing: 0.5px;
+    }
+
+    .doc-title-badge {
+        display: inline-block;
+        background-color: #EFF6FF;
+        color: #1E40AF;
+        font-weight: 700;
+        font-size: 8.5pt;
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid #BFDBFE;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 6px;
+    }
+
+    h1.section-header {
+        font-size: 14pt;
+        color: #0F172A;
+        border-bottom: 2px solid #0F172A;
+        padding-bottom: 4px;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        page-break-after: avoid;
+    }
+
+    h2 {
+        font-size: 11pt;
+        color: #1E293B;
+        border-left: 4px solid #2563EB;
+        padding-left: 8px;
+        margin-top: 16px;
+        margin-bottom: 8px;
+        page-break-after: avoid;
+    }
+
+    h3 {
+        font-size: 9.5pt;
+        color: #334155;
+        margin-top: 12px;
+        margin-bottom: 4px;
+        font-weight: 700;
+        page-break-after: avoid;
+    }
+
+    p {
+        margin-top: 0;
+        margin-bottom: 8px;
+        text-align: justify;
+    }
+
+    ul, ol {
+        margin-top: 0;
+        margin-bottom: 8px;
+        padding-left: 18px;
+    }
+
+    li {
+        margin-bottom: 3px;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        margin-bottom: 12px;
+        font-size: 8pt;
+        page-break-inside: auto;
+    }
+
+    tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+    }
+
+    th {
+        background-color: #0F172A;
+        color: #FFFFFF;
+        font-weight: 600;
+        text-align: left;
+        padding: 6px 8px;
+        border: 1px solid #0F172A;
+    }
+
+    td {
+        padding: 5px 8px;
+        border: 1px solid #E2E8F0;
+        vertical-align: top;
+    }
+
+    tr:nth-child(even) td {
+        background-color: #F8FAFC;
+    }
+
+    pre, code {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 7.5pt;
+    }
+
+    pre {
+        background-color: #0F172A;
+        color: #38BDF8;
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin-top: 6px;
+        margin-bottom: 10px;
+        border: 1px solid #1E293B;
+        page-break-inside: avoid;
+    }
+
+    .callout {
+        background-color: #F0FDF4;
+        border-left: 4px solid #16A34A;
+        padding: 8px 12px;
+        margin: 10px 0;
+        border-radius: 0 4px 4px 0;
+        font-size: 8.5pt;
+    }
+
+    .callout-title {
+        font-weight: bold;
+        color: #15803D;
+        margin-bottom: 3px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 2px 5px;
+        font-size: 7pt;
+        font-weight: 700;
+        border-radius: 3px;
+        text-transform: uppercase;
+    }
+
+    .badge-primary { background-color: #DBEAFE; color: #1E40AF; }
+    .badge-warning { background-color: #FEF3C7; color: #92400E; }
+
+    .tag {
+        font-family: monospace;
+        background-color: #E2E8F0;
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 7.5pt;
+        color: #0F172A;
+    }
+
+    .divider {
+        border-top: 2px dashed #CBD5E1;
+        margin: 24px 0;
+    }
+</style>
+</head>
+<body>
+
+<div class="header-banner">
+    <h1>REAL ESTATE ERP SYSTEM</h1>
+    <div class="subtitle">Complete Pre-Development Technical Blueprint Suite (Public Portal, Off-Plan, Sales & Leasing)</div>
+    <div class="meta-grid">
+        <div class="meta-cell">
+            <div class="meta-label">Author & Role</div>
+            <div>Chief Technology Officer</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Architecture Target</div>
+            <div>Decoupled Multi-Tenant ERP & Web Portal</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Document Version</div>
+            <div>Version 2.0.0-PROD (July 2026)</div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================================= -->
+<!-- DOCUMENT 1: SOFTWARE REQUIREMENTS SPECIFICATION (SRS) -->
+<!-- ========================================================================================= -->
+<div class="document-section">
+    <div class="doc-title-badge">Document 01</div>
+    <h1 class="section-header">Software Requirements Specification (SRS)</h1>
+
+    <h2>1. Executive Summary & System Scope</h2>
+    <p>
+        The Real Estate ERP System is an enterprise-grade multi-tenant platform managing off-plan sales (incomplete construction), completed property sales, long-term rentals/leasing, public-facing portal discovery, construction milestone tracking, customer CRM, and double-entry multi-currency general ledger accounting. The system provides atomic inventory protection against double booking and dynamic, metadata-driven administration.
+    </p>
+
+    <h2>2. User Roles & Access Control Framework</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Role Title</th>
+                <th>Responsibilities</th>
+                <th>System Scope</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>System Admin</strong></td>
+                <td>Global configuration, RBAC, tenant isolation, database recovery, audit inspection.</td>
+                <td>Full system operational access across all modules.</td>
+            </tr>
+            <tr>
+                <td><strong>Public Visitor</strong></td>
+                <td>Search listings, view interactive floor plans, reserve off-plan/complete units, apply for lease.</td>
+                <td>Public-facing web portal only.</td>
+            </tr>
+            <tr>
+                <td><strong>Sales Manager</strong></td>
+                <td>Manage sales teams, approve reservation overrides, unit transfers, contract cancellations.</td>
+                <td>CRM, Sales, Inventory, and Contract Lifecycle modules.</td>
+            </tr>
+            <tr>
+                <td><strong>Buyer / Tenant</strong></td>
+                <td>Track payment schedules, make online portal payments, download tax invoices and statements.</td>
+                <td>Customer Self-Service Portal.</td>
+            </tr>
+            <tr>
+                <td><strong>Project Manager</strong></td>
+                <td>Track construction milestones, update stage %, upload site photos and inspection logs.</td>
+                <td>Construction Management & Site Vault.</td>
+            </tr>
+            <tr>
+                <td><strong>Finance & Accounting</strong></td>
+                <td>General ledger, AR/AP, bank reconciliations, tax (VAT/WHT/Stamp Duty), fixed assets.</td>
+                <td>ERP Financial Core, Banking & Accounting.</td>
+            </tr>
+            <tr>
+                <td><strong>Petty Cash Custodian</strong></td>
+                <td>Manage local site operational floats, disburse petty cash, submit vouchers and receipts.</td>
+                <td>Dedicated Petty Cash sub-module.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>3. Comprehensive Functional Requirements</h2>
+    
+    <h3>3.1 Property & Project Configuration</h3>
+    <ul>
+        <li><strong>FR-PRJ-01 (Project & Phase Hierarchy):</strong> Create new projects structured into multiple blocks, phases, or master-planned plots. Completed projects can be archived in a read-only state without data deletion.</li>
+        <li><strong>FR-PRJ-02 (Unit Numbering & Bulk Import):</strong> Supports flexible unit numbering schemas (<span class="tag">Block/Floor/Unit/Plot</span>). Allows importing unit records via Excel (<span class="tag">.xlsx</span>) templates.</li>
+        <li><strong>FR-PRJ-03 (Multi-Currency Support):</strong> Stores unit pricing in dual base currencies (USD and KES) with live or locked contract-level exchange rates.</li>
+        <li><strong>FR-PRJ-04 (Rich Unit Metadata & Pricing Updates):</strong> Units store floor plans, site photos, unit size, parking slots, storage units, balconies, and status (<span class="tag">AVAILABLE</span>, <span class="tag">RESERVED</span>, <span class="tag">SOLD</span>, <span class="tag">RENTED</span>, <span class="tag">BLOCKED</span>). Selling prices can be revised with audit trail logs.</li>
+    </ul>
+
+    <h3>3.2 Customer (CRM) & Ownership Models</h3>
+    <ul>
+        <li><strong>FR-CRM-01 (Customer Vault):</strong> Stores personal details, uploaded national IDs, passports, KRA PIN certificates, executed agreements, and Next of Kin / Nominee details.</li>
+        <li><strong>FR-CRM-02 (Complex Ownership Patterns):</strong>
+            <ul>
+                <li><em>One-to-Many:</em> Single client can own or lease multiple units across different projects.</li>
+                <li><em>Many-to-One:</em> Single unit can be co-owned by multiple clients with specified share percentages.</li>
+            </ul>
+        </li>
+        <li><strong>FR-CRM-03 (Ownership Transfer):</strong> Transfer ownership from one client to another while maintaining complete historical ownership logs.</li>
+    </ul>
+
+    <h3>3.3 Sales, Off-Plan Reservations & Allocation</h3>
+    <ul>
+        <li><strong>FR-SAL-01 (Anti-Double Booking Engine):</strong> Atomic database row-level locking guarantees zero double bookings across the public website and back-office sales interface.</li>
+        <li><strong>FR-SAL-02 (Overrides & Release):</strong> Management users can override reservations or cancel bookings, which automatically returns units to <span class="tag">AVAILABLE</span> status.</li>
+        <li><strong>FR-SAL-03 (Payment Plans & Auto Contracts):</strong> Supports standard, milestone-driven (off-plan), or custom payment plans, and generates auto-filled sale contracts and offer letters.</li>
+    </ul>
+
+    <h3>3.4 Installments, Collections & Accounts Receivable</h3>
+    <ul>
+        <li><strong>FR-AR-01 (Dynamic Payment Schedules):</strong> Auto-generates installment schedules with manual editing or milestone-triggered due dates. Calculates outstanding balance and percentage paid.</li>
+        <li><strong>FR-AR-02 (Invoicing & Receipts):</strong> Supports bulk invoicing, automated PDF email invoices, partial payments, allocation to deposit vs. installment, receipt printing/reprinting/cancelling, and customer statements with AR aging reports.</li>
+    </ul>
+
+    <h3>3.5 Contract Lifecycle, Unit Swaps & Reallocations</h3>
+    <ul>
+        <li><strong>FR-CNT-01 (Unit Swaps / Transfers):</strong> Customers can switch units. Payments automatically transfer to the new unit, price differentials (refund or extra payment) are calculated, and the old unit is released back to available inventory.</li>
+        <li><strong>FR-CNT-02 (Sales Cancellations & Refunds):</strong> Calculates cancellation fees and net refunds. Refunds require strict approval flows and appear on customer statements.</li>
+        <li><strong>FR-CNT-03 (Payment Reallocation):</strong> Misassigned payments can be reallocated across customers, units, or invoices with an immutable audit trail.</li>
+    </ul>
+
+    <h3>3.6 Accounts Payable, Petty Cash & Construction Management</h3>
+    <ul>
+        <li><strong>FR-AP-01 (Accounts Payable):</strong> Attach supplier invoices, stage payments, reconcile supplier statements, and link expenses to specific projects/units.</li>
+        <li><strong>FR-PC-01 (Petty Cash):</strong> Dedicated multi-box petty cash module with float custodians, printable vouchers, receipt attachments, and reconciliation routines.</li>
+        <li><strong>FR-CON-01 (Construction Progress):</strong> Tracks off-plan construction stages, progress percentages, site photo uploads, and engineer inspection reports.</li>
+    </ul>
+
+    <h2>4. Security, Accounting & System Constraints</h2>
+    <ul>
+        <li><strong>Financial General Ledger:</strong> Double-entry bookkeeping with manual/reversing journals, multi-bank auto-reconciliation, fixed asset depreciation, period locking, and full tax engines (VAT, WHT, Stamp Duty).</li>
+        <li><strong>Security & Audit:</strong> Role-based access control (RBAC), project-level data isolation, 2FA authentication, immutable audit log, and soft-delete record recovery.</li>
+    </ul>
+</div>
+
+<div class="divider"></div>
+
+<!-- ========================================================================================= -->
+<!-- DOCUMENT 2: SOFTWARE DESIGN DOCUMENT (SDD) -->
+<!-- ========================================================================================= -->
+<div class="document-section">
+    <div class="doc-title-badge">Document 02</div>
+    <h1 class="section-header">Software Design Document (SDD)</h1>
+
+    <h2>1. Technical Stack & Cloud Architecture</h2>
+    <ul>
+        <li><strong>Frontend Framework:</strong> React 18+ (TypeScript), Vite, TailwindCSS, React Hook Form, Zod.</li>
+        <li><strong>Backend Framework:</strong> NestJS (Node.js/TypeScript) implementing modular domain-driven architecture.</li>
+        <li><strong>Database Layer:</strong> PostgreSQL 16+ featuring Row-Level Security (RLS) for tenant/project isolation.</li>
+        <li><strong>Caching & Queues:</strong> Redis Enterprise for session locks, listing caches, and BullMQ background job processing.</li>
+        <li><strong>Object Storage:</strong> AWS S3 (KMS Encrypted) for customer passports, PINs, vendor invoices, and site photos.</li>
+    </ul>
+
+    <h2>2. Database Schema (PostgreSQL DDL)</h2>
+<pre><code>-- 1. PROJECTS & UNITS
+CREATE TYPE unit_status_enum AS ENUM ('AVAILABLE', 'RESERVED', 'SOLD', 'RENTED', 'BLOCKED');
+
+CREATE TABLE projects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(30) UNIQUE NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    location VARCHAR(150),
+    is_archived BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE project_blocks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    block_name VARCHAR(50) NOT NULL,
+    total_floors INT NOT NULL
+);
+
+CREATE TABLE units (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    block_id UUID REFERENCES project_blocks(id) ON DELETE RESTRICT,
+    unit_number VARCHAR(30) NOT NULL,
+    floor_number INT NOT NULL,
+    size_sqm NUMERIC(10,2) NOT NULL,
+    price_kes NUMERIC(14,2) NOT NULL,
+    price_usd NUMERIC(14,2) NOT NULL,
+    status unit_status_enum DEFAULT 'AVAILABLE',
+    parking_slots INT DEFAULT 0,
+    has_balcony BOOLEAN DEFAULT FALSE,
+    has_store BOOLEAN DEFAULT FALSE,
+    floor_plan_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    version INT DEFAULT 1
+);
+
+-- 2. CRM & MULTI-OWNERSHIP
+CREATE TABLE customers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    national_id_passport VARCHAR(50) NOT NULL,
+    kra_pin VARCHAR(50),
+    next_of_kin_json JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE unit_ownership (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    unit_id UUID REFERENCES units(id) ON DELETE RESTRICT,
+    customer_id UUID REFERENCES customers(id) ON DELETE RESTRICT,
+    ownership_percentage NUMERIC(5,2) DEFAULT 100.00,
+    is_primary_owner BOOLEAN DEFAULT TRUE,
+    acquired_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    transferred_at TIMESTAMP WITH TIME ZONE
+);
+
+-- 3. CONTRACTS & REALLOCATIONS
+CREATE TABLE sales_contracts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    contract_number VARCHAR(50) UNIQUE NOT NULL,
+    unit_id UUID REFERENCES units(id) ON DELETE RESTRICT,
+    primary_customer_id UUID REFERENCES customers(id) ON DELETE RESTRICT,
+    currency VARCHAR(3) DEFAULT 'KES',
+    total_agreed_price NUMERIC(14,2) NOT NULL,
+    contract_status VARCHAR(30) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE customer_payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    receipt_number VARCHAR(50) UNIQUE NOT NULL,
+    contract_id UUID REFERENCES sales_contracts(id) ON DELETE RESTRICT,
+    amount_paid NUMERIC(14,2) NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    payment_method VARCHAR(30) NOT NULL,
+    transaction_reference VARCHAR(100) UNIQUE NOT NULL,
+    payment_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE payment_reallocations_audit (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    payment_id UUID REFERENCES customer_payments(id),
+    source_contract_id UUID,
+    destination_contract_id UUID,
+    reallocated_amount NUMERIC(14,2) NOT NULL,
+    reason TEXT NOT NULL,
+    reallocated_by UUID NOT NULL,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);</code></pre>
+
+    <h2>3. Unit Swap & Transactional Payment Transfer Engine</h2>
+<pre><code>// src/modules/sales/unit-transfer.service.ts
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
+import { SalesContract } from './entities/sales-contract.entity';
+import { Unit, UnitStatus } from '../inventory/entities/unit.entity';
+import { CustomerPayment } from '../finance/entities/customer-payment.entity';
+import { PaymentReallocationAudit } from '../finance/entities/reallocation-audit.entity';
+
+@Injectable()
+export class UnitTransferService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async executeUnitTransfer(
+    currentContractId: string,
+    targetUnitId: string,
+    requestedByUserId: string,
+    transferReason: string
+  ): Promise<{ newContractId: string; priceDifference: number }> {
+    return await this.dataSource.transaction(async (manager: EntityManager) => {
+      const currentContract = await manager.findOne(SalesContract, {
+        where: { id: currentContractId, contractStatus: 'ACTIVE' },
+        relations: ['unit', 'payments'],
+        lock: { mode: 'pessimistic_write' }
+      });
+
+      if (!currentContract) throw new BadRequestException('Active source contract not found.');
+
+      const targetUnit = await manager.findOne(Unit, {
+        where: { id: targetUnitId },
+        lock: { mode: 'pessimistic_write' }
+      });
+
+      if (!targetUnit || targetUnit.status !== UnitStatus.AVAILABLE) {
+        throw new BadRequestException('Target unit unavailable.');
+      }
+
+      const totalPaidOnOldUnit = currentContract.payments.reduce((sum, p) => sum + Number(p.amountPaid), 0);
+      const priceDifference = Number(targetUnit.priceKes) - Number(currentContract.totalAgreedPrice);
+
+      // Release old unit & reserve new unit
+      currentContract.unit.status = UnitStatus.AVAILABLE;
+      await manager.save(Unit, currentContract.unit);
+
+      targetUnit.status = UnitStatus.SOLD;
+      await manager.save(Unit, targetUnit);
+
+      // Create new contract & transfer payments
+      currentContract.contractStatus = 'SWAPPED';
+      await manager.save(SalesContract, currentContract);
+
+      const newContract = manager.create(SalesContract, {
+        contractNumber: `${currentContract.contractNumber}-SWAP`,
+        unit: targetUnit,
+        primaryCustomer: currentContract.primaryCustomer,
+        currency: currentContract.currency,
+        totalAgreedPrice: targetUnit.priceKes,
+        contractStatus: 'ACTIVE'
+      });
+      const savedNewContract = await manager.save(SalesContract, newContract);
+
+      for (const payment of currentContract.payments) {
+        payment.contract = savedNewContract;
+        await manager.save(CustomerPayment, payment);
+
+        const audit = manager.create(PaymentReallocationAudit, {
+          payment: payment,
+          sourceContractId: currentContract.id,
+          destinationContractId: savedNewContract.id,
+          reallocatedAmount: payment.amountPaid,
+          reason: `Automated Unit Swap: ${transferReason}`,
+          reallocatedBy: requestedByUserId
+        });
+        await manager.save(PaymentReallocationAudit, audit);
+      }
+
+      return { newContractId: savedNewContract.id, priceDifference };
+    });
+  }
+}</code></pre>
+</div>
+
+<div class="divider"></div>
+
+<!-- ========================================================================================= -->
+<!-- DOCUMENT 3: PROJECT PLAN & STATEMENT OF WORK (SOW) -->
+<!-- ========================================================================================= -->
+<div class="document-section">
+    <div class="doc-title-badge">Document 03</div>
+    <h1 class="section-header">Project Plan & Statement of Work (SOW)</h1>
+
+    <h2>1. 12-Week Milestone Delivery Roadmap</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Milestone</th>
+                <th>Phase Title</th>
+                <th>Timeline</th>
+                <th>Core Scope & Key Deliverables</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>M1</strong></td>
+                <td>Architecture & Multi-Currency GL</td>
+                <td>Weeks 1–2</td>
+                <td>PostgreSQL database schema, multi-tenant RLS, auth 2FA, multi-currency GL backbone.</td>
+            </tr>
+            <tr>
+                <td><strong>M2</strong></td>
+                <td>Public Portal & Inventory Engine</td>
+                <td>Weeks 3–4</td>
+                <td>Public website search, unit detail maps, row-level database locks for anti-double booking.</td>
+            </tr>
+            <tr>
+                <td><strong>M3</strong></td>
+                <td>Off-Plan Sales & Customer Portal</td>
+                <td>Weeks 5–6</td>
+                <td>CRM vault, milestone payment schedule generator, buyer self-service portal.</td>
+            </tr>
+            <tr>
+                <td><strong>M4</strong></td>
+                <td>AR/AP, Invoicing & Petty Cash</td>
+                <td>Weeks 7–8</td>
+                <td>Bulk invoicing, automated receipting, supplier invoice staging, multi-box petty cash module.</td>
+            </tr>
+            <tr>
+                <td><strong>M5</strong></td>
+                <td>Contract Lifecycle & Construction</td>
+                <td>Weeks 9–10</td>
+                <td>Unit swap engine, cancellation/refund approval workflow, construction milestone tracker.</td>
+            </tr>
+            <tr>
+                <td><strong>M6</strong></td>
+                <td>Reporting, Data Migration & Go-Live</td>
+                <td>Weeks 11–12</td>
+                <td>Financial P&L / Balance Sheet reports, Excel historical data import, penetration test, production launch.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2>2. Resource Allocation & Budget Projection</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Role Title</th>
+                <th>Headcount / Allocation</th>
+                <th>Weekly Rate</th>
+                <th>Total Investment (12 Wks)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Chief Technology Officer / Lead Architect</td>
+                <td>1 FTE (100%)</td>
+                <td>$3,500 / week</td>
+                <td>$42,000</td>
+            </tr>
+            <tr>
+                <td>Senior Backend Engineers (NestJS/PostgreSQL)</td>
+                <td>2 FTE (100%)</td>
+                <td>$2,800 / engineer / wk</td>
+                <td>$67,200</td>
+            </tr>
+            <tr>
+                <td>Senior Frontend Engineers (React/TS)</td>
+                <td>2 FTE (100%)</td>
+                <td>$2,800 / engineer / wk</td>
+                <td>$67,200</td>
+            </tr>
+            <tr>
+                <td>QA Automation & Security Engineer</td>
+                <td>1 FTE (100%)</td>
+                <td>$2,000 / week</td>
+                <td>$24,000</td>
+            </tr>
+            <tr>
+                <td>DevOps & Cloud Engineer</td>
+                <td>1 FTE (100%)</td>
+                <td>$2,200 / week</td>
+                <td>$26,400</td>
+            </tr>
+            <tr>
+                <td>Cloud Infrastructure & Security Audit</td>
+                <td>AWS & Security Vendor</td>
+                <td>Flat allocation</td>
+                <td>$13,200</td>
+            </tr>
+            <tr style="font-weight: bold; background-color: #E2E8F0;">
+                <td colspan="3" style="text-align: right;">TOTAL ESTIMATED INVESTMENT:</td>
+                <td>$240,000 USD</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

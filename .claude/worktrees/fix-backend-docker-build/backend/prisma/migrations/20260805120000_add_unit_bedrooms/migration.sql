@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Unit" ADD COLUMN "bedrooms" INTEGER NOT NULL DEFAULT 0;

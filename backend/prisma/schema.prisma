@@ -1,0 +1,1521 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+
+
+
+
+
+
+
+
+
+/// Which GL account money of a given kind should land in.
+///
+/// Restored after the property strip removed it as "unused": receipts and
+/// supplier payments resolve their account through this, so dropping it took
+/// the routing with it. RENT and UTILITIES are gone; SALES now means goods.
+enum AccountPurpose {
+  SALES
+  SUPPLIER_PAYMENTS
+  TAX_REMITTANCE
+  GENERAL
+}
+
+/// A place goods are sold from: a shop, a warehouse, an online channel.
+///
+/// This is the dimension the ledger tags against. It replaces the project the
+/// accounting stack was built around, so per-store profit and loss, expenses
+/// and stock all fall out of machinery that already exists.
+model Store {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  location    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  journalLines     JournalLine[]
+  invoices         Invoice[]
+  supplierInvoices SupplierInvoice[]
+  bankAccounts     BankAccount[]
+  pettyCashBoxes   PettyCashBox[]
+  fixedAssets      FixedAsset[]
+  taxRemittances   TaxRemittance[]
+  reminderRules    ReminderRule[]
+  payslips         Payslip[]
+  employees        Employee[]
+
+  stockLevels    StockLevel[]
+  stockMovements StockMovement[]
+  orders         Order[]
+  accountAssignments StoreAccountAssignment[]
+}
+
+model Customer {
+  id                  String                 @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String                 @unique
+  phone               String
+  nationalIdPassport  String
+  kraPin              String?
+  nextOfKinJson       Json?
+  /// Bcrypt hash for the customer-facing portal. Null means no portal access
+  /// has been granted yet; staff set it explicitly.
+  portalPassword      String?
+  /// Lets staff revoke portal access without destroying the credential.
+  portalEnabled       Boolean                @default(false)
+  portalLastLoginAt   DateTime?
+  createdAt           DateTime               @default(now())
+  documents           CustomerDocument[]
+  invoices            Invoice[]
+  receipts            Receipt[]
+  orders              Order[]
+}
+
+model CustomerDocument {
+  id           String               @id @default(uuid())
+  customer     Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId   String
+  documentType CustomerDocumentType
+  fileName     String
+  objectKey    String
+  url          String
+  contentType  String?
+  fileSize     Int?
+  notes        String?
+  uploadedAt   DateTime             @default(now())
+}
+
+enum CustomerDocumentType {
+  NATIONAL_ID
+  PASSPORT
+  KRA_PIN
+  PROOF_OF_ADDRESS
+  BANK_STATEMENT
+  SALE_CONTRACT
+  LEASE_AGREEMENT
+  NEXT_OF_KIN_ID
+  PHOTO
+  OTHER
+}
+
+
+
+
+
+enum RentalPaymentCategory {
+  RENT
+  WATER
+  ELECTRICITY
+  GARBAGE
+  SECURITY
+  INTERNET
+  PARKING
+  SERVICE_CHARGE
+  OTHER
+}
+
+
+
+
+
+
+
+
+model User {
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  password            String
+  name                String
+  role                String?
+  createdAt           DateTime   @default(now())
+  roles               UserRole[]
+  employee            Employee?
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  action      String
+  subject     String
+  key         String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+
+  @@unique([subject, action])
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  assignedAt   DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+// ============================================================
+// ACCOUNTING MODULE
+// ============================================================
+
+model Currency {
+  code          String         @id
+  name          String
+  isBase        Boolean        @default(false)
+  symbol        String?
+  createdAt     DateTime       @default(now())
+  exchangeRates ExchangeRate[]
+}
+
+model ExchangeRate {
+  id            String   @id @default(uuid())
+  currency      Currency @relation(fields: [currencyCode], references: [code])
+  currencyCode  String
+  rateToBase    Decimal
+  effectiveDate DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([currencyCode, effectiveDate])
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+model ChartOfAccount {
+  id             String           @id @default(uuid())
+  code           String           @unique
+  name           String
+  type           AccountType
+  subtype        String?
+  parent         ChartOfAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  parentId       String?
+  children       ChartOfAccount[] @relation("AccountHierarchy")
+  isSystem       Boolean          @default(false)
+  isActive       Boolean          @default(true)
+  description    String?
+  createdAt      DateTime         @default(now())
+  journalLines   JournalLine[]
+  bankAccounts   BankAccount[]
+  taxRates       TaxRate[]
+}
+
+enum BankAccountType {
+  BANK
+  MOBILE_MONEY
+}
+
+enum TaxApplication {
+  OUTPUT
+  INPUT
+  WITHHOLDING
+}
+
+model TaxRate {
+  id                      String            @id @default(uuid())
+  name                    String
+  code                    String            @unique
+  rate                    Decimal
+  appliesTo               TaxApplication
+  glAccount               ChartOfAccount    @relation(fields: [glAccountId], references: [id])
+  glAccountId             String
+  isActive                Boolean           @default(true)
+  createdAt               DateTime          @default(now())
+  invoiceLines            InvoiceLine[]
+  supplierInvoices        SupplierInvoice[]
+  suppliersDefaultingHere Supplier[]
+  remittances             TaxRemittance[]
+}
+
+model TaxRemittance {
+  id               String       @id @default(uuid())
+  remittanceNumber String       @unique
+  taxRate          TaxRate      @relation(fields: [taxRateId], references: [id])
+  taxRateId        String
+  bankAccount      BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId    String?
+  amount           Decimal
+  periodStart      DateTime
+  periodEnd        DateTime
+  reference        String?
+  remittedBy       String       @default("system")
+  remittedAt       DateTime     @default(now())
+  journalEntryId   String?
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+model BankAccount {
+  id                 String                     @id @default(uuid())
+  type               BankAccountType            @default(BANK)
+  name               String
+  accountNumber      String
+  bankName           String
+  branch             String?
+  currencyCode       String                     @default("KES")
+  glAccount          ChartOfAccount             @relation(fields: [glAccountId], references: [id])
+  glAccountId        String                     @unique
+  isActive           Boolean                    @default(true)
+  createdAt          DateTime                   @default(now())
+  reconciliations    BankReconciliation[]
+  transfersOut       AccountTransfer[]          @relation("TransferFrom")
+  transfersIn        AccountTransfer[]          @relation("TransferTo")
+  taxRemittances     TaxRemittance[]
+  receipts           Receipt[]
+  refunds            Refund[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+  purposeAssignments StoreAccountAssignment[]
+}
+
+
+model AccountTransfer {
+  id             String      @id @default(uuid())
+  transferNumber String      @unique
+  fromAccount    BankAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  fromAccountId  String
+  toAccount      BankAccount @relation("TransferTo", fields: [toAccountId], references: [id])
+  toAccountId    String
+  amount         Decimal
+  currency       String      @default("KES")
+  transferDate   DateTime    @default(now())
+  memo           String?
+  journalEntryId String?
+  createdBy      String      @default("system")
+  createdAt      DateTime    @default(now())
+}
+
+enum JournalSource {
+  MANUAL
+  AR
+  AP
+  PETTY_CASH
+  DEPRECIATION
+  BANK_RECON
+  ASSET_TRANSFER
+  ACCOUNT_TRANSFER
+  TAX_REMITTANCE
+}
+
+enum JournalStatus {
+  POSTED
+  REVERSED
+}
+
+model JournalEntry {
+  id           String        @id @default(uuid())
+  entryNumber  String        @unique
+  entryDate    DateTime      @default(now())
+  memo         String?
+  source       JournalSource @default(MANUAL)
+  sourceId     String?
+  status       JournalStatus @default(POSTED)
+  reversalOf   JournalEntry? @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversalOfId String?       @unique
+  reversedBy   JournalEntry? @relation("JournalReversal")
+  postedBy     String        @default("system")
+  createdAt    DateTime      @default(now())
+  lines        JournalLine[]
+}
+
+model JournalLine {
+  id           String         @id @default(uuid())
+  entry        JournalEntry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entryId      String
+  account      ChartOfAccount @relation(fields: [accountId], references: [id])
+  accountId    String
+  debit        Decimal        @default(0)
+  credit       Decimal        @default(0)
+  currencyCode String         @default("KES")
+  fxRate       Decimal        @default(1)
+  baseDebit    Decimal        @default(0)
+  baseCredit   Decimal        @default(0)
+  /// Attributes a line to a supplier. Not a relation to SupplierInvoice: spend
+  /// is often paid directly without an invoice, and still needs to show on the
+  /// supplier's account.
+  supplier     Supplier?      @relation(fields: [supplierId], references: [id])
+  supplierId   String?
+  memo         String?
+
+  @@index([accountId])
+  @@index([supplierId])
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+enum BankReconciliationStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model BankReconciliation {
+  id                    String                   @id @default(uuid())
+  bankAccount           BankAccount              @relation(fields: [bankAccountId], references: [id])
+  bankAccountId         String
+  statementDate         DateTime
+  statementBalance      Decimal
+  systemBalance         Decimal
+  clearedJournalLineIds Json?
+  status                BankReconciliationStatus @default(IN_PROGRESS)
+  reconciledBy          String?
+  reconciledAt          DateTime?
+  createdAt             DateTime                 @default(now())
+}
+
+// -------------------- Accounts Receivable --------------------
+
+enum InvoiceSourceType {
+  ORDER
+  MANUAL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  OVERDUE
+}
+
+model Invoice {
+  id              String              @id @default(uuid())
+  invoiceNumber   String              @unique
+  customer        Customer            @relation(fields: [customerId], references: [id])
+  customerId      String
+  sourceType      InvoiceSourceType
+  sourceId        String?
+  journalEntryId  String?
+  currency        String              @default("KES")
+  amount          Decimal
+  dueDate         DateTime
+  status          InvoiceStatus       @default(DRAFT)
+  issuedAt        DateTime            @default(now())
+  sentAt          DateTime?
+  cancelledAt     DateTime?
+  cancelledReason String?
+  cancelledBy     String?
+  createdBy       String              @default("system")
+  createdAt       DateTime            @default(now())
+  lines           InvoiceLine[]
+  allocations     ReceiptAllocation[]
+  emailLogs       EmailLog[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  description String
+  amount      Decimal
+  glAccountId String?
+  taxRate     TaxRate? @relation(fields: [taxRateId], references: [id])
+  taxRateId   String?
+  taxAmount   Decimal  @default(0)
+}
+
+enum ReceiptStatus {
+  ACTIVE
+  CANCELLED
+  REFUNDED
+}
+
+model Receipt {
+  id                   String              @id @default(uuid())
+  receiptNumber        String              @unique
+  customer             Customer            @relation(fields: [customerId], references: [id])
+  customerId           String
+  amount               Decimal
+  currency             String              @default("KES")
+  paymentMethod        String
+  transactionReference String?
+  bankAccount          BankAccount?        @relation(fields: [bankAccountId], references: [id])
+  bankAccountId        String?
+  status               ReceiptStatus       @default(ACTIVE)
+  cancelledAt          DateTime?
+  cancelledReason      String?
+  cancelledBy          String?
+  printedAt            DateTime?
+  printCount           Int                 @default(0)
+  receivedAt           DateTime            @default(now())
+  createdBy            String              @default("system")
+  journalEntryId       String?
+  allocations          ReceiptAllocation[]
+  refunds              Refund[]
+}
+
+model ReceiptAllocation {
+  id              String   @id @default(uuid())
+  receipt         Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId       String
+  allocatedAmount Decimal
+  allocationType  String   @default("INSTALLMENT")
+  createdAt       DateTime @default(now())
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSED
+  REJECTED
+}
+
+model Refund {
+  id             String       @id @default(uuid())
+  receipt        Receipt      @relation(fields: [receiptId], references: [id])
+  receiptId      String
+  amount         Decimal
+  reason         String
+  method         String
+  bankAccount    BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId  String?
+  status         RefundStatus @default(PENDING)
+  requestedBy    String       @default("system")
+  processedBy    String?
+  processedAt    DateTime?
+  rejectedReason String?
+  journalEntryId String?
+  createdAt      DateTime     @default(now())
+}
+
+enum EmailLogStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+model EmailLog {
+  id                String           @id @default(uuid())
+  invoice           Invoice?         @relation(fields: [invoiceId], references: [id])
+  invoiceId         String?
+  supplierInvoice   SupplierInvoice? @relation(fields: [supplierInvoiceId], references: [id])
+  supplierInvoiceId String?
+  recipient         String
+  subject           String
+  status            EmailLogStatus   @default(QUEUED)
+  errorMessage      String?
+  sentAt            DateTime?
+  createdAt         DateTime         @default(now())
+}
+
+// -------------------- Inquiries --------------------
+
+
+// -------------------- Accounts Payable --------------------
+
+model Supplier {
+  id               String                            @id @default(uuid())
+  name             String
+  contactName      String?
+  email            String?
+  phone            String?
+  kraPin           String?
+  paymentTermsDays Int                               @default(30)
+  isActive         Boolean                           @default(true)
+  defaultWhtRate   TaxRate?                          @relation(fields: [defaultWhtRateId], references: [id])
+  defaultWhtRateId String?
+  createdAt        DateTime                          @default(now())
+  invoices         SupplierInvoice[]
+  payments         SupplierPayment[]
+  reconciliations  SupplierStatementReconciliation[]
+  journalLines     JournalLine[]
+}
+
+enum SupplierInvoiceStatus {
+  PENDING_APPROVAL
+  APPROVED
+  STAGED
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+model SupplierInvoice {
+  id                 String                      @id @default(uuid())
+  invoiceNumber      String
+  supplier           Supplier                    @relation(fields: [supplierId], references: [id])
+  supplierId         String
+  invoiceDate        DateTime
+  dueDate            DateTime
+  currency           String                      @default("KES")
+  amount             Decimal
+  status             SupplierInvoiceStatus       @default(PENDING_APPROVAL)
+  glExpenseAccountId String?
+  taxRate            TaxRate?                    @relation(fields: [taxRateId], references: [id])
+  taxRateId          String?
+  taxAmount          Decimal                     @default(0)
+  approvedBy         String?
+  approvedAt         DateTime?
+  createdBy          String                      @default("system")
+  createdAt          DateTime                    @default(now())
+  attachments        SupplierInvoiceAttachment[]
+  payments           SupplierPaymentAllocation[]
+  emailLogs          EmailLog[]
+
+  @@unique([supplierId, invoiceNumber])
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+model SupplierInvoiceAttachment {
+  id                String          @id @default(uuid())
+  supplierInvoice   SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id], onDelete: Cascade)
+  supplierInvoiceId String
+  fileName          String
+  url               String
+  objectKey         String?
+  uploadedAt        DateTime        @default(now())
+  uploadedBy        String          @default("system")
+}
+
+enum SupplierPaymentStatus {
+  STAGED
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+model SupplierPayment {
+  id             String                      @id @default(uuid())
+  paymentNumber  String                      @unique
+  supplier       Supplier                    @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  bankAccountId  String?
+  whtRateId      String?
+  whtAmount      Decimal                     @default(0)
+  amount         Decimal
+  currency       String                      @default("KES")
+  status         SupplierPaymentStatus       @default(STAGED)
+  stagedBy       String?
+  stagedAt       DateTime                    @default(now())
+  approvedBy     String?
+  approvedAt     DateTime?
+  paidAt         DateTime?
+  journalEntryId String?
+  allocations    SupplierPaymentAllocation[]
+}
+
+model SupplierPaymentAllocation {
+  id                String          @id @default(uuid())
+  payment           SupplierPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  paymentId         String
+  supplierInvoice   SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id])
+  supplierInvoiceId String
+  allocatedAmount   Decimal
+}
+
+enum ReconciliationStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+model SupplierStatementReconciliation {
+  id             String               @id @default(uuid())
+  supplier       Supplier             @relation(fields: [supplierId], references: [id])
+  supplierId     String
+  periodStart    DateTime
+  periodEnd      DateTime
+  statementTotal Decimal
+  systemTotal    Decimal
+  variance       Decimal              @default(0)
+  notes          String?
+  status         ReconciliationStatus @default(IN_PROGRESS)
+  reconciledBy   String?
+  reconciledAt   DateTime?
+  createdAt      DateTime             @default(now())
+}
+
+// -------------------- Petty Cash --------------------
+
+model PettyCashBox {
+  id              String                    @id @default(uuid())
+  name            String                    @unique
+  custodian       String
+  currency        String                    @default("KES")
+  floatAmount     Decimal                   @default(0)
+  isActive        Boolean                   @default(true)
+  createdAt       DateTime                  @default(now())
+  vouchers        PettyCashVoucher[]
+  reconciliations PettyCashReconciliation[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+enum PettyCashVoucherType {
+  TOPUP
+  EXPENSE
+}
+
+enum PettyCashVoucherStatus {
+  DRAFT
+  APPROVED
+  VOID
+}
+
+model PettyCashVoucher {
+  id             String                 @id @default(uuid())
+  voucherNumber  String                 @unique
+  box            PettyCashBox           @relation(fields: [boxId], references: [id])
+  boxId          String
+  type           PettyCashVoucherType
+  amount         Decimal
+  payee          String?
+  purpose        String
+  glAccountId    String?
+  receiptUrl     String?
+  status         PettyCashVoucherStatus @default(APPROVED)
+  printedAt      DateTime?
+  printCount     Int                    @default(0)
+  journalEntryId String?
+  createdBy      String                 @default("system")
+  createdAt      DateTime               @default(now())
+}
+
+model PettyCashReconciliation {
+  id              String       @id @default(uuid())
+  box             PettyCashBox @relation(fields: [boxId], references: [id])
+  boxId           String
+  periodEnd       DateTime
+  expectedBalance Decimal
+  countedBalance  Decimal
+  variance        Decimal      @default(0)
+  notes           String?
+  reconciledBy    String?
+  reconciledAt    DateTime     @default(now())
+}
+
+// -------------------- Fixed Assets --------------------
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+}
+
+enum FixedAssetStatus {
+  ACTIVE
+  DISPOSED
+  TRANSFERRED
+}
+
+model FixedAsset {
+  id                   String                      @id @default(uuid())
+  assetCode            String                      @unique
+  description          String
+  category             String
+  acquisitionDate      DateTime
+  acquisitionCost      Decimal
+  usefulLifeMonths     Int
+  depreciationMethod   DepreciationMethod          @default(STRAIGHT_LINE)
+  residualValue        Decimal                     @default(0)
+  status               FixedAssetStatus            @default(ACTIVE)
+  disposedAt           DateTime?
+  disposalProceeds     Decimal?
+  createdAt            DateTime                    @default(now())
+  depreciationSchedule AssetDepreciationSchedule[]
+  transfers            AssetTransfer[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+model AssetDepreciationSchedule {
+  id                      String     @id @default(uuid())
+  asset                   FixedAsset @relation(fields: [assetId], references: [id])
+  assetId                 String
+  periodStart             DateTime
+  periodEnd               DateTime
+  depreciationAmount      Decimal
+  accumulatedDepreciation Decimal
+  netBookValue            Decimal
+  journalEntryId          String?
+  postedAt                DateTime   @default(now())
+
+  @@unique([assetId, periodStart])
+}
+
+model AssetTransfer {
+  id             String     @id @default(uuid())
+  asset          FixedAsset @relation(fields: [assetId], references: [id])
+  assetId        String
+  fromProjectId  String?
+  toProjectId    String?
+  transferDate   DateTime   @default(now())
+  reason         String?
+  transferredBy  String     @default("system")
+  journalEntryId String?
+}
+
+
+/// Editable copy for a public marketing page, keyed by URL slug.
+///
+/// `content` is JSON rather than columns because each page has a different
+/// shape (the About page has a heritage timeline, Services has cards) and those
+/// shapes change with design work. The frontend validates the shape it needs
+/// and falls back to built-in defaults, so a partial or stale document renders
+/// the original copy instead of an empty page.
+model PageContent {
+  slug      String   @id
+  content   Json
+  updatedBy String   @default("system")
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+// --- Reminder engine ---------------------------------------------------------
+
+/// What a reminder rule watches. Each maps to a different way of working out
+/// what is owed and when.
+enum ReminderTargetType {
+  /// PaymentScheduleInstallment rows on a sales contract.
+  SALES_INSTALLMENT
+  /// Monthly rent derived from Tenancy.rentDueDay.
+  RENT
+  /// Recurring utility charges attached to a tenancy.
+  UTILITY
+  /// Any open Invoice, whatever raised it.
+  INVOICE
+}
+
+enum ReminderChannel {
+  SMS
+  EMAIL
+  BOTH
+}
+
+/// When a reminder fires relative to the due date.
+enum ReminderTiming {
+  /// N days before the due date, sent whether or not payment has been made.
+  BEFORE_DUE
+  /// N days after the due date, only while the amount is still outstanding.
+  AFTER_DUE_IF_UNPAID
+  /// On the due date itself.
+  ON_DUE_DATE
+}
+
+enum ReminderDispatchStatus {
+  PENDING
+  SENT
+  FAILED
+  /// Suppressed before sending: quiet hours, missing contact details, or the
+  /// charge was settled between scheduling and delivery.
+  SKIPPED
+}
+
+/// A configurable reminder: "SMS and email the buyer 15 days before each
+/// installment", "SMS the tenant 3 days after rent was due if still unpaid".
+///
+/// Rules are data rather than code so the business can add, retime or disable
+/// them without a deploy. `offsetDays` combined with `timing` covers the whole
+/// space of before/on/after schedules, and several rules on the same target
+/// give the 15/10/5-day ladders the business asked for.
+model ReminderRule {
+  id          String             @id @default(uuid())
+  name        String
+  description String?
+  targetType  ReminderTargetType
+  timing      ReminderTiming
+  /// Days from the due date. Always positive; `timing` gives it direction.
+  offsetDays  Int                @default(0)
+  channel     ReminderChannel    @default(BOTH)
+  isActive    Boolean            @default(true)
+
+  /// Optional narrowing. Null means the rule applies everywhere.
+  /// Only for UTILITY rules; null means every utility category.
+  utilityCategory RentalPaymentCategory?
+
+  /// Message bodies. Support {{customerName}}, {{amount}}, {{dueDate}},
+  /// {{daysUntilDue}}, {{daysOverdue}}, {{unitNumber}}, {{projectName}},
+  /// {{description}} and {{reference}}.
+  smsTemplate     String?
+  emailSubject    String?
+  emailTemplate   String?
+
+  /// Sends outside this window are held to the next run rather than waking
+  /// someone at 3am. Null means no restriction.
+  quietHoursStart Int?
+  quietHoursEnd   Int?
+
+  createdBy String   @default("system")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  logs      ReminderLog[]
+
+  @@index([targetType, isActive])
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+/// One delivery attempt. Doubles as the dedupe key: the unique constraint
+/// stops a rule firing twice for the same charge on the same day, however many
+/// times the scheduler runs or someone hits the manual trigger.
+model ReminderLog {
+  id       String       @id @default(uuid())
+  rule     ReminderRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  ruleId   String?
+
+  targetType ReminderTargetType
+  /// Id of the installment, tenancy or invoice this concerns.
+  targetId   String
+  /// The due date this reminder was about, normalised to midnight. Part of the
+  /// dedupe key so a monthly rent charge is distinct each period.
+  dueDate    DateTime
+
+  customerId String?
+  channel    ReminderChannel
+  recipientPhone String?
+  recipientEmail String?
+  smsBody    String?
+  emailSubject String?
+  emailBody  String?
+
+  status       ReminderDispatchStatus @default(PENDING)
+  /// Populated on SKIPPED and FAILED so the portal can explain what happened.
+  statusReason String?
+  /// True when a human pressed send rather than the scheduler.
+  isManual     Boolean @default(false)
+  triggeredBy  String?
+
+  amount     Decimal?
+  currency   String?
+  attempts   Int      @default(0)
+  sentAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@unique([ruleId, targetType, targetId, dueDate])
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// A recurring non-rent charge on a tenancy: water, garbage, service charge.
+/// Amounts live here rather than on RentalPayment so the engine knows what is
+/// expected each period, not just what was paid.
+enum DeductionKind {
+  /// Progressive bands, e.g. PAYE.
+  GRADUATED
+  /// Flat percentage of the basis, e.g. Housing Levy, SHIF.
+  PERCENTAGE
+  /// Tiered contribution with its own bounds, e.g. NSSF.
+  TIERED
+  /// A flat amount regardless of pay.
+  FIXED
+}
+
+/// What a deduction is calculated on.
+enum DeductionBasis {
+  GROSS
+  /// Gross less deductions marked as reducing taxable pay, e.g. PAYE after
+  /// NSSF and Housing Levy relief.
+  TAXABLE
+  BASIC
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+/// A statutory or voluntary deduction, versioned by the date it takes effect.
+///
+/// Rates are data rather than code because they change with each Finance Act.
+/// A new version is added with a later effectiveFrom; older payslips keep
+/// calculating against the version that was in force when they were run, so
+/// history stays reproducible.
+model DeductionRule {
+  id              String         @id @default(uuid())
+  code            String
+  name            String
+  kind            DeductionKind
+  basis           DeductionBasis @default(GROSS)
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  /// Flat rate for PERCENTAGE, or the amount for FIXED.
+  rate            Decimal?
+  fixedAmount     Decimal?
+  /// Bands for GRADUATED and TIERED kinds.
+  bands           DeductionBand[]
+  /// Monthly relief subtracted after the bands, e.g. PAYE personal relief.
+  reliefAmount    Decimal?
+  /// Employer's matching contribution, where one applies.
+  employerRate    Decimal?
+  employerFixed   Decimal?
+  /// Whether this reduces pay before TAXABLE-basis deductions are worked out.
+  reducesTaxable  Boolean        @default(false)
+  /// Liability account the deduction is credited to.
+  liabilityAccountCode String
+  /// Employer cost account, when the employer also contributes.
+  employerExpenseAccountCode String?
+  isStatutory     Boolean        @default(true)
+  isActive        Boolean        @default(true)
+  notes           String?
+  createdBy       String         @default("system")
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  lines           PayslipLine[]
+
+  @@unique([code, effectiveFrom])
+  @@index([code])
+  @@index([effectiveFrom])
+}
+
+/// One band of a graduated or tiered deduction.
+model DeductionBand {
+  id         String        @id @default(uuid())
+  rule       DeductionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  ruleId     String
+  sequence   Int
+  /// Lower bound, inclusive.
+  lowerBound Decimal       @default(0)
+  /// Upper bound, inclusive. Null means no ceiling.
+  upperBound Decimal?
+  rate       Decimal
+  /// Caps the contribution from this band, used by tiered schemes.
+  maxAmount  Decimal?
+
+  @@index([ruleId])
+}
+
+model PayrollRun {
+  id            String           @id @default(uuid())
+  runNumber     String           @unique
+  /// The month being paid, stored as the first of that month.
+  periodMonth   DateTime
+  periodLabel   String
+  status        PayrollRunStatus @default(DRAFT)
+  /// Date the rules are resolved against, so a re-run is reproducible.
+  ruleDate      DateTime
+  grossTotal    Decimal          @default(0)
+  deductionTotal Decimal         @default(0)
+  employerCostTotal Decimal      @default(0)
+  netTotal      Decimal          @default(0)
+  employeeCount Int              @default(0)
+  notes         String?
+  approvedBy    String?
+  approvedAt    DateTime?
+  paidAt        DateTime?
+  journalEntryId String?
+  createdBy     String           @default("system")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  payslips      Payslip[]
+
+  @@index([status])
+  @@index([periodMonth])
+}
+
+model Payslip {
+  id            String        @id @default(uuid())
+  run           PayrollRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId         String
+  employee      Employee      @relation(fields: [employeeId], references: [id])
+  employeeId    String
+  /// Snapshot of the employee at the time of the run, so a later change of
+  /// name or rate does not rewrite a payslip already issued.
+  employeeName  String
+  employeeNumber String
+  basicPay      Decimal       @default(0)
+  allowances    Decimal       @default(0)
+  overtime      Decimal       @default(0)
+  bonus         Decimal       @default(0)
+  grossPay      Decimal       @default(0)
+  taxablePay    Decimal       @default(0)
+  totalDeductions Decimal     @default(0)
+  employerCost  Decimal       @default(0)
+  netPay        Decimal       @default(0)
+  /// Days worked, for daily-rated staff.
+  daysWorked    Decimal?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  lines         PayslipLine[]
+
+  @@unique([runId, employeeId])
+  @@index([employeeId])
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+/// One deduction as applied to one payslip, with the figures it was based on.
+model PayslipLine {
+  id          String         @id @default(uuid())
+  payslip     Payslip        @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  payslipId   String
+  rule        DeductionRule? @relation(fields: [ruleId], references: [id])
+  ruleId      String?
+  code        String
+  name        String
+  /// Amount the calculation was applied to, kept so a payslip can be explained.
+  basisAmount Decimal        @default(0)
+  amount      Decimal        @default(0)
+  employerAmount Decimal     @default(0)
+  liabilityAccountCode String?
+
+  @@index([payslipId])
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum PayType {
+  MONTHLY
+  DAILY
+}
+
+enum ContractType {
+  PERMANENT
+  FIXED_TERM
+  CASUAL
+  INTERN
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A member of staff.
+///
+/// Separate from User: most staff never sign in, and those who do have an
+/// account for a different reason. The optional link lets the two be joined
+/// where both exist.
+model Employee {
+  id               String       @id @default(uuid())
+  employeeNumber   String       @unique
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  nationalId       String?
+  kraPin           String?
+  nssfNumber       String?
+  shifNumber       String?
+  jobTitle         String?
+  department       String?
+  /// Where this person's cost belongs. Null means shared across projects.
+  contractType     ContractType @default(PERMANENT)
+  payType          PayType      @default(MONTHLY)
+  /// Monthly salary, or the daily rate when payType is DAILY.
+  payRate          Decimal      @default(0)
+  currency         String       @default("KES")
+  bankName         String?
+  bankAccountNumber String?
+  startDate        DateTime
+  endDate          DateTime?
+  status           EmployeeStatus @default(ACTIVE)
+  /// Set when this person also signs in to the portal.
+  user             User?        @relation(fields: [userId], references: [id])
+  userId           String?      @unique
+  notes            String?
+  createdBy        String       @default("system")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  leaveRequests    LeaveRequest[]
+  leaveBalances    LeaveBalance[]
+  payslips         Payslip[]
+
+  @@index([status])
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?  @relation(fields: [storeId], references: [id])
+  storeId   String?
+}
+
+/// A category of leave and how much of it staff are entitled to each year.
+model LeaveType {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  code          String   @unique
+  /// Days granted for a full leave year.
+  annualDays    Decimal  @default(0)
+  /// Whether unused days survive the year end.
+  carriesOver   Boolean  @default(false)
+  /// Cap on days carried into the next year, when carriesOver is true.
+  maxCarryOver  Decimal?
+  /// Unpaid types are tracked for records but cost nothing.
+  isPaid        Boolean  @default(true)
+  /// Casual staff typically accrue nothing; this excludes them.
+  accruesForCasual Boolean @default(false)
+  description   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  requests      LeaveRequest[]
+  balances      LeaveBalance[]
+}
+
+/// One employee's entitlement and usage for a leave type in a given year.
+///
+/// Stored rather than derived: entitlement is pro-rated from the start date at
+/// the moment it is opened, and carry-over is a decision taken once at year
+/// end. Recomputing either later would silently rewrite history.
+model LeaveBalance {
+  id            String    @id @default(uuid())
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId    String
+  leaveType     LeaveType @relation(fields: [leaveTypeId], references: [id])
+  leaveTypeId   String
+  year          Int
+  /// Days for the year, already pro-rated for a mid-year start.
+  entitledDays  Decimal   @default(0)
+  /// Days brought forward from the previous year.
+  broughtForward Decimal  @default(0)
+  /// Days consumed by approved requests.
+  takenDays     Decimal   @default(0)
+  /// Manual correction, positive or negative, with a reason.
+  adjustmentDays Decimal  @default(0)
+  adjustmentNote String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([employeeId])
+}
+
+model LeaveRequest {
+  id            String             @id @default(uuid())
+  employee      Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId    String
+  leaveType     LeaveType          @relation(fields: [leaveTypeId], references: [id])
+  leaveTypeId   String
+  startDate     DateTime
+  endDate       DateTime
+  /// Working days requested, excluding weekends. Stored because the figure is
+  /// what the balance was decremented by.
+  days          Decimal
+  reason        String?
+  status        LeaveRequestStatus @default(PENDING)
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  reviewNote    String?
+  createdBy     String             @default("system")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate])
+}
+
+
+
+
+enum AuditActorType {
+  STAFF
+  CUSTOMER
+  ANONYMOUS
+  SYSTEM
+}
+
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+}
+
+/// System-wide record of who changed what.
+///
+/// Written by an interceptor around every mutating request, so a new feature
+/// is covered the moment its controller exists. Deliberately standalone with
+/// no foreign keys: an audit row must survive deletion of the actor or the
+/// record it describes, which a cascade would otherwise erase.
+model AuditLog {
+  id           String         @id @default(uuid())
+  actorType    AuditActorType @default(ANONYMOUS)
+  /// User.id or Customer.id. Not a relation, so the trail outlives the actor.
+  actorId      String?
+  actorEmail   String?
+  actorName    String?
+  /// CREATE / UPDATE / DELETE, derived from the HTTP verb.
+  action       String
+  /// Kebab-case resource, e.g. "tax-rate", taken from the route.
+  resource     String
+  resourceId   String?
+  method       String
+  path         String
+  statusCode   Int?
+  outcome      AuditOutcome   @default(SUCCESS)
+  /// Request body with sensitive fields redacted, never raw.
+  requestBody  Json?
+  errorMessage String?
+  ipAddress    String?
+  userAgent    String?
+  durationMs   Int?
+  createdAt    DateTime       @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([resource, resourceId])
+  @@index([actorType])
+  @@index([outcome])
+}
+
+// ---------------------------------------------------------------------------
+// Commerce
+// ---------------------------------------------------------------------------
+
+/// Maps a purpose to a GL account, optionally per store, so a shop can post
+/// its sales somewhere different from head office.
+model StoreAccountAssignment {
+  id        String         @id @default(uuid())
+  store     Store?         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String?
+  purpose       AccountPurpose
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  bankAccountId String
+  createdAt     DateTime    @default(now())
+
+  @@unique([storeId, purpose])
+}
+
+/// What is sold. A product is the thing a customer recognises -- "Air Max 90",
+/// "Sony WH-1000XM5" -- while what is actually picked, priced and counted is a
+/// variant of it.
+model Product {
+  id          String   @id @default(uuid())
+  sku         String   @unique
+  name        String
+  slug        String   @unique
+  description String?
+  brand       String?
+  category    ProductCategory? @relation(fields: [categoryId], references: [id])
+  categoryId  String?
+  /// Gallery; the first is used where a single image is needed.
+  imageUrls   Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants ProductVariant[]
+
+  @@index([categoryId])
+}
+
+/// Self-nesting so "Footwear > Running" needs no second model.
+model ProductCategory {
+  id          String            @id @default(uuid())
+  name        String
+  slug        String            @unique
+  description String?
+  parent      ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  parentId    String?
+  children    ProductCategory[] @relation("CategoryTree")
+  products    Product[]
+  createdAt   DateTime          @default(now())
+}
+
+/// The sellable unit: a size, a colour, a capacity.
+///
+/// Price lives here rather than on the product because a 256GB phone and a
+/// 512GB one are the same product at different prices, and shoes in one size
+/// can outsell another to the point of being discounted separately.
+model ProductVariant {
+  id          String   @id @default(uuid())
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+  sku         String   @unique
+  name        String
+  /// Free-form so footwear can carry size and colour while electronics carry
+  /// capacity, without a column per attribute.
+  attributes  Json?
+  priceKes    Decimal
+  /// What it cost to buy, for margin. Not shown to customers.
+  costKes     Decimal?
+  barcode     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stock      StockLevel[]
+  orderLines OrderLine[]
+  movements  StockMovement[]
+
+  @@index([productId])
+}
+
+/// Stock of one variant at one store. Quantity is derived from movements but
+/// kept here too, because a list of a hundred products should not have to sum
+/// a movement history per row.
+model StockLevel {
+  id        String         @id @default(uuid())
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variantId String
+  store     Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  quantity  Int            @default(0)
+  /// Held by unpaid orders: sellable is quantity minus this.
+  reserved  Int            @default(0)
+  /// Below this, the variant shows as needing a reorder.
+  reorderAt Int            @default(0)
+  updatedAt DateTime       @updatedAt
+
+  @@unique([variantId, storeId])
+  @@index([storeId])
+}
+
+/// Every change to stock, and why. An audit trail rather than a running total:
+/// "we are twelve short" is only answerable if each movement was recorded.
+model StockMovement {
+  id        String            @id @default(uuid())
+  variant   ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variantId String
+  store     Store             @relation(fields: [storeId], references: [id])
+  storeId   String
+  type      StockMovementType
+  /// Negative for anything leaving the store.
+  quantity  Int
+  reference String?
+  notes     String?
+  createdBy String            @default("system")
+  createdAt DateTime          @default(now())
+
+  @@index([variantId, storeId])
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  RETURN
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  DAMAGE
+}
+
+/// A customer order. Money owed and money paid are tracked separately so a
+/// part-paid order is a normal state rather than an edge case.
+model Order {
+  id          String      @id @default(uuid())
+  orderNumber String      @unique
+  customer    Customer?   @relation(fields: [customerId], references: [id])
+  customerId  String?
+  store       Store       @relation(fields: [storeId], references: [id])
+  storeId     String
+  status      OrderStatus @default(PENDING)
+  channel     String      @default("IN_STORE")
+
+  subtotal    Decimal  @default(0)
+  discount    Decimal  @default(0)
+  taxAmount   Decimal  @default(0)
+  shipping    Decimal  @default(0)
+  total       Decimal  @default(0)
+  amountPaid  Decimal  @default(0)
+  currency    String   @default("KES")
+
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+  shippingAddress String?
+  notes         String?
+
+  placedAt   DateTime  @default(now())
+  fulfilledAt DateTime?
+  cancelledAt DateTime?
+  createdBy  String    @default("system")
+
+  lines    OrderLine[]
+  payments OrderPayment[]
+
+  @@index([customerId])
+  @@index([storeId])
+  @@index([status])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+/// A line copies name and price at the time of sale. The variant may be
+/// renamed or repriced later, and an old order must still show what was
+/// actually bought and charged.
+model OrderLine {
+  id          String         @id @default(uuid())
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  variantId   String
+  description String
+  quantity    Int
+  unitPrice   Decimal
+  discount    Decimal        @default(0)
+  lineTotal   Decimal
+
+  @@index([orderId])
+}
+
+/// Money against an order. Several are allowed: a deposit now, the balance on
+/// collection, or a split between cash and M-Pesa.
+model OrderPayment {
+  id         String   @id @default(uuid())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  amount     Decimal
+  method     String
+  reference  String?
+  receivedAt DateTime @default(now())
+  receivedBy String   @default("system")
+  /// Set once posted to the ledger, so a payment is never double-counted.
+  journalEntryId String?
+
+  @@index([orderId])
+}
