@@ -39,7 +39,15 @@ export class StorefrontService {
       name: product.name,
       brand: product.brand,
       description: product.description,
-      imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : [],
+      // Featured first, so the chosen image leads the gallery and the share
+      // card without duplicating it further down.
+      imageUrls: (() => {
+        const all: string[] = Array.isArray(product.imageUrls) ? product.imageUrls : [];
+        const featured = product.featuredImageUrl;
+        return featured && all.includes(featured)
+          ? [featured, ...all.filter((url: string) => url !== featured)]
+          : all;
+      })(),
       category: product.category ? { name: product.category.name, slug: product.category.slug } : null,
       variants,
       priceFrom: prices.length ? Math.min(...prices) : 0,

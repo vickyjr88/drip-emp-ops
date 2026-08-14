@@ -92,6 +92,11 @@ export class CreateProductDto {
   @IsString({ each: true })
   imageUrls?: string[];
 
+  @ApiPropertyOptional({ description: 'The image shown on cards and shares. Defaults to the first.' })
+  @IsOptional()
+  @IsString()
+  featuredImageUrl?: string;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

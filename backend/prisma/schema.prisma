@@ -1338,8 +1338,12 @@ model Product {
   brand       String?
   category    ProductCategory? @relation(fields: [categoryId], references: [id])
   categoryId  String?
-  /// Gallery; the first is used where a single image is needed.
+  /// Every image, in display order.
   imageUrls   Json?
+  /// The one shown on a card, a search result and a share preview. Held
+  /// explicitly rather than taken as imageUrls[0], so removing an image cannot
+  /// silently promote a different one to the front of the shop.
+  featuredImageUrl String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

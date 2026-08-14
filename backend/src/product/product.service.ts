@@ -54,12 +54,15 @@ export class ProductService {
   }
 
   async create(dto: CreateProductDto) {
-    const { variants, slug, imageUrls, ...rest } = dto;
+    const { variants, slug, imageUrls, featuredImageUrl, ...rest } = dto;
     return this.prisma.product.create({
       data: {
         ...rest,
         slug: await this.uniqueSlug(slug || dto.name),
         imageUrls: (imageUrls ?? undefined) as Prisma.InputJsonValue | undefined,
+        // Falls back to the first image, so a product is never left with a
+        // gallery and nothing chosen to represent it.
+        featuredImageUrl: featuredImageUrl || imageUrls?.[0],
         ...(variants?.length
           ? { variants: { create: variants.map((variant) => this.variantData(variant)) } }
           : {}),
@@ -119,8 +122,16 @@ export class ProductService {
   }
 
   async update(id: string, dto: UpdateProductDto) {
-    await this.findOne(id);
-    const { slug, imageUrls, ...rest } = dto;
+    const current = await this.findOne(id);
+    const { slug, imageUrls, featuredImageUrl, ...rest } = dto;
+
+    // The featured image has to be one the product actually has. Removing the
+    // featured image would otherwise leave a pointer at a deleted file, and
+    // the shop would render a broken card.
+    const gallery = imageUrls ?? ((current.imageUrls as string[] | null) ?? []);
+    const wanted = featuredImageUrl ?? current.featuredImageUrl ?? undefined;
+    const resolvedFeatured =
+      wanted && gallery.includes(wanted) ? wanted : gallery[0] ?? null;
     return this.prisma.product.update({
       where: { id },
       data: {
@@ -128,6 +139,9 @@ export class ProductService {
         ...(slug ? { slug: await this.uniqueSlug(slug, id) } : {}),
         ...(imageUrls !== undefined
           ? { imageUrls: imageUrls as Prisma.InputJsonValue }
+          : {}),
+        ...(imageUrls !== undefined || featuredImageUrl !== undefined
+          ? { featuredImageUrl: resolvedFeatured }
           : {}),
       },
       include: INCLUDE,

@@ -9,7 +9,7 @@
  */
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ListPager, ListSearch, useListControls } from '../components/list-controls';
@@ -20,7 +20,7 @@ import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatMoney,
-  hasPermission, loadProfile, roleLabelFor,
+  hasPermission, loadProfile, roleLabelFor, uploadMedia,
 } from '../accounting/lib';
 
 type Variant = {
@@ -31,7 +31,7 @@ type Variant = {
 
 type Product = {
   id: string; sku: string; name: string; slug: string; brand?: string | null;
-  imageUrls?: string[] | null; isActive: boolean;
+  imageUrls?: string[] | null; featuredImageUrl?: string | null; isActive: boolean;
   category?: { id: string; name: string } | null;
   variants: Variant[];
 };
@@ -57,6 +57,12 @@ export default function CataloguePage() {
   const [price, setPrice] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Managing images on a product that already exists, which is most of them:
+  // the create form only ever covered new ones.
+  const [imageFor, setImageFor] = useState<Product | null>(null);
+  const [editPickerOpen, setEditPickerOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
@@ -135,6 +141,36 @@ export default function CataloguePage() {
       setErrorMessage(error);
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Writes the gallery back, optionally changing which image is featured. */
+  async function saveImages(product: Product, urls: string[], featured?: string) {
+    if (!token) return;
+    try {
+      await apiRequest(`/products/${product.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ imageUrls: urls, ...(featured ? { featuredImageUrl: featured } : {}) }),
+      }, token);
+      setImageFor((prev) => (prev && prev.id === product.id ? { ...prev, imageUrls: urls } : prev));
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  }
+
+  async function onUploadImages(product: Product, files: FileList | null) {
+    if (!token || !files?.length) return;
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(Array.from(files).map((file) => uploadMedia(file, token)));
+      const urls = uploaded.map((item) => item.url).filter(Boolean);
+      await saveImages(product, [...(product.imageUrls || []), ...urls]);
+      setFeedback(`${urls.length} image(s) added to ${product.name}.`);
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -338,7 +374,7 @@ export default function CataloguePage() {
                   controls.visible.map((product) => (
                     <div key={product.id} className="portal-record">
                       <div className="portal-list-row has-thumb">
-                        <ListThumb sources={[product.imageUrls?.[0]]} label={product.name} />
+                        <ListThumb sources={[product.featuredImageUrl, product.imageUrls?.[0]]} label={product.name} />
                         <div>
                           <strong>
                             {product.name}
@@ -362,6 +398,17 @@ export default function CataloguePage() {
                             {expanded === product.id ? 'Hide Sizes' : 'Sizes'}
                           </button>
                           {canUpdate ? (
+                            <button
+                              type="button"
+                              className="portal-inline-btn"
+                              onClick={() => setImageFor(imageFor?.id === product.id ? null : product)}
+                            >
+                              {product.imageUrls?.length
+                                ? `Images (${product.imageUrls.length})`
+                                : 'Add Images'}
+                            </button>
+                          ) : null}
+                          {canUpdate ? (
                             <button type="button" className="portal-inline-btn" onClick={() => void onToggle(product)}>
                               {product.isActive ? 'Deactivate' : 'Reactivate'}
                             </button>
@@ -373,6 +420,110 @@ export default function CataloguePage() {
                           ) : null}
                         </div>
                       </div>
+
+                      {imageFor?.id === product.id ? (
+                        <div className="portal-media-section">
+                          <div className="portal-card-header-row">
+                            <div>
+                              <h3 style={{ margin: 0 }}>Images</h3>
+                              <p className="portal-muted" style={{ margin: '4px 0 0' }}>
+                                Mark one as featured — that is the image shoppers see on a card,
+                                in search results and when the link is shared.
+                              </p>
+                            </div>
+                            <div className="portal-inline-actions">
+                              <button
+                                type="button"
+                                className="portal-inline-btn"
+                                disabled={uploading}
+                                onClick={() => fileInputRef.current?.click()}
+                              >
+                                {uploading ? 'Uploading...' : 'Upload'}
+                              </button>
+                              <button
+                                type="button"
+                                className="portal-inline-btn"
+                                onClick={() => setEditPickerOpen(true)}
+                              >
+                                Choose Existing
+                              </button>
+                            </div>
+                          </div>
+
+                          {product.imageUrls?.length ? (
+                            <div className="portal-project-gallery-grid" style={{ marginTop: 12 }}>
+                              {product.imageUrls.map((url, index) => (
+                                <div
+                                  key={`${url}-${index}`}
+                                  className={`portal-project-gallery-item${
+                                    (product.featuredImageUrl || product.imageUrls?.[0]) === url ? ' is-featured' : ''
+                                  }`}
+                                >
+                                  <img src={url} alt="" className="portal-project-gallery-thumb" />
+                                  <div className="portal-gallery-item-actions">
+                                    {(product.featuredImageUrl || product.imageUrls?.[0]) === url ? (
+                                      <span className="portal-featured-badge">Featured</span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="portal-inline-btn"
+                                        onClick={() =>
+                                          void saveImages(product, product.imageUrls || [], url)
+                                        }
+                                      >
+                                        Make Featured
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="portal-inline-btn is-danger"
+                                      onClick={() =>
+                                        void saveImages(
+                                          product,
+                                          (product.imageUrls || []).filter((item) => item !== url),
+                                        )
+                                      }
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="portal-empty-state" style={{ marginTop: 12 }}>
+                              No images yet. A product without a photo is the one shoppers scroll past.
+                            </div>
+                          )}
+
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            hidden
+                            onChange={(event) => {
+                              void onUploadImages(product, event.target.files);
+                              event.target.value = '';
+                            }}
+                          />
+                          <ImagePicker
+                            open={editPickerOpen}
+                            token={token}
+                            multiple
+                            onClose={() => setEditPickerOpen(false)}
+                            onSelect={(urls) => {
+                              const existing = product.imageUrls || [];
+                              void saveImages(product, [
+                                ...existing,
+                                ...urls.filter((url) => !existing.includes(url)),
+                              ]);
+                            }}
+                            usedUrls={product.imageUrls || []}
+                            title={`Images for ${product.name}`}
+                          />
+                        </div>
+                      ) : null}
 
                       {expanded === product.id ? (
                         <div className="portal-table-wrap">
