@@ -9322,7 +9322,10 @@ img {
   --de-muted: #6b7280;
   --de-line: #e3e1dc;
   --de-paper: #faf9f7;
-  /* One accent, reserved for the WhatsApp action. */
+  /* The brand blue. 6.26:1 on white, so it carries text as well as fills. */
+  --de-royal: #3457c9;
+  /* WhatsApp keeps its own green: the button is recognised by that colour,
+     and repainting it in the brand blue would cost more than it gains. */
   --de-go: #0f7a40;
   padding-bottom: 84px;
 }
@@ -9411,12 +9414,12 @@ img {
 }
 
 .de-chip:hover {
-  border-color: var(--de-ink);
+  border-color: var(--de-royal);
 }
 
 .de-chip.is-on {
-  background: var(--de-ink);
-  border-color: var(--de-ink);
+  background: var(--de-royal);
+  border-color: var(--de-royal);
   color: #fff;
 }
 
@@ -9576,13 +9579,20 @@ img {
 .de-card-sizes em {
   font-style: normal;
   border: 1px solid var(--de-line);
-  padding: 2px 6px;
-  font-size: 0.78rem;
+  padding: 2px 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--de-ink);
 }
 
+.de-card-sizes small {
+  font-size: 0.75rem;
+  color: var(--de-muted);
+}
+
 .de-card-sizes.is-none {
-  color: #a33;
+  color: var(--de-royal);
+  font-weight: 600;
 }
 
 .de-empty {
@@ -9649,7 +9659,7 @@ img {
 }
 
 .de-gallery-thumbs button.is-on {
-  border-color: var(--de-ink);
+  border-color: var(--de-royal);
 }
 
 .de-gallery-thumbs img {
@@ -9703,7 +9713,7 @@ img {
 
 .de-sizes-head em {
   font-style: normal;
-  color: #a33;
+  color: var(--de-royal);
 }
 
 .de-size-buttons {
@@ -9726,12 +9736,12 @@ img {
 }
 
 .de-size:hover:not(:disabled) {
-  border-color: var(--de-ink);
+  border-color: var(--de-royal);
 }
 
 .de-size.is-on {
-  background: var(--de-ink);
-  border-color: var(--de-ink);
+  background: var(--de-royal);
+  border-color: var(--de-royal);
   color: #fff;
 }
 

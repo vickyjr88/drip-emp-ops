@@ -20,6 +20,23 @@ import {
   ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts, priceLabel,
 } from '../lib/shop';
 
+/**
+ * "36–44" from a list of sizes, or a single size when only one is left.
+ *
+ * Sorted numerically because "EUR 39" sorts before "EUR 7" as text, and a
+ * range built from a text sort would be wrong.
+ */
+function sizeRange(sizes: string[]) {
+  const numbers = sizes
+    .map((size) => parseInt(size.replace(/\D/g, ''), 10))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (!numbers.length) return '';
+  const low = numbers[0];
+  const high = numbers[numbers.length - 1];
+  return low === high ? String(low) : `${low}–${high}`;
+}
+
 export function ShopClient() {
   const router = useRouter();
   const params = useSearchParams();
@@ -195,14 +212,16 @@ export function ShopClient() {
                   <h2><Link href={`/shop/${product.slug}`}>{product.name}</Link></h2>
                   <p className="de-card-price">{priceLabel(product)}</p>
 
-                  {/* Sizes on the card, so a shopper never opens a product to
-                      discover their size is not carried. */}
+                  {/* A range rather than every size: a full 36-46 run would be
+                      eleven chips per card and unreadable at a glance. The
+                      product page carries the exact grid. */}
                   {product.sizesInStock.length ? (
                     <p className="de-card-sizes">
-                      <span>Sizes</span>
-                      {product.sizesInStock.map((item) => (
-                        <em key={item}>{item.replace('EUR ', '')}</em>
-                      ))}
+                      <span>EUR</span>
+                      <em>{sizeRange(product.sizesInStock)}</em>
+                      {product.sizesInStock.length > 1 ? (
+                        <small>{product.sizesInStock.length} sizes</small>
+                      ) : null}
                     </p>
                   ) : (
                     <p className="de-card-sizes is-none">Out of stock — ask us</p>
