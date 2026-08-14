@@ -1,5 +1,5 @@
 /**
- * The neighbourhoods the firm covers, matching dirirrealtors.com/areas.
+ * The neighbourhoods the firm covers, matching dripemporium.store/areas.
  *
  * Deliberately shaped like SERVICES in ./services.ts: a typed list with a
  * stable anchor, a short nav label and the body content, shared by the areas

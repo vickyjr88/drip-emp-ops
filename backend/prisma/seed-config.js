@@ -319,7 +319,7 @@ async function seedCurrencies() {
  * grantable without a manual step.
  */
 async function seedRbac(options = {}) {
-  const email = process.env.ADMIN_SEED_EMAIL || 'admin@dirrir.com';
+  const email = process.env.ADMIN_SEED_EMAIL || 'admin@dripemporium.store';
   const password = process.env.ADMIN_SEED_PASSWORD || 'Admin@123';
   const force = process.env.ADMIN_SEED_FORCE === 'true' || options.force === true;
 
@@ -349,13 +349,13 @@ async function seedRbac(options = {}) {
   const admin = await prisma.user.upsert({
     where: { email },
     update: {
-      name: 'Dirrir Administrator',
+      name: 'Drip Emporium Administrator',
       role: 'ADMIN',
       password: await bcrypt.hash(password, 10),
     },
     create: {
       email,
-      name: 'Dirrir Administrator',
+      name: 'Drip Emporium Administrator',
       role: 'ADMIN',
       password: await bcrypt.hash(password, 10),
     },

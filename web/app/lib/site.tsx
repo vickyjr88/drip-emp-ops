@@ -19,7 +19,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3
   '',
 );
 
-export const SITE_NAME = 'Dirrir Realtors';
+export const SITE_NAME = 'Drip Emporium';
 
 export const SITE_DESCRIPTION =
   'Property sales, rentals and portfolio management in Nairobi. Browse available apartments, ' +
@@ -54,7 +54,7 @@ export function organizationSchema() {
 /**
  * Renders a JSON-LD block.
  *
- * Structured data is what lets an assistant answer "what does Dirrir Realtors
+ * Structured data is what lets an assistant answer "what does Drip Emporium
  * sell and where" without parsing prose, and what a search engine reads for
  * rich results. dangerouslySetInnerHTML is the documented way to emit it --
  * React would otherwise escape the JSON into unusable text.

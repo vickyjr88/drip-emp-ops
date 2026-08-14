@@ -158,7 +158,7 @@ export class ReminderEngineService {
       daysUntilDue: String(Math.max(delta, 0)),
       daysOverdue: String(Math.max(-delta, 0)),
       unitNumber: target.unitNumber ?? '',
-      projectName: target.projectName ?? 'Dirrir Realtors',
+      projectName: target.projectName ?? 'Drip Emporium',
       description: target.description,
       reference: target.reference ?? '',
     };

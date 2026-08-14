@@ -8,8 +8,8 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/contact',
     title: 'Contact Us',
     description:
-      'Get in touch with Dirrir Realtors about a property, a viewing, or managing your portfolio. Phone, email and office details.',
-    shareTitle: 'Contact Dirrir Realtors',
+      'Get in touch with Drip Emporium about a property, a viewing, or managing your portfolio. Phone, email and office details.',
+    shareTitle: 'Contact Drip Emporium',
   });
 }
 

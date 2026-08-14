@@ -78,11 +78,11 @@ export function downloadCsvTemplate() {
   ];
   const sampleRows = [
     // Row 1 names a plan and leaves the figures blank: they come from the plan.
-    ['Block A', '101', '1', 'Plan A', '', '', '65000', '', '', '1', 'true', 'false', 'AVAILABLE', 'Apartment', 'SALE', 'DRL-101', 'Furnished', '2026-04-20'],
+    ['Block A', '101', '1', 'Plan A', '', '', '65000', '', '', '1', 'true', 'false', 'AVAILABLE', 'Apartment', 'SALE', 'DE-101', 'Furnished', '2026-04-20'],
     // Row 2 uses a plan but overrides size and price for a corner unit.
-    ['Block A', '102', '1', 'Plan A', '1033', '11000000', '78000', '', '', '1', 'true', 'true', 'AVAILABLE', 'Apartment', 'SALE', 'DRL-102', '', ''],
+    ['Block A', '102', '1', 'Plan A', '1033', '11000000', '78000', '', '', '1', 'true', 'true', 'AVAILABLE', 'Apartment', 'SALE', 'DE-102', '', ''],
     // Row 3 has no plan, so every figure is given.
-    ['Block B', '201', '2', '', '646', '7000000', '53000', '1', '1', '1', 'false', 'false', 'AVAILABLE', 'Apartment', 'RENT', 'DRL-201', 'Unfurnished', ''],
+    ['Block B', '201', '2', '', '646', '7000000', '53000', '1', '1', '1', 'false', 'false', 'AVAILABLE', 'Apartment', 'RENT', 'DE-201', 'Unfurnished', ''],
   ];
   const csvContent = [headers.join(','), ...sampleRows.map((r) => r.join(','))].join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

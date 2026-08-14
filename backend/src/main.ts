@@ -18,8 +18,8 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
   const config = new DocumentBuilder()
-    .setTitle('Dirrir Realtors API')
-    .setDescription('API documentation for Dirrir Realtors backend')
+    .setTitle('Drip Emporium API')
+    .setDescription('API documentation for Drip Emporium backend')
     .setVersion('1.0')
     .addTag('api')
     .addBearerAuth()

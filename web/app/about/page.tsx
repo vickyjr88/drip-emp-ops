@@ -10,8 +10,8 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/about',
     title: 'About Us',
     description:
-      'Dirrir Realtors is a Nairobi property firm handling sales, lettings and portfolio management. Meet the team and see how we work.',
-    shareTitle: 'About Dirrir Realtors',
+      'Drip Emporium is a Nairobi property firm handling sales, lettings and portfolio management. Meet the team and see how we work.',
+    shareTitle: 'About Drip Emporium',
   });
 }
 
@@ -62,8 +62,8 @@ const heritage = [
 ];
 
 const LEADERSHIP_PARAGRAPHS = [
-  "Mohamed Dirrir brings over 20 years of unparalleled experience in the luxury real estate sector. His journey began with a vision to redefine the brokerage experience into an editorial, high-touch consultancy for the world's most discerning buyers.",
-  'Under his guidance, Dirrir Realtors Limited has facilitated billions in transactions, specializing in off-market assets and architectural masterpieces. His philosophy is built on the pillars of absolute integrity and a relentless pursuit of perfection.',
+  "Mohamed Drip Emporium brings over 20 years of unparalleled experience in the luxury real estate sector. His journey began with a vision to redefine the brokerage experience into an editorial, high-touch consultancy for the world's most discerning buyers.",
+  'Under his guidance, Drip Emporium has facilitated billions in transactions, specializing in off-market assets and architectural masterpieces. His philosophy is built on the pillars of absolute integrity and a relentless pursuit of perfection.',
   'Today, Mohamed continues to lead the firm by hand-selecting each professional advisor to ensure the DRL standard of excellence is maintained across every territory we serve.',
 ];
 
@@ -73,7 +73,7 @@ const DEFAULT_LEADERSHIP_IMAGE =
 export default async function AboutPage() {
   const content = await fetchPageContent('about');
 
-  const heroKicker = contentValue(content, 'hero.kicker', 'Dirrir Realtors Limited');
+  const heroKicker = contentValue(content, 'hero.kicker', 'Drip Emporium');
   const heroHeading = contentValue(content, 'hero.heading', 'Who We Are');
   const heroSubheading = contentValue(
     content,
@@ -121,12 +121,12 @@ export default async function AboutPage() {
   const partners = contentValue<Array<{ name: string; logo?: string }>>(content, 'recognition.partners', []);
 
   const advantageKicker = contentValue(content, 'advantage.kicker', 'Why Choose DRL');
-  const advantageHeading = contentValue(content, 'advantage.heading', 'The Dirrir Advantage');
+  const advantageHeading = contentValue(content, 'advantage.heading', 'The Drip Emporium Advantage');
   const advantageItems = contentValue<string[]>(content, 'advantage.items', []);
 
   const leadershipKicker = contentValue(content, 'leadership.kicker', 'Our Leadership');
   const leadershipHeading = contentValue(content, 'leadership.heading', 'Visionary Leadership for the Modern Era');
-  const leadershipName = contentValue(content, 'leadership.name', 'Mohamed Dirrir');
+  const leadershipName = contentValue(content, 'leadership.name', 'Mohamed Drip Emporium');
   const leadershipRole = contentValue(content, 'leadership.role', 'Principal Broker & Founder');
   const leadershipImage = contentValue(content, 'leadership.image', DEFAULT_LEADERSHIP_IMAGE);
   const leadershipParagraphs = contentValue<string[]>(content, 'leadership.paragraphs', LEADERSHIP_PARAGRAPHS);
@@ -143,7 +143,7 @@ export default async function AboutPage() {
   const ctaBody = contentValue(
     content,
     'cta.body',
-    'Whether you are acquiring a legacy estate or divesting from a global portfolio, Dirrir Realtors Limited provides the discretion, expertise, and results you deserve.',
+    'Whether you are acquiring a legacy estate or divesting from a global portfolio, Drip Emporium provides the discretion, expertise, and results you deserve.',
   );
   const ctaPrimary = contentValue(content, 'cta.primaryLabel', 'Meet our Agents');
   const ctaSecondary = contentValue(content, 'cta.secondaryLabel', 'Contact Us');

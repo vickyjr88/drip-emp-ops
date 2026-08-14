@@ -121,7 +121,7 @@ export async function openGraphImages(path: string, explicit?: string | null) {
       url,
       width: OG_IMAGE_WIDTH,
       height: OG_IMAGE_HEIGHT,
-      alt: 'Dirrir Realtors property',
+      alt: 'Drip Emporium property',
     },
   ];
 }

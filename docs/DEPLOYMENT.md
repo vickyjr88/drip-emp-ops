@@ -17,9 +17,9 @@ The workflow assumes the repo is already checked out on the VPS and never
 creates it. On the server, as the deploy user:
 
 ```bash
-sudo mkdir -p /opt/dirrir-realtors && sudo chown "$USER" /opt/dirrir-realtors
-git clone git@github.com:vickyjr88/dirrir-realtors.git /opt/dirrir-realtors
-cd /opt/dirrir-realtors
+sudo mkdir -p /opt/drip-emporium && sudo chown "$USER" /opt/drip-emporium
+git clone git@github.com:vickyjr88/drip-emporium.git /opt/drip-emporium
+cd /opt/drip-emporium
 cp .env.sample .env
 ```
 
@@ -38,8 +38,8 @@ the script does `git fetch` as that user.
 | Variable | Notes |
 |---|---|
 | `JWT_SECRET` | Generate with `openssl rand -hex 32`. Without it the API falls back to a hardcoded dev key and anyone can forge admin tokens. Compose refuses to start and the preflight refuses to deploy. |
-| `NEXT_PUBLIC_SITE_URL` | The site's public origin, e.g. `https://dirrirrealtors.com`. Canonical URLs, Open Graph tags, `sitemap.xml` and `robots.txt` are all absolute and built from it. Left at localhost, every canonical points at localhost and the site de-indexes itself — so the preflight blocks that too. Override for a deliberate local deploy with `ALLOW_LOCALHOST_SITE_URL=true`. |
-| `DATABASE_URL` | Must point at the `db` service, e.g. `postgresql://postgres:<pw>@db:5432/dirrir_realtors`. |
+| `NEXT_PUBLIC_SITE_URL` | The site's public origin, e.g. `https://dripemporium.com`. Canonical URLs, Open Graph tags, `sitemap.xml` and `robots.txt` are all absolute and built from it. Left at localhost, every canonical points at localhost and the site de-indexes itself — so the preflight blocks that too. Override for a deliberate local deploy with `ALLOW_LOCALHOST_SITE_URL=true`. |
+| `DATABASE_URL` | Must point at the `db` service, e.g. `postgresql://postgres:<pw>@db:5432/drip_emporium`. |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Must agree with `DATABASE_URL`. |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Object storage credentials. |
 
@@ -64,7 +64,7 @@ editing `.env` and redeploying is enough.
 | `MINIO_ENDPOINT` / `MINIO_PORT` / `MINIO_USE_SSL` | `minio` / `9000` / `false` | How the backend reaches object storage inside the Compose network. |
 | `MINIO_BUCKET` | `project-media` | Bucket uploads land in. |
 | `REDIS_URL` | `redis://redis:6379` | Backs the BullMQ reminder queues. |
-| `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` | `admin@dirrir.com` / `Admin@123` | The admin account bootstrapped on first start. **Change the password before the first deploy** — the default is in the sample and in this repo. |
+| `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` | `admin@dripemporium.store` / `Admin@123` | The admin account bootstrapped on first start. **Change the password before the first deploy** — the default is in the sample and in this repo. |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `INQUIRY_FALLBACK_EMAIL` | blank | Transactional email. A blank key means inquiry emails are logged as FAILED rather than sent, which is a deliberate no-op rather than a crash. |
 | `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID` | blank / `sandbox` / blank | Africa's Talking, for reminder SMS. Blank key ⇒ SMS is skipped and logged rather than failing the run. |
 | `REMINDERS_ENABLED` | `true` | Set `false` on replicas so only one instance runs the scheduler. |
@@ -93,14 +93,14 @@ variables and the next deploy will stop at the preflight. Add, in order of what
 will bite first:
 
 ```bash
-cd /opt/dirrir-realtors
+cd /opt/drip-emporium
 
 # 1. Required. The preflight rejects a missing or localhost value.
 echo 'NEXT_PUBLIC_SITE_URL=https://your-real-domain.com' >> .env
 
 # 2. Backups. scripts/backup.sh refuses to run without a destination.
 echo 'BACKUP_SSH_HOST=backupuser@backup.example.com' >> .env
-echo 'BACKUP_REMOTE_DIR=/srv/dirrir-backups' >> .env
+echo 'BACKUP_REMOTE_DIR=/srv/dripemporium-backups' >> .env
 
 # 3. Check the rest against the sample; anything absent falls back to a
 #    Compose default, which is right for some and wrong for MEDIA_PUBLIC_BASE_URL.
@@ -124,7 +124,7 @@ Settings → Secrets and variables → Actions:
 | `CONTABO_USER` | SSH user. |
 | `CONTABO_SSH_KEY` | Private key, full PEM including header/footer. Use a key dedicated to CI. |
 | `CONTABO_SSH_KNOWN_HOSTS` | Output of `ssh-keyscan -H <host>`. Pins the host key so the session cannot be silently redirected. |
-| `CONTABO_DEPLOY_PATH` | Absolute deploy dir, e.g. `/opt/dirrir-realtors`. |
+| `CONTABO_DEPLOY_PATH` | Absolute deploy dir, e.g. `/opt/drip-emporium`. |
 | `CONTABO_PORT` | Optional, defaults to `22`. |
 
 The `deploy` job targets a `production` environment, so you can add required
@@ -181,7 +181,7 @@ schema is current".
 The same script works on the server during an incident:
 
 ```bash
-cd /opt/dirrir-realtors
+cd /opt/drip-emporium
 ./scripts/deploy.sh                          # deploy origin/main
 DEPLOY_REF=origin/hotfix ./scripts/deploy.sh
 RUN_SEED=true ./scripts/deploy.sh            # also insert demo data (staging only)
@@ -194,7 +194,7 @@ ALLOW_LOCALHOST_SITE_URL=true ./scripts/deploy.sh   # local/staging, no public d
 Deploy the previous commit:
 
 ```bash
-cd /opt/dirrir-realtors
+cd /opt/drip-emporium
 DEPLOY_REF=<previous-sha> ./scripts/deploy.sh
 ```
 

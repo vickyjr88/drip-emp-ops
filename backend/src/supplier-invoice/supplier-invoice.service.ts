@@ -231,7 +231,7 @@ export class SupplierInvoiceService {
       html: `<p>Dear ${invoice.supplier.name},</p>
 <p>We have received your invoice <strong>${invoice.invoiceNumber}</strong>.</p>
 <p>Amount: <strong>${Number(invoice.amount).toLocaleString()}</strong></p>
-<p>Thank you,<br/>Dirrir Realtors</p>`,
+<p>Thank you,<br/>Drip Emporium</p>`,
       supplierInvoiceId: invoice.id,
     });
   }

@@ -52,7 +52,7 @@ export function SiteFooter() {
     };
   }, []);
 
-  const brandHeading = contentValue(content, 'brand.heading', 'Dirrir Realtors');
+  const brandHeading = contentValue(content, 'brand.heading', 'Drip Emporium');
   const brandDescription = contentValue(
     content,
     'brand.description',
@@ -66,14 +66,14 @@ export function SiteFooter() {
   const serviceLinks = contentValue<FooterLink[]>(content, 'services.items', DEFAULT_SERVICE_LINKS);
 
   const contactHeading = contentValue(content, 'contact.heading', 'Contact Us');
-  const email = contentValue(content, 'contact.email', 'info@dirirrealtors.com');
+  const email = contentValue(content, 'contact.email', 'info@dripemporium.store');
   const phone = contentValue(content, 'contact.phone', '+254 722 872 539');
   const address = contentValue(content, 'contact.address', 'Nairobi, Kenya');
 
   const copyright = contentValue(
     content,
     'bottom.copyright',
-    '© 2026 Dirrir Realtors Limited. All Rights Reserved.',
+    '© 2026 Drip Emporium. All Rights Reserved.',
   );
   const bottomLinks = contentValue<FooterLink[]>(content, 'bottom.links', DEFAULT_BOTTOM_LINKS);
   const legalLinks = contentValue<FooterLink[]>(content, 'bottom.legalLinks', []);

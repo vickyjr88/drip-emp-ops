@@ -280,7 +280,7 @@ export default function AuditLogPage() {
                           onKeyDown={(event) => {
                             if (event.key === 'Enter') onApplyFilters();
                           }}
-                          placeholder="e.g. admin@dirrir.com"
+                          placeholder="e.g. admin@dripemporium.store"
                         />
                       </label>
                       <label>

@@ -7,7 +7,7 @@ export async function generateMetadata(): Promise<Metadata> {
     key: 'privacy',
     path: '/privacy',
     title: 'Privacy Policy',
-    description: 'How Dirrir Realtors collects, uses and protects the information you share.',
+    description: 'How Drip Emporium collects, uses and protects the information you share.',
   });
 }
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# Server-side deployment for dirrir-realtors, invoked over SSH by
+# Server-side deployment for drip-emporium, invoked over SSH by
 # .github/workflows/deploy.yml. Safe to run by hand on the VPS too:
 #
-#   cd /opt/dirrir-realtors && ./scripts/deploy.sh
+#   cd /opt/drip-emporium && ./scripts/deploy.sh
 #
 # Expects a populated .env in the deploy directory (never committed, never
 # written by CI) and the repo already checked out on the target branch.
@@ -63,7 +63,7 @@ fi
 # canonicals pointing at localhost, which tells search engines to drop the site.
 # Nothing crashes, so this is the only place it can be caught.
 if ! grep -qE '^NEXT_PUBLIC_SITE_URL=https?://.+' .env; then
-  echo "NEXT_PUBLIC_SITE_URL is missing or malformed in .env - set it to the live origin, e.g. https://dirrirrealtors.com" >&2
+  echo "NEXT_PUBLIC_SITE_URL is missing or malformed in .env - set it to the live origin, e.g. https://dripemporium.com" >&2
   exit 1
 fi
 if grep -qE '^NEXT_PUBLIC_SITE_URL=https?://(localhost|127\.0\.0\.1)' .env; then

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: `${SITE_NAME} | Property Sales, Rentals and Management in Nairobi`,
-    // Page titles read "Listings | Dirrir Realtors" rather than each page
+    // Page titles read "Listings | Drip Emporium" rather than each page
     // repeating the brand by hand.
     template: `%s | ${SITE_NAME}`,
   },

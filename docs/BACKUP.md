@@ -32,7 +32,7 @@ It should not be the machine being backed up.
 1. **On the backup host**, create the destination and authorise the deploy user:
 
    ```bash
-   mkdir -p /srv/dirrir-backups
+   mkdir -p /srv/dripemporium-backups
    # paste the deploy host's public key
    vi ~/.ssh/authorized_keys
    ```
@@ -42,20 +42,20 @@ It should not be the machine being backed up.
    ```
    BACKUP_SSH_HOST=backupuser@backup.example.com
    BACKUP_SSH_PORT=22
-   BACKUP_REMOTE_DIR=/srv/dirrir-backups
+   BACKUP_REMOTE_DIR=/srv/dripemporium-backups
    BACKUP_SSH_KEY=/home/deploy/.ssh/id_ed25519
    ```
 
 3. **Test it by hand before trusting it to cron:**
 
    ```bash
-   cd /opt/dirrir-realtors && ./scripts/backup.sh
+   cd /opt/drip-emporium && ./scripts/backup.sh
    ```
 
 4. **Schedule it**, as the deploy user:
 
    ```cron
-   30 2 * * * cd /opt/dirrir-realtors && ./scripts/backup.sh >> /var/log/dirrir-backup.log 2>&1
+   30 2 * * * cd /opt/drip-emporium && ./scripts/backup.sh >> /var/log/dripemporium-backup.log 2>&1
    ```
 
 ## What the nightly run does
@@ -101,7 +101,7 @@ files already on disk.
 ```bash
 # 1. new host: install docker + compose
 # 2. clone the repo
-git clone <repo> /opt/dirrir-realtors && cd /opt/dirrir-realtors
+git clone <repo> /opt/drip-emporium && cd /opt/drip-emporium
 
 # 3. restore .env from your password manager  <-- the step that blocks everything
 

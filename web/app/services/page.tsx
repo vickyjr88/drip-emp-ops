@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: 'Services',
     description:
       'Property sales, lettings, portfolio management and construction oversight for owners and investors in Nairobi.',
-    shareTitle: 'Services | Dirrir Realtors',
+    shareTitle: 'Services | Drip Emporium',
   });
 }
 
@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 export default async function ServicesPage() {
   const content = await fetchPageContent('services');
 
-  const heroKicker = contentValue(content, 'hero.kicker', 'Dirrir Realtors Limited');
+  const heroKicker = contentValue(content, 'hero.kicker', 'Drip Emporium');
   const heroHeading = contentValue(content, 'hero.heading', 'What We Do');
   const heroIntro = contentValue(
     content,

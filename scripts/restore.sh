@@ -12,7 +12,7 @@
 # current state is taken first so a mistaken restore is itself reversible.
 #
 # On a brand new VPS, before running this:
-#   1. install docker + compose, clone the repo to /opt/dirrir-realtors
+#   1. install docker + compose, clone the repo to /opt/drip-emporium
 #   2. restore .env from your password manager (it is never in git or backups)
 #   3. docker compose up -d db minio
 #   4. ./scripts/restore.sh --date <day>

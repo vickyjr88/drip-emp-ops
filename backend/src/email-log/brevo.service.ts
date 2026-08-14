@@ -28,8 +28,8 @@ export class BrevoService {
   private readonly logger = new Logger(BrevoService.name);
 
   private readonly apiKey = process.env.BREVO_API_KEY || '';
-  private readonly senderEmail = process.env.BREVO_SENDER_EMAIL || 'no-reply@dirrir.com';
-  private readonly senderName = process.env.BREVO_SENDER_NAME || 'Dirrir Realtors';
+  private readonly senderEmail = process.env.BREVO_SENDER_EMAIL || 'no-reply@dripemporium.store';
+  private readonly senderName = process.env.BREVO_SENDER_NAME || 'Drip Emporium';
 
   get isConfigured() {
     return Boolean(this.apiKey);

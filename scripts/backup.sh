@@ -3,7 +3,7 @@
 # Nightly backup of the database and MinIO objects, pushed to a second host
 # over SSH.
 #
-#   cd /opt/dirrir-realtors && ./scripts/backup.sh
+#   cd /opt/drip-emporium && ./scripts/backup.sh
 #
 # Both volumes are `driver: local`, so they exist only on this VPS's disk. A
 # destroyed host, a `docker volume rm`, or a disk failure loses everything with
@@ -13,11 +13,11 @@
 # Expects in .env (see .env.sample):
 #   BACKUP_SSH_HOST      user@host of the backup target
 #   BACKUP_SSH_PORT      optional, default 22
-#   BACKUP_REMOTE_DIR    absolute path on the target, e.g. /srv/dirrir-backups
+#   BACKUP_REMOTE_DIR    absolute path on the target, e.g. /srv/dripemporium-backups
 #   BACKUP_SSH_KEY       optional path to the private key
 #
 # Cron, as the deploy user:
-#   30 2 * * * cd /opt/dirrir-realtors && ./scripts/backup.sh >> /var/log/dirrir-backup.log 2>&1
+#   30 2 * * * cd /opt/drip-emporium && ./scripts/backup.sh >> /var/log/dripemporium-backup.log 2>&1
 
 set -Eeuo pipefail
 
@@ -100,7 +100,7 @@ if [[ "${VERIFY}" == "true" ]]; then
   # to be empty or corrupt exactly when they are needed. Size and gzip checks
   # cannot catch a dump that is well-formed but restores to nothing, so restore
   # it for real into a throwaway container and count what lands.
-  VERIFY_NAME="dirrir-backup-verify-${STAMP}"
+  VERIFY_NAME="dripemporium-backup-verify-${STAMP}"
   docker run -d --name "${VERIFY_NAME}" \
     -e POSTGRES_PASSWORD=verify \
     -e POSTGRES_USER=verify \

@@ -180,7 +180,7 @@ export class InvoiceService {
       html: `<p>Dear ${invoice.customer.firstName} ${invoice.customer.lastName},</p>
 <p>Please find the details for invoice <strong>${invoice.invoiceNumber}</strong> below.</p>
 <p>Amount due: <strong>${Number(invoice.amount).toLocaleString()}</strong></p>
-<p>Thank you,<br/>Dirrir Realtors</p>`,
+<p>Thank you,<br/>Drip Emporium</p>`,
       invoiceId: invoice.id,
     });
     return this.prisma.invoice.update({

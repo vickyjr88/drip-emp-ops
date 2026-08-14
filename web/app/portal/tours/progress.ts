@@ -20,7 +20,7 @@ export type TourProgress = {
 
 type ProgressMap = Record<string, TourProgress>;
 
-const KEY_PREFIX = 'dirrir.tours.';
+const KEY_PREFIX = 'dripemporium.tours.';
 
 function storageKey(userId: string) {
   return `${KEY_PREFIX}${userId}`;

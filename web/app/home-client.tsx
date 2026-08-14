@@ -58,7 +58,7 @@ export default function HomeClient() {
   const [searchLocation, setSearchLocation] = useState('');
   const [searchMinBedrooms, setSearchMinBedrooms] = useState('');
 
-  const heroHeading = contentValue(content, 'hero.heading', 'Find Your Dream Home With\nDirrir Realtors Limited');
+  const heroHeading = contentValue(content, 'hero.heading', 'Find Your Dream Home With\nDrip Emporium');
   const heroSubheading = contentValue(
     content,
     'hero.subheading',

@@ -62,7 +62,7 @@ export function SiteHeader({ active }: { active: string }) {
     };
   }, []);
 
-  const wordmark = contentValue(content, 'brand.wordmark', 'Dirrir Realtors');
+  const wordmark = contentValue(content, 'brand.wordmark', 'Drip Emporium');
   const navLinks = contentValue<NavLink[]>(content, 'nav.items', DEFAULT_NAV_LINKS);
   const ctaLabel = contentValue(content, 'cta.label', 'Contact Professional');
   const ctaHref = contentValue(content, 'cta.href', '/contact');

@@ -126,32 +126,31 @@ export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
 export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
   home: {
     hero: {
-      heading: 'Find Your Dream Home With\nDirrir Realtors Limited',
+      heading: 'Quality Affordable\nSneakers & Streetwear',
       subheading:
-        "Experience the pinnacle of luxury property management and acquisition. Our curated portfolio represents the most exclusive residences in the world's most sought-after locations.",
+        'Curating the finest sneakers and premium streetwear. Define your look, own your style, stay fresh.',
       backgroundImage: '',
     },
     services: {
-      heading: 'Elite Real Estate Services',
-      subheading:
-        "Providing a comprehensive suite of professional solutions tailored to the world's most discerning clientele.",
+      heading: 'Shop By Category',
+      subheading: 'Sneakers, boots, casuals, sandals, officials and cleaning agents — all in one place.',
       // A teaser of the full list on /services, kept in the same order so the
       // icons (resolved by position) line up across both pages.
       items: [
         {
-          title: 'Property Sales',
+          title: 'Sneakers',
           description:
-            "Looking to buy a home or investment property in Nairobi? We offer a curated selection of apartments, houses, townhouses, and land across the city's most sought-after locations.",
+            'Nike, Adidas, Jordan and Puma. Air Force 1, Air Max, Samba, Campus and more, in UK 6 to UK 10.',
         },
         {
-          title: 'Rentals & Lettings',
+          title: 'Boots & Officials',
           description:
-            'Whether you need a furnished apartment for a short stay or an unfurnished family home for the long term, we have options to suit every lifestyle.',
+            'Smart leather officials and hard-wearing boots for work, weather and everything in between.',
         },
         {
-          title: 'Property Advisory & Consultation',
+          title: 'Casuals & Sandals',
           description:
-            "Not sure where to invest? Our advisory team offers data-driven insights on Nairobi's property market to help you make smart decisions.",
+            'Everyday wear that goes with anything, plus sandals for when the day is too hot for laces.',
         },
       ],
     },
@@ -172,9 +171,9 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     // The credibility block the old site carries and this page lacked: who
     // stands behind the firm, before any ask.
     about: {
-      heading: "Real Estate Done Right, in Nairobi's Most Sought-After Neighbourhoods",
+      heading: 'Quality Affordable Sneakers & Streetwear in Kenya',
       body:
-        "Backed by Rabat Properties Limited, Dirrir Realtors brings deep local knowledge and transparent dealings to every transaction — whether you're looking for a family home in Kilimani, a rental in Parklands, or an investment property with strong yield. We serve clients across Nairobi and beyond, from first-time buyers to diaspora investors building wealth through Kenyan real estate.",
+        'Drip Emporium curates the finest sneakers and premium streetwear from Nike, Adidas, Jordan, Puma, Calvin Klein, Tommy Hilfiger and BOSS. Find us at Dubai Merchants Mall shop F53 and Palms Mall shop BF75 on Ronald Ngala Street, Nairobi, or order online. Free nationwide delivery on orders over KES 15,000.',
       image: '',
       linkLabel: 'More About Us',
       linkHref: '/about',
@@ -228,7 +227,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
 
   about: {
     hero: {
-      kicker: 'Dirrir Realtors Limited',
+      kicker: 'Drip Emporium',
       heading: 'Who We Are',
       subheading:
         'A real estate company built on trust, transparency, and a deep understanding of what home means.',
@@ -237,7 +236,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     story: {
       heading: 'Our Story',
       paragraphs: [
-        'Dirrir Realtors Limited is a Nairobi-based real estate advisory and brokerage brand operating under Rabat Properties Limited. Our work is guided by verified listings, transparent process, and long-term value for both homeowners and investors.',
+        'Drip Emporium is a Nairobi-based real estate advisory and brokerage brand operating under Rabat Properties Limited. Our work is guided by verified listings, transparent process, and long-term value for both homeowners and investors.',
         'Beyond sourcing homes, we provide an integrated support journey across property search, advisory, negotiation, and transaction guidance. This end-to-end approach gives clients one clear, reliable partner from first shortlist to final handover.',
       ],
       stats: [
@@ -287,12 +286,12 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     leadership: {
       kicker: 'Our Leadership',
       heading: 'Visionary Leadership for the Modern Era',
-      name: 'Mohamed Dirrir',
+      name: 'Mohamed Drip Emporium',
       role: 'Principal Broker & Founder',
       image: '',
       paragraphs: [
-        "Mohamed Dirrir brings over 20 years of unparalleled experience in the luxury real estate sector. His journey began with a vision to redefine the brokerage experience into an editorial, high-touch consultancy for the world's most discerning buyers.",
-        'Under his guidance, Dirrir Realtors Limited has facilitated billions in transactions, specializing in off-market assets and architectural masterpieces. His philosophy is built on the pillars of absolute integrity and a relentless pursuit of perfection.',
+        "Mohamed Drip Emporium brings over 20 years of unparalleled experience in the luxury real estate sector. His journey began with a vision to redefine the brokerage experience into an editorial, high-touch consultancy for the world's most discerning buyers.",
+        'Under his guidance, Drip Emporium has facilitated billions in transactions, specializing in off-market assets and architectural masterpieces. His philosophy is built on the pillars of absolute integrity and a relentless pursuit of perfection.',
         'Today, Mohamed continues to lead the firm by hand-selecting each professional advisor to ensure the DRL standard of excellence is maintained across every territory we serve.',
       ],
     },
@@ -327,11 +326,11 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
         'Clients work directly with senior advisors — not a call-centre queue. Every enquiry is assigned to a named point of contact from first viewing to final handover.',
       items: [
         {
-          name: 'Abdulhakim Dirrir',
-          role: 'Principal · Dirrir Realtors',
+          name: 'Abdulhakim Drip Emporium',
+          role: 'Principal · Drip Emporium',
           description:
             'Leads client advisory for families and diaspora investors across Parklands, Kilimani, and Westlands — with a focus on transparent process and long-term value.',
-          email: 'hello@dirirrealtors.com',
+          email: 'hello@dripemporium.store',
           image: '',
         },
         {
@@ -339,7 +338,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
           role: 'Parent Group',
           description:
             'Operating backbone for sourcing, due diligence, and project delivery — with an established portfolio of Nairobi residential and mixed-use developments.',
-          email: 'info@rabatproperties.co.ke',
+          email: 'info@dripemporium.store',
           image: '',
         },
         {
@@ -347,7 +346,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
           role: 'Sales & Diaspora Support',
           description:
             'Dedicated specialists for viewings, remote consultations, escrow guidance, and transaction coordination — available in local and diaspora time zones.',
-          email: 'advisory@dirirrealtors.com',
+          email: 'advisory@dripemporium.store',
           image: '',
         },
       ],
@@ -360,7 +359,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       items: [
         {
           quote:
-            'Dirrir guided us through the home-buying process with clarity and patience. We felt supported at every step and closed with full confidence.',
+            'Drip Emporium guided us through the home-buying process with clarity and patience. We felt supported at every step and closed with full confidence.',
           name: 'Ayaan Yusuf',
           detail: 'First-time homebuyer · Parklands, Nairobi',
           date: 'March 2026',
@@ -418,7 +417,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
     advantage: {
       kicker: 'Why Choose DRL',
-      heading: 'The Dirrir Advantage',
+      heading: 'The Drip Emporium Advantage',
       items: [
         'Local expertise across Parklands, Kilimani, Westlands, Lavington, and more.',
         'Clear communication and transparent documentation at every stage.',
@@ -429,7 +428,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
     cta: {
       heading: 'Partner with Excellence',
-      body: 'Whether you are acquiring a legacy estate or divesting from a global portfolio, Dirrir Realtors Limited provides the discretion, expertise, and results you deserve.',
+      body: 'Whether you are acquiring a legacy estate or divesting from a global portfolio, Drip Emporium provides the discretion, expertise, and results you deserve.',
       primaryLabel: 'Meet our Agents',
       secondaryLabel: 'Contact Us',
     },
@@ -437,7 +436,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
 
   services: {
     hero: {
-      kicker: 'Dirrir Realtors Limited',
+      kicker: 'Drip Emporium',
       heading: 'What We Do',
       intro:
         "Comprehensive real estate services tailored to your needs — whether you're buying, renting, selling, or investing.",
@@ -505,27 +504,26 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     home: {
       title: '',
       description:
-        'Property sales, rentals and portfolio management in Nairobi. Browse available apartments, townhouses and plots, or work with our team on acquisition and management.',
-      shareTitle: 'Dirrir Realtors | Property Sales, Rentals and Management in Nairobi',
+        'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall and Palms Mall, Ronald Ngala Street.',
+      shareTitle: 'Drip Emporium | Quality Affordable Sneakers & Streetwear',
     },
     properties: {
-      title: 'Properties for Sale and Rent in Nairobi',
+      title: 'Shop All Sneakers & Streetwear',
       description:
-        'Apartments, townhouses and land across Westlands, Kilimani, Lavington and the wider Nairobi metro. Filter by location, type, bedrooms and budget.',
-      shareTitle: 'Properties in Nairobi | Dirrir Realtors',
-      shareDescription: 'Filter available homes and investments by location, type, bedrooms and budget.',
+        'Browse sneakers, boots, casuals, sandals and officials from Nike, Adidas, Jordan and Puma. Free delivery on orders over KES 15,000.',
+      shareTitle: 'Shop Sneakers & Streetwear | Drip Emporium',
     },
     listings: {
-      title: 'Property Listings in Nairobi',
+      title: 'Sneakers and Streetwear in Nairobi',
       description:
-        'Apartments, townhouses and plots currently available through Dirrir Realtors. Filter by bedrooms, price and project, with photos, floor plans and prices in KES.',
-      shareTitle: 'Property Listings in Nairobi | Dirrir Realtors',
+        'Every pair in stock at Drip Emporium, with sizes and prices in KES.',
+      shareTitle: 'Sneakers in Nairobi | Drip Emporium',
     },
     areas: {
       title: "Nairobi's Best Neighbourhoods",
       description:
         'Westlands, Kilimani, Lavington, Parklands and Kileleshwa — what makes each Nairobi neighbourhood distinct, with indicative sale and rental ranges.',
-      shareTitle: "Nairobi's Best Neighbourhoods | Dirrir Realtors",
+      shareTitle: "Nairobi's Best Neighbourhoods | Drip Emporium",
       shareDescription:
         "What makes each of Nairobi's most sought-after residential areas distinct, with indicative prices.",
     },
@@ -533,27 +531,27 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       title: 'Services',
       description:
         'Property sales, lettings, portfolio management and construction oversight for owners and investors in Nairobi.',
-      shareTitle: 'Services | Dirrir Realtors',
+      shareTitle: 'Services | Drip Emporium',
     },
     about: {
       title: 'About Us',
       description:
-        'Dirrir Realtors is a Nairobi property firm handling sales, lettings and portfolio management. Meet the team and see how we work.',
-      shareTitle: 'About Dirrir Realtors',
+        'Drip Emporium curates the finest sneakers and premium streetwear. Two stores on Ronald Ngala Street, Nairobi.',
+      shareTitle: 'About Drip Emporium',
     },
     terms: {
       title: 'Terms of Service',
-      description: 'The terms on which the Dirrir Realtors website and services are offered.',
+      description: 'The terms on which the Drip Emporium website and services are offered.',
     },
     privacy: {
       title: 'Privacy Policy',
-      description: 'How Dirrir Realtors collects, uses and protects the information you share.',
+      description: 'How Drip Emporium collects, uses and protects the information you share.',
     },
     contact: {
       title: 'Contact Us',
       description:
-        'Get in touch with Dirrir Realtors about a property, a viewing, or managing your portfolio. Phone, email and office details.',
-      shareTitle: 'Contact Dirrir Realtors',
+        'Visit Drip Emporium at Dubai Merchants Mall shop F53 or Palms Mall shop BF75, Ronald Ngala Street. Open 08:00 to 20:00.',
+      shareTitle: 'Contact Drip Emporium',
     },
   },
 
@@ -710,7 +708,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
 
   header: {
     brand: {
-      wordmark: 'Dirrir Realtors',
+      wordmark: 'Drip Emporium',
     },
     nav: {
       items: [
@@ -729,14 +727,14 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     // Used by the enquiry buttons on listings and the properties index, which
     // each carried their own copy of the number before this existed.
     enquiries: {
-      whatsapp: '254722872539',
-      phone: '+254 722 872 539',
+      whatsapp: '254113206481',
+      phone: '+254 113 206 481',
     },
   },
 
   footer: {
     brand: {
-      heading: 'Dirrir Realtors',
+      heading: 'Drip Emporium',
       description:
         'Your professional partner in Nairobi real estate, providing verified listings, transparent process, and long-term value.',
     },
@@ -762,9 +760,9 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
     contact: {
       heading: 'Contact Us',
-      email: 'info@dirirrealtors.com',
-      phone: '+254 722 872 539',
-      address: 'Nairobi, Kenya',
+      email: 'info@dripemporium.store',
+      phone: '+254 113 206 481',
+      address: 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi',
     },
     // Social profiles, as the old site carries them. Each is hidden while its
     // URL is blank, so an account the firm does not have never renders a link
@@ -777,7 +775,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       linkedin: '',
     },
     bottom: {
-      copyright: '© 2026 Dirrir Realtors Limited. All Rights Reserved.',
+      copyright: '© 2026 Drip Emporium. All Rights Reserved.',
       links: [
         { label: 'About', href: '/about' },
         { label: 'Listings', href: '/listings' },
@@ -802,15 +800,15 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     // The card beside the form. Was hardcoded in the page, including the
     // photograph, so none of it could be changed without a deploy.
     agent: {
-      name: 'Mohamed Dirrir',
+      name: 'Mohamed Drip Emporium',
       role: 'Principal Broker',
       image: '',
     },
     details: {
-      phone: '+12345678900',
-      email: 'direct@dirrir.com',
-      officeName: 'Head Office',
-      officeAddress: 'Nairobi, Kenya',
+      phone: '+254 113 206 481',
+      email: 'direct@dripemporium.store',
+      officeName: 'Dubai Merchants Mall, Shop F53',
+      officeAddress: 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi',
     },
     highlights: {
       items: [

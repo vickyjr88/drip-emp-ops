@@ -7,7 +7,7 @@ export async function generateMetadata(): Promise<Metadata> {
     key: 'terms',
     path: '/terms',
     title: 'Terms of Service',
-    description: 'The terms on which the Dirrir Realtors website and services are offered.',
+    description: 'The terms on which the Drip Emporium website and services are offered.',
   });
 }
 

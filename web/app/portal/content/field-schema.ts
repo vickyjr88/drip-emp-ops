@@ -478,7 +478,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       },
       {
         key: 'advantage',
-        title: 'The Dirrir Advantage',
+        title: 'The Drip Emporium Advantage',
         fields: [
           { path: 'advantage.kicker', label: 'Kicker', type: 'text' },
           { path: 'advantage.heading', label: 'Heading', type: 'text' },

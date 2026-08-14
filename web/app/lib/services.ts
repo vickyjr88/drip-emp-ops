@@ -1,7 +1,7 @@
 import type { ServiceIconKey } from '../components/service-icons';
 
 /**
- * The firm's actual service lines, matching dirirrealtors.com/services.
+ * The firm's actual service lines, matching dripemporium.store/services.
  *
  * Shared by the home page teaser and the services page so the two cannot drift.
  * `icon` keys into ServiceIcon; the CMS edits titles and descriptions but not

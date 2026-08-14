@@ -52,14 +52,14 @@ export default function ContactClient() {
     'form.intro',
     'Tell us what you are looking for and we will come back to you within one working day. Whether you are buying, letting or looking for someone to manage a property you already own, it helps to know your budget, preferred areas and timing.',
   );
-  const agentName = contentValue(content, 'agent.name', 'Mohamed Dirrir');
+  const agentName = contentValue(content, 'agent.name', 'Mohamed Drip Emporium');
   const agentRole = contentValue(content, 'agent.role', 'Principal Broker');
   // Falls back to the file that was hardcoded here, so the card keeps its
   // photograph until someone uploads a replacement.
   const agentImage = contentValue(content, 'agent.image', '/images/agent-shared.jpg');
   const phone = contentValue(content, 'details.phone', '+12345678900');
-  const email = contentValue(content, 'details.email', 'direct@dirrir.com');
-  const officeName = contentValue(content, 'details.officeName', 'Dirrir HQ');
+  const email = contentValue(content, 'details.email', 'direct@dripemporium.store');
+  const officeName = contentValue(content, 'details.officeName', 'Drip Emporium HQ');
   const officeAddress = contentValue(content, 'details.officeAddress', 'Manhattan, New York');
   const highlights = contentValue<Array<{ title: string; description: string }>>(content, 'highlights.items', [
     {
@@ -131,10 +131,10 @@ export default function ContactClient() {
           <div>
             <img
               src="/images/agent-shared.jpg"
-              alt="Mohamed Dirrir"
+              alt="Mohamed Drip Emporium"
             />
           </div>
-          <h2>Mohamed Dirrir</h2>
+          <h2>Mohamed Drip Emporium</h2>
           <p>Principal Consultant</p>
         </section>
 

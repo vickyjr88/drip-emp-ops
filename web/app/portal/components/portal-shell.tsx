@@ -6,16 +6,12 @@ import { useRegisterTourViewer, useTours } from '../tours/tour-provider';
 import { TourChecklist } from '../tours/checklist';
 
 export type PortalNavKey =
-  | 'projects'
-  | 'blocks'
-  | 'floorPlans'
-  | 'units'
-  | 'amenities'
+  | 'dashboard'
+  | 'stores'
+  | 'catalogue'
+  | 'inventory'
+  | 'orders'
   | 'customers'
-  | 'brokers'
-  | 'inquiries'
-  | 'operations'
-  | 'finance'
   | 'accounting'
   | 'analytics'
   | 'reminders'
@@ -28,18 +24,13 @@ export type PortalNavKey =
   | 'rbac';
 
 const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
-  { key: 'projects', href: '/portal/projects', label: 'Projects' },
-  // Between projects and units, matching the order they must be created in.
-  { key: 'blocks', href: '/portal/blocks', label: 'Blocks' },
-  // Between blocks and units: a plan is defined before the units built to it.
-  { key: 'floorPlans', href: '/portal/floor-plans', label: 'Floor Plans' },
-  { key: 'units', href: '/portal/units', label: 'Units' },
-  { key: 'amenities', href: '/portal/amenities', label: 'Amenities' },
+  { key: 'dashboard', href: '/portal', label: 'Dashboard' },
+  // Catalogue before inventory before orders: the order things are set up in.
+  { key: 'stores', href: '/portal/stores', label: 'Stores' },
+  { key: 'catalogue', href: '/portal/catalogue', label: 'Catalogue' },
+  { key: 'inventory', href: '/portal/inventory', label: 'Inventory' },
+  { key: 'orders', href: '/portal/orders', label: 'Orders' },
   { key: 'customers', href: '/portal/customers', label: 'Customers' },
-  { key: 'brokers', href: '/portal/brokers', label: 'Brokers' },
-  { key: 'inquiries', href: '/portal/inquiries', label: 'Inquiries' },
-  { key: 'operations', href: '/portal/operations', label: 'Operations' },
-  { key: 'finance', href: '/portal/finance', label: 'Finance' },
   { key: 'accounting', href: '/portal/accounting', label: 'Accounting' },
   { key: 'analytics', href: '/portal/analytics', label: 'Analytics' },
   { key: 'reminders', href: '/portal/reminders', label: 'Reminders' },
@@ -53,16 +44,12 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
 ];
 
 const PAGE_TITLES: Record<PortalNavKey, string> = {
-  projects: 'Projects',
-  blocks: 'Project Blocks',
-  floorPlans: 'Floor Plans',
-  units: 'Units',
-  amenities: 'Amenities',
+  dashboard: 'Dashboard',
+  stores: 'Stores',
+  catalogue: 'Catalogue',
+  inventory: 'Inventory',
+  orders: 'Orders',
   customers: 'Customers',
-  brokers: 'Brokers',
-  inquiries: 'Inquiries',
-  operations: 'Operations',
-  finance: 'Finance',
   accounting: 'Accounting',
   analytics: 'Analytics',
   reminders: 'Reminders',

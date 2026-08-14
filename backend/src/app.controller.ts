@@ -10,7 +10,7 @@ export class AppController {
 
   @Get()
   getRoot(): string {
-    return 'Dirrir Realtors API is running';
+    return 'Drip Emporium API is running';
   }
 
   /**

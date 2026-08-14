@@ -21,12 +21,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: 'Page not found',
     description:
-      'That page could not be found. Browse available listings, explore our services, or get in touch with the Dirrir Realtors team.',
+      'That page could not be found. Browse available listings, explore our services, or get in touch with the Drip Emporium team.',
     // Keep dead URLs out of the index while still serving a useful page.
     robots: { index: false, follow: true },
     // noindex does not stop a chat client or messaging app unfurling the link
     // someone pasted, so the card should still look like the site.
-    openGraph: { ...preview, title: 'Page not found | Dirrir Realtors' },
+    openGraph: { ...preview, title: 'Page not found | Drip Emporium' },
   };
 }
 
@@ -43,7 +43,7 @@ const DESTINATIONS = [
   },
   {
     href: '/about',
-    title: 'About Dirrir Realtors',
+    title: 'About Drip Emporium',
     body: 'Who we are, how we work, and the developments we have delivered.',
   },
   {

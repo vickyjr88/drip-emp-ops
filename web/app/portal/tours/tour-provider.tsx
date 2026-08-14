@@ -121,7 +121,7 @@ export function TourProvider({
     if (!userId) return;
     try {
       setChecklistVisibleState(
-        window.localStorage.getItem(`dirrir.tours.hidden.${userId}`) !== 'true',
+        window.localStorage.getItem(`dripemporium.tours.hidden.${userId}`) !== 'true',
       );
     } catch {
       setChecklistVisibleState(true);
@@ -133,8 +133,8 @@ export function TourProvider({
       setChecklistVisibleState(visible);
       if (!userId) return;
       try {
-        if (visible) window.localStorage.removeItem(`dirrir.tours.hidden.${userId}`);
-        else window.localStorage.setItem(`dirrir.tours.hidden.${userId}`, 'true');
+        if (visible) window.localStorage.removeItem(`dripemporium.tours.hidden.${userId}`);
+        else window.localStorage.setItem(`dripemporium.tours.hidden.${userId}`, 'true');
       } catch {
         // Non-fatal: the choice just will not persist.
       }
@@ -227,7 +227,7 @@ export function TourProvider({
       if (status === 'COMPLETED') {
         let hidden = false;
         try {
-          hidden = window.localStorage.getItem(`dirrir.tours.hidden.${userId}`) === 'true';
+          hidden = window.localStorage.getItem(`dripemporium.tours.hidden.${userId}`) === 'true';
         } catch {
           hidden = false;
         }

@@ -153,7 +153,7 @@ export const IMPORT_DEFINITIONS: ImportDefinition[] = [
     uniqueBy: 'email',
     fields: [
       { name: 'name', label: 'Full Name', type: 'string', required: true, example: 'Amina Hassan' },
-      { name: 'email', label: 'Email', type: 'email', required: true, example: 'amina@dirrir.com' },
+      { name: 'email', label: 'Email', type: 'email', required: true, example: 'amina@dripemporium.store' },
       {
         name: 'password',
         label: 'Initial Password',
