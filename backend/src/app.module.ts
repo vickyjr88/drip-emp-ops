@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { StoreModule } from './store/store.module';
+import { ProductCategoryModule } from './product-category/product-category.module';
+import { ProductModule } from './product/product.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { OrderModule } from './order/order.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 
@@ -46,6 +51,11 @@ import { PdfModule } from './pdf/pdf.module';
 
 @Module({
   imports: [
+    StoreModule,
+    ProductCategoryModule,
+    ProductModule,
+    InventoryModule,
+    OrderModule,
     PrismaModule,
     CustomerModule,
     CustomerPortalModule,

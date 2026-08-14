@@ -41,10 +41,31 @@ Their logic was property-shaped and would have been rewritten anyway:
   removed the three project reports.
 - `expense-import` — kept; dropped the project tagging column.
 
-## Still to do
+## Commerce API: done
 
-- **Commerce services and controllers.** The schema exists; the REST layer for
-  products, stock and orders does not.
+Five modules, all RBAC-gated (permissions generate from the datamodel, so the
+new models got theirs automatically):
+
+- `stores` — CRUD plus a per-store summary. Refuses to delete a store that has
+  orders, stock movements or ledger lines; deactivate instead.
+- `product-categories` — self-nesting, auto-slugged.
+- `products` — search across name, SKU and brand; variants created with the
+  product and managed through their own routes.
+- `inventory` — stock levels and movements. Movement and running total are
+  written in one transaction; stock can never go negative.
+- `orders` — placing an order takes the stock with it in one transaction.
+  Status follows a defined sequence. Payments accumulate; overpayment is
+  refused; settling in full moves PENDING to PAID. Cancel or refund returns
+  the goods to stock.
+
+Verified against a running API using Drip Emporium's real data: both shops,
+all six categories, seven products at their listed prices with size variants,
+210 units received, an order placed, part-paid then settled, walked through
+PACKED/SHIPPED/DELIVERED, refunded, and stock confirmed restored. An illegal
+status jump and an overpayment were both refused with usable messages. Test
+rows truncated afterwards.
+
+## Still to do
 - **Frontend.** `web/app/portal` still has the property screens and nav.
 - **Rebranding.** Name, CMS copy and SEO defaults still say Dirrir Realtors.
 - **`git init`.** Not yet a repository.

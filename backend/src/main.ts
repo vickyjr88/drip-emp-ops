@@ -28,7 +28,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.listen(3100, '0.0.0.0');
+  // Configurable so this can run alongside another instance on one host,
+  // which is exactly the case while the realtors app is still up.
+  await app.listen(Number(process.env.PORT) || 3100, '0.0.0.0');
   console.log('🚀 Backend listening on http://0.0.0.0:3100');
 }
 bootstrap();
