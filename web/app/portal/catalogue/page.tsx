@@ -4,7 +4,7 @@
  * Catalogue: products and the variants that are actually sold.
  *
  * A product is shown as one row with its variants beneath, because that is how
- * someone thinks about stock — "Air Force 1, do we have a UK 9" — rather than
+ * someone thinks about stock — "Air Force 1, do we have a EUR 43" — rather than
  * as a flat list of thirty-five SKUs.
  */
 
@@ -40,7 +40,7 @@ type Category = { id: string; name: string; slug: string };
 
 const BLANK = { sku: '', name: '', brand: '', categoryId: '', description: '' };
 /** Shoes sell by size, so a new product starts with the usual run. */
-const DEFAULT_SIZES = ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10'];
+const DEFAULT_SIZES = ['EUR 39', 'EUR 41', 'EUR 42', 'EUR 43', 'EUR 44'];
 
 export default function CataloguePage() {
   const dialog = usePortalDialog();

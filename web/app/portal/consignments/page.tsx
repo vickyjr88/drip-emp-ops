@@ -1,0 +1,592 @@
+"use client";
+
+/**
+ * Consignments: goods out with resellers, and settling them when they return.
+ *
+ * A pickup is issued from stock on the shop floor, then settled line by line —
+ * some sold, some back in the bag — which is how a reseller actually turns up.
+ * Overdue pickups are listed first because those are the ones to chase.
+ */
+
+import Link from 'next/link';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { EliteLayout } from '../../components/elite-layout';
+import { PortalShell } from '../components/portal-shell';
+import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ListExport } from '../components/list-export';
+import { usePortalDialog } from '../components/portal-dialog';
+import { useErrorState, useFeedbackState } from '../components/notifications';
+import {
+  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDate, formatMoney,
+  hasPermission, loadProfile, roleLabelFor,
+} from '../accounting/lib';
+
+type Store = { id: string; code: string; name: string };
+type Reseller = { id: string; code: string; name: string; priceTier: string; isActive: boolean };
+
+type Level = {
+  quantity: number; onConsignment: number;
+  store: Store;
+  variant: { id: string; sku: string; name: string; priceKes: string | number; product: { name: string } };
+};
+
+type Line = {
+  id: string; description: string; quantityOut: number;
+  quantitySold: number; quantityReturned: number; unitPrice: string | number;
+  variant: { id: string; sku: string; name: string; product: { name: string } };
+};
+
+type Consignment = {
+  id: string; reference: string; status: string; priceTier: string;
+  totalValue: string | number; soldValue: string | number; amountPaid: string | number;
+  dueDate?: string | null; issuedAt: string; notes?: string | null;
+  unitsStillOut: number; balance: number; isOverdue: boolean;
+  reseller: Reseller; store: Store; lines: Line[];
+  payments: Array<{ id: string; amount: string | number; method: string; reference?: string | null }>;
+};
+
+type Draft = { variantId: string; quantity: number; label: string };
+
+export default function ConsignmentsPage() {
+  const dialog = usePortalDialog();
+  const [initialized, setInitialized] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [profile, setProfile] = useState<AuthProfile | null>(null);
+  const [consignments, setConsignments] = useState<Consignment[]>([]);
+  const [levels, setLevels] = useState<Level[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [resellers, setResellers] = useState<Reseller[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [showIssue, setShowIssue] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [errorMessage, setErrorMessage] = useErrorState();
+  const [, setFeedback] = useFeedbackState();
+
+  const [head, setHead] = useState({ resellerId: '', storeId: '', notes: '' });
+  const [draft, setDraft] = useState<Draft[]>([]);
+  const [pick, setPick] = useState({ variantId: '', quantity: '1' });
+  // Settlement is per line: sold and returned reported together.
+  const [settle, setSettle] = useState<{ id: string; entries: Record<string, { sold: string; returned: string }>; amount: string; method: string; reference: string } | null>(null);
+
+  useEffect(() => {
+    setToken(window.localStorage.getItem(TOKEN_KEY));
+    setInitialized(true);
+  }, []);
+
+  const load = useCallback(async (authToken: string) => {
+    setLoading(true);
+    try {
+      const nextProfile = await loadProfile(authToken);
+      setProfile(nextProfile);
+      const [rows, levelRows, storeRows, resellerRows] = await Promise.all([
+        apiRequest<Consignment[]>('/consignments', { method: 'GET' }, authToken),
+        apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
+        apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
+        apiRequest<Reseller[]>('/resellers', { method: 'GET' }, authToken),
+      ]);
+      setConsignments(rows);
+      setLevels(levelRows);
+      setStores(storeRows);
+      setResellers(resellerRows);
+      setHead((prev) => ({
+        ...prev,
+        storeId: prev.storeId || storeRows[0]?.id || '',
+        resellerId: prev.resellerId || resellerRows[0]?.id || '',
+      }));
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [setErrorMessage]);
+
+  useEffect(() => {
+    if (!initialized) return;
+    if (!token) { setLoading(false); return; }
+    void load(token);
+  }, [initialized, token, load]);
+
+  const rows = useMemo(
+    () => consignments
+      .filter((row) => !statusFilter || row.status === statusFilter)
+      // Overdue first: those are the pickups to chase.
+      .sort((a, b) => Number(b.isOverdue) - Number(a.isOverdue))
+      .map((row) => ({ ...row, resellerName: row.reseller.name, storeName: row.store.name })),
+    [consignments, statusFilter],
+  );
+
+  const controls = useListControls(rows, (row) => [row.reference, row.resellerName, row.storeName]);
+
+  const canCreate = hasPermission(profile, 'consignment.create');
+  const canUpdate = hasPermission(profile, 'consignment.update');
+
+  // Only stock on the shop floor at the chosen store can go out.
+  const availableHere = levels.filter((row) => row.store.id === head.storeId && row.quantity > 0);
+
+  function addLine() {
+    const level = availableHere.find((row) => row.variant.id === pick.variantId);
+    if (!level) return;
+    const quantity = Number(pick.quantity) || 1;
+    setDraft((prev) => {
+      const existing = prev.find((line) => line.variantId === level.variant.id);
+      if (existing) {
+        return prev.map((line) =>
+          line.variantId === level.variant.id ? { ...line, quantity: line.quantity + quantity } : line);
+      }
+      return [...prev, {
+        variantId: level.variant.id, quantity,
+        label: `${level.variant.product.name} — ${level.variant.name}`,
+      }];
+    });
+    setPick({ variantId: '', quantity: '1' });
+  }
+
+  async function onIssue(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || draft.length === 0) return;
+    setSaving(true);
+    try {
+      const created = await apiRequest<Consignment>('/consignments', {
+        method: 'POST',
+        body: JSON.stringify({
+          resellerId: head.resellerId,
+          storeId: head.storeId,
+          notes: head.notes || undefined,
+          lines: draft.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
+        }),
+      }, token);
+      setFeedback(`${created.reference} issued — ${formatMoney(created.totalValue)}, due back ${formatDate(created.dueDate)}.`);
+      setDraft([]); setHead((prev) => ({ ...prev, notes: '' })); setShowIssue(false);
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onSettle(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !settle) return;
+    const lines = Object.entries(settle.entries)
+      .map(([lineId, value]) => ({
+        lineId,
+        sold: Number(value.sold) || 0,
+        returned: Number(value.returned) || 0,
+      }))
+      .filter((line) => line.sold > 0 || line.returned > 0);
+
+    if (lines.length === 0 && !settle.amount) {
+      setErrorMessage(new Error('Nothing to record — enter what sold, what came back, or a payment.'));
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await apiRequest<Consignment>(`/consignments/${settle.id}/settle`, {
+        method: 'POST',
+        body: JSON.stringify({
+          lines: lines.length ? lines : [{ lineId: Object.keys(settle.entries)[0], sold: 0 }],
+          amountPaid: settle.amount ? Number(settle.amount) : undefined,
+          method: settle.method,
+          reference: settle.reference || undefined,
+        }),
+      }, token);
+      setFeedback(
+        result.status === 'SETTLED'
+          ? `${result.reference} fully settled and closed.`
+          : `${result.reference} updated — ${result.unitsStillOut} unit(s) still out.`,
+      );
+      setSettle(null);
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onWriteOff(consignment: Consignment) {
+    if (!token) return;
+    const confirmed = await dialog.confirm({
+      title: 'Write Off',
+      message: `Write off the ${consignment.unitsStillOut} unit(s) still out on ${consignment.reference}? The stock is removed and recorded as a loss.`,
+      confirmLabel: 'Write Off',
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await apiRequest(`/consignments/${consignment.id}/write-off`, {
+        method: 'PATCH',
+        body: JSON.stringify({ reason: 'Not returned by reseller' }),
+      }, token);
+      setFeedback(`${consignment.reference} written off.`);
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  }
+
+  if (!initialized || loading) {
+    return (
+      <EliteLayout active="portal">
+        <main className="lp-main-content portal-main">
+          <section className="lp-container" style={{ paddingTop: 72 }}>
+            <article className="portal-card portal-loading">Loading consignments...</article>
+          </section>
+        </main>
+      </EliteLayout>
+    );
+  }
+
+  if (!token || !profile) {
+    return (
+      <EliteLayout active="portal">
+        <main className="lp-main-content portal-main">
+          <section className="lp-container" style={{ paddingTop: 72 }}>
+            <article className="portal-card">
+              <h2>Authentication required</h2>
+              <Link href="/portal" className="portal-primary-btn" style={{ display: 'inline-flex', width: 'fit-content' }}>
+                Go to Portal Login
+              </Link>
+            </article>
+          </section>
+        </main>
+      </EliteLayout>
+    );
+  }
+
+  const overdue = consignments.filter((row) => row.isOverdue).length;
+  const unitsOut = consignments.reduce((sum, row) => sum + row.unitsStillOut, 0);
+  const owed = consignments.reduce((sum, row) => sum + row.balance, 0);
+
+  return (
+    <EliteLayout active="portal">
+      <main className="lp-main-content portal-main is-authenticated">
+        <section className="lp-container portal-auth-section">
+          <PortalShell
+            active="consignments"
+            tourUserId={profile.id}
+            tourPermissions={profile.permissions || []}
+            tourIsAdmin={profile.role === 'ADMIN' || (profile.roles || []).some((r) => r.name === 'ADMIN')}
+            pageTitle="Consignments"
+            pageSubtitle="Stock out with resellers. Unsold goods are due back in three days."
+            email={profile.email}
+            roleLabel={roleLabelFor(profile)}
+            permissionCount={profile.permissions?.length || 0}
+            canReadRbac={canReadRbacFor(profile)}
+            canReadUsers={hasPermission(profile, 'user.read')}
+            onLogout={() => { window.localStorage.removeItem(TOKEN_KEY); window.location.href = '/portal'; }}
+            onRefresh={() => token && void load(token)}
+          >
+            {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
+
+            <div className="portal-stat-grid">
+              <article className="portal-stat-card">
+                <p>Units out</p><h3>{unitsOut}</h3>
+                <span className="portal-stat-note">owned, not sellable</span>
+              </article>
+              <article className="portal-stat-card">
+                <p>Owed</p><h3>{formatMoney(owed)}</h3>
+                <span className="portal-stat-note">sold, not yet paid</span>
+              </article>
+              <article className="portal-stat-card">
+                <p>Overdue</p><h3>{overdue}</h3>
+                <span className="portal-stat-note">past three days</span>
+              </article>
+            </div>
+
+            {showIssue && canCreate ? (
+              <article className="portal-card">
+                <h2 style={{ marginTop: 0 }}>Issue Pickup</h2>
+                <p className="portal-muted">
+                  Goods leave the shop floor but stay owned until sold or returned. Price is fixed now.
+                </p>
+                <form className="portal-entity-form" onSubmit={onIssue}>
+                  <div className="portal-entity-grid-2">
+                    <label>
+                      <span>Reseller</span>
+                      <select value={head.resellerId} required
+                        onChange={(event) => setHead((prev) => ({ ...prev, resellerId: event.target.value }))}>
+                        {resellers.map((reseller) => (
+                          <option key={reseller.id} value={reseller.id}>
+                            {reseller.name} ({reseller.priceTier.toLowerCase()})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>From store</span>
+                      <select value={head.storeId}
+                        onChange={(event) => { setHead((prev) => ({ ...prev, storeId: event.target.value })); setDraft([]); }}>
+                        {stores.map((store) => (
+                          <option key={store.id} value={store.id}>{store.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="portal-entity-grid-3">
+                    <label>
+                      <span>Item</span>
+                      <select value={pick.variantId}
+                        onChange={(event) => setPick((prev) => ({ ...prev, variantId: event.target.value }))}>
+                        <option value="">Choose…</option>
+                        {availableHere.map((row) => (
+                          <option key={row.variant.id} value={row.variant.id}>
+                            {row.variant.product.name} — {row.variant.name} ({row.quantity} on floor)
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Quantity</span>
+                      <input type="number" min="1" value={pick.quantity}
+                        onChange={(event) => setPick((prev) => ({ ...prev, quantity: event.target.value }))} />
+                    </label>
+                    <label>
+                      <span>&nbsp;</span>
+                      <button type="button" className="portal-inline-btn" onClick={addLine} disabled={!pick.variantId}>
+                        Add
+                      </button>
+                    </label>
+                  </div>
+
+                  {draft.length > 0 ? (
+                    <div className="portal-table-wrap">
+                      <table className="portal-data-table is-doc">
+                        <thead><tr><th>Item</th><th>Qty</th><th /></tr></thead>
+                        <tbody>
+                          {draft.map((line) => (
+                            <tr key={line.variantId}>
+                              <td>{line.label}</td>
+                              <td>{line.quantity}</td>
+                              <td>
+                                <button type="button" className="portal-inline-btn is-danger"
+                                  onClick={() => setDraft((prev) => prev.filter((item) => item.variantId !== line.variantId))}>
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="portal-empty-state">Nothing added yet.</div>
+                  )}
+
+                  <label>
+                    <span>Notes</span>
+                    <input value={head.notes}
+                      onChange={(event) => setHead((prev) => ({ ...prev, notes: event.target.value }))} />
+                  </label>
+
+                  <div className="portal-inline-actions">
+                    <button type="submit" className="portal-primary-btn" disabled={saving || draft.length === 0}>
+                      {saving ? 'Issuing...' : 'Issue Pickup'}
+                    </button>
+                    <button type="button" className="portal-ghost-btn"
+                      onClick={() => { setShowIssue(false); setDraft([]); }}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </article>
+            ) : null}
+
+            {settle ? (
+              <article className="portal-card">
+                <h2 style={{ marginTop: 0 }}>Settle Pickup</h2>
+                <p className="portal-muted">
+                  Enter how many of each sold and how many came back. Anything left stays out.
+                </p>
+                <form className="portal-entity-form" onSubmit={onSettle}>
+                  <div className="portal-table-wrap">
+                    <table className="portal-data-table is-doc">
+                      <thead><tr><th>Item</th><th>Still out</th><th>Sold</th><th>Returned</th></tr></thead>
+                      <tbody>
+                        {consignments.find((row) => row.id === settle.id)?.lines.map((line) => {
+                          const stillOut = line.quantityOut - line.quantitySold - line.quantityReturned;
+                          return (
+                            <tr key={line.id}>
+                              <td>{line.variant.product.name} — {line.variant.name}</td>
+                              <td>{stillOut}</td>
+                              <td>
+                                <input type="number" min="0" max={stillOut} style={{ width: 70 }}
+                                  value={settle.entries[line.id]?.sold || ''}
+                                  onChange={(event) => setSettle((prev) => prev && ({
+                                    ...prev,
+                                    entries: { ...prev.entries, [line.id]: { ...(prev.entries[line.id] || { sold: '', returned: '' }), sold: event.target.value } },
+                                  }))} />
+                              </td>
+                              <td>
+                                <input type="number" min="0" max={stillOut} style={{ width: 70 }}
+                                  value={settle.entries[line.id]?.returned || ''}
+                                  onChange={(event) => setSettle((prev) => prev && ({
+                                    ...prev,
+                                    entries: { ...prev.entries, [line.id]: { ...(prev.entries[line.id] || { sold: '', returned: '' }), returned: event.target.value } },
+                                  }))} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="portal-entity-grid-3">
+                    <label>
+                      <span>Payment (KES)</span>
+                      <input type="number" min="0" value={settle.amount}
+                        onChange={(event) => setSettle((prev) => prev && ({ ...prev, amount: event.target.value }))} />
+                    </label>
+                    <label>
+                      <span>Method</span>
+                      <select value={settle.method}
+                        onChange={(event) => setSettle((prev) => prev && ({ ...prev, method: event.target.value }))}>
+                        {['MPESA', 'CASH', 'BANK_TRANSFER'].map((method) => (
+                          <option key={method} value={method}>{method.replace('_', ' ')}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Reference</span>
+                      <input value={settle.reference}
+                        onChange={(event) => setSettle((prev) => prev && ({ ...prev, reference: event.target.value }))} />
+                    </label>
+                  </div>
+
+                  <div className="portal-inline-actions">
+                    <button type="submit" className="portal-primary-btn" disabled={saving}>
+                      {saving ? 'Recording...' : 'Record Settlement'}
+                    </button>
+                    <button type="button" className="portal-ghost-btn" onClick={() => setSettle(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </article>
+            ) : null}
+
+            <article className="portal-card">
+              <div className="portal-card-header-row">
+                <div><h2 style={{ margin: 0 }}>Pickups</h2></div>
+                {canCreate && !showIssue ? (
+                  <button type="button" className="portal-primary-btn" onClick={() => setShowIssue(true)}>
+                    Issue Pickup
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="list-toolbar">
+                <ListSearch controls={controls} placeholder="Search reference or reseller…" />
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                  <option value="">All statuses</option>
+                  {['OPEN', 'SETTLED', 'WRITTEN_OFF'].map((status) => (
+                    <option key={status} value={status}>{status.replace('_', ' ')}</option>
+                  ))}
+                </select>
+                <ListExport
+                  rows={controls.filtered}
+                  config={{
+                    fileName: 'consignments',
+                    columns: [
+                      { header: 'Reference', value: (row) => row.reference },
+                      { header: 'Reseller', value: (row) => row.resellerName },
+                      { header: 'Issued', value: (row) => formatDate(row.issuedAt) },
+                      { header: 'Due', value: (row) => formatDate(row.dueDate) },
+                      { header: 'Status', value: (row) => row.status },
+                      { header: 'Value', value: (row) => Number(row.totalValue) },
+                      { header: 'Sold', value: (row) => Number(row.soldValue) },
+                      { header: 'Paid', value: (row) => Number(row.amountPaid) },
+                      { header: 'Still Out', value: (row) => row.unitsStillOut },
+                    ],
+                  }}
+                />
+              </div>
+
+              <div className="portal-list-stack">
+                {controls.visible.length === 0 ? (
+                  <div className="portal-empty-state">
+                    {controls.search || statusFilter ? 'No pickups match.' : 'No pickups yet.'}
+                  </div>
+                ) : (
+                  controls.visible.map((consignment) => (
+                    <div key={consignment.id} className="portal-record">
+                      <div className="portal-list-row">
+                        <div>
+                          <strong>
+                            {consignment.reference} · {consignment.resellerName}
+                            {consignment.isOverdue ? ' — OVERDUE' : ''}
+                          </strong>
+                          <p className="portal-muted">
+                            {consignment.storeName} · issued {formatDate(consignment.issuedAt)}
+                            {consignment.dueDate ? ` · due ${formatDate(consignment.dueDate)}` : ''}
+                          </p>
+                          <p>
+                            {consignment.unitsStillOut} still out · sold {formatMoney(consignment.soldValue)}
+                            {consignment.balance > 0 ? ` · ${formatMoney(consignment.balance)} owing` : ''}
+                          </p>
+                        </div>
+                        <span>{consignment.status.replace('_', ' ')}</span>
+                        <div className="portal-action-row">
+                          <button type="button" className="portal-inline-btn"
+                            onClick={() => setExpanded(expanded === consignment.id ? null : consignment.id)}>
+                            {expanded === consignment.id ? 'Hide' : 'Details'}
+                          </button>
+                          {canUpdate && consignment.status === 'OPEN' ? (
+                            <>
+                              <button type="button" className="portal-inline-btn"
+                                onClick={() => setSettle({
+                                  id: consignment.id, entries: {}, amount: '', method: 'MPESA', reference: '',
+                                })}>
+                                Settle
+                              </button>
+                              <button type="button" className="portal-inline-btn is-danger"
+                                onClick={() => void onWriteOff(consignment)}>
+                                Write Off
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {expanded === consignment.id ? (
+                        <div className="portal-table-wrap">
+                          <table className="portal-data-table is-doc">
+                            <thead><tr><th>Item</th><th>Out</th><th>Sold</th><th>Returned</th><th>Still out</th><th>Unit</th></tr></thead>
+                            <tbody>
+                              {consignment.lines.map((line) => (
+                                <tr key={line.id}>
+                                  <td>{line.variant.product.name} — {line.variant.name}</td>
+                                  <td>{line.quantityOut}</td>
+                                  <td>{line.quantitySold}</td>
+                                  <td>{line.quantityReturned}</td>
+                                  <td>{line.quantityOut - line.quantitySold - line.quantityReturned}</td>
+                                  <td>{formatMoney(line.unitPrice)}</td>
+                                </tr>
+                              ))}
+                              {consignment.payments.map((paid) => (
+                                <tr key={paid.id}>
+                                  <td colSpan={5}>Paid — {paid.method}{paid.reference ? ` (${paid.reference})` : ''}</td>
+                                  <td>{formatMoney(paid.amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+              <ListPager controls={controls} noun="pickups" />
+            </article>
+          </PortalShell>
+        </section>
+      </main>
+    </EliteLayout>
+  );
+}

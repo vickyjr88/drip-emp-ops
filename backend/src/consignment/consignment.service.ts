@@ -299,7 +299,7 @@ export class ConsignmentService {
       const soldValue = Number(consignment.soldValue) + soldValueAdded;
       const paid = Number(consignment.amountPaid) + (dto.amountPaid ?? 0);
 
-      return tx.consignment.update({
+      const updated = await tx.consignment.update({
         where: { id },
         data: {
           soldValue: new Prisma.Decimal(soldValue),
@@ -310,6 +310,10 @@ export class ConsignmentService {
         },
         include: INCLUDE,
       });
+
+      // Same derived shape findOne returns, so a caller does not have to
+      // re-fetch to learn what is still out.
+      return this.decorate(updated);
     });
   }
 
@@ -343,20 +347,24 @@ export class ConsignmentService {
     return query.overdueOnly === 'true' ? mapped.filter((row) => row.isOverdue) : mapped;
   }
 
-  async findOne(id: string) {
-    const consignment = await this.prisma.consignment.findUnique({ where: { id }, include: INCLUDE });
-    if (!consignment) throw new NotFoundException(`Consignment ${id} not found`);
-    const stillOut = consignment.lines.reduce(
+  /** Adds the figures every caller wants: what is still out, and the balance. */
+  private decorate<T extends { status: string; dueDate: Date | null; soldValue: Prisma.Decimal; amountPaid: Prisma.Decimal; lines: Array<{ quantityOut: number; quantitySold: number; quantityReturned: number }> }>(row: T) {
+    const stillOut = row.lines.reduce(
       (sum, line) => sum + (line.quantityOut - line.quantitySold - line.quantityReturned),
       0,
     );
     return {
-      ...consignment,
+      ...row,
       unitsStillOut: stillOut,
-      balance: Number(consignment.soldValue) - Number(consignment.amountPaid),
-      isOverdue:
-        consignment.status === 'OPEN' && !!consignment.dueDate && consignment.dueDate.getTime() < Date.now(),
+      balance: Number(row.soldValue) - Number(row.amountPaid),
+      isOverdue: row.status === 'OPEN' && !!row.dueDate && row.dueDate.getTime() < Date.now(),
     };
+  }
+
+  async findOne(id: string) {
+    const consignment = await this.prisma.consignment.findUnique({ where: { id }, include: INCLUDE });
+    if (!consignment) throw new NotFoundException(`Consignment ${id} not found`);
+    return this.decorate(consignment);
   }
 
   /** Writes off what a reseller never returned or paid for. */
@@ -386,11 +394,12 @@ export class ConsignmentService {
         });
       }
 
-      return tx.consignment.update({
+      const written = await tx.consignment.update({
         where: { id },
         data: { status: ConsignmentStatus.WRITTEN_OFF, closedAt: new Date(), notes: reason },
         include: INCLUDE,
       });
+      return this.decorate(written);
     });
   }
 }

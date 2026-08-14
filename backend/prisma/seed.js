@@ -34,7 +34,7 @@ const PRODUCTS = [
 ];
 
 /** Shoes sell by size, so every product carries the same size run. */
-const SIZES = ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10'];
+const SIZES = ['EUR 39', 'EUR 41', 'EUR 42', 'EUR 43', 'EUR 44'];
 
 const slugify = (value) =>
   value.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
