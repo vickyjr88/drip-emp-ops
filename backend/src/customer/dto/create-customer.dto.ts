@@ -1,58 +1,30 @@
-import {
-  IsString,
-  IsEmail,
-  IsOptional,
-  Validate,
-  ValidatorConstraint,
-  ValidatorConstraintInterface,
-  ValidationArguments,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
-@ValidatorConstraint({ name: 'isObjectOrArray', async: false })
-class IsObjectOrArrayConstraint implements ValidatorConstraintInterface {
-  validate(value: unknown) {
-    // class-validator's @IsObject() rejects arrays; nextOfKin supports both legacy object and array.
-    return value === null || value === undefined || typeof value === 'object';
-  }
-
-  defaultMessage(args?: ValidationArguments) {
-    return `${args?.property || 'value'} must be an object or array`;
-  }
-}
-
+/**
+ * A customer, as a shoe shop needs one: who they are and how to reach them.
+ *
+ * The ID number, tax PIN and next-of-kin this used to require belonged to
+ * property contracts. Asking a shopper for a passport number to buy trainers
+ * would lose the sale, so they are gone rather than made optional.
+ */
 export class CreateCustomerDto {
   @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   firstName!: string;
 
   @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   lastName!: string;
 
   @ApiProperty()
   @IsEmail()
   email!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '+254113206481' })
   @IsString()
+  @IsNotEmpty()
   phone!: string;
-
-  @ApiProperty()
-  @IsString()
-  nationalIdPassport!: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  kraPin?: string;
-
-  @ApiPropertyOptional({
-    description: 'Single next-of-kin object (legacy) or array of next-of-kin entries with ownershipPercentage',
-    type: 'object',
-    additionalProperties: true,
-  })
-  @IsOptional()
-  @Validate(IsObjectOrArrayConstraint)
-  nextOfKinJson?: any;
 }

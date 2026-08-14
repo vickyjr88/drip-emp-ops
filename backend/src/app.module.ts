@@ -8,6 +8,8 @@ import { ResellerModule } from './reseller/reseller.module';
 import { ConsignmentModule } from './consignment/consignment.module';
 import { SalesPostingModule } from './sales-posting/sales-posting.module';
 import { StorefrontModule } from './storefront/storefront.module';
+import { PaystackModule } from './paystack/paystack.module';
+import { CheckoutModule } from './checkout/checkout.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 
@@ -64,6 +66,8 @@ import { PdfModule } from './pdf/pdf.module';
     ConsignmentModule,
     SalesPostingModule,
     StorefrontModule,
+    PaystackModule,
+    CheckoutModule,
     PrismaModule,
     CustomerModule,
     CustomerPortalModule,

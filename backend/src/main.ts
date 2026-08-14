@@ -6,7 +6,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody is required to verify the Paystack webhook signature: the HMAC is
+  // computed over the exact bytes sent, and the parsed-then-restringified body
+  // differs by key order and whitespace, so every callback would fail.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.use(json({ limit: '25mb' }));
   app.use(urlencoded({ extended: true, limit: '25mb' }));
   app.enableCors({

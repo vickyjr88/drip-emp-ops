@@ -5,15 +5,6 @@ import { useErrorState, useFeedbackState } from '../../components/notifications'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
-import {
-  emptyNextOfKinForm,
-  NextOfKin,
-  NextOfKinFormProps,
-  normalizeNextOfKinList,
-  serializeNextOfKinList,
-  toNextOfKinFormList,
-  totalNextOfKinOwnership,
-} from '../next-of-kin';
 
 type Customer = {
   id: string;
@@ -21,9 +12,6 @@ type Customer = {
   lastName: string;
   email: string;
   phone: string;
-  nationalIdPassport?: string;
-  kraPin?: string | null;
-  nextOfKinJson?: NextOfKin | NextOfKin[] | { contacts?: NextOfKin[] } | null;
   portalEnabled?: boolean;
   portalLastLoginAt?: string | null;
   createdAt?: string;
@@ -142,8 +130,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
   const [contracts, setContracts] = useState<SalesContract[]>([]);
   const [tenancies, setTenancies] = useState<Tenancy[]>([]);
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
-  const [nextOfKinForms, setNextOfKinForms] = useState<NextOfKinFormProps[]>([emptyNextOfKinForm('100')]);
-  const [editingNextOfKin, setEditingNextOfKin] = useState(false);
   const [showPortalForm, setShowPortalForm] = useState(false);
   const [portalPassword, setPortalPassword] = useState('');
 
@@ -190,7 +176,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
       setContracts(nextContracts);
       setTenancies(nextTenancies);
       setDocuments(nextDocuments);
-      setNextOfKinForms(toNextOfKinFormList(nextCustomer.nextOfKinJson));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer details.');
     } finally {
@@ -210,17 +195,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
 
     void loadCustomer(token);
   }, [initialized, token, loadCustomer]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (window.location.hash === '#next-of-kin') {
-      const element = document.getElementById('next-of-kin');
-      element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [customer, loading]);
 
   const unitMap = useMemo(() => {
     const map = new Map<string, Unit>();
@@ -294,44 +268,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
     }
   }
 
-  async function onSaveNextOfKin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || !canUpdateCustomer || !customer) {
-      return;
-    }
-
-    const total = totalNextOfKinOwnership(nextOfKinForms.filter((entry) => entry.name.trim()));
-    if (total > 100.0001) {
-      setErrorMessage(`Next of kin ownership percentages total ${total.toFixed(1)}% and cannot exceed 100%.`);
-      return;
-    }
-
-    setMutating(true);
-    setFeedback(null);
-    setErrorMessage(null);
-
-    try {
-      const nextOfKinJson = serializeNextOfKinList(nextOfKinForms);
-
-      const updated = await apiRequest<Customer>(
-        `/customers/${customer.id}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({ nextOfKinJson }),
-        },
-        token,
-      );
-
-      setCustomer(updated);
-      setNextOfKinForms(toNextOfKinFormList(updated.nextOfKinJson));
-      setEditingNextOfKin(false);
-      setFeedback('Next of kin list updated.');
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to update next of kin.');
-    } finally {
-      setMutating(false);
-    }
-  }
 
   if (!initialized || loading) {
     return (
@@ -383,8 +319,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
     return null;
   }
 
-  const nextOfKinList = normalizeNextOfKinList(customer.nextOfKinJson);
-  const kinOwnershipTotal = totalNextOfKinOwnership(nextOfKinList);
   const roleLabel =
     profile.roles && profile.roles.length > 0
       ? profile.roles.map((role) => role.name).join(', ')
@@ -418,7 +352,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
               <span>{matchedOwnerships.length} unit{matchedOwnerships.length === 1 ? '' : 's'}</span>
               <span>{matchedContracts.length} contract{matchedContracts.length === 1 ? '' : 's'}</span>
               <span>{documents.length} document{documents.length === 1 ? '' : 's'}</span>
-              <span>{nextOfKinList.length} next of kin</span>
             </div>
             <div className="portal-detail-header-actions">
               {canUpdateCustomer ? (
@@ -445,14 +378,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                   <div className="portal-info-row">
                     <span>Phone</span>
                     <strong>{customer.phone}</strong>
-                  </div>
-                  <div className="portal-info-row">
-                    <span>National ID / Passport</span>
-                    <strong>{customer.nationalIdPassport || '—'}</strong>
-                  </div>
-                  <div className="portal-info-row">
-                    <span>KRA PIN</span>
-                    <strong>{customer.kraPin || '—'}</strong>
                   </div>
                 </div>
               </article>
@@ -537,177 +462,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                 ) : null}
               </article>
 
-              <article className="portal-card" id="next-of-kin">
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}>
-                  <h2 style={{ margin: 0 }}>Next of Kin</h2>
-                  {canUpdateCustomer ? (
-                    <button
-                      type="button"
-                      className="portal-inline-btn"
-                      onClick={() => {
-                        setNextOfKinForms(toNextOfKinFormList(customer.nextOfKinJson));
-                        setEditingNextOfKin((prev) => !prev);
-                      }}
-                    >
-                      {editingNextOfKin ? 'Close' : nextOfKinList.length ? 'Edit' : 'Add'}
-                    </button>
-                  ) : null}
-                </div>
-
-                <p className="portal-kin-total">
-                  Allocated next-of-kin ownership share:{' '}
-                  <strong>
-                    {(editingNextOfKin
-                      ? totalNextOfKinOwnership(nextOfKinForms.filter((entry) => entry.name.trim()))
-                      : kinOwnershipTotal
-                    ).toFixed(1)}
-                    %
-                  </strong>
-                </p>
-
-                {editingNextOfKin && canUpdateCustomer ? (
-                  <form className="portal-entity-form" onSubmit={onSaveNextOfKin}>
-                    {nextOfKinForms.map((entry, index) => (
-                      <div key={`kin-edit-${index}`} className="portal-kin-card">
-                        <div className="portal-card-header-row">
-                          <strong>Next of kin {index + 1}</strong>
-                          {nextOfKinForms.length > 1 ? (
-                            <button
-                              type="button"
-                              className="portal-inline-btn is-danger"
-                              onClick={() =>
-                                setNextOfKinForms((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
-                              }
-                            >
-                              Remove
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className="portal-entity-grid-2">
-                          <label>
-                            <span>Name</span>
-                            <input
-                              value={entry.name}
-                              onChange={(event) =>
-                                setNextOfKinForms((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, name: event.target.value } : item,
-                                  ),
-                                )
-                              }
-                              required={index === 0 || Boolean(entry.name || entry.phone || entry.email)}
-                            />
-                          </label>
-                          <label>
-                            <span>Ownership %</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step="0.01"
-                              value={entry.ownershipPercentage}
-                              onChange={(event) =>
-                                setNextOfKinForms((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index
-                                      ? { ...item, ownershipPercentage: event.target.value }
-                                      : item,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                        </div>
-                        <div className="portal-entity-grid-3">
-                          <label>
-                            <span>Relationship</span>
-                            <input
-                              value={entry.relationship}
-                              onChange={(event) =>
-                                setNextOfKinForms((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, relationship: event.target.value } : item,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Phone</span>
-                            <input
-                              value={entry.phone}
-                              onChange={(event) =>
-                                setNextOfKinForms((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, phone: event.target.value } : item,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <label>
-                            <span>Email</span>
-                            <input
-                              type="email"
-                              value={entry.email}
-                              onChange={(event) =>
-                                setNextOfKinForms((prev) =>
-                                  prev.map((item, itemIndex) =>
-                                    itemIndex === index ? { ...item, email: event.target.value } : item,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="portal-inline-actions">
-                      <button
-                        type="button"
-                        className="portal-inline-btn"
-                        onClick={() => setNextOfKinForms((prev) => [...prev, emptyNextOfKinForm('0')])}
-                      >
-                        Add Next of Kin
-                      </button>
-                      <button type="submit" className="portal-primary-btn" disabled={mutating}>
-                        {mutating ? 'Saving...' : 'Save Next of Kin'}
-                      </button>
-                      <button type="button" className="portal-ghost-btn" onClick={() => setEditingNextOfKin(false)}>
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : nextOfKinList.length > 0 ? (
-                  <div className="portal-list-stack">
-                    {nextOfKinList.map((entry, index) => (
-                      <div key={`${entry.name}-${index}`} className="portal-kin-card">
-                        <div className="portal-kin-card-header">
-                          <div>
-                            <strong>{entry.name}</strong>
-                            <p>{entry.relationship || 'Relationship not set'}</p>
-                          </div>
-                          <span className="portal-kin-badge">
-                            {Number(entry.ownershipPercentage || 0).toFixed(1)}% ownership
-                          </span>
-                        </div>
-                        <div className="portal-kin-meta">
-                          <div>
-                            <span>Phone</span>
-                            <p>{entry.phone || '—'}</p>
-                          </div>
-                          <div>
-                            <span>Email</span>
-                            <p>{entry.email || '—'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="portal-empty-state">No next of kin recorded for this customer.</div>
-                )}
-              </article>
             </div>
 
             <div className="portal-section-grid">

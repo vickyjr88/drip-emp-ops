@@ -69,9 +69,6 @@ model Customer {
   lastName            String
   email               String                 @unique
   phone               String
-  nationalIdPassport  String
-  kraPin              String?
-  nextOfKinJson       Json?
   /// Bcrypt hash for the customer-facing portal. Null means no portal access
   /// has been granted yet; staff set it explicitly.
   portalPassword      String?
@@ -1552,6 +1549,10 @@ model OrderPayment {
   receivedBy String   @default("system")
   /// Set once posted to the ledger, so a payment is never double-counted.
   journalEntryId String?
+  /// Paystack's own reference, unique so a webhook replay cannot record the
+  /// same payment twice.
+  providerRef    String?  @unique
+  providerStatus String?
 
   @@index([orderId])
 }
