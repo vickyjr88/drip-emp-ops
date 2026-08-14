@@ -22,14 +22,12 @@ export type ImageSlot = {
 // "footer" is not a page, but it is site-wide editable copy and fits the same
 // slug-keyed document model, so it rides along rather than needing its own
 // table and endpoints.
-export const PAGE_SLUGS = ['home', 'about', 'services', 'areas', 'contact', 'terms', 'privacy', 'header', 'footer', 'seo'] as const;
+export const PAGE_SLUGS = ['home', 'about', 'contact', 'terms', 'privacy', 'header', 'footer', 'seo'] as const;
 export type PageSlug = (typeof PAGE_SLUGS)[number];
 
 export const PAGE_LABELS: Record<PageSlug, string> = {
   home: 'Home',
   about: 'About',
-  services: 'Services',
-  areas: 'Areas',
   contact: 'Contact',
   terms: 'Terms',
   privacy: 'Privacy',
@@ -90,28 +88,11 @@ export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
       note: 'Wide transparent PNG. The partner name shows as text until a logo is uploaded.',
     },
   ],
-  areas: [
-    {
-      key: 'hero.image',
-      label: 'Hero background',
-      recommendedWidth: 1920,
-      recommendedHeight: 1080,
-    },
-  ],
   terms: [],
   privacy: [],
   header: [],
   footer: [],
   seo: [],
-  services: [
-    {
-      key: 'services.items[].image',
-      label: 'Service section',
-      recommendedWidth: 1200,
-      recommendedHeight: 900,
-      note: 'Landscape 4:3, shown beside each service. Leave blank for an icon placeholder.',
-    },
-  ],
   contact: [
     {
       key: 'agent.image',
@@ -229,274 +210,51 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     hero: {
       kicker: 'Drip Emporium',
       heading: 'Who We Are',
-      subheading:
-        'A real estate company built on trust, transparency, and a deep understanding of what home means.',
-      image: '/images/agent-shared.jpg',
+      intro:
+        'A Nairobi sneaker and streetwear shop, trading from two stores on Ronald Ngala Street.',
+      image: '',
     },
     story: {
-      heading: 'Our Story',
+      kicker: 'Our Story',
+      heading: 'Built on the Right Pair',
       paragraphs: [
-        'Drip Emporium is a Nairobi-based real estate advisory and brokerage brand operating under Rabat Properties Limited. Our work is guided by verified listings, transparent process, and long-term value for both homeowners and investors.',
-        'Beyond sourcing homes, we provide an integrated support journey across property search, advisory, negotiation, and transaction guidance. This end-to-end approach gives clients one clear, reliable partner from first shortlist to final handover.',
-      ],
-      stats: [
-        { value: '100+', label: 'Happy Clients' },
-        { value: '50+', label: 'Properties Sold' },
-        { value: '5+', label: 'Prime Nairobi Areas' },
-        { value: '01', label: 'Trusted Partner' },
-      ],
-    },
-    missionVision: {
-      items: [
-        {
-          title: 'Mission',
-          description:
-            'To provide reliable, transparent, and culturally attuned real estate services that help individuals and families find properties they can call home — and investments they can count on.',
-        },
-        {
-          title: 'Vision',
-          description:
-            "To become East Africa's most trusted real estate partner for diaspora and local investors alike, known for integrity, quality service, and deep community ties.",
-        },
+        'Drip Emporium started with a simple frustration: finding a genuine pair in your size, at a price that made sense, without trekking across town for it.',
+        'We stock sneakers, boots, casuals, sandals and officials from Nike, Adidas, Jordan, Puma, Calvin Klein, Tommy Hilfiger and BOSS. Everything on the shelf is what it says it is, priced so you do not have to negotiate to feel fairly treated.',
+        'Two shops, EUR 36 to 46, and a WhatsApp line that gets answered. If we do not have your size in one shop, we will tell you whether the other one does.',
       ],
     },
     values: {
-      kicker: 'Core Values',
-      heading: 'Our DNA',
+      kicker: 'What We Stand For',
+      heading: 'How We Trade',
       items: [
         {
-          title: 'Transparency',
-          description: 'No hidden fees, no surprises. We keep you informed at every stage.',
-        },
-        {
-          title: 'Integrity',
-          description: "We represent properties honestly and act in our clients' best interests.",
-        },
-        {
-          title: 'Community',
+          title: 'Genuine Stock',
           description:
-            'We serve a diverse clientele and take pride in connecting people to communities where they belong.',
+            'What is on the shelf is what it claims to be. No stories about why this pair is different.',
         },
         {
-          title: 'Excellence',
-          description: 'From property selection to after-sales support, we deliver a premium experience.',
-        },
-      ],
-    },
-    leadership: {
-      kicker: 'Our Leadership',
-      heading: 'Visionary Leadership for the Modern Era',
-      name: 'Mohamed Drip Emporium',
-      role: 'Principal Broker & Founder',
-      image: '',
-      paragraphs: [
-        "Mohamed Drip Emporium brings over 20 years of unparalleled experience in the luxury real estate sector. His journey began with a vision to redefine the brokerage experience into an editorial, high-touch consultancy for the world's most discerning buyers.",
-        'Under his guidance, Drip Emporium has facilitated billions in transactions, specializing in off-market assets and architectural masterpieces. His philosophy is built on the pillars of absolute integrity and a relentless pursuit of perfection.',
-        'Today, Mohamed continues to lead the firm by hand-selecting each professional advisor to ensure the DRL standard of excellence is maintained across every territory we serve.',
-      ],
-    },
-    heritage: {
-      heading: 'Our Heritage',
-      subheading: 'Two Decades at the Apex',
-      items: [
-        {
-          year: '2004',
-          title: 'The Foundation',
-          text: 'DRL began as a boutique firm dedicated to historic restoration and preservation sales.',
-          image: '',
-        },
-        {
-          year: '2012',
-          title: 'Global Expansion',
-          text: 'Our first international hub in Geneva marked the transition to a globally recognized brokerage.',
-          image: '',
-        },
-        {
-          year: '2024',
-          title: 'Digital Mastery',
-          text: 'AI-driven valuation and private virtual viewing experiences keep clients at the front of the market.',
-          image: '',
-        },
-      ],
-    },
-    team: {
-      kicker: 'A focused team, accountable at every step.',
-      heading: 'The People Behind DRL',
-      intro:
-        'Clients work directly with senior advisors — not a call-centre queue. Every enquiry is assigned to a named point of contact from first viewing to final handover.',
-      items: [
-        {
-          name: 'Abdulhakim Drip Emporium',
-          role: 'Principal · Drip Emporium',
+          title: 'Straight Pricing',
           description:
-            'Leads client advisory for families and diaspora investors across Parklands, Kilimani, and Westlands — with a focus on transparent process and long-term value.',
-          email: 'hello@dripemporium.store',
-          image: '',
+            'Marked prices you can trust, and room to talk when a deal makes sense for both of us.',
         },
         {
-          name: 'Rabat Properties',
-          role: 'Parent Group',
+          title: 'Try Before You Pay',
           description:
-            'Operating backbone for sourcing, due diligence, and project delivery — with an established portfolio of Nairobi residential and mixed-use developments.',
-          email: 'info@dripemporium.store',
-          image: '',
+            'Walk in, try the pair on, decide then. Nobody buys shoes they have not put on.',
         },
         {
-          name: 'Advisory Desk',
-          role: 'Sales & Diaspora Support',
+          title: 'We Answer',
           description:
-            'Dedicated specialists for viewings, remote consultations, escrow guidance, and transaction coordination — available in local and diaspora time zones.',
-          email: 'advisory@dripemporium.store',
-          image: '',
-        },
-      ],
-    },
-    testimonials: {
-      kicker: 'What clients say about DRL.',
-      heading: 'A Testament To Excellence',
-      intro:
-        'A selection of recent client feedback from buyers, renters, and diaspora investors across Parklands, Kilimani, and Westlands.',
-      items: [
-        {
-          quote:
-            'Drip Emporium guided us through the home-buying process with clarity and patience. We felt supported at every step and closed with full confidence.',
-          name: 'Ayaan Yusuf',
-          detail: 'First-time homebuyer · Parklands, Nairobi',
-          date: 'March 2026',
-        },
-        {
-          quote:
-            'What stood out was the transparency. Pricing, paperwork, and timelines were all clearly explained, which made the entire process stress-free.',
-          name: 'Mohamed Hassan',
-          detail: 'Investor · Rental portfolio · Kilimani, Nairobi',
-          date: 'February 2026',
-        },
-        {
-          quote:
-            'As a diaspora client, I needed a trustworthy team on the ground. DRL delivered consistent updates and helped me secure the right investment property.',
-          name: 'Safiya Abdullahi',
-          detail: 'Diaspora client · UK · London → Westlands',
-          date: 'January 2026',
-        },
-      ],
-    },
-    recognition: {
-      kicker: 'Accountability you can stand behind.',
-      heading: 'Recognition & Partners',
-      intro:
-        'Guided by a transparent operating standard, backed by an established real estate group, and aligned with reputable financial partners across Kenya.',
-      items: [
-        {
-          title: 'Trusted Advisory',
-          description: 'Recognised for transparent process across diaspora and local clients.',
-        },
-        {
-          title: 'Verified Listings',
-          description: 'Every listing inspected and documented before reaching clients.',
-        },
-        {
-          title: 'Rabat Group',
-          description: 'Operating under Rabat Properties Limited — established Nairobi developer.',
-        },
-        {
-          title: '5-Star Service',
-          description: 'Consistent feedback from buyers, renters, and investor clients.',
-        },
-      ],
-      // Logos are CMS-uploaded rather than hotlinked: third-party brand assets
-      // are not ours to serve from another site, and remote URLs rot. The name
-      // renders as styled text until a logo is uploaded.
-      partners: [
-        { name: 'Rabat Properties', logo: '' },
-        { name: 'Housing Finance Kenya', logo: '' },
-        { name: 'KCB Mortgage', logo: '' },
-        { name: 'Stanbic Bank', logo: '' },
-        { name: 'Hass Consult Index', logo: '' },
-        { name: 'Knight Frank KE', logo: '' },
-      ],
-    },
-    advantage: {
-      kicker: 'Why Choose DRL',
-      heading: 'The Drip Emporium Advantage',
-      items: [
-        'Local expertise across Parklands, Kilimani, Westlands, Lavington, and more.',
-        'Clear communication and transparent documentation at every stage.',
-        'Dedicated diaspora support — virtual viewings, secure transactions, and remote advisory.',
-        'Verified listings only — every property is inspected before it reaches you.',
-        'End-to-end support from property search through to move-in day.',
-      ],
-    },
-    cta: {
-      heading: 'Partner with Excellence',
-      body: 'Whether you are acquiring a legacy estate or divesting from a global portfolio, Drip Emporium provides the discretion, expertise, and results you deserve.',
-      primaryLabel: 'Meet our Agents',
-      secondaryLabel: 'Contact Us',
-    },
-  },
-
-  services: {
-    hero: {
-      kicker: 'Drip Emporium',
-      heading: 'What We Do',
-      intro:
-        "Comprehensive real estate services tailored to your needs — whether you're buying, renting, selling, or investing.",
-    },
-    services: {
-      // Each item renders as a full-width section with its own image and gets
-      // an entry in the page's jump nav, keyed by `anchor`.
-      items: [
-        {
-          anchor: 'property-sales',
-          title: 'Property Sales',
-          navLabel: 'Property Sales',
-          description:
-            "Looking to buy a home or investment property in Nairobi? We offer a curated selection of apartments, houses, townhouses, and land across the city's most sought-after locations.",
-          features: ['Personalised property matching', 'Accompanied viewings', 'Market analysis', 'Legal guidance'],
-          image: '',
-        },
-        {
-          anchor: 'rentals-lettings',
-          title: 'Rentals & Lettings',
-          navLabel: 'Rentals',
-          description:
-            'Whether you need a furnished apartment for a short stay or an unfurnished family home for the long term, we have options to suit every lifestyle.',
-          features: ['Verified listings', 'Lease negotiation', 'Move-in coordination', 'Tenant support'],
-          image: '',
-        },
-        {
-          anchor: 'property-advisory',
-          title: 'Property Advisory & Consultation',
-          navLabel: 'Advisory',
-          description:
-            "Not sure where to invest? Our advisory team offers data-driven insights on Nairobi's property market to help you make smart decisions.",
-          features: ['Neighbourhood analysis', 'Yield projections', 'Valuations', 'Consultation sessions'],
-          image: '',
-        },
-        {
-          anchor: 'diaspora-investment',
-          title: 'Diaspora Investment Services',
-          navLabel: 'Diaspora',
-          description:
-            'For clients living abroad, investing in Nairobi property has never been easier. We handle everything remotely so you can build your portfolio from anywhere.',
-          features: ['Virtual tours', 'Transaction management', 'Progress updates', 'Remote support'],
-          image: '',
-        },
-        {
-          anchor: 'property-management',
-          title: 'Property Management',
-          navLabel: 'Management',
-          description:
-            "Own a property in Nairobi but don't have time to manage it? Let us handle tenant placement, rent collection, and property maintenance on your behalf.",
-          features: ['Tenant screening', 'Rent collection', 'Maintenance', 'Lease renewal'],
-          image: '',
+            'WhatsApp and phone during shop hours, 08:00 to 20:00. Asking about a size should not take a day.',
         },
       ],
     },
     cta: {
-      heading: 'Need a tailored strategy for your next move?',
-      body: 'Whether you are selling, leasing, or acquiring, our team can structure the right approach around your property objectives.',
-      primaryLabel: 'Contact Our Experts',
-      secondaryLabel: 'Explore Listings',
+      heading: 'Come and try a pair on',
+      body:
+        'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street. Open 08:00 to 20:00.',
+      primaryLabel: 'Get Directions',
+      secondaryLabel: 'Shop Online',
     },
   },
 
@@ -555,132 +313,6 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
   },
 
-  areas: {
-    hero: {
-      kicker: 'Areas We Cover',
-      heading: "Nairobi's Best Neighbourhoods",
-      intro:
-        "We specialise in Nairobi's most sought-after residential areas. Here is what makes each neighbourhood distinct, and roughly what it costs to buy or rent there.",
-      image: '',
-    },
-    // The neighbourhoods themselves, seeded so an editor opens the Areas tab
-    // and sees the six that are actually on the page rather than an empty list
-    // they have to recreate. Emptying the list falls back to the copy compiled
-    // into the page, so clearing it by accident does not blank the section.
-    areas: {
-      items: [
-        {
-          name: "Westlands",
-          navLabel: "Westlands",
-          anchor: "westlands",
-          kicker: "Premium Neighbourhood",
-          description: "Nairobi's commercial heart, where corporate headquarters sit beside some of the city's best restaurants and nightlife. Apartments here trade on convenience: a short commute, everything within walking distance, and rental demand that rarely softens. Popular with professionals and expatriates, and the strongest yields in the city for well-finished one and two-bedroom units.",
-          highlights: [
-            "Sarit Centre & Westgate",
-            "Diplomatic Blue Zone",
-            "Nairobi Expressway access",
-            "Restaurant and nightlife strip"
-          ],
-          saleRange: "KES 8M – 120M",
-          rentRange: "KES 60,000 – 350,000",
-          filterValue: "Westlands",
-          image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80",
-        },
-        {
-          name: "Kilimani",
-          navLabel: "Kilimani",
-          anchor: "kilimani",
-          kicker: "Premium Neighbourhood",
-          description: "Leafy streets that have absorbed more new apartment stock than anywhere else in Nairobi, and still the first place many buyers look. Central without being in the CBD, well served by schools and clinics, and close enough to Yaya Centre and the Kilimani strip that residents rarely need to drive. Good depth of supply means real choice on layout and finish.",
-          highlights: [
-            "Yaya Centre",
-            "Kilimani schools & clinics",
-            "Argwings Kodhek corridor",
-            "Short drive to the CBD"
-          ],
-          saleRange: "KES 6M – 90M",
-          rentRange: "KES 45,000 – 250,000",
-          filterValue: "Kilimani",
-          image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1600&q=80",
-        },
-        {
-          name: "Lavington",
-          navLabel: "Lavington",
-          anchor: "lavington",
-          kicker: "Premium Neighbourhood",
-          description: "Older, quieter and greener than its neighbours, with larger plots and a settled family character. Townhouses and low-rise apartments dominate rather than towers, and the schools are a large part of why people move here and then stay. Prices reflect scarcity: little new land, and owners who are in no hurry to sell.",
-          highlights: [
-            "Lavington Green",
-            "International schools",
-            "Mature tree cover",
-            "Low-rise, low-density"
-          ],
-          saleRange: "KES 15M – 200M",
-          rentRange: "KES 80,000 – 400,000",
-          filterValue: "Lavington",
-          image: "https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=1600&q=80",
-        },
-        {
-          name: "Parklands",
-          navLabel: "Parklands",
-          anchor: "parklands",
-          kicker: "Established Neighbourhood",
-          description: "One of the oldest residential quarters in the city and still one of the best connected, with the Aga Khan Hospital, City Park and the Westlands business district all close. A strong community feel, plenty of amenities within walking distance, and apartment stock ranging from long-established blocks to recent developments.",
-          highlights: [
-            "Aga Khan Hospital",
-            "City Park",
-            "Diverse dining",
-            "Walkable amenities"
-          ],
-          saleRange: "KES 7M – 80M",
-          rentRange: "KES 40,000 – 200,000",
-          filterValue: "Parklands",
-          image: "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1600&q=80",
-        },
-        {
-          name: "Kileleshwa",
-          navLabel: "Kileleshwa",
-          anchor: "kileleshwa",
-          kicker: "Established Neighbourhood",
-          description: "Central, residential and steadily redeveloping, with new apartment blocks replacing older bungalows along Laikipia and Othaya roads. Quieter than Kilimani while being just as close to town, which suits families who want space without a long commute.",
-          highlights: [
-            "Laikipia Road corridor",
-            "Quiet residential streets",
-            "Close to Kilimani & Lavington",
-            "Growing new-build supply"
-          ],
-          saleRange: "KES 8M – 95M",
-          rentRange: "KES 50,000 – 260,000",
-          filterValue: "Kileleshwa",
-          image: "https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=1600&q=80",
-        },
-        {
-          name: "Other Areas",
-          navLabel: "Elsewhere",
-          anchor: "other-areas",
-          kicker: "Wider Nairobi",
-          description: "We also transact across Riverside, South B and C, Ngong Road, Eastleigh and the wider metro. If you have somewhere specific in mind that is not listed here, tell us -- coverage is broader than the neighbourhoods we profile, and off-market stock often sits outside the obvious postcodes.",
-          highlights: [
-            "Riverside",
-            "South B & C",
-            "Ngong Road",
-            "Eastleigh"
-          ],
-          saleRange: "",
-          rentRange: "",
-          filterValue: "",
-          image: "https://images.unsplash.com/photo-1502005229762-cf1b2da7c5d6?auto=format&fit=crop&w=1600&q=80",
-        },
-      ],
-    },
-    cta: {
-      heading: 'Not sure which neighbourhood fits?',
-      body:
-        'Tell us how you live — commute, schools, whether you want quiet or want to walk to dinner — and we will narrow it down.',
-      primaryLabel: 'Talk to an Advisor',
-      secondaryLabel: 'Browse All Properties',
-    },
-  },
 
   terms: {
     hero: {
@@ -740,20 +372,22 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       heading: 'Quick Links',
       items: [
         { label: 'Home', href: '/' },
-        { label: 'Search Listings', href: '/listings' },
-        { label: 'About Our Firm', href: '/about' },
-        { label: 'Contact Agent', href: '/contact' },
-        { label: 'Client Portal', href: '/portal' },
+        { label: 'Shop All', href: '/shop' },
+        { label: 'About Us', href: '/about' },
+        { label: 'Contact', href: '/contact' },
+        { label: 'Staff Portal', href: '/portal' },
       ],
     },
     services: {
-      heading: 'Services',
+      heading: 'Shop',
+      // Categories, linking into the shop's own filter rather than to anchors
+      // on a services page that no longer describes what is sold.
       items: [
-        { label: 'Property Sales', href: '/services#property-sales' },
-        { label: 'Rentals & Lettings', href: '/services#rentals-lettings' },
-        { label: 'Property Advisory', href: '/services#property-advisory' },
-        { label: 'Diaspora Investment', href: '/services#diaspora-investment' },
-        { label: 'Property Management', href: '/services#property-management' },
+        { label: 'Sneakers', href: '/shop?category=sneakers' },
+        { label: 'Boots', href: '/shop?category=boots' },
+        { label: 'Casuals', href: '/shop?category=casuals' },
+        { label: 'Sandals', href: '/shop?category=sandals' },
+        { label: 'Officials', href: '/shop?category=officials' },
       ],
     },
     contact: {
@@ -776,7 +410,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       copyright: '© 2026 Drip Emporium. All Rights Reserved.',
       links: [
         { label: 'About', href: '/about' },
-        { label: 'Listings', href: '/listings' },
+        { label: 'Shop', href: '/shop' },
         { label: 'Contact', href: '/contact' },
         { label: 'Portal', href: '/portal' },
       ],
@@ -810,9 +444,9 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
     highlights: {
       items: [
-        { title: 'Personalized Service', description: 'A dedicated advisor for every enquiry.' },
-        { title: 'Market Expertise', description: 'Deep local knowledge across prime districts.' },
-        { title: 'Exclusive Inventory', description: 'Access to off-market and pre-release residences.' },
+        { title: 'Ask About Your Size', description: 'Tell us the shoe and the size; we answer straight away.' },
+        { title: 'Genuine Stock', description: 'Nike, Adidas, Jordan and Puma, priced honestly.' },
+        { title: 'Two Shops, One Street', description: 'Ronald Ngala Street, open 08:00 to 20:00 daily.' },
       ],
     },
   },

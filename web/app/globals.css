@@ -9851,3 +9851,134 @@ img {
     text-align: center;
   }
 }
+
+/* --- Home and About, shop edition -------------------------------------- */
+.de-home-search {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 14px;
+  max-width: 520px;
+}
+
+.de-home-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--eef-border, #dfe2f0);
+  font-size: 1rem;
+}
+
+.de-home-hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.de-home-cats,
+.de-home-new {
+  padding: 64px 0 0;
+}
+
+.de-cat-grid {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+/* Category tiles rather than cards: they are navigation, and dressing them up
+   would compete with the products below. */
+.de-cat {
+  display: grid;
+  gap: 2px;
+  padding: 20px 18px;
+  border: 1px solid #dfe2f0;
+  background: #fff;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.de-cat:hover {
+  border-color: #06166e;
+}
+
+.de-cat span {
+  font-weight: 600;
+  color: #020721;
+}
+
+.de-cat em {
+  font-style: normal;
+  font-size: 0.82rem;
+  color: #5b6480;
+}
+
+.de-home-new-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.de-home-new-head h2 {
+  font-family: 'Libre Caslon Text', serif;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  margin: 0;
+  color: #020721;
+}
+
+.de-home-new-head p {
+  margin: 6px 0 0;
+  color: #5b6480;
+}
+
+.de-about-story {
+  padding: 56px 0 0;
+  max-width: 760px;
+}
+
+.de-about-story h2,
+.de-about-values h2 {
+  font-family: 'Libre Caslon Text', serif;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  margin: 6px 0 0;
+  color: #020721;
+}
+
+.de-about-story p {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: #454e68;
+}
+
+.de-about-values {
+  padding: 56px 0 64px;
+}
+
+.de-value-grid {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+.de-value {
+  border: 1px solid #dfe2f0;
+  background: #fff;
+  padding: 22px 20px;
+}
+
+.de-value h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  color: #020721;
+}
+
+.de-value p {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: #454e68;
+}

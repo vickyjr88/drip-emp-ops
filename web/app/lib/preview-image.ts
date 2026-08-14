@@ -87,11 +87,12 @@ function hashPath(path: string): number {
  */
 const SPREAD: Record<string, number> = {
   '/': 0,
-  '/listings': 1,
+  '/shop': 1,
   '/about': 2,
-  '/services': 3,
-  '/contact': 4,
-  '/404': 5,
+  '/contact': 3,
+  '/terms': 4,
+  '/privacy': 5,
+  '/404': 6,
 };
 
 /**

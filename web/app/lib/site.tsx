@@ -22,8 +22,8 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3
 export const SITE_NAME = 'Drip Emporium';
 
 export const SITE_DESCRIPTION =
-  'Property sales, rentals and portfolio management in Nairobi. Browse available apartments, ' +
-  'townhouses and plots, or work with our team on acquisition and management.';
+  'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma in ' +
+  'EUR 36-46, at two shops on Ronald Ngala Street.';
 
 /** Absolute URL for a site-relative path. */
 export function absoluteUrl(path = '/') {

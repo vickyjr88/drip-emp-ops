@@ -39,7 +39,6 @@ export function navKeyForHref(href: string): string {
   const path = (href || '').split(/[?#]/)[0].replace(/\/+$/, '') || '/';
   if (path === '/') return 'search';
   if (path.startsWith('/shop')) return 'shop';
-  if (path.startsWith('/services')) return 'services';
   if (path.startsWith('/about')) return 'profile';
   if (path.startsWith('/contact')) return 'contact';
   if (path.startsWith('/portal')) return 'portal';

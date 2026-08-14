@@ -18,23 +18,23 @@ type FooterLink = { label: string; href: string };
 
 const DEFAULT_QUICK_LINKS: FooterLink[] = [
   { label: 'Home', href: '/' },
-  { label: 'Search Listings', href: '/listings' },
-  { label: 'About Our Firm', href: '/about' },
-  { label: 'Contact Agent', href: '/contact' },
-  { label: 'Client Portal', href: '/portal' },
+  { label: 'Shop All', href: '/shop' },
+  { label: 'About Us', href: '/about' },
+  { label: 'Contact', href: '/contact' },
+  { label: 'Staff Portal', href: '/portal' },
 ];
 
 const DEFAULT_SERVICE_LINKS: FooterLink[] = [
-  { label: 'Property Sales', href: '/services#property-sales' },
-  { label: 'Rentals & Lettings', href: '/services#rentals-lettings' },
-  { label: 'Property Advisory', href: '/services#property-advisory' },
-  { label: 'Diaspora Investment', href: '/services#diaspora-investment' },
-  { label: 'Property Management', href: '/services#property-management' },
+  { label: 'Sneakers', href: '/shop?category=sneakers' },
+  { label: 'Boots', href: '/shop?category=boots' },
+  { label: 'Casuals', href: '/shop?category=casuals' },
+  { label: 'Sandals', href: '/shop?category=sandals' },
+  { label: 'Officials', href: '/shop?category=officials' },
 ];
 
 const DEFAULT_BOTTOM_LINKS: FooterLink[] = [
   { label: 'About', href: '/about' },
-  { label: 'Listings', href: '/listings' },
+  { label: 'Shop', href: '/shop' },
   { label: 'Contact', href: '/contact' },
   { label: 'Portal', href: '/portal' },
 ];
@@ -56,13 +56,13 @@ export function SiteFooter() {
   const brandDescription = contentValue(
     content,
     'brand.description',
-    'Your professional partner in Nairobi real estate, providing verified listings, transparent process, and long-term value.',
+    'Quality affordable sneakers and streetwear in Nairobi. Two shops on Ronald Ngala Street, open 08:00 to 20:00.',
   );
 
   const quickHeading = contentValue(content, 'quickLinks.heading', 'Quick Links');
   const quickLinks = contentValue<FooterLink[]>(content, 'quickLinks.items', DEFAULT_QUICK_LINKS);
 
-  const servicesHeading = contentValue(content, 'services.heading', 'Services');
+  const servicesHeading = contentValue(content, 'services.heading', 'Shop');
   const serviceLinks = contentValue<FooterLink[]>(content, 'services.items', DEFAULT_SERVICE_LINKS);
 
   const contactHeading = contentValue(content, 'contact.heading', 'Contact Us');
@@ -113,7 +113,7 @@ export function SiteFooter() {
           <section>
             <h4>{servicesHeading}</h4>
             {serviceLinks.map((link, index) => (
-              <Link key={`${link.href}-${index}`} href={link.href || '/services'}>
+              <Link key={`${link.href}-${index}`} href={link.href || '/shop'}>
                 {link.label}
               </Link>
             ))}

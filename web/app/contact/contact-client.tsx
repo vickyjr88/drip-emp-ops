@@ -50,7 +50,7 @@ export default function ContactClient() {
   const formIntro = contentValue(
     content,
     'form.intro',
-    'Tell us what you are looking for and we will come back to you within one working day. Whether you are buying, letting or looking for someone to manage a property you already own, it helps to know your budget, preferred areas and timing.',
+    'Tell us what you are after and we will come back to you the same day. Naming the shoe, your size and which shop is nearest saves a round of messages.',
   );
   const agentName = contentValue(content, 'agent.name', 'Mohamed Drip Emporium');
   const agentRole = contentValue(content, 'agent.role', 'Principal Broker');
@@ -60,21 +60,21 @@ export default function ContactClient() {
   const phone = contentValue(content, 'details.phone', '+12345678900');
   const email = contentValue(content, 'details.email', 'direct@dripemporium.store');
   const officeName = contentValue(content, 'details.officeName', 'Drip Emporium HQ');
-  const officeAddress = contentValue(content, 'details.officeAddress', 'Manhattan, New York');
+  const officeAddress = contentValue(content, 'details.officeAddress', 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi');
   const highlights = contentValue<Array<{ title: string; description: string }>>(content, 'highlights.items', [
     {
-      title: 'Personalized Service',
+      title: 'Ask About Your Size',
       description:
-        'Every portfolio is managed with extreme attention to individual goals and lifestyle aspirations.',
+        'Tell us your size and what you are after; we will say straight away whether we have it.',
     },
     {
       title: 'Market Expertise',
       description:
-        'Over two decades of experience navigating high-end property acquisitions and investment scaling.',
+        'Genuine stock from Nike, Adidas, Jordan and Puma, priced so you do not have to haggle.',
     },
     {
       title: 'Exclusive Inventory',
-      description: 'Gain access to off-market listings and private estate auctions globally.',
+      description: 'Two shops on Ronald Ngala Street, open 08:00 to 20:00, and a WhatsApp line that gets answered.',
     },
   ]);
 
@@ -179,7 +179,7 @@ export default function ContactClient() {
                 <textarea
                   rows={4}
                   required
-                  placeholder="I am interested in exploring property acquisitions..."
+                  placeholder="Do you have the Air Force 1 in EUR 43?"
                   value={form.message}
                   onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
                 />
@@ -228,7 +228,7 @@ export default function ContactClient() {
             </article>
 
             <article className="lp-contact-why">
-              <h3>Why Choose DRL?</h3>
+              <h3>Why Shop With Us?</h3>
               <ul>
                 {highlights.map((highlight, index) => (
                   <li key={`${highlight.title}-${index}`}>
