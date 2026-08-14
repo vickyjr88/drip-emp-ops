@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, StockMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { RecordMovementDto } from './dto/stock.dto';
 
 /**
@@ -23,7 +24,10 @@ const DIRECTION: Partial<Record<StockMovementType, 1 | -1>> = {
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly posting: SalesPostingService,
+  ) {}
 
   /**
    * Stock across stores, newest movement first.
@@ -124,11 +128,29 @@ export class InventoryService {
         },
       });
 
-      return client.stockLevel.upsert({
+      const updated = await client.stockLevel.upsert({
         where: { variantId_storeId: { variantId: dto.variantId, storeId: dto.storeId } },
         create: { variantId: dto.variantId, storeId: dto.storeId, quantity: delta },
         update: { quantity: { increment: delta } },
       });
+
+      // Stock arriving is an asset gained and owed for; stock damaged is a
+      // loss. Both belong in the ledger, and neither has an order behind it.
+      if (dto.type === 'PURCHASE') {
+        await this.posting.postStockReceipt(
+          { variantId: dto.variantId, storeId: dto.storeId, quantity: dto.quantity,
+            reference: dto.reference || 'Stock received' },
+          client,
+        );
+      } else if (dto.type === 'DAMAGE') {
+        await this.posting.postShrinkage(
+          { variantId: dto.variantId, storeId: dto.storeId, quantity: dto.quantity,
+            reference: dto.reference || 'Damage', reason: dto.notes || 'damaged stock' },
+          client,
+        );
+      }
+
+      return updated;
     };
 
     return tx ? run(tx) : this.prisma.$transaction(run);

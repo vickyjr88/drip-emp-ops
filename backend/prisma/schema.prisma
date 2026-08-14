@@ -330,6 +330,9 @@ model AccountTransfer {
 
 enum JournalSource {
   MANUAL
+  SALES
+  CONSIGNMENT
+  INVENTORY
   AR
   AP
   PETTY_CASH

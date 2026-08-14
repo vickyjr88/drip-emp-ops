@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConsignmentStatus, PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateConsignmentDto, SettleConsignmentDto } from './dto/consignment.dto';
 
 /** The agreed holding period before unsold stock is due back. */
@@ -21,7 +22,10 @@ const INCLUDE = {
 
 @Injectable()
 export class ConsignmentService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly posting: SalesPostingService,
+  ) {}
 
   /** The price a given tier pays, falling back up the tiers when unset. */
   static priceFor(
@@ -208,6 +212,15 @@ export class ConsignmentService {
     });
   }
 
+  /** Cost of goods a reseller reported sold, off the balance sheet. */
+  private async postConsignmentCost(
+    tx: Prisma.TransactionClient, variantId: string, storeId: string, quantity: number, reference: string,
+  ) {
+    const variant = await tx.productVariant.findUnique({ where: { id: variantId } });
+    if (!variant?.costKes) return;
+    await this.posting.postConsignmentCost({ variantId, storeId, quantity, reference }, tx);
+  }
+
   /** Value a reseller is holding that is neither paid for nor returned. */
   private async outstandingFor(resellerId: string, tx: Prisma.TransactionClient) {
     const open = await tx.consignment.findMany({
@@ -261,6 +274,9 @@ export class ConsignmentService {
             direction: 'SOLD', reference: consignment.reference, actor,
           });
           soldValueAdded += sold * Number(line.unitPrice);
+          // Reported sold means the goods are gone: their cost leaves
+          // inventory now, not when the pickup was issued.
+          await this.postConsignmentCost(tx, line.variantId, consignment.storeId, sold, consignment.reference);
         }
         if (returned > 0) {
           await this.moveStock(tx, {
@@ -279,7 +295,7 @@ export class ConsignmentService {
       }
 
       if (dto.amountPaid && dto.amountPaid > 0) {
-        await tx.consignmentPayment.create({
+        const payment = await tx.consignmentPayment.create({
           data: {
             consignmentId: id,
             amount: new Prisma.Decimal(dto.amountPaid),
@@ -288,6 +304,7 @@ export class ConsignmentService {
             receivedBy: actor,
           },
         });
+        await this.posting.postConsignmentPayment(payment.id, tx);
       }
 
       // Closed only when nothing is still out with them.
@@ -392,6 +409,12 @@ export class ConsignmentService {
             reference: consignment.reference, notes: `Written off: ${reason}`, createdBy: actor,
           },
         });
+        // A loss, not a sale: it goes to shrinkage so margin stays readable.
+        await this.posting.postShrinkage(
+          { variantId: line.variantId, storeId: consignment.storeId, quantity: stillOut,
+            reference: consignment.reference, reason: `written off: ${reason}` },
+          tx,
+        );
       }
 
       const written = await tx.consignment.update({

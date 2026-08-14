@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { OrderStatus, PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateOrderDto, RecordOrderPaymentDto } from './dto/create-order.dto';
 
 const INCLUDE = {
@@ -53,6 +54,7 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
+    private readonly posting: SalesPostingService,
   ) {}
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
@@ -238,6 +240,11 @@ export class OrderService {
       });
     }
 
+    // The goods leave the balance sheet once they are actually handed over.
+    if (status === 'DELIVERED') {
+      await this.posting.postOrderCost(id);
+    }
+
     return this.prisma.order.update({
       where: { id },
       data: {
@@ -270,7 +277,7 @@ export class OrderService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.orderPayment.create({
+      const payment = await tx.orderPayment.create({
         data: {
           orderId: id,
           amount: new Prisma.Decimal(dto.amount),
@@ -279,6 +286,10 @@ export class OrderService {
           receivedBy: actor,
         },
       });
+
+      // The takings reach the ledger in the same transaction as the payment,
+      // so the books cannot disagree with the till about what came in.
+      await this.posting.postOrderPayment(payment.id, tx);
 
       const paid = Number(order.amountPaid) + dto.amount;
       const settled = paid >= Number(order.total) - 0.001;

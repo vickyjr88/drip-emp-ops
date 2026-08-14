@@ -121,6 +121,7 @@ const DEFAULT_CHART_OF_ACCOUNTS = [
   { code: '1000', name: 'Cash and Bank', type: 'ASSET', subtype: 'CASH' },
   { code: '1010', name: 'Petty Cash', type: 'ASSET', subtype: 'CASH' },
   { code: '1100', name: 'Accounts Receivable', type: 'ASSET', subtype: 'RECEIVABLE' },
+  { code: '1200', name: 'Inventory', type: 'ASSET', subtype: 'INVENTORY' },
   { code: '1500', name: 'Fixed Assets', type: 'ASSET', subtype: 'FIXED_ASSET' },
   { code: '1510', name: 'Accumulated Depreciation', type: 'ASSET', subtype: 'CONTRA_ASSET' },
   { code: '2100', name: 'Accounts Payable', type: 'LIABILITY', subtype: 'PAYABLE' },
@@ -136,21 +137,18 @@ const DEFAULT_CHART_OF_ACCOUNTS = [
   { code: '2370', name: 'Net Pay Payable', type: 'LIABILITY', subtype: 'PAYROLL' },
   { code: '3000', name: "Owner's Equity", type: 'EQUITY', subtype: 'CAPITAL' },
   { code: '4000', name: 'Sales Revenue', type: 'REVENUE', subtype: 'SALES' },
-  { code: '4100', name: 'Rental Revenue', type: 'REVENUE', subtype: 'RENTAL' },
+  { code: '4200', name: 'Wholesale Revenue', type: 'REVENUE', subtype: 'SALES' },
+  { code: '4900', name: 'Sales Discounts', type: 'REVENUE', subtype: 'SALES' },
   { code: '5000', name: 'General Expense', type: 'EXPENSE', subtype: 'OPERATING' },
-  // Project cost structure. Two parents so a project report can answer "what
-  // did construction cost vs what did managing it cost", with one child per
-  // category the business already tracks.
-  { code: '5100', name: 'Cost of Construction', type: 'EXPENSE', subtype: 'CONSTRUCTION' },
-  { code: '5110', name: 'Construction Materials & Works', type: 'EXPENSE', subtype: 'CONSTRUCTION', parentCode: '5100' },
-  { code: '5120', name: 'Excavation & Site Works', type: 'EXPENSE', subtype: 'CONSTRUCTION', parentCode: '5100' },
-  { code: '5130', name: 'Legal, Approvals & Professional Fees', type: 'EXPENSE', subtype: 'CONSTRUCTION', parentCode: '5100' },
-  { code: '5140', name: 'Land Rent', type: 'EXPENSE', subtype: 'CONSTRUCTION', parentCode: '5100' },
-  { code: '5200', name: 'Cost of Management', type: 'EXPENSE', subtype: 'MANAGEMENT' },
-  { code: '5210', name: 'Salaries & Staff Costs', type: 'EXPENSE', subtype: 'MANAGEMENT', parentCode: '5200' },
-  { code: '5220', name: 'Office Rent', type: 'EXPENSE', subtype: 'MANAGEMENT', parentCode: '5200' },
-  { code: '5230', name: 'Other Operating Costs', type: 'EXPENSE', subtype: 'MANAGEMENT', parentCode: '5200' },
-  { code: '5240', name: 'Broker Commissions', type: 'EXPENSE', subtype: 'MANAGEMENT', parentCode: '5200' },
+  // Retail cost structure: what the goods cost, then what running the shops
+  // costs, so a profit and loss separates margin from overheads.
+  { code: '5300', name: 'Cost of Goods Sold', type: 'EXPENSE', subtype: 'COGS' },
+  { code: '5310', name: 'Inventory Shrinkage', type: 'EXPENSE', subtype: 'COGS', parentCode: '5300' },
+  { code: '5400', name: 'Shop Operating Costs', type: 'EXPENSE', subtype: 'OPERATING' },
+  { code: '5410', name: 'Salaries & Staff Costs', type: 'EXPENSE', subtype: 'OPERATING', parentCode: '5400' },
+  { code: '5420', name: 'Shop Rent', type: 'EXPENSE', subtype: 'OPERATING', parentCode: '5400' },
+  { code: '5430', name: 'Other Operating Costs', type: 'EXPENSE', subtype: 'OPERATING', parentCode: '5400' },
+  { code: '5440', name: 'Delivery & Transport', type: 'EXPENSE', subtype: 'OPERATING', parentCode: '5400' },
   { code: '5900', name: 'Depreciation Expense', type: 'EXPENSE', subtype: 'DEPRECIATION' },
   { code: '9999', name: 'Suspense', type: 'ASSET', subtype: 'SUSPENSE' },
 ];
