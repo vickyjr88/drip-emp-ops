@@ -12,7 +12,7 @@
   --lp-charcoal: #101010;
   --lp-text: #212121;
   --lp-muted: #6c6c6c;
-  --lp-red: #b70011;
+  --lp-red: #06166e;
   --lp-border: #e5e5e5;
 }
 
@@ -1384,7 +1384,7 @@ img {
   margin: 0 0 12px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: #f1aaa5;
+  color: #c3c9ee;
   font-weight: 700;
 }
 
@@ -1441,7 +1441,7 @@ img {
 
 .lp-about-leadership-caption p {
   margin: 0;
-  color: #ffb4ab;
+  color: #c3c9ee;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 0.72rem;
@@ -1486,7 +1486,7 @@ img {
 .lp-about-heritage-subtitle {
   margin: 0 0 34px;
   text-align: center;
-  color: #e6655c;
+  color: #4a5cc4;
   text-transform: uppercase;
   letter-spacing: 0.14em;
   font-size: 0.75rem;
@@ -1553,7 +1553,7 @@ img {
   width: 16px;
   height: 16px;
   border-radius: 9999px;
-  background: #e31e24;
+  background: #172688;
   border: 4px solid #111;
   justify-self: center;
   position: relative;
@@ -3165,14 +3165,14 @@ img {
 }
 
   :root {
-    --eef-primary: #ba0013;
-    --eef-primary-container: #e31e24;
+    --eef-primary: #06166e;
+    --eef-primary-container: #172688;
     --eef-black: #1a1c1c;
     --eef-white: #ffffff;
     --eef-surface: #f9f9f9;
     --eef-surface-low: #f3f3f4;
     --eef-border: #e2e2e2;
-    --eef-outline: #926f6b;
+    --eef-outline: #6c7493;
   }
 
   .portal-dialog-overlay {
@@ -3562,7 +3562,7 @@ img {
   }
 
   .portal-dropzone.is-dragging {
-    background: #fff5f5;
+    background: #f4f5fc;
     border-color: var(--eef-primary);
   }
 
@@ -4241,8 +4241,8 @@ img {
 
   .portal-role-banner {
     border-left: 4px solid var(--eef-primary);
-    background: #fff9f8;
-    color: #4b2a2a;
+    background: #f4f5fc;
+    color: #2a3050;
     font-size: 14px;
     line-height: 1.5;
   }
@@ -4431,7 +4431,7 @@ img {
   .portal-cms-image-warning {
     margin: 0 0 8px;
     font-size: 12px;
-    color: #ba0013;
+    color: #06166e;
   }
 
   .portal-inline-btn.is-disabled {
@@ -4491,7 +4491,7 @@ img {
 
   .portal-trend-bar {
     width: 100%;
-    background: linear-gradient(180deg, #ba0013 0%, #1a1c1c 100%);
+    background: linear-gradient(180deg, #06166e 0%, #1a1c1c 100%);
     transition: height 0.3s ease;
   }
 
@@ -4637,8 +4637,8 @@ img {
   }
 
   .portal-primary-btn.is-danger:hover {
-    background: #6e0007;
-    border-color: #6e0007;
+    background: #020b3d;
+    border-color: #020b3d;
   }
 
   .portal-entity-form {
@@ -5207,8 +5207,8 @@ img {
 
   .portal-chip.is-danger {
     background: #fdecec;
-    border-color: #c0392b;
-    color: #a4291b;
+    border-color: #2438a8;
+    color: #172688;
   }
 
   /* Paused rules and non-delivered reminders: present but not drawing the eye. */
@@ -5500,7 +5500,7 @@ img {
 
   .portal-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #ba0013 0%, #1a1c1c 100%);
+    background: linear-gradient(90deg, #06166e 0%, #1a1c1c 100%);
   }
 
   .portal-empty-state,
@@ -6249,7 +6249,7 @@ img {
      colours below are reserved for state and are never reused as a series.
      ===================================================================== */
   :root {
-    --chart-cat-1: #ba0013;
+    --chart-cat-1: #06166e;
     --chart-cat-2: #0f6f9c;
     --chart-cat-3: #c98a00;
     --chart-cat-4: #1c7d47;
@@ -6261,15 +6261,15 @@ img {
        adjacent dL >= 0.06, single hue (13 deg spread), light end 2.06:1 vs
        surface. Darkest = worst (most overdue, least complete), which is the
        direction these buckets are read in. */
-    --chart-seq-1: #e3a1a9;
-    --chart-seq-2: #d17d88;
-    --chart-seq-3: #bd4e5c;
-    --chart-seq-4: #991525;
-    --chart-seq-5: #6b0811;
+    --chart-seq-1: #c3c9ee;
+    --chart-seq-2: #8a95dc;
+    --chart-seq-3: #4a5cc4;
+    --chart-seq-4: #0d2088;
+    --chart-seq-5: #020b3d;
 
     --chart-good: #1c7d47;
     --chart-warn: #c98a00;
-    --chart-bad: #ba0013;
+    --chart-bad: #06166e;
 
     --chart-grid: #e6e6e4;
     --chart-ink: #1a1c1c;
@@ -6287,9 +6287,9 @@ img {
      (band/chroma/normal-vision/contrast all PASS, green-amber deutan dE 8.0 at
      the top of the floor band, legal with the labels and legends used here):
 
-       --chart-cat: #e8434f #2b93c4 #bd7d16 #31a86a #8f6ede
-       --chart-seq: #4a1015 #7d1a24 #b03340 #d95f6b #f0959d
-       --chart-good #31a86a  --chart-warn #bd7d16  --chart-bad #e8434f
+       --chart-cat: #2438a8 #2b93c4 #bd7d16 #31a86a #8f6ede
+       --chart-seq: #020721 #0d2088 #2438a8 #4a5cc4 #8a95dc
+       --chart-good #31a86a  --chart-warn #bd7d16  --chart-bad #2438a8
        --chart-grid #2a2a28  --chart-ink #ececea   --chart-ink-soft #a0a09c
 
      Reinstate it as :root[data-theme="dark"] together with that theme, not as
@@ -6925,7 +6925,7 @@ img {
 }
 
 .notfound-card:focus-visible {
-  outline: 2px solid var(--lp-red, #ba0013);
+  outline: 2px solid var(--lp-red, #06166e);
   outline-offset: -2px;
 }
 
@@ -6948,7 +6948,7 @@ img {
   left: 24px;
   bottom: 20px;
   font-size: 1rem;
-  color: var(--lp-red, #ba0013);
+  color: var(--lp-red, #06166e);
   transition: transform 140ms ease;
 }
 
@@ -6963,7 +6963,7 @@ img {
 }
 
 .notfound-footnote a {
-  color: var(--lp-red, #ba0013);
+  color: var(--lp-red, #06166e);
   text-underline-offset: 3px;
 }
 
@@ -8784,7 +8784,9 @@ img {
 /* --- Homepage: about the firm and track record ------------------------- */
 .lp-home-about {
   padding: 72px 0;
-  background: #faf9f7;
+  /* The brand tint, matching the storefront rather than the warm off-white
+     this carried over from the previous project. */
+  background: #f4f5fc;
 }
 
 .lp-home-about-inner {
@@ -9097,7 +9099,7 @@ img {
 
 .lp-legal-empty {
   border: 1px solid var(--eef-border, #dddddd);
-  background: #faf9f7;
+  background: #f4f5fc;
   padding: 24px 26px;
 }
 
@@ -9318,14 +9320,35 @@ img {
    ========================================================================== */
 .de-shop,
 .de-product {
-  --de-ink: #14161a;
-  --de-muted: #6b7280;
-  --de-line: #e3e1dc;
-  --de-paper: #faf9f7;
-  /* The brand blue. 6.26:1 on white, so it carries text as well as fills. */
-  --de-royal: #3457c9;
-  /* WhatsApp keeps its own green: the button is recognised by that colour,
-     and repainting it in the brand blue would cost more than it gains. */
+  /* --- Brand ramp -------------------------------------------------------
+     Sampled from the brand artwork rather than guessed: #06166e is 78% of
+     those pixels, #172688 the lighter accent, #020721 the near-black. The
+     tints between are stepped toward white on the same hue, so a pale fill
+     still reads as the brand rather than as grey.
+
+     Contrast on white: 400 is 5.80:1 and the lightest step that carries body
+     text; 300 and above are surfaces and borders only. */
+  --de-900: #020721;
+  --de-800: #06166e;
+  --de-700: #0d2088;
+  --de-600: #172688;
+  --de-500: #2438a8;
+  --de-400: #4a5cc4;
+  --de-300: #8a95dc;
+  --de-200: #c3c9ee;
+  --de-100: #e8eaf8;
+  --de-050: #f4f5fc;
+
+  /* Ink is the brand near-black, so even body copy sits on the same hue as
+     the rest of the palette instead of a neutral grey. */
+  --de-ink: var(--de-900);
+  --de-muted: #5b6480;
+  --de-line: #dfe2f0;
+  --de-paper: var(--de-050);
+  /* The brand navy, used for fills and any coloured text. */
+  --de-royal: var(--de-800);
+  /* WhatsApp keeps its own green: that button is recognised by its colour,
+     and repainting it in the brand navy would cost more than it gains. */
   --de-go: #0f7a40;
   padding-bottom: 84px;
 }
@@ -9466,7 +9489,7 @@ img {
   position: relative;
   display: block;
   aspect-ratio: 1 / 1;
-  background: var(--de-paper);
+  background: var(--de-100);
   overflow: hidden;
 }
 
@@ -9500,14 +9523,14 @@ img {
   justify-content: center;
   font-family: 'Libre Caslon Text', serif;
   font-size: 3rem;
-  color: #cfcdc7;
+  color: var(--de-400);
 }
 
 .de-card-flag {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: var(--de-ink);
+  background: var(--de-800);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -9629,7 +9652,7 @@ img {
 .de-gallery-main {
   position: relative;
   aspect-ratio: 1 / 1;
-  background: var(--de-paper);
+  background: var(--de-100);
   border: 1px solid var(--de-line);
   overflow: hidden;
 }
@@ -9653,7 +9676,7 @@ img {
   height: 66px;
   padding: 0;
   border: 1px solid var(--de-line);
-  background: var(--de-paper);
+  background: var(--de-100);
   cursor: pointer;
   overflow: hidden;
 }
@@ -9748,8 +9771,8 @@ img {
 /* Struck through and dimmed: a sold-out size is legible as sold out before
    anyone clicks it. */
 .de-size.is-out {
-  color: #7d7a74;
-  background: var(--de-paper);
+  color: #6c7493;
+  background: var(--de-100);
   cursor: not-allowed;
   text-decoration: line-through;
 }
@@ -9788,7 +9811,7 @@ img {
 .de-assurances li::before {
   content: '✓';
   margin-right: 8px;
-  color: var(--de-go);
+  color: var(--de-600);
   font-weight: 700;
 }
 
