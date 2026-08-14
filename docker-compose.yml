@@ -9,14 +9,14 @@ services:
         # Next.js inlines NEXT_PUBLIC_* at build time, so these have to be build
         # args. Setting them only at runtime leaves the browser bundle pointing at
         # the localhost defaults and the deployed site cannot reach the API.
-        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3100}
+        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3101}
         # The site's own public origin, used for canonical URLs, Open Graph tags,
         # sitemap.xml and robots.txt -- all of which are absolute. Left at the
         # localhost default in production, every canonical would point at
         # localhost and the site would effectively de-index itself.
-        - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3002}
+        - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
     ports:
-      - "3002:3002"
+      - "${WEB_PORT:-3003}:3002"
     environment:
       # Server-side rendering runs inside this container, where localhost is the
       # web app itself. Server fetches must go to the backend service directly;
@@ -32,7 +32,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3100:3100"
+      - "${API_PORT:-3101}:3100"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       # No default: auth falls back to a hardcoded dev key when this is unset,
@@ -89,7 +89,7 @@ services:
     volumes:
       - redis-data:/data
     ports:
-      - "16379:6379"
+      - "${REDIS_PORT:-16380}:6379"
     restart: unless-stopped
 
   db:
@@ -106,7 +106,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     ports:
-      - "15432:5432"
+      - "${DB_PORT:-15433}:5432"
     restart: unless-stopped
 
   minio:
@@ -116,8 +116,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "19000:9000"
-      - "19001:9001"
+      - "${MINIO_HOST_PORT:-19002}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-19003}:9001"
     volumes:
       - minio-data:/data
     restart: unless-stopped
