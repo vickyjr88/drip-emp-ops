@@ -15,8 +15,8 @@
 import { useEffect, useState } from 'react';
 import { PageContentDocument, contentValue, fetchPageContent } from './page-content';
 
-const DEFAULT_WHATSAPP = '254722872539';
-const DEFAULT_PHONE = '+254 722 872 539';
+const DEFAULT_WHATSAPP = '254113206481';
+const DEFAULT_PHONE = '+254 113 206 481';
 
 export function useEnquiryContact() {
   const [content, setContent] = useState<PageContentDocument | null>(null);

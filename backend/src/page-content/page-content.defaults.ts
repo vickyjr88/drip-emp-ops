@@ -713,11 +713,9 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     nav: {
       items: [
         { label: 'Home', href: '/' },
-        { label: 'Properties', href: '/properties' },
-        { label: 'Areas', href: '/areas' },
-        { label: 'Services', href: '/services' },
+        { label: 'Shop', href: '/shop' },
         { label: 'About', href: '/about' },
-        { label: 'Portal', href: '/portal' },
+        { label: 'Contact', href: '/contact' },
       ],
     },
     cta: {

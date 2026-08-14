@@ -21,11 +21,9 @@ export type NavLink = { label: string; href: string };
 
 export const DEFAULT_NAV_LINKS: NavLink[] = [
   { label: 'Home', href: '/' },
-  { label: 'Properties', href: '/properties' },
-  { label: 'Areas', href: '/areas' },
-  { label: 'Services', href: '/services' },
+  { label: 'Shop', href: '/shop' },
   { label: 'About', href: '/about' },
-  { label: 'Portal', href: '/portal' },
+  { label: 'Contact', href: '/contact' },
 ];
 
 /**
@@ -40,8 +38,7 @@ export const DEFAULT_NAV_LINKS: NavLink[] = [
 export function navKeyForHref(href: string): string {
   const path = (href || '').split(/[?#]/)[0].replace(/\/+$/, '') || '/';
   if (path === '/') return 'search';
-  if (path.startsWith('/properties') || path.startsWith('/listings')) return 'listings';
-  if (path.startsWith('/areas')) return 'areas';
+  if (path.startsWith('/shop')) return 'shop';
   if (path.startsWith('/services')) return 'services';
   if (path.startsWith('/about')) return 'profile';
   if (path.startsWith('/contact')) return 'contact';

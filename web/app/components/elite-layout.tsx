@@ -4,7 +4,7 @@ import { WhatsAppFloat } from './whatsapp-float';
 
 // 'none' is for pages that sit outside the primary nav -- the 404, for
 // instance -- so nothing is highlighted rather than an arbitrary tab.
-type NavKey = 'search' | 'listings' | 'areas' | 'services' | 'profile' | 'contact' | 'portal' | 'none';
+type NavKey = 'search' | 'shop' | 'services' | 'profile' | 'contact' | 'portal' | 'none';
 
 
 export function EliteLayout({

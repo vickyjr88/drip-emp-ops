@@ -67,7 +67,7 @@ export function SiteFooter() {
 
   const contactHeading = contentValue(content, 'contact.heading', 'Contact Us');
   const email = contentValue(content, 'contact.email', 'info@dripemporium.store');
-  const phone = contentValue(content, 'contact.phone', '+254 722 872 539');
+  const phone = contentValue(content, 'contact.phone', '+254 113 206 481');
   const address = contentValue(content, 'contact.address', 'Nairobi, Kenya');
 
   const copyright = contentValue(
