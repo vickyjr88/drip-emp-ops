@@ -86,7 +86,7 @@ type StagedDocument = {
 };
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
-const TOKEN_KEY = 'drl_access_token';
+const TOKEN_KEY = 'de_access_token';
 
 async function apiRequest<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {

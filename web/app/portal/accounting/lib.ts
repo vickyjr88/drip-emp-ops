@@ -1,5 +1,5 @@
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
-export const TOKEN_KEY = 'drl_access_token';
+export const TOKEN_KEY = 'de_access_token';
 
 export type AuthRole = {
   id: string;
