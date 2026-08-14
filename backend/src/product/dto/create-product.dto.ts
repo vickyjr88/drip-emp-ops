@@ -26,6 +26,18 @@ export class CreateVariantDto {
   @Min(0)
   priceKes!: number;
 
+  @ApiPropertyOptional({ description: 'What a competing shop pays. Falls back to retail when unset.' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  resellerPriceKes?: number;
+
+  @ApiPropertyOptional({ description: 'Keenest price, for bulk. Lowest of the three.' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  wholesalePriceKes?: number;
+
   @ApiPropertyOptional({ description: 'Buying price, for margin. Never shown to customers.' })
   @IsOptional()
   @IsNumber()

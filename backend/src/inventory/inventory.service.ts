@@ -3,8 +3,15 @@ import { Prisma, StockMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecordMovementDto } from './dto/stock.dto';
 
-/** Which way each movement pushes the count. */
-const DIRECTION: Record<StockMovementType, 1 | -1> = {
+/**
+ * Which way each movement pushes the shop-floor count.
+ *
+ * The consignment types are deliberately absent: they move stock between the
+ * floor and the consignment bucket and must go through the consignment
+ * service, which writes the paperwork alongside. Recording one by hand here
+ * would move the count without a pickup behind it.
+ */
+const DIRECTION: Partial<Record<StockMovementType, 1 | -1>> = {
   PURCHASE: 1,
   RETURN: 1,
   TRANSFER_IN: 1,
@@ -84,7 +91,13 @@ export class InventoryService {
       if (!variant) throw new NotFoundException(`Variant ${dto.variantId} not found`);
       if (!store) throw new NotFoundException(`Store ${dto.storeId} not found`);
 
-      const delta = DIRECTION[dto.type] * dto.quantity;
+      const direction = DIRECTION[dto.type];
+      if (!direction) {
+        throw new BadRequestException(
+          `${dto.type} is recorded by issuing or settling a consignment, not as a manual movement.`,
+        );
+      }
+      const delta = direction * dto.quantity;
 
       const level = await client.stockLevel.findUnique({
         where: { variantId_storeId: { variantId: dto.variantId, storeId: dto.storeId } },

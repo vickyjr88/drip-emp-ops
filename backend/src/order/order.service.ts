@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus, PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { CreateOrderDto, RecordOrderPaymentDto } from './dto/create-order.dto';
@@ -34,6 +34,20 @@ const NEXT: Record<OrderStatus, OrderStatus[]> = {
   REFUNDED: [],
 };
 
+/** What a given tier pays, falling back up the tiers when a price is unset. */
+function priceForTier(
+  variant: { priceKes: Prisma.Decimal; resellerPriceKes: Prisma.Decimal | null; wholesalePriceKes: Prisma.Decimal | null },
+  tier: PriceTier,
+): number {
+  if (tier === 'WHOLESALE') {
+    return Number(variant.wholesalePriceKes ?? variant.resellerPriceKes ?? variant.priceKes);
+  }
+  if (tier === 'RESELLER') {
+    return Number(variant.resellerPriceKes ?? variant.priceKes);
+  }
+  return Number(variant.priceKes);
+}
+
 @Injectable()
 export class OrderService {
   constructor(
@@ -66,11 +80,17 @@ export class OrderService {
       const missing = variantIds.filter((id) => !byId.has(id));
       if (missing.length) throw new NotFoundException(`Unknown variant(s): ${missing.join(', ')}`);
 
+      const tier = dto.priceTier ?? PriceTier.RETAIL;
+
       const lines = dto.lines.map((line) => {
         const variant = byId.get(line.variantId)!;
+        // The marked price for this tier, kept beside what was actually
+        // charged: a walk-in can be talked up or down, and "sold at 3,200"
+        // means little without knowing it was marked at 3,499.
+        const listPrice = priceForTier(variant, tier);
         // Price is copied now: repricing the variant later must not rewrite
         // what this order says was charged.
-        const unitPrice = line.unitPrice ?? Number(variant.priceKes);
+        const unitPrice = line.unitPrice ?? listPrice;
         const discount = line.discount ?? 0;
         const lineTotal = unitPrice * line.quantity - discount;
         if (lineTotal < 0) {
@@ -81,6 +101,7 @@ export class OrderService {
           description: `${variant.name} (${variant.sku})`,
           quantity: line.quantity,
           unitPrice: new Prisma.Decimal(unitPrice),
+          listPrice: new Prisma.Decimal(listPrice),
           discount: new Prisma.Decimal(discount),
           lineTotal: new Prisma.Decimal(lineTotal),
         };
@@ -88,7 +109,13 @@ export class OrderService {
 
       const subtotal = lines.reduce((sum, line) => sum + Number(line.lineTotal), 0);
       const discount = dto.discount ?? 0;
-      const shipping = dto.shipping ?? 0;
+      // A walk-in carries their shoes out of the shop, so shipping on an
+      // in-store sale is always a mistake rather than a choice.
+      const walkIn = (dto.channel || 'IN_STORE') === 'IN_STORE';
+      if (walkIn && dto.shipping) {
+        throw new BadRequestException('There is no shipping on an in-store sale.');
+      }
+      const shipping = walkIn ? 0 : dto.shipping ?? 0;
       const total = subtotal - discount + shipping;
       if (total < 0) throw new BadRequestException('The order discount is more than the order is worth.');
 
@@ -98,6 +125,7 @@ export class OrderService {
           storeId: dto.storeId,
           customerId: dto.customerId,
           channel: dto.channel || 'IN_STORE',
+          priceTier: tier,
           customerName: dto.customerName,
           customerPhone: dto.customerPhone,
           customerEmail: dto.customerEmail,

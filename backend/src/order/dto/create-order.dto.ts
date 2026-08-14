@@ -4,7 +4,7 @@ import {
   ArrayMinSize, IsArray, IsEmail, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional,
   IsString, Min, ValidateNested,
 } from 'class-validator';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, PriceTier } from '@prisma/client';
 
 export class CreateOrderLineDto {
   @ApiProperty()
@@ -40,6 +40,14 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   customerId?: string;
+
+  @ApiPropertyOptional({
+    enum: PriceTier,
+    description: 'Which price list to use. A walk-in is RETAIL; a shop buying outright is RESELLER or WHOLESALE.',
+  })
+  @IsOptional()
+  @IsEnum(PriceTier)
+  priceTier?: PriceTier;
 
   @ApiPropertyOptional({ example: 'IN_STORE', description: 'IN_STORE, WHATSAPP, INSTAGRAM, WEBSITE.' })
   @IsOptional()

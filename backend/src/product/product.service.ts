@@ -45,6 +45,8 @@ export class ProductService {
       name: dto.name,
       attributes: (dto.attributes ?? undefined) as Prisma.InputJsonValue | undefined,
       priceKes: new Prisma.Decimal(dto.priceKes),
+      ...(dto.resellerPriceKes !== undefined ? { resellerPriceKes: new Prisma.Decimal(dto.resellerPriceKes) } : {}),
+      ...(dto.wholesalePriceKes !== undefined ? { wholesalePriceKes: new Prisma.Decimal(dto.wholesalePriceKes) } : {}),
       ...(dto.costKes !== undefined ? { costKes: new Prisma.Decimal(dto.costKes) } : {}),
       barcode: dto.barcode,
       isActive: dto.isActive ?? true,
@@ -171,6 +173,8 @@ export class ProductService {
           ? { attributes: dto.attributes as Prisma.InputJsonValue }
           : {}),
         ...(dto.priceKes !== undefined ? { priceKes: new Prisma.Decimal(dto.priceKes) } : {}),
+        ...(dto.resellerPriceKes !== undefined ? { resellerPriceKes: new Prisma.Decimal(dto.resellerPriceKes) } : {}),
+        ...(dto.wholesalePriceKes !== undefined ? { wholesalePriceKes: new Prisma.Decimal(dto.wholesalePriceKes) } : {}),
         ...(dto.costKes !== undefined ? { costKes: new Prisma.Decimal(dto.costKes) } : {}),
         ...(dto.barcode !== undefined ? { barcode: dto.barcode } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),

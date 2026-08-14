@@ -4,6 +4,8 @@ import { ProductCategoryModule } from './product-category/product-category.modul
 import { ProductModule } from './product/product.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { OrderModule } from './order/order.module';
+import { ResellerModule } from './reseller/reseller.module';
+import { ConsignmentModule } from './consignment/consignment.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 
@@ -56,6 +58,8 @@ import { PdfModule } from './pdf/pdf.module';
     ProductModule,
     InventoryModule,
     OrderModule,
+    ResellerModule,
+    ConsignmentModule,
     PrismaModule,
     CustomerModule,
     CustomerPortalModule,

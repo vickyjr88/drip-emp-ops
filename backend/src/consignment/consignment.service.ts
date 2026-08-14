@@ -1,0 +1,396 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConsignmentStatus, PriceTier, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateConsignmentDto, SettleConsignmentDto } from './dto/consignment.dto';
+
+/** The agreed holding period before unsold stock is due back. */
+export const HOLDING_DAYS = 3;
+
+const INCLUDE = {
+  reseller: { select: { id: true, code: true, name: true, phone: true, priceTier: true } },
+  store: { select: { id: true, code: true, name: true } },
+  lines: {
+    include: {
+      variant: {
+        select: { id: true, sku: true, name: true, product: { select: { name: true, brand: true } } },
+      },
+    },
+  },
+  payments: { orderBy: { receivedAt: 'asc' } },
+} satisfies Prisma.ConsignmentInclude;
+
+@Injectable()
+export class ConsignmentService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** The price a given tier pays, falling back up the tiers when unset. */
+  static priceFor(
+    variant: { priceKes: Prisma.Decimal; resellerPriceKes: Prisma.Decimal | null; wholesalePriceKes: Prisma.Decimal | null },
+    tier: PriceTier,
+  ): number {
+    if (tier === 'WHOLESALE') {
+      return Number(variant.wholesalePriceKes ?? variant.resellerPriceKes ?? variant.priceKes);
+    }
+    if (tier === 'RESELLER') {
+      return Number(variant.resellerPriceKes ?? variant.priceKes);
+    }
+    return Number(variant.priceKes);
+  }
+
+  private async nextReference(tx: Prisma.TransactionClient) {
+    const year = new Date().getFullYear();
+    const count = await tx.consignment.count({ where: { reference: { startsWith: `CON-${year}-` } } });
+    return `CON-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  /**
+   * Hands goods to a reseller.
+   *
+   * The stock moves off the shop floor into the consignment bucket rather than
+   * leaving entirely: it is still owned, and it either comes back or gets paid
+   * for. Keeping it out of `quantity` is what stops the same pair being sold
+   * over the counter while it sits in someone else's shop.
+   */
+  async create(dto: CreateConsignmentDto, actor = 'system') {
+    return this.prisma.$transaction(async (tx) => {
+      const [reseller, store] = await Promise.all([
+        tx.reseller.findUnique({ where: { id: dto.resellerId } }),
+        tx.store.findUnique({ where: { id: dto.storeId } }),
+      ]);
+      if (!reseller) throw new NotFoundException(`Reseller ${dto.resellerId} not found`);
+      if (!store) throw new NotFoundException(`Store ${dto.storeId} not found`);
+      if (!reseller.isActive) {
+        throw new BadRequestException(`${reseller.name} is not active.`);
+      }
+
+      const tier = dto.priceTier ?? reseller.priceTier;
+      const variants = await tx.productVariant.findMany({
+        where: { id: { in: dto.lines.map((line) => line.variantId) } },
+      });
+      const byId = new Map(variants.map((variant) => [variant.id, variant]));
+
+      const lines = dto.lines.map((line) => {
+        const variant = byId.get(line.variantId);
+        if (!variant) throw new NotFoundException(`Variant ${line.variantId} not found`);
+        // Fixed now: a price rise next month does not change what is owed on
+        // stock already sitting in their shop.
+        const unitPrice = line.unitPrice ?? ConsignmentService.priceFor(variant, tier);
+        return {
+          variantId: variant.id,
+          description: `${variant.name} (${variant.sku})`,
+          quantityOut: line.quantity,
+          unitPrice: new Prisma.Decimal(unitPrice),
+        };
+      });
+
+      const totalValue = lines.reduce(
+        (sum, line) => sum + Number(line.unitPrice) * line.quantityOut,
+        0,
+      );
+
+      if (Number(reseller.creditLimit) > 0) {
+        const outstanding = await this.outstandingFor(reseller.id, tx);
+        if (outstanding + totalValue > Number(reseller.creditLimit)) {
+          throw new BadRequestException(
+            `${reseller.name} would be holding ${(outstanding + totalValue).toLocaleString()} against a limit of ${Number(reseller.creditLimit).toLocaleString()}.`,
+          );
+        }
+      }
+
+      const due = dto.dueDate
+        ? new Date(dto.dueDate)
+        : new Date(Date.now() + HOLDING_DAYS * 24 * 60 * 60 * 1000);
+
+      const consignment = await tx.consignment.create({
+        data: {
+          reference: await this.nextReference(tx),
+          resellerId: dto.resellerId,
+          storeId: dto.storeId,
+          priceTier: tier,
+          totalValue: new Prisma.Decimal(totalValue),
+          dueDate: due,
+          notes: dto.notes,
+          createdBy: actor,
+          lines: { create: lines },
+        },
+        include: INCLUDE,
+      });
+
+      for (const line of dto.lines) {
+        await this.moveStock(tx, {
+          variantId: line.variantId,
+          storeId: dto.storeId,
+          quantity: line.quantity,
+          direction: 'OUT',
+          reference: consignment.reference,
+          actor,
+        });
+      }
+
+      return consignment;
+    });
+  }
+
+  /**
+   * Moves stock between the shop floor and the consignment bucket.
+   *
+   * Both counts change together and a movement is written for each, so the
+   * running totals and the audit trail can never disagree about where a pair
+   * of shoes is.
+   */
+  private async moveStock(
+    tx: Prisma.TransactionClient,
+    params: {
+      variantId: string; storeId: string; quantity: number;
+      direction: 'OUT' | 'RETURN' | 'SOLD';
+      reference: string; actor: string;
+    },
+  ) {
+    const level = await tx.stockLevel.findUnique({
+      where: { variantId_storeId: { variantId: params.variantId, storeId: params.storeId } },
+    });
+
+    if (params.direction === 'OUT') {
+      const onFloor = level?.quantity ?? 0;
+      if (onFloor < params.quantity) {
+        throw new BadRequestException(
+          `Only ${onFloor} on the shop floor; cannot send out ${params.quantity}.`,
+        );
+      }
+      await tx.stockLevel.update({
+        where: { variantId_storeId: { variantId: params.variantId, storeId: params.storeId } },
+        data: { quantity: { decrement: params.quantity }, onConsignment: { increment: params.quantity } },
+      });
+      await tx.stockMovement.create({
+        data: {
+          variantId: params.variantId, storeId: params.storeId,
+          type: 'CONSIGNMENT_OUT', quantity: -params.quantity,
+          reference: params.reference, createdBy: params.actor,
+        },
+      });
+      return;
+    }
+
+    const held = level?.onConsignment ?? 0;
+    if (held < params.quantity) {
+      throw new BadRequestException(
+        `Only ${held} recorded as out with resellers; cannot account for ${params.quantity}.`,
+      );
+    }
+
+    if (params.direction === 'RETURN') {
+      // Comes back to the shop floor, so it is sellable again.
+      await tx.stockLevel.update({
+        where: { variantId_storeId: { variantId: params.variantId, storeId: params.storeId } },
+        data: { quantity: { increment: params.quantity }, onConsignment: { decrement: params.quantity } },
+      });
+      await tx.stockMovement.create({
+        data: {
+          variantId: params.variantId, storeId: params.storeId,
+          type: 'CONSIGNMENT_RETURN', quantity: params.quantity,
+          reference: params.reference, createdBy: params.actor,
+        },
+      });
+      return;
+    }
+
+    // SOLD: it leaves for good, so only the consignment bucket drops.
+    await tx.stockLevel.update({
+      where: { variantId_storeId: { variantId: params.variantId, storeId: params.storeId } },
+      data: { onConsignment: { decrement: params.quantity } },
+    });
+    await tx.stockMovement.create({
+      data: {
+        variantId: params.variantId, storeId: params.storeId,
+        type: 'CONSIGNMENT_SOLD', quantity: -params.quantity,
+        reference: params.reference, createdBy: params.actor,
+      },
+    });
+  }
+
+  /** Value a reseller is holding that is neither paid for nor returned. */
+  private async outstandingFor(resellerId: string, tx: Prisma.TransactionClient) {
+    const open = await tx.consignment.findMany({
+      where: { resellerId, status: 'OPEN' },
+      include: { lines: true },
+    });
+    return open.reduce((sum, consignment) => {
+      const held = consignment.lines.reduce(
+        (lineSum, line) =>
+          lineSum + (line.quantityOut - line.quantitySold - line.quantityReturned) * Number(line.unitPrice),
+        0,
+      );
+      return sum + held;
+    }, 0);
+  }
+
+  /**
+   * Records what a reseller sold and what came back.
+   *
+   * Sold and returned are reported together because that is how a reseller
+   * settles: they arrive with money for some pairs and the rest in a bag.
+   */
+  async settle(id: string, dto: SettleConsignmentDto, actor = 'system') {
+    return this.prisma.$transaction(async (tx) => {
+      const consignment = await tx.consignment.findUnique({ where: { id }, include: { lines: true } });
+      if (!consignment) throw new NotFoundException(`Consignment ${id} not found`);
+      if (consignment.status !== 'OPEN') {
+        throw new BadRequestException(`${consignment.reference} is already ${consignment.status.toLowerCase()}.`);
+      }
+
+      let soldValueAdded = 0;
+
+      for (const entry of dto.lines) {
+        const line = consignment.lines.find((item) => item.id === entry.lineId);
+        if (!line) throw new NotFoundException(`Line ${entry.lineId} is not on this consignment`);
+
+        const sold = entry.sold ?? 0;
+        const returned = entry.returned ?? 0;
+        if (sold === 0 && returned === 0) continue;
+
+        const stillHeld = line.quantityOut - line.quantitySold - line.quantityReturned;
+        if (sold + returned > stillHeld) {
+          throw new BadRequestException(
+            `${line.description}: only ${stillHeld} still unaccounted for, but ${sold + returned} reported.`,
+          );
+        }
+
+        if (sold > 0) {
+          await this.moveStock(tx, {
+            variantId: line.variantId, storeId: consignment.storeId, quantity: sold,
+            direction: 'SOLD', reference: consignment.reference, actor,
+          });
+          soldValueAdded += sold * Number(line.unitPrice);
+        }
+        if (returned > 0) {
+          await this.moveStock(tx, {
+            variantId: line.variantId, storeId: consignment.storeId, quantity: returned,
+            direction: 'RETURN', reference: consignment.reference, actor,
+          });
+        }
+
+        await tx.consignmentLine.update({
+          where: { id: line.id },
+          data: {
+            quantitySold: { increment: sold },
+            quantityReturned: { increment: returned },
+          },
+        });
+      }
+
+      if (dto.amountPaid && dto.amountPaid > 0) {
+        await tx.consignmentPayment.create({
+          data: {
+            consignmentId: id,
+            amount: new Prisma.Decimal(dto.amountPaid),
+            method: dto.method || 'CASH',
+            reference: dto.reference,
+            receivedBy: actor,
+          },
+        });
+      }
+
+      // Closed only when nothing is still out with them.
+      const lines = await tx.consignmentLine.findMany({ where: { consignmentId: id } });
+      const stillOut = lines.reduce(
+        (sum, line) => sum + (line.quantityOut - line.quantitySold - line.quantityReturned),
+        0,
+      );
+      const soldValue = Number(consignment.soldValue) + soldValueAdded;
+      const paid = Number(consignment.amountPaid) + (dto.amountPaid ?? 0);
+
+      return tx.consignment.update({
+        where: { id },
+        data: {
+          soldValue: new Prisma.Decimal(soldValue),
+          amountPaid: new Prisma.Decimal(paid),
+          ...(stillOut === 0
+            ? { status: ConsignmentStatus.SETTLED, closedAt: new Date() }
+            : {}),
+        },
+        include: INCLUDE,
+      });
+    });
+  }
+
+  async findAll(query: { resellerId?: string; storeId?: string; status?: ConsignmentStatus; overdueOnly?: string }) {
+    const rows = await this.prisma.consignment.findMany({
+      where: {
+        ...(query.resellerId ? { resellerId: query.resellerId } : {}),
+        ...(query.storeId ? { storeId: query.storeId } : {}),
+        ...(query.status ? { status: query.status } : {}),
+      },
+      include: INCLUDE,
+      orderBy: { issuedAt: 'desc' },
+    });
+
+    const now = Date.now();
+    const mapped = rows.map((row) => {
+      const stillOut = row.lines.reduce(
+        (sum, line) => sum + (line.quantityOut - line.quantitySold - line.quantityReturned),
+        0,
+      );
+      return {
+        ...row,
+        unitsStillOut: stillOut,
+        balance: Number(row.soldValue) - Number(row.amountPaid),
+        // Overdue matters more than any other flag here: goods past the agreed
+        // three days are the ones to chase.
+        isOverdue: row.status === 'OPEN' && !!row.dueDate && row.dueDate.getTime() < now,
+      };
+    });
+
+    return query.overdueOnly === 'true' ? mapped.filter((row) => row.isOverdue) : mapped;
+  }
+
+  async findOne(id: string) {
+    const consignment = await this.prisma.consignment.findUnique({ where: { id }, include: INCLUDE });
+    if (!consignment) throw new NotFoundException(`Consignment ${id} not found`);
+    const stillOut = consignment.lines.reduce(
+      (sum, line) => sum + (line.quantityOut - line.quantitySold - line.quantityReturned),
+      0,
+    );
+    return {
+      ...consignment,
+      unitsStillOut: stillOut,
+      balance: Number(consignment.soldValue) - Number(consignment.amountPaid),
+      isOverdue:
+        consignment.status === 'OPEN' && !!consignment.dueDate && consignment.dueDate.getTime() < Date.now(),
+    };
+  }
+
+  /** Writes off what a reseller never returned or paid for. */
+  async writeOff(id: string, reason: string, actor = 'system') {
+    return this.prisma.$transaction(async (tx) => {
+      const consignment = await tx.consignment.findUnique({ where: { id }, include: { lines: true } });
+      if (!consignment) throw new NotFoundException(`Consignment ${id} not found`);
+      if (consignment.status !== 'OPEN') {
+        throw new BadRequestException(`${consignment.reference} is already ${consignment.status.toLowerCase()}.`);
+      }
+
+      for (const line of consignment.lines) {
+        const stillOut = line.quantityOut - line.quantitySold - line.quantityReturned;
+        if (stillOut <= 0) continue;
+        // The goods are gone: drop them from the consignment bucket and record
+        // it as damage so the loss is visible rather than silently vanishing.
+        await tx.stockLevel.update({
+          where: { variantId_storeId: { variantId: line.variantId, storeId: consignment.storeId } },
+          data: { onConsignment: { decrement: stillOut } },
+        });
+        await tx.stockMovement.create({
+          data: {
+            variantId: line.variantId, storeId: consignment.storeId,
+            type: 'DAMAGE', quantity: -stillOut,
+            reference: consignment.reference, notes: `Written off: ${reason}`, createdBy: actor,
+          },
+        });
+      }
+
+      return tx.consignment.update({
+        where: { id },
+        data: { status: ConsignmentStatus.WRITTEN_OFF, closedAt: new Date(), notes: reason },
+        include: INCLUDE,
+      });
+    });
+  }
+}

@@ -60,6 +60,7 @@ model Store {
   stockMovements StockMovement[]
   orders         Order[]
   accountAssignments StoreAccountAssignment[]
+  consignments   Consignment[]
 }
 
 model Customer {
@@ -1372,7 +1373,14 @@ model ProductVariant {
   /// Free-form so footwear can carry size and colour while electronics carry
   /// capacity, without a column per attribute.
   attributes  Json?
+  /// Retail: the marked price a walk-in normally pays. A walk-in can still be
+  /// charged above or below it, and the difference is recorded on the line.
   priceKes    Decimal
+  /// What a competing shop pays, whether they buy outright or settle after
+  /// selling on consignment. Falls back to retail when unset.
+  resellerPriceKes Decimal?
+  /// The keenest price, for bulk. Lowest of the three.
+  wholesalePriceKes Decimal?
   /// What it cost to buy, for margin. Not shown to customers.
   costKes     Decimal?
   barcode     String?
@@ -1385,6 +1393,7 @@ model ProductVariant {
   movements  StockMovement[]
 
   @@index([productId])
+  consignmentLines ConsignmentLine[]
 }
 
 /// Stock of one variant at one store. Quantity is derived from movements but
@@ -1396,9 +1405,14 @@ model StockLevel {
   variantId String
   store     Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
   storeId   String
+  /// On the shop floor: what can be sold today.
   quantity  Int            @default(0)
   /// Held by unpaid orders: sellable is quantity minus this.
   reserved  Int            @default(0)
+  /// Out with a reseller, unsold. Still owned -- it comes back or gets paid
+  /// for -- but it is in another shop, so it cannot be sold from here. Owned
+  /// stock is quantity + onConsignment.
+  onConsignment Int        @default(0)
   /// Below this, the variant shows as needing a reorder.
   reorderAt Int            @default(0)
   updatedAt DateTime       @updatedAt
@@ -1434,6 +1448,12 @@ enum StockMovementType {
   TRANSFER_IN
   TRANSFER_OUT
   DAMAGE
+  /// Goods handed to a reseller: off the shop floor, still owned.
+  CONSIGNMENT_OUT
+  /// Unsold goods coming back from a reseller to the shop floor.
+  CONSIGNMENT_RETURN
+  /// A reseller reported a sale: the goods are gone for good.
+  CONSIGNMENT_SOLD
 }
 
 /// A customer order. Money owed and money paid are tracked separately so a
@@ -1447,6 +1467,9 @@ model Order {
   storeId     String
   status      OrderStatus @default(PENDING)
   channel     String      @default("IN_STORE")
+  /// Which price list this order was written against. A walk-in is RETAIL;
+  /// a shop buying outright is RESELLER or WHOLESALE.
+  priceTier   PriceTier   @default(RETAIL)
 
   subtotal    Decimal  @default(0)
   discount    Decimal  @default(0)
@@ -1496,7 +1519,13 @@ model OrderLine {
   variantId   String
   description String
   quantity    Int
+  /// What was actually charged.
   unitPrice   Decimal
+  /// The list price for this tier at the time of sale. Kept beside unitPrice
+  /// so a discount or a markup at the counter is visible per line and can be
+  /// totalled later -- without it, "we sold it for 3,200" loses the fact that
+  /// it was marked at 3,499.
+  listPrice   Decimal?
   discount    Decimal        @default(0)
   lineTotal   Decimal
 
@@ -1518,4 +1547,114 @@ model OrderPayment {
   journalEntryId String?
 
   @@index([orderId])
+}
+
+enum PriceTier {
+  RETAIL
+  RESELLER
+  WHOLESALE
+}
+
+/// A shop that takes goods from us, sells them, and pays for what sold.
+///
+/// Separate from Customer because the relationship is different in kind: a
+/// reseller holds our stock, carries a running balance, and is settled
+/// periodically rather than at a till.
+model Reseller {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  contactName  String?
+  phone        String?
+  email        String?
+  location     String?
+  /// Which price list this shop is on.
+  priceTier    PriceTier @default(RESELLER)
+  /// Most stock, at cost, we are willing to have out with them at once.
+  /// Zero means no limit.
+  creditLimit  Decimal   @default(0)
+  isActive     Boolean   @default(true)
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  consignments Consignment[]
+}
+
+/// One pickup: the goods a reseller took on a given day.
+///
+/// Stays OPEN while any of it is unaccounted for. Each line tracks what was
+/// taken, what has been sold and paid for, and what came back, so the cycle
+/// is answerable per pair rather than only in total.
+model Consignment {
+  id             String            @id @default(uuid())
+  reference      String            @unique
+  reseller       Reseller          @relation(fields: [resellerId], references: [id])
+  resellerId     String
+  store          Store             @relation(fields: [storeId], references: [id])
+  storeId        String
+  status         ConsignmentStatus @default(OPEN)
+  /// Fixed when the goods leave: a later price rise does not change what is
+  /// owed on stock already out.
+  priceTier      PriceTier         @default(RESELLER)
+  /// Value of everything taken, at the agreed tier.
+  totalValue     Decimal           @default(0)
+  /// Value of what has been reported sold.
+  soldValue      Decimal           @default(0)
+  amountPaid     Decimal           @default(0)
+  /// When unsold goods are due back. Defaults to three days from pickup,
+  /// which is the agreed holding period; it is stored per pickup rather than
+  /// assumed at read time so a one-off extension is possible and visible.
+  dueDate        DateTime?
+  notes          String?
+  issuedAt       DateTime          @default(now())
+  closedAt       DateTime?
+  createdBy      String            @default("system")
+
+  lines    ConsignmentLine[]
+  payments ConsignmentPayment[]
+
+  @@index([resellerId])
+  @@index([status])
+}
+
+enum ConsignmentStatus {
+  /// Goods are out and something is still unaccounted for.
+  OPEN
+  /// Everything taken has been either paid for or returned.
+  SETTLED
+  /// Closed with stock written off rather than returned.
+  WRITTEN_OFF
+}
+
+/// One product on a pickup. quantityOut = sold + returned + still held.
+model ConsignmentLine {
+  id            String      @id @default(uuid())
+  consignment   Consignment @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
+  consignmentId String
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
+  variantId     String
+  description   String
+  quantityOut   Int
+  quantitySold  Int         @default(0)
+  quantityReturned Int      @default(0)
+  /// Agreed price per pair, fixed at pickup.
+  unitPrice     Decimal
+
+  @@index([consignmentId])
+}
+
+/// Money from a reseller against a pickup.
+model ConsignmentPayment {
+  id            String      @id @default(uuid())
+  consignment   Consignment @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
+  consignmentId String
+  amount        Decimal
+  method        String
+  reference     String?
+  receivedAt    DateTime    @default(now())
+  receivedBy    String      @default("system")
+  journalEntryId String?
+
+  @@index([consignmentId])
 }
