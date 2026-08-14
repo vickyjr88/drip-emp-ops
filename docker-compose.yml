@@ -16,6 +16,8 @@ services:
         # localhost and the site would effectively de-index itself.
         - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
     ports:
+      # host:container. Next binds 3002 inside the container and logs that
+      # port on startup -- the site is reached on WEB_PORT from the host.
       - "${WEB_PORT:-3003}:3002"
     environment:
       # Server-side rendering runs inside this container, where localhost is the
