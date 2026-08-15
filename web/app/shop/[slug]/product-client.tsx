@@ -30,7 +30,13 @@ export function ProductClient({ product }: { product: ShopProduct }) {
   const auth = useCustomerAuth();
   const [added, setAdded] = useState(false);
   const [sizeId, setSizeId] = useState<string | null>(
-    product.variants.find((variant) => variant.inStock)?.id ?? null,
+    // A discounted size wins the default. Otherwise a shopper landing on a
+    // product with a clearance badge would see the full price until they
+    // happened to click the one size that is actually reduced.
+    () =>
+      product.variants.find((variant) => variant.inStock && variant.wasPriceKes)?.id ??
+      product.variants.find((variant) => variant.inStock)?.id ??
+      null,
   );
   const [image, setImage] = useState(0);
 
@@ -132,6 +138,14 @@ export function ProductClient({ product }: { product: ShopProduct }) {
             <h1>{product.name}</h1>
             <p className="de-product-price">
               {chosen ? formatKes(chosen.priceKes) : priceLabel(product)}
+              {/* Struck-through original beside the sale price: a discount a
+                  shopper cannot see the size of is not much of a discount. */}
+              {chosen?.wasPriceKes ? (
+                <>
+                  <s className="de-price-was">{formatKes(chosen.wasPriceKes)}</s>
+                  <span className="de-offer-badge">{chosen.offerLabel || 'Offer'}</span>
+                </>
+              ) : null}
             </p>
 
             <div className="de-sizes">
@@ -243,7 +257,12 @@ export function ProductClient({ product }: { product: ShopProduct }) {
                   <div className="de-card-body">
                     {item.brand ? <p className="de-card-brand">{item.brand}</p> : null}
                     <h3><Link href={`/shop/${item.slug}`}>{item.name}</Link></h3>
-                    <p className="de-card-price">{priceLabel(item)}</p>
+                    <p className="de-card-price">
+                      {priceLabel(item)}
+                      {item.onOffer ? (
+                        <span className="de-offer-badge">{item.offerLabel || 'Offer'}</span>
+                      ) : null}
+                    </p>
                   </div>
                 </article>
               ))}

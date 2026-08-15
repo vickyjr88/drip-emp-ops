@@ -15,11 +15,17 @@ export type ShopVariant = {
   sku: string;
   size: string;
   priceKes: number;
+  /** Retail before the markdown. Null when nothing is discounted. */
+  wasPriceKes?: number | null;
+  offerLabel?: string | null;
   /** Availability, not a count. */
   inStock: boolean;
 };
 
 export type ShopProduct = {
+  /** Set when any size is discounted, so a card can badge itself. */
+  onOffer?: boolean;
+  offerLabel?: string | null;
   id: string;
   slug: string;
   name: string;

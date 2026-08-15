@@ -10760,3 +10760,32 @@ img {
 .portal-main {
   margin-top: 0;
 }
+
+/* --- Special offers ---------------------------------------------------------
+   A markdown has to read as one at a glance: the old price struck through
+   beside the new, and a badge naming the offer.
+   --------------------------------------------------------------------------- */
+
+.de-offer-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: #fff;
+  /* Not the brand navy: a clearance badge should not read as the shop's own
+     chrome, and this is the one place a warm colour earns its keep. */
+  background: #8a1220;
+  border-radius: 999px;
+}
+
+.de-price-was {
+  margin-left: 10px;
+  font-size: 0.62em;
+  font-weight: 400;
+  color: var(--de-muted);
+  text-decoration-thickness: 1px;
+}

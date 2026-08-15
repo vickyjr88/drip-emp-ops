@@ -18,17 +18,30 @@ export class StorefrontService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Only what a shopper may see. Note the absence of cost and other tiers. */
-  private shape(product: any, stockByVariant: Map<string, number>) {
+  private shape(
+    product: any,
+    stockByVariant: Map<string, number>,
+    offerByVariant: Map<string, { price: number; was: number; label: string | null }> = new Map(),
+  ) {
     const variants = product.variants
       .filter((variant: any) => variant.isActive)
-      .map((variant: any) => ({
-        id: variant.id,
-        sku: variant.sku,
-        size: variant.name,
-        priceKes: Number(variant.priceKes),
-        // Availability, not quantity.
-        inStock: (stockByVariant.get(variant.id) ?? 0) > 0,
-      }));
+      .map((variant: any) => {
+        const offer = offerByVariant.get(variant.id);
+        const retail = Number(variant.priceKes);
+        return {
+          id: variant.id,
+          sku: variant.sku,
+          size: variant.name,
+          // The price a shopper pays: the offer when there is one.
+          priceKes: offer ? offer.price : retail,
+          // What it was, so the storefront can strike it through. Null when
+          // nothing is discounted, rather than repeating the same number.
+          wasPriceKes: offer ? offer.was : null,
+          offerLabel: offer ? offer.label : null,
+          // Availability, not quantity.
+          inStock: (stockByVariant.get(variant.id) ?? 0) > 0,
+        };
+      });
 
     const inStock = variants.filter((variant: any) => variant.inStock);
     const prices = variants.map((variant: any) => variant.priceKes);
@@ -54,6 +67,10 @@ export class StorefrontService {
       priceTo: prices.length ? Math.max(...prices) : 0,
       sizesInStock: inStock.map((variant: any) => variant.size),
       anyInStock: inStock.length > 0,
+      // Drives the badge on a card without the caller inspecting every size.
+      onOffer: variants.some((variant: any) => variant.wasPriceKes !== null),
+      offerLabel:
+        variants.find((variant: any) => variant.offerLabel)?.offerLabel ?? null,
     };
   }
 
@@ -63,6 +80,46 @@ export class StorefrontService {
    * A shopper wants to know the shop has it, not which branch -- and consigned
    * stock is excluded because it is sitting in somebody else's shop.
    */
+  /**
+   * Live offer prices, by variant.
+   *
+   * Only offers that are published and inside their window count, so a draft
+   * or a scheduled markdown never leaks a price onto the shop. Where a variant
+   * somehow sits on two, the cheapest wins -- that is the price the shopper
+   * would expect to be honoured.
+   */
+  private async offerMap(variantIds: string[]) {
+    if (!variantIds.length) return new Map<string, { price: number; was: number; label: string | null }>();
+    const now = new Date();
+    const lines = await this.prisma.offerLine.findMany({
+      where: {
+        variantId: { in: variantIds },
+        offer: {
+          status: 'ACTIVE',
+          AND: [
+            { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+            { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+          ],
+        },
+      },
+      include: { offer: { select: { label: true } } },
+    });
+
+    const map = new Map<string, { price: number; was: number; label: string | null }>();
+    for (const line of lines) {
+      const price = Number(line.offerPriceKes);
+      const existing = map.get(line.variantId);
+      if (!existing || price < existing.price) {
+        map.set(line.variantId, {
+          price,
+          was: Number(line.wasPriceKes),
+          label: line.offer.label ?? null,
+        });
+      }
+    }
+    return map;
+  }
+
   private async stockMap(variantIds?: string[]) {
     const rows = await this.prisma.stockLevel.groupBy({
       by: ['variantId'],
@@ -139,8 +196,12 @@ export class StorefrontService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const stock = await this.stockMap(products.flatMap((p) => p.variants.map((v) => v.id)));
-    let shaped = products.map((product) => this.shape(product, stock));
+    const variantIds = products.flatMap((p) => p.variants.map((v) => v.id));
+    const [stock, offers] = await Promise.all([
+      this.stockMap(variantIds),
+      this.offerMap(variantIds),
+    ]);
+    let shaped = products.map((product) => this.shape(product, stock, offers));
 
     // Price filters run after shaping because the price shown is the cheapest
     // variant, which is not a column on the product.
@@ -171,8 +232,11 @@ export class StorefrontService {
     });
     if (!product) throw new NotFoundException(`No product at "${slug}"`);
 
-    const stock = await this.stockMap(product.variants.map((variant) => variant.id));
-    const shaped = this.shape(product, stock);
+    const [stock, offers] = await Promise.all([
+      this.stockMap(product.variants.map((variant) => variant.id)),
+      this.offerMap(product.variants.map((variant) => variant.id)),
+    ]);
+    const shaped = this.shape(product, stock, offers);
 
     // A few alternatives from the same category, so a sold-out size is not a
     // dead end.
@@ -183,7 +247,13 @@ export class StorefrontService {
     });
     const relatedStock = await this.stockMap(related.flatMap((p) => p.variants.map((v) => v.id)));
 
-    return { ...shaped, related: related.map((item) => this.shape(item, relatedStock)) };
+    const relatedOffers = await this.offerMap(
+      related.flatMap((item) => item.variants.map((variant) => variant.id)),
+    );
+    return {
+      ...shaped,
+      related: related.map((item) => this.shape(item, relatedStock, relatedOffers)),
+    };
   }
 
   /** Shops a customer can walk into. */

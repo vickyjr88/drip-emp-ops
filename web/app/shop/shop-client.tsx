@@ -212,7 +212,14 @@ export function ShopClient() {
                 <div className="de-card-body">
                   {product.brand ? <p className="de-card-brand">{product.brand}</p> : null}
                   <h2><Link href={`/shop/${product.slug}`}>{product.name}</Link></h2>
-                  <p className="de-card-price">{priceLabel(product)}</p>
+                  <p className="de-card-price">
+                    {priceLabel(product)}
+                    {/* The badge earns its place only when something is
+                        actually cheaper, so it never becomes wallpaper. */}
+                    {product.onOffer ? (
+                      <span className="de-offer-badge">{product.offerLabel || 'Offer'}</span>
+                    ) : null}
+                  </p>
 
                   {/* A range rather than every size: a full 36-46 run would be
                       eleven chips per card and unreadable at a glance. The

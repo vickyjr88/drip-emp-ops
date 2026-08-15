@@ -1395,6 +1395,7 @@ model ProductVariant {
   orderLines       OrderLine[]
   movements        StockMovement[]
   consignmentLines ConsignmentLine[]
+  offerLines       OfferLine[]
 
   @@index([productId])
 }
@@ -1402,6 +1403,60 @@ model ProductVariant {
 /// Stock of one variant at one store. Quantity is derived from movements but
 /// kept here too, because a list of a hundred products should not have to sum
 /// a movement history per row.
+/// A markdown to clear stock that is not moving.
+///
+/// Retail only. Resellers and wholesalers already buy below retail on their
+/// agreed tiers, and cutting those too would erode the margin the shop runs
+/// on -- so an offer never touches them.
+model Offer {
+  id     String      @id @default(uuid())
+  name   String
+  /// Shown on the storefront badge, e.g. "Clearance" or "End of Season".
+  label  String?
+  status OfferStatus @default(DRAFT)
+
+  /// Either a percentage off retail, or a fixed price. Exactly one is set;
+  /// a percentage scales across a whole category, a fixed price lets the shop
+  /// land on a round number.
+  percentOff    Decimal?
+  fixedPriceKes Decimal?
+
+  /// Optional window. Null start means live as soon as it is published; null
+  /// end means it runs until someone stops it.
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String   @default("system")
+
+  lines OfferLine[]
+
+  @@index([status])
+}
+
+/// One variant on one offer. Per variant, not per product: a shop is usually
+/// clearing the sizes nobody wants, not the whole line.
+model OfferLine {
+  id        String         @id @default(uuid())
+  offer     Offer          @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  offerId   String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variantId String
+
+  /// What the offer works out to for this variant, resolved when it is added
+  /// so a later change to the retail price cannot silently move the sale
+  /// price out from under a shopper.
+  offerPriceKes Decimal
+  /// Retail at the time, so the storefront can show what was struck through
+  /// without recomputing it.
+  wasPriceKes   Decimal
+
+  @@unique([offerId, variantId])
+  @@index([variantId])
+}
+
 model StockLevel {
   id            String         @id @default(uuid())
   variant       ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
@@ -1441,6 +1496,15 @@ model StockMovement {
   createdAt DateTime          @default(now())
 
   @@index([variantId, storeId])
+}
+
+/// DRAFT is being prepared and is invisible. ACTIVE is live within its window.
+/// ENDED was stopped by hand; expiry is inferred from endsAt rather than
+/// stored, so nothing has to run on a timer to keep the status honest.
+enum OfferStatus {
+  DRAFT
+  ACTIVE
+  ENDED
 }
 
 enum StockMovementType {

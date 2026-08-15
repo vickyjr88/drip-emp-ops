@@ -136,17 +136,43 @@ export class CheckoutService {
       });
       const byId = new Map(variants.map((variant) => [variant.id, variant]));
 
+      // A live offer is the price the shopper was shown, so it is the price
+      // they are charged. Read here rather than taken from the request: the
+      // basket is client-side and cannot be trusted to name its own discount.
+      const now = new Date();
+      const offerLines = await tx.offerLine.findMany({
+        where: {
+          variantId: { in: dto.lines.map((line) => line.variantId) },
+          offer: {
+            status: 'ACTIVE',
+            AND: [
+              { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+              { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+            ],
+          },
+        },
+      });
+      const offerByVariant = new Map<string, number>();
+      for (const offerLine of offerLines) {
+        const price = Number(offerLine.offerPriceKes);
+        const seen = offerByVariant.get(offerLine.variantId);
+        if (seen === undefined || price < seen) offerByVariant.set(offerLine.variantId, price);
+      }
+
       const lines = dto.lines.map((line) => {
         const variant = byId.get(line.variantId);
         if (!variant) throw new NotFoundException(`That item is no longer available.`);
-        const unitPrice = Number(variant.priceKes);
+        const listPrice = Number(variant.priceKes);
+        const unitPrice = offerByVariant.get(variant.id) ?? listPrice;
         return {
           variantId: variant.id,
           description: `${variant.product.name} — ${variant.name}`,
           quantity: line.quantity,
           unitPrice: new Prisma.Decimal(unitPrice),
-          listPrice: new Prisma.Decimal(unitPrice),
-          discount: new Prisma.Decimal(0),
+          // Kept apart so the markdown is visible on the order and totals
+          // into the discount reported by the margin reports.
+          listPrice: new Prisma.Decimal(listPrice),
+          discount: new Prisma.Decimal((listPrice - unitPrice) * line.quantity),
           lineTotal: new Prisma.Decimal(unitPrice * line.quantity),
         };
       });
