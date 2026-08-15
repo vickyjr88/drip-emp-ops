@@ -14,6 +14,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useCart } from '../lib/cart';
 import { PageContentDocument, contentValue, fetchPageContent } from '../lib/page-content';
 import { MobileNav } from './mobile-nav';
 
@@ -47,6 +48,7 @@ export function navKeyForHref(href: string): string {
 
 export function SiteHeader({ active }: { active: string }) {
   const [content, setContent] = useState<PageContentDocument | null>(null);
+  const cart = useCart();
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +85,18 @@ export function SiteHeader({ active }: { active: string }) {
             );
           })}
         </nav>
+        {/* Stays visible at every width, unlike the nav and the CTA. A basket
+            a buyer cannot find is a basket they abandon, and on a phone is
+            where most of them are. The count only appears once the cart has
+            read localStorage, so the server HTML and the first client paint
+            agree. */}
+        <Link className="lp-cart-link" href="/cart" aria-label={cartLabel(cart.ready, cart.count)}>
+          <CartIcon />
+          {cart.ready && cart.count > 0 ? (
+            <span className="lp-cart-count" aria-hidden="true">{cart.count}</span>
+          ) : null}
+        </Link>
+
         <Link className="lp-button lp-button-primary lp-header-cta" href={ctaHref}>
           {ctaLabel}
         </Link>
@@ -92,5 +106,27 @@ export function SiteHeader({ active }: { active: string }) {
         <MobileNav active={active} links={navLinks} ctaLabel={ctaLabel} ctaHref={ctaHref} />
       </div>
     </header>
+  );
+}
+
+function cartLabel(ready: boolean, count: number) {
+  if (!ready || count === 0) return 'Cart, empty';
+  return `Cart, ${count} item${count === 1 ? '' : 's'}`;
+}
+
+function CartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <path
+        d="M3 4h2.2l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.2a1.6 1.6 0 0 0 1.6-1.2L21 8H6.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="10" cy="20" r="1.4" fill="currentColor" />
+      <circle cx="17.5" cy="20" r="1.4" fill="currentColor" />
+    </svg>
   );
 }

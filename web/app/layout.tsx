@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { PortalDialogProvider } from './portal/components/portal-dialog';
 import { NotificationsProvider } from './portal/components/notifications';
+import { CartProvider } from './lib/cart';
 import { JsonLd, SITE_DESCRIPTION, SITE_NAME, SITE_URL, organizationSchema } from './lib/site';
 
 export const metadata: Metadata = {
@@ -67,9 +68,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             ],
           }}
         />
-        <NotificationsProvider>
+        <CartProvider>
+          <NotificationsProvider>
           <PortalDialogProvider>{children}</PortalDialogProvider>
         </NotificationsProvider>
+        </CartProvider>
       </body>
     </html>
   );

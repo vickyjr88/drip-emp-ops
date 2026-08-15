@@ -10,19 +10,23 @@
  * the product, the SKU and the size, so the shop can answer without a
  * back-and-forth about which black Air Force the customer means.
  *
- * There is no cart. The business sells over WhatsApp and across a counter; a
- * cart that ends in "we will email you" would be a worse version of what
- * already works.
+ * Two ways to buy, deliberately. Card checkout for someone who wants to pay
+ * now, and WhatsApp for the trade that already happens there — most of this
+ * shop's customers message before they buy, and burying that behind a cart
+ * would cost more than the cart gains.
  */
 
 import Link from 'next/link';
 import { useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
+import { useCart } from '../../lib/cart';
 import { ShopProduct, formatKes, priceLabel } from '../../lib/shop';
 
 export function ProductClient({ product }: { product: ShopProduct }) {
   const enquiry = useEnquiryContact();
+  const cart = useCart();
+  const [added, setAdded] = useState(false);
   const [sizeId, setSizeId] = useState<string | null>(
     product.variants.find((variant) => variant.inStock)?.id ?? null,
   );
@@ -115,18 +119,50 @@ export function ProductClient({ product }: { product: ShopProduct }) {
             </div>
 
             <div className="de-actions">
+              <button
+                type="button"
+                className="lp-button lp-button-primary"
+                disabled={!chosen}
+                onClick={() => {
+                  if (!chosen) return;
+                  cart.add({
+                    variantId: chosen.id,
+                    productSlug: product.slug,
+                    name: product.name,
+                    size: chosen.size,
+                    sku: chosen.sku,
+                    priceKes: chosen.priceKes,
+                    imageUrl: product.imageUrls[0] || null,
+                  });
+                  // Confirmed in place rather than by yanking the shopper to
+                  // the cart: most people add a second pair.
+                  setAdded(true);
+                  window.setTimeout(() => setAdded(false), 2500);
+                }}
+              >
+                {added ? 'Added ✓' : chosen ? `Add ${chosen.size} to Cart` : 'Select a size'}
+              </button>
+
               <a
-                className="lp-button lp-button-primary de-whatsapp"
+                className="lp-button de-whatsapp"
                 href={enquiry.whatsappHref(message)}
                 target="_blank"
                 rel="noreferrer"
               >
-                {chosen ? `Order ${chosen.size.replace('EUR ', 'EUR ')} on WhatsApp` : 'Ask about sizes on WhatsApp'}
+                {chosen ? 'Or order on WhatsApp' : 'Ask about sizes on WhatsApp'}
               </a>
               <a className="lp-button lp-button-ghost" href={enquiry.phoneHref}>
                 Call {enquiry.phone}
               </a>
             </div>
+
+            {cart.count > 0 ? (
+              <p className="de-cart-hint">
+                <Link href="/cart">
+                  {cart.count} item{cart.count === 1 ? '' : 's'} in your cart — checkout
+                </Link>
+              </p>
+            ) : null}
 
             {/* The three things a shopper checks before committing. */}
             <ul className="de-assurances">
