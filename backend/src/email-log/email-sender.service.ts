@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BrevoProvider } from './providers/brevo.provider';
 import { BillionMailProvider } from './providers/billionmail.provider';
+import { SmtpProvider } from './providers/smtp.provider';
 import { EmailProvider, EmailSendParams, EmailSendResult } from './providers/email-provider';
 
 /**
@@ -19,8 +20,10 @@ export class EmailSenderService {
   private readonly providers: EmailProvider[];
   private readonly active: EmailProvider | null;
 
-  constructor(brevo: BrevoProvider, billionMail: BillionMailProvider) {
-    this.providers = [brevo, billionMail];
+  constructor(smtp: SmtpProvider, brevo: BrevoProvider, billionMail: BillionMailProvider) {
+    // SMTP first: it is the plainest of the three and takes subject and body
+    // directly, so it is the right default when more than one is configured.
+    this.providers = [smtp, brevo, billionMail];
 
     const requested = (process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
     if (requested) {
