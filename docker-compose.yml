@@ -15,6 +15,12 @@ services:
         # localhost default in production, every canonical would point at
         # localhost and the site would effectively de-index itself.
         - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
+        # Paystack's publishable key. Not used today: checkout redirects to a
+        # URL the server creates with the secret key, so the browser never
+        # needs a key of its own. Wired through for the inline popup, which
+        # would need it, and safe in the bundle either way -- it identifies the
+        # merchant; only the secret key can move money.
+        - NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY:-}
     ports:
       # host:container. Next binds 3002 inside the container and logs that
       # port on startup -- the site is reached on WEB_PORT from the host.
@@ -52,6 +58,9 @@ services:
       - BREVO_API_KEY=${BREVO_API_KEY:-}
       - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
       - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-}
+      # Paystack. The secret key never leaves the server; without it the API
+      # reports checkout as unavailable and refuses to take an order.
+      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY:-}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-}
       - SMTP_USER=${SMTP_USER:-}
