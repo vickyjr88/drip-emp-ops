@@ -76,7 +76,7 @@ export function CartClient() {
   function buildWhatsappMessage() {
     const lines = ['Hello Drip Emporium, I would like to order:'];
     for (const line of cart.lines) {
-      lines.push(`- ${line.quantity} x ${line.name} (EUR ${line.size}) - ${formatKes(line.priceKes * line.quantity)}`);
+      lines.push(`- ${line.quantity} x ${line.name} (${line.size}) - ${formatKes(line.priceKes * line.quantity)}`);
     }
     lines.push('');
     lines.push(`Subtotal: ${formatKes(cart.subtotal)}`);

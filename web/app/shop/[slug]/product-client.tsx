@@ -21,11 +21,13 @@ import { useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
+import { useCustomerAuth } from '../../lib/customer-auth';
 import { ShopProduct, formatKes, priceLabel } from '../../lib/shop';
 
 export function ProductClient({ product }: { product: ShopProduct }) {
   const enquiry = useEnquiryContact();
   const cart = useCart();
+  const auth = useCustomerAuth();
   const [added, setAdded] = useState(false);
   const [sizeId, setSizeId] = useState<string | null>(
     product.variants.find((variant) => variant.inStock)?.id ?? null,
@@ -34,9 +36,55 @@ export function ProductClient({ product }: { product: ShopProduct }) {
 
   const chosen = product.variants.find((variant) => variant.id === sizeId) || null;
 
-  const message = chosen
-    ? `Hello Drip Emporium, I would like the ${product.name} in ${chosen.size} (${chosen.sku}) at ${formatKes(chosen.priceKes)}. Is it available?`
-    : `Hello Drip Emporium, I am interested in the ${product.name}. What sizes do you have?`;
+  /**
+   * The enquiry, as a message someone can act on without asking twice.
+   *
+   * It used to be a single line naming the shoe and the size. That reads
+   * fine, but the shop then has to ask who is writing and which listing they
+   * mean -- so the item is spelled out on its own lines, the page is linked,
+   * and a signed-in customer's own details ride along. Nothing is invented
+   * for a visitor who is not signed in: the shop just gets the item.
+   */
+  function buildEnquiry() {
+    const lines: string[] = [];
+
+    if (chosen) {
+      lines.push('Hello Drip Emporium, I would like to order:');
+      lines.push('');
+      lines.push(`Item:  ${product.name}${product.brand ? ` (${product.brand})` : ''}`);
+      lines.push(`Size:  ${chosen.size}`);
+      lines.push(`SKU:   ${chosen.sku}`);
+      lines.push(`Price: ${formatKes(chosen.priceKes)}`);
+      // Saying it is out of stock up front stops the shop replying "yes" to
+      // something they cannot sell.
+      if (!chosen.inStock) lines.push('(Shown as out of stock — can it be ordered in?)');
+    } else {
+      lines.push(`Hello Drip Emporium, I am interested in the ${product.name}.`);
+      lines.push('');
+      lines.push('What sizes do you have?');
+    }
+
+    if (typeof window !== 'undefined') {
+      lines.push('');
+      lines.push(`Link: ${window.location.origin}/shop/${product.slug}`);
+    }
+
+    // Only for a signed-in customer, and never the password: WhatsApp messages
+    // get forwarded and backed up.
+    if (auth.customer) {
+      lines.push('');
+      lines.push(`Name:  ${`${auth.customer.firstName} ${auth.customer.lastName}`.trim()}`);
+      lines.push(`Email: ${auth.customer.email}`);
+      if (auth.customer.phone) lines.push(`Phone: ${auth.customer.phone}`);
+      if (auth.customer.priceTier && auth.customer.priceTier !== 'RETAIL') {
+        lines.push(`Account: ${auth.customer.priceTier} price list`);
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  const message = buildEnquiry();
 
   return (
     <EliteLayout active="shop">
