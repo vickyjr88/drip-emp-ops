@@ -38,7 +38,7 @@ export function EliteLayout({
             </Link>
           </nav>
           <Link className="lp-button lp-button-primary lp-header-cta" href="/contact">
-            Contact Professional
+            Contact A Team
           </Link>
         </div>
       </header>

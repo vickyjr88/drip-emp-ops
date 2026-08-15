@@ -9111,7 +9111,7 @@ img {
 
 /* --- Terms and privacy -------------------------------------------------- */
 .lp-legal-body {
-  padding: 56px 0 84px;
+  padding-block: 56px 84px;
   max-width: 780px;
 }
 
@@ -9676,7 +9676,7 @@ img {
 
 /* --- product page ------------------------------------------------------- */
 .de-crumbs {
-  padding: 22px 0 0;
+  padding-block: 22px 0;
   display: flex;
   gap: 8px;
   font-size: 0.85rem;
@@ -10305,7 +10305,7 @@ img {
 .de-complete {
   display: flex;
   justify-content: center;
-  padding: 48px 0 80px;
+  padding-block: 48px 80px;
 }
 
 .de-complete-card {
@@ -10507,7 +10507,7 @@ img {
 .de-auth {
   display: flex;
   justify-content: center;
-  padding: 56px 0 80px;
+  padding-block: 56px 80px;
 }
 
 .de-auth-card {

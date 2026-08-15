@@ -24,7 +24,7 @@ import { DEFAULT_NAV_LINKS, NavLink, navKeyForHref } from './site-header';
 export function MobileNav({
   active,
   links = DEFAULT_NAV_LINKS,
-  ctaLabel = 'Contact Professional',
+  ctaLabel = 'Contact A Team',
   ctaHref = '/contact',
 }: {
   active: string;

@@ -351,7 +351,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       ],
     },
     cta: {
-      label: 'Contact Professional',
+      label: 'Contact A Team',
       href: '/contact',
     },
     // Used by the enquiry buttons on listings and the properties index, which

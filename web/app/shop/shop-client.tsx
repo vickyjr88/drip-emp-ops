@@ -104,84 +104,86 @@ export function ShopClient() {
           <p>{loading ? 'Loading…' : `${products.length} style${products.length === 1 ? '' : 's'}`}</p>
         </section>
 
-        <section className="lp-container de-filters" aria-label="Filter products">
-          <form
-            className="de-search"
-            onSubmit={(event) => { event.preventDefault(); setParam('search', searchDraft.trim()); }}
-          >
-            <input
-              type="search"
-              value={searchDraft}
-              placeholder="Search Nike, Jordan, Samba…"
-              aria-label="Search products"
-              onChange={(event) => setSearchDraft(event.target.value)}
-            />
-            <button type="submit" className="lp-button lp-button-black">Search</button>
-          </form>
-
-          <div className="de-filter-row">
-            <label>
-              <span>Category</span>
-              <select value={category} onChange={(event) => setParam('category', event.target.value)}>
-                <option value="">All</option>
-                {categories.map((item) => (
-                  <option key={item.slug} value={item.slug}>{item.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Brand</span>
-              <select value={brand} onChange={(event) => setParam('brand', event.target.value)}>
-                <option value="">All</option>
-                {brands.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
-            </label>
-            <label>
-              <span>Sort</span>
-              <select value={sort} onChange={(event) => setParam('sort', event.target.value)}>
-                <option value="">Newest</option>
-                <option value="price-asc">Price: low to high</option>
-                <option value="price-desc">Price: high to low</option>
-                <option value="name">Name</option>
-              </select>
-            </label>
-          </div>
-
-          {/* Size as buttons rather than a dropdown: a shopper can see at a
-              glance which sizes the shop carries without opening a menu. */}
-          <div className="de-size-filter">
-            <span>Size</span>
-            <div className="de-size-chips">
-              <button
-                type="button"
-                className={`de-chip${size ? '' : ' is-on'}`}
-                onClick={() => setParam('size', '')}
-              >
-                Any
-              </button>
-              {sizes.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={`de-chip${size === item ? ' is-on' : ''}`}
-                  onClick={() => setParam('size', size === item ? '' : item)}
-                >
-                  {item.replace('EUR ', '')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="de-filter-foot">
-            <label className="de-check">
+        <section className="lp-container" aria-label="Filter products">
+          <div className="de-filters">
+            <form
+              className="de-search"
+              onSubmit={(event) => { event.preventDefault(); setParam('search', searchDraft.trim()); }}
+            >
               <input
-                type="checkbox"
-                checked={inStockOnly}
-                onChange={(event) => setParam('inStockOnly', event.target.checked ? 'true' : '')}
+                type="search"
+                value={searchDraft}
+                placeholder="Search Nike, Jordan, Samba…"
+                aria-label="Search products"
+                onChange={(event) => setSearchDraft(event.target.value)}
               />
-              <span>In stock only</span>
-            </label>
-            {hasFilters ? <Link href="/shop" className="de-clear">Clear all</Link> : null}
+              <button type="submit" className="lp-button lp-button-black">Search</button>
+            </form>
+
+            <div className="de-filter-row">
+              <label>
+                <span>Category</span>
+                <select value={category} onChange={(event) => setParam('category', event.target.value)}>
+                  <option value="">All</option>
+                  {categories.map((item) => (
+                    <option key={item.slug} value={item.slug}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Brand</span>
+                <select value={brand} onChange={(event) => setParam('brand', event.target.value)}>
+                  <option value="">All</option>
+                  {brands.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Sort</span>
+                <select value={sort} onChange={(event) => setParam('sort', event.target.value)}>
+                  <option value="">Newest</option>
+                  <option value="price-asc">Price: low to high</option>
+                  <option value="price-desc">Price: high to low</option>
+                  <option value="name">Name</option>
+                </select>
+              </label>
+            </div>
+
+            {/* Size as buttons rather than a dropdown: a shopper can see at a
+                glance which sizes the shop carries without opening a menu. */}
+            <div className="de-size-filter">
+              <span>Size</span>
+              <div className="de-size-chips">
+                <button
+                  type="button"
+                  className={`de-chip${size ? '' : ' is-on'}`}
+                  onClick={() => setParam('size', '')}
+                >
+                  Any
+                </button>
+                {sizes.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`de-chip${size === item ? ' is-on' : ''}`}
+                    onClick={() => setParam('size', size === item ? '' : item)}
+                  >
+                    {item.replace('EUR ', '')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="de-filter-foot">
+              <label className="de-check">
+                <input
+                  type="checkbox"
+                  checked={inStockOnly}
+                  onChange={(event) => setParam('inStockOnly', event.target.checked ? 'true' : '')}
+                />
+                <span>In stock only</span>
+              </label>
+              {hasFilters ? <Link href="/shop" className="de-clear">Clear all</Link> : null}
+            </div>
           </div>
         </section>
 
