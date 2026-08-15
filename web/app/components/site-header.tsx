@@ -87,33 +87,36 @@ export function SiteHeader({ active }: { active: string }) {
             );
           })}
         </nav>
-        {/* Stays visible at every width, unlike the nav and the CTA. A basket
-            a buyer cannot find is a basket they abandon, and on a phone is
-            where most of them are. The count only appears once the cart has
-            read localStorage, so the server HTML and the first client paint
-            agree. */}
-        {/* Account before cart: signing in is what a returning customer is
-            looking for, and it is where people expect it. Renders nothing
-            until the token has been read so the label cannot flip. */}
-        <Link
-          className="lp-cart-link"
-          href={auth.customer ? '/account' : '/account/login'}
-          aria-label={auth.customer ? `Account, signed in as ${auth.customer.firstName}` : 'Sign in'}
-        >
-          <AccountIcon />
-          {auth.ready && auth.customer ? <span className="lp-account-dot" aria-hidden="true" /> : null}
-        </Link>
+        {/* The icons and the CTA are one group, not three items sharing the
+            header's space-between. Loose, they drifted into the middle of the
+            gap between the nav and the button and read as unrelated. */}
+        <div className="lp-header-actions">
+          {/* Account first: signing in is what a returning customer is looking
+              for, and top-right is where people reach for it. The signed-in dot
+              waits for the token to be read so the state cannot flip. */}
+          <Link
+            className="lp-icon-link"
+            href={auth.customer ? '/account' : '/account/login'}
+            aria-label={auth.customer ? `Account, signed in as ${auth.customer.firstName}` : 'Sign in'}
+          >
+            <AccountIcon />
+            {auth.ready && auth.customer ? <span className="lp-account-dot" aria-hidden="true" /> : null}
+          </Link>
 
-        <Link className="lp-cart-link" href="/cart" aria-label={cartLabel(cart.ready, cart.count)}>
-          <CartIcon />
-          {cart.ready && cart.count > 0 ? (
-            <span className="lp-cart-count" aria-hidden="true">{cart.count}</span>
-          ) : null}
-        </Link>
+          {/* Visible at every width, unlike the nav and the CTA: a basket a
+              buyer cannot find is a basket they abandon, and on a phone is
+              where most of them are. */}
+          <Link className="lp-icon-link" href="/cart" aria-label={cartLabel(cart.ready, cart.count)}>
+            <CartIcon />
+            {cart.ready && cart.count > 0 ? (
+              <span className="lp-cart-count" aria-hidden="true">{cart.count}</span>
+            ) : null}
+          </Link>
 
-        <Link className="lp-button lp-button-primary lp-header-cta" href={ctaHref}>
-          {ctaLabel}
-        </Link>
+          <Link className="lp-button lp-button-primary lp-header-cta" href={ctaHref}>
+            {ctaLabel}
+          </Link>
+        </div>
 
         {/* Replaces both the nav and the CTA below 1060px, where they are
             hidden. Without it the header had no navigation at all. */}

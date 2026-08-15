@@ -52,6 +52,15 @@ img {
 .lp-main-content {
   padding-bottom: 0;
   flex: 1 0 auto;
+  /* The header is fixed, so it occupies no space and content would start
+     underneath it. Cleared here, once, rather than by each section adding its
+     own margin-top: the per-section approach meant every new page inherited
+     the overlap until someone noticed, which is exactly what happened to the
+     storefront and account pages.
+
+     Sections that already set their own margin-top zero it out below, so this
+     does not double up on the pages that were already correct. */
+  padding-top: var(--lp-header-h);
 }
 
 .lp-container {
@@ -3330,7 +3339,8 @@ img {
   }
 
   .portal-main {
-    margin-top: var(--lp-header-h);
+    /* Header clearance comes from .lp-main-content; setting it again here
+       would double the gap on a phone. */
     background: linear-gradient(180deg, #ffffff 0%, #f9f9f9 30%, #f3f3f4 100%);
     padding-bottom: 100px;
   }
@@ -10376,7 +10386,17 @@ img {
 
 /* --- header cart --- */
 
-.lp-cart-link {
+/* Account and cart icons plus the CTA, kept together at the right rather than
+   spread by the header's space-between. */
+.lp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* The badges sit slightly outside their icon, so the group must not clip. */
+  overflow: visible;
+}
+
+.lp-icon-link {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -10384,30 +10404,49 @@ img {
   /* 44px is the smallest target a thumb hits reliably. */
   width: 44px;
   height: 44px;
-  color: var(--de-ink);
+  color: var(--de-ink, #020721);
   border-radius: 50%;
   transition: background 0.15s ease;
 }
 
-.lp-cart-link:hover {
-  background: var(--de-100);
+.lp-icon-link:hover {
+  background: var(--de-100, #e8eaf8);
 }
 
+.lp-icon-link:focus-visible {
+  outline: 2px solid var(--de-500, #2438a8);
+  outline-offset: 2px;
+}
+
+/* Badges are pulled inside the 44px box rather than hung off its corner: at
+   the edge they were clipped by the header's bottom border. */
 .lp-cart-count {
   position: absolute;
-  top: 4px;
-  right: 2px;
-  min-width: 18px;
-  height: 18px;
+  top: 6px;
+  right: 4px;
+  min-width: 17px;
+  height: 17px;
   padding: 0 4px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 18px;
+  line-height: 17px;
   text-align: center;
   color: #fff;
-  background: var(--de-royal);
-  border: 2px solid #fff;
+  background: var(--de-royal, #06166e);
+  border: 2px solid #fbfbfb;
   border-radius: 999px;
+}
+
+/* A dot rather than a count: it says "signed in" without implying a number. */
+.lp-account-dot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 8px;
+  height: 8px;
+  background: var(--de-go, #0f7a40);
+  border: 2px solid #fbfbfb;
+  border-radius: 50%;
 }
 
 .de-cart-hint {
@@ -10503,18 +10542,6 @@ img {
 .de-auth-link {
   color: var(--de-royal);
   font-weight: 600;
-}
-
-/* A dot rather than a count: it says "signed in" without implying a number. */
-.lp-account-dot {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 8px;
-  height: 8px;
-  background: var(--de-go);
-  border: 2px solid #fff;
-  border-radius: 50%;
 }
 
 .de-account {
@@ -10637,4 +10664,25 @@ img {
   .de-account {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* These cleared the fixed header themselves before .lp-main-content did it for
+   everyone. Zeroed rather than deleted from each block: the margin also has to
+   go on the portal shell and the CMS pages, and one list is easier to keep
+   honest than seven scattered edits. */
+.lp-hero,
+.lp-services-page,
+.lp-about-hero,
+.lp-listings-main,
+.lp-contact-main,
+.lp-detail-main,
+.lp-lightbox-grid,
+.pd-main,
+.pr-main {
+  margin-top: 0;
+}
+
+/* The portal sits inside the same shell. */
+.portal-main {
+  margin-top: 0;
 }
