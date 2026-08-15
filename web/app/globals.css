@@ -10176,11 +10176,6 @@ img {
   gap: 12px;
 }
 
-.de-field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
 
 .de-checkout-form label {
   display: flex;
@@ -10418,7 +10413,4 @@ img {
     text-align: left;
   }
 
-  .de-field-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
