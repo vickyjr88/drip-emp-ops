@@ -20,14 +20,14 @@ import {
   roleLabelFor,
 } from '../lib';
 
-type Project = { id: string; code: string; name: string };
+type Store = { id: string; code: string; name: string };
 
 type FixedAsset = {
   id: string;
   assetCode: string;
   description: string;
   category: string;
-  projectId?: string | null;
+  storeId?: string | null;
   acquisitionDate: string;
   acquisitionCost: string | number;
   usefulLifeMonths: number;
@@ -46,13 +46,13 @@ export default function FixedAssetsPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   const [assets, setAssets] = useState<FixedAsset[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
 
   const [showAssetForm, setShowAssetForm] = useState(false);
   const [assetCode, setAssetCode] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [storeId, setStoreId] = useState('');
   const [acquisitionDate, setAcquisitionDate] = useState('');
   const [acquisitionCost, setAcquisitionCost] = useState('');
   const [usefulLifeMonths, setUsefulLifeMonths] = useState('60');
@@ -71,17 +71,17 @@ export default function FixedAssetsPage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextAssets, nextProjects] = await Promise.all([
+      const [nextAssets, nextStores] = await Promise.all([
         hasPermission(nextProfile, 'fixed-asset.read')
           ? apiRequest<FixedAsset[]>('/fixed-assets?take=200', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'project.read')
-          ? apiRequest<Project[]>('/projects', { method: 'GET' }, authToken)
+        hasPermission(nextProfile, 'store.read')
+          ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
       ]);
       setProfile(nextProfile);
       setAssets(nextAssets);
-      setProjects(nextProjects);
+      setStores(nextStores);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load fixed assets.');
     } finally {
@@ -98,11 +98,11 @@ export default function FixedAssetsPage() {
     void load(token);
   }, [initialized, token, load]);
 
-  const projectMap = useMemo(() => {
-    const map = new Map<string, Project>();
-    for (const project of projects) map.set(project.id, project);
+  const storeMap = useMemo(() => {
+    const map = new Map<string, Store>();
+    for (const store of stores) map.set(store.id, store);
     return map;
-  }, [projects]);
+  }, [stores]);
 
   const canCreateAsset = hasPermission(profile, 'fixed-asset.create');
   const canUpdateAsset = hasPermission(profile, 'fixed-asset.update');
@@ -141,7 +141,7 @@ export default function FixedAssetsPage() {
             assetCode,
             description,
             category,
-            projectId: projectId || undefined,
+            storeId: storeId || undefined,
             acquisitionDate,
             acquisitionCost: Number(acquisitionCost),
             usefulLifeMonths: Number(usefulLifeMonths),
@@ -154,7 +154,7 @@ export default function FixedAssetsPage() {
       setAssetCode('');
       setDescription('');
       setCategory('');
-      setProjectId('');
+      setStoreId('');
       setAcquisitionDate('');
       setAcquisitionCost('');
     }, 'Fixed asset created.');
@@ -190,6 +190,10 @@ export default function FixedAssetsPage() {
 
   async function onTransfer(assetId: string) {
     if (!token || !canCreateTransfer) return;
+    // toProjectId is the API's field name, and the AssetTransfer table still
+    // spells its columns that way; the value is a store id and the service
+    // writes it to the asset's storeId. Renaming the wire field would need a
+    // migration, so only the screen's own wording changed.
     const toProjectId = transferTargets[assetId];
     if (!toProjectId) return;
     await runMutation(async () => {
@@ -246,7 +250,7 @@ export default function FixedAssetsPage() {
             tourIsAdmin={profile.role === 'ADMIN' || (profile.roles || []).some((r: { name: string }) => r.name === 'ADMIN')}
             active="accounting"
             pageTitle="Fixed Assets"
-            pageSubtitle="Asset register, automatic depreciation, and transfers between projects."
+            pageSubtitle="Asset register, automatic depreciation, and transfers between stores."
             email={profile.email}
             roleLabel={roleLabelFor(profile)}
             permissionCount={profile.permissions?.length || 0}
@@ -311,12 +315,12 @@ export default function FixedAssetsPage() {
                   </label>
                   <div className="portal-entity-grid-2">
                     <label>
-                      <span>Project (optional)</span>
-                      <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+                      <span>Store (optional)</span>
+                      <select value={storeId} onChange={(event) => setStoreId(event.target.value)}>
                         <option value="">Unassigned</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.code} — {project.name}
+                        {stores.map((store) => (
+                          <option key={store.id} value={store.id}>
+                            {store.code} — {store.name}
                           </option>
                         ))}
                       </select>
@@ -380,7 +384,7 @@ export default function FixedAssetsPage() {
                           </strong>
                           <p>
                             {asset.category} • Acquired {formatDate(asset.acquisitionDate)}
-                            {asset.projectId ? ` • ${projectMap.get(asset.projectId)?.name || 'Unknown project'}` : ' • Unassigned'}
+                            {asset.storeId ? ` • ${storeMap.get(asset.storeId)?.name || 'Unknown store'}` : ' • Unassigned'}
                           </p>
                         </div>
                         <span>{asset.status}</span>
@@ -397,12 +401,12 @@ export default function FixedAssetsPage() {
                                 onChange={(event) => setTransferTargets((prev) => ({ ...prev, [asset.id]: event.target.value }))}
                                 style={{ minWidth: 200 }}
                               >
-                                <option value="">Transfer to project...</option>
-                                {projects
-                                  .filter((project) => project.id !== asset.projectId)
-                                  .map((project) => (
-                                    <option key={project.id} value={project.id}>
-                                      {project.code} — {project.name}
+                                <option value="">Transfer to store...</option>
+                                {stores
+                                  .filter((store) => store.id !== asset.storeId)
+                                  .map((store) => (
+                                    <option key={store.id} value={store.id}>
+                                      {store.code} — {store.name}
                                     </option>
                                   ))}
                               </select>

@@ -82,7 +82,7 @@ export class LedgerController {
   @Post('expense-imports/validate')
   @Permissions(buildPermissionKey('JournalEntry', 'create'))
   validateImport(@Body() dto: ExpenseImportDto) {
-    return this.importer.validate(dto.rows, dto.creditAccountCode);
+    return this.importer.validate(dto.rows, dto.creditAccountCode, dto.defaultStoreCode);
   }
 
   @Post('expense-imports')
@@ -91,6 +91,7 @@ export class LedgerController {
     return this.importer.commit(dto.rows, {
       creditAccountCode: dto.creditAccountCode,
       batchRef: dto.batchRef,
+      defaultStoreCode: dto.defaultStoreCode,
       postedBy: request?.user?.email,
     });
   }

@@ -74,7 +74,7 @@ type InvoiceLineForm = { description: string; amount: string; taxRateId: string 
 
 type TaxRate = { id: string; name: string; rate: string | number; appliesTo: 'OUTPUT' | 'INPUT' | 'WITHHOLDING' };
 
-type Project = { id: string; code: string; name: string };
+type Store = { id: string; code: string; name: string };
 
 type Refund = {
   id: string;
@@ -121,14 +121,14 @@ export default function AccountsReceivablePage() {
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
   const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [refunds, setRefunds] = useState<Refund[]>([]);
 
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceCustomerId, setInvoiceCustomerId] = useState('');
   const [invoiceDueDate, setInvoiceDueDate] = useState('');
   const [invoiceLines, setInvoiceLines] = useState<InvoiceLineForm[]>([{ description: '', amount: '', taxRateId: '' }]);
-  const [invoiceProjectId, setInvoiceProjectId] = useState('');
+  const [invoiceStoreId, setInvoiceStoreId] = useState('');
 
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [receiptCustomerId, setReceiptCustomerId] = useState('');
@@ -151,7 +151,7 @@ export default function AccountsReceivablePage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextCustomers, nextInvoices, nextReceipts, nextAging, nextBanks, nextTaxRates, nextProjects, nextRefunds] = await Promise.all([
+      const [nextCustomers, nextInvoices, nextReceipts, nextAging, nextBanks, nextTaxRates, nextStores, nextRefunds] = await Promise.all([
         hasPermission(nextProfile, 'customer.read')
           ? apiRequest<Customer[]>('/customers?take=500', { method: 'GET' }, authToken)
           : Promise.resolve([]),
@@ -170,8 +170,8 @@ export default function AccountsReceivablePage() {
         hasPermission(nextProfile, 'tax-rate.read')
           ? apiRequest<TaxRate[]>('/tax-rates?activeOnly=true', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'project.read')
-          ? apiRequest<Project[]>('/projects', { method: 'GET' }, authToken)
+        hasPermission(nextProfile, 'store.read')
+          ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'refund.read')
           ? apiRequest<Refund[]>('/refunds', { method: 'GET' }, authToken)
@@ -184,7 +184,7 @@ export default function AccountsReceivablePage() {
       setAging(nextAging);
       setBankAccounts(nextBanks);
       setTaxRates(nextTaxRates);
-      setProjects(nextProjects);
+      setStores(nextStores);
       setRefunds(nextRefunds);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load accounts receivable.');
@@ -253,7 +253,7 @@ export default function AccountsReceivablePage() {
           body: JSON.stringify({
             customerId: invoiceCustomerId,
             dueDate: invoiceDueDate,
-            projectId: invoiceProjectId || undefined,
+            storeId: invoiceStoreId || undefined,
             lines: invoiceLines
               .filter((line) => line.description && line.amount)
               .map((line) => ({
@@ -269,7 +269,7 @@ export default function AccountsReceivablePage() {
       setShowInvoiceForm(false);
       setInvoiceCustomerId('');
       setInvoiceDueDate('');
-      setInvoiceProjectId('');
+      setInvoiceStoreId('');
       setInvoiceLines([{ description: '', amount: '', taxRateId: '' }]);
     }, 'Invoice created.');
   }
@@ -592,12 +592,12 @@ export default function AccountsReceivablePage() {
                         </label>
                       </div>
                       <label>
-                        <span>Project (optional)</span>
-                        <select value={invoiceProjectId} onChange={(event) => setInvoiceProjectId(event.target.value)}>
-                          <option value="">Not project-specific</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.code} — {project.name}
+                        <span>Store (optional)</span>
+                        <select value={invoiceStoreId} onChange={(event) => setInvoiceStoreId(event.target.value)}>
+                          <option value="">Not store-specific</option>
+                          {stores.map((store) => (
+                            <option key={store.id} value={store.id}>
+                              {store.code} — {store.name}
                             </option>
                           ))}
                         </select>
@@ -810,7 +810,7 @@ export default function AccountsReceivablePage() {
                         </label>
                       </div>
                       <label>
-                        <span>Received Into (optional — auto-resolved from project/purpose if left blank)</span>
+                        <span>Received Into (optional — auto-resolved from store/purpose if left blank)</span>
                         <select value={receiptBankAccountId} onChange={(event) => setReceiptBankAccountId(event.target.value)}>
                           <option value="">Auto-resolve</option>
                           {bankAccounts.map((bank) => (

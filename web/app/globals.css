@@ -3941,6 +3941,38 @@ img {
     padding: 2px 5px;
   }
 
+  /* Several rate meters read as one comparison, so they are spaced as a
+     group rather than sitting flush against each other. */
+  .analytics-meter-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* Money and counts line up on the decimal so columns can be scanned down
+     rather than read cell by cell. */
+  .portal-data-table th.portal-num,
+  .portal-data-table td.portal-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Consignment past its three-day return window. Carries the word as well as
+     the colour so it survives greyscale and a colourblind reader. */
+  .portal-overdue-flag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #8a1220;
+    background: #fdecee;
+    border: 1px solid #f5c2c8;
+    border-radius: 999px;
+  }
+
   .portal-table-sub {
     margin-top: 3px;
     font-size: 12px;

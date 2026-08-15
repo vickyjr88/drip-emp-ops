@@ -35,7 +35,7 @@ type SupplierInvoice = {
   currency: string;
   amount: string | number;
   status: 'PENDING_APPROVAL' | 'APPROVED' | 'STAGED' | 'PAID' | 'DISPUTED' | 'CANCELLED';
-  projectId?: string | null;
+  storeId?: string | null;
   glExpenseAccountId?: string | null;
   attachments: SupplierInvoiceAttachment[];
 };
@@ -80,12 +80,12 @@ export default function AccountsPayablePage() {
   const [supplierBalances, setSupplierBalances] = useState<
     Array<{ id: string; name: string; invoicedTotal: number; paidTotal: number; outstanding: number }>
   >([]);
-  const [projects, setProjects] = useState<Array<{ id: string; code: string; name: string }>>([]);
+  const [stores, setStores] = useState<Array<{ id: string; code: string; name: string }>>([]);
   const [expenseAccounts, setExpenseAccounts] = useState<
     Array<{ id: string; code: string; name: string; type: string; parentId?: string | null }>
   >([]);
   const [recatInvoiceId, setRecatInvoiceId] = useState<string | null>(null);
-  const [recatForm, setRecatForm] = useState({ projectId: '', glExpenseAccountId: '' });
+  const [recatForm, setRecatForm] = useState({ storeId: '', glExpenseAccountId: '' });
   const [supplierInvoices, setSupplierInvoices] = useState<SupplierInvoice[]>([]);
   const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
@@ -123,7 +123,7 @@ export default function AccountsPayablePage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextSuppliers, nextBalances, nextInvoices, nextPayments, nextTaxRates, nextBanks, nextProjects, nextAccounts] = await Promise.all([
+      const [nextSuppliers, nextBalances, nextInvoices, nextPayments, nextTaxRates, nextBanks, nextStores, nextAccounts] = await Promise.all([
         hasPermission(nextProfile, 'supplier.read')
           ? apiRequest<Supplier[]>('/suppliers?take=500', { method: 'GET' }, authToken)
           : Promise.resolve([]),
@@ -142,8 +142,8 @@ export default function AccountsPayablePage() {
         hasPermission(nextProfile, 'bank-account.read')
           ? apiRequest<BankAccount[]>('/bank-accounts', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'project.read')
-          ? apiRequest<any[]>('/projects', { method: 'GET' }, authToken)
+        hasPermission(nextProfile, 'store.read')
+          ? apiRequest<any[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'chart-of-account.read')
           ? apiRequest<any[]>('/chart-of-accounts', { method: 'GET' }, authToken)
@@ -152,9 +152,9 @@ export default function AccountsPayablePage() {
       setProfile(nextProfile);
       setSuppliers(nextSuppliers);
       setSupplierBalances(nextBalances);
-      setProjects(nextProjects);
+      setStores(nextStores);
       // Only leaf expense accounts: posting to a parent bypasses the category
-      // split the project cost report is built on.
+      // split the store cost report is built on.
       setExpenseAccounts(
         nextAccounts.filter((account: any) => account.type === 'EXPENSE' && account.parentId),
       );
@@ -203,14 +203,14 @@ export default function AccountsPayablePage() {
         {
           method: 'PATCH',
           body: JSON.stringify({
-            projectId: recatForm.projectId || null,
+            storeId: recatForm.storeId || null,
             glExpenseAccountId: recatForm.glExpenseAccountId || null,
           }),
         },
         token,
       );
       setRecatInvoiceId(null);
-    }, 'Invoice recategorised — the project cost report now reflects this spend.');
+    }, 'Invoice recategorised — the store cost report now reflects this spend.');
   }
 
   function onLogout() {
@@ -658,7 +658,7 @@ export default function AccountsPayablePage() {
                         { header: 'Status', value: (row) => row.status },
                         { header: 'Invoiced', value: (row) => formatDate(row.invoiceDate) },
                         { header: 'Due', value: (row) => formatDate(row.dueDate) },
-                        { header: 'Project', value: (row) => projects.find((p) => p.id === row.projectId)?.name || '' },
+                        { header: 'Store', value: (row) => stores.find((p) => p.id === row.storeId)?.name || '' },
                       ],
                     }}
                   />
@@ -678,10 +678,10 @@ export default function AccountsPayablePage() {
                             <p>{supplierLabel(supplierMap.get(invoice.supplierId))}</p>
                             <p>Due {formatDate(invoice.dueDate)}</p>
                             <p className="portal-muted" style={{ margin: '4px 0 0' }}>
-                              {invoice.projectId
-                                ? projects.find((project) => project.id === invoice.projectId)?.name ||
-                                  'Unknown project'
-                                : 'No project'}
+                              {invoice.storeId
+                                ? stores.find((store) => store.id === invoice.storeId)?.name ||
+                                  'Unknown store'
+                                : 'No store'}
                               {' • '}
                               {invoice.glExpenseAccountId
                                 ? expenseAccounts.find((account) => account.id === invoice.glExpenseAccountId)
@@ -743,7 +743,7 @@ export default function AccountsPayablePage() {
                                 }
                                 setRecatInvoiceId(invoice.id);
                                 setRecatForm({
-                                  projectId: invoice.projectId || '',
+                                  storeId: invoice.storeId || '',
                                   glExpenseAccountId: invoice.glExpenseAccountId || '',
                                 });
                               }}
@@ -762,22 +762,22 @@ export default function AccountsPayablePage() {
                             }}
                           >
                             <p className="portal-muted" style={{ margin: 0 }}>
-                              Tag this spend so it shows on the project cost report. Amounts are not
+                              Tag this spend so it shows on the store cost report. Amounts are not
                               changed — only where the cost is reported.
                             </p>
                             <div className="portal-entity-grid-2">
                               <label>
-                                <span>Project</span>
+                                <span>Store</span>
                                 <select
-                                  value={recatForm.projectId}
+                                  value={recatForm.storeId}
                                   onChange={(event) =>
-                                    setRecatForm((prev) => ({ ...prev, projectId: event.target.value }))
+                                    setRecatForm((prev) => ({ ...prev, storeId: event.target.value }))
                                   }
                                 >
-                                  <option value="">No project</option>
-                                  {projects.map((project) => (
-                                    <option key={project.id} value={project.id}>
-                                      {project.code} — {project.name}
+                                  <option value="">No store</option>
+                                  {stores.map((store) => (
+                                    <option key={store.id} value={store.id}>
+                                      {store.code} — {store.name}
                                     </option>
                                   ))}
                                 </select>

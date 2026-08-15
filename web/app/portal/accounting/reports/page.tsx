@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useErrorState } from '../../components/notifications';
-import { perSqftFromPerSqm } from '../../../lib/area';
 import { TourLauncher } from '../../tours/tour-launcher';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
@@ -29,14 +28,15 @@ type ReportKey =
   | 'cash-flow'
   | 'ar-aging'
   | 'ap-aging'
-  | 'project-cost'
-  | 'project-profitability'
-  | 'project-analytics'
+  | 'store-performance'
+  | 'product-profitability'
+  | 'consignment-exposure'
   | 'tax';
 
 const REPORTS: Array<{ key: ReportKey; label: string }> = [
-  { key: 'project-cost', label: 'Project Cost' },
-  { key: 'project-analytics', label: 'Project Analytics' },
+  { key: 'store-performance', label: 'Store Performance' },
+  { key: 'product-profitability', label: 'Product Profitability' },
+  { key: 'consignment-exposure', label: 'Consignment Exposure' },
   { key: 'trial-balance', label: 'Trial Balance' },
   { key: 'general-ledger', label: 'General Ledger' },
   { key: 'journal-listing', label: 'Journal Listing' },
@@ -45,35 +45,43 @@ const REPORTS: Array<{ key: ReportKey; label: string }> = [
   { key: 'cash-flow', label: 'Cash Flow' },
   { key: 'ar-aging', label: 'AR Aging' },
   { key: 'ap-aging', label: 'AP Aging' },
-  { key: 'project-profitability', label: 'Project Profitability' },
   { key: 'tax', label: 'Tax Report' },
 ];
 
 /**
- * Journal listing has no projectId filter on the API, and project profitability
- * and analytics already break results down per project, so a scope picker would
- * be meaningless (or silently ignored) on these.
+ * Reports a store filter does not apply to.
+ *
+ * Journal listing has no store filter on the API; store performance already
+ * breaks every store out into its own row, so scoping it to one store would
+ * just be a one-row table. AR ageing, AP ageing and tax are company-wide by
+ * nature.
  */
-const REPORTS_WITHOUT_PROJECT_SCOPE: ReportKey[] = ['journal-listing', 'project-profitability'];
+const REPORTS_WITHOUT_STORE_SCOPE: ReportKey[] = [
+  'journal-listing',
+  'store-performance',
+  'ar-aging',
+  'ap-aging',
+  'tax',
+];
 
 /**
- * Reports the PDF endpoint can render. The other four in the picker are served
- * by different controllers and have no PDF route yet, so the download button is
- * hidden for them rather than offering something that fails.
+ * Reports the PDF endpoint can render. The rest are served by other
+ * controllers and have no PDF route, so the download button is hidden for them
+ * rather than offering something that fails.
  */
 const PDF_REPORTS: ReportKey[] = [
   'profit-and-loss',
   'balance-sheet',
   'cash-flow',
   'ap-aging',
-  'project-cost',
-  'project-profitability',
-  'project-analytics',
+  'store-performance',
+  'product-profitability',
+  'consignment-exposure',
   'tax',
 ];
 
 type ChartOfAccount = { id: string; code: string; name: string; type?: string };
-type ProjectOption = { id: string; code: string; name: string };
+type StoreOption = { id: string; code: string; name: string };
 
 export default function FinancialReportsPage() {
   const [initialized, setInitialized] = useState(false);
@@ -83,20 +91,17 @@ export default function FinancialReportsPage() {
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
 
-  const [activeReport, setActiveReport] = useState<ReportKey>('project-analytics');
+  const [activeReport, setActiveReport] = useState<ReportKey>('store-performance');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [glAccountId, setGlAccountId] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [storeId, setStoreId] = useState('');
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
   const [reportDataKey, setReportDataKey] = useState<ReportKey | null>(null);
 
-  const [budgetForm, setBudgetForm] = useState({ projectId: '', accountId: '', budgetAmount: '', periodStart: '', periodEnd: '' });
-  const [budgetSaving, setBudgetSaving] = useState(false);
-  const [budgetError, setBudgetError] = useState<string | null>(null);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -114,14 +119,14 @@ export default function FinancialReportsPage() {
         setAccounts(nextAccounts);
         setGlAccountId((prev) => prev || nextAccounts[0]?.id || '');
       }
-      // Populates the scope picker. A missing project.read just leaves it on
-      // "All projects" rather than failing the whole reports page.
-      if (hasPermission(nextProfile, 'project.read')) {
+      // Populates the scope picker. A missing store.read just leaves it on
+      // "All stores" rather than failing the whole reports page.
+      if (hasPermission(nextProfile, 'store.read')) {
         try {
-          const nextProjects = await apiRequest<ProjectOption[]>('/projects', { method: 'GET' }, authToken);
-          setProjects(Array.isArray(nextProjects) ? nextProjects : []);
+          const nextStores = await apiRequest<StoreOption[]>('/stores', { method: 'GET' }, authToken);
+          setStores(nextStores);
         } catch {
-          setProjects([]);
+          // Non-fatal: the reports still run company-wide.
         }
       }
     } catch (error) {
@@ -149,7 +154,7 @@ export default function FinancialReportsPage() {
     setDownloadingPdf(true);
     setErrorMessage(null);
     try {
-      const scopedProjectId = REPORTS_WITHOUT_PROJECT_SCOPE.includes(activeReport) ? '' : projectId;
+      const scopedStoreId = REPORTS_WITHOUT_STORE_SCOPE.includes(activeReport) ? '' : storeId;
       const params = new URLSearchParams();
       if (from) params.set('from', from);
       // As-of reports read `asOf`; sending both is harmless and saves branching
@@ -158,10 +163,10 @@ export default function FinancialReportsPage() {
         params.set('to', to);
         params.set('asOf', to);
       }
-      if (scopedProjectId) {
-        params.set('projectId', scopedProjectId);
-        const project = projects.find((entry) => entry.id === scopedProjectId);
-        if (project) params.set('projectName', `${project.code} — ${project.name}`);
+      if (scopedStoreId) {
+        params.set('storeId', scopedStoreId);
+        const store = stores.find((entry) => entry.id === scopedStoreId);
+        if (store) params.set('storeName', `${store.code} — ${store.name}`);
       }
       await downloadFile(
         `/reports/${activeReport}/pdf?${params.toString()}`,
@@ -181,19 +186,23 @@ export default function FinancialReportsPage() {
     setReportLoading(true);
     setErrorMessage(null);
     try {
-      // Scope applies to every report that supports it; the two exceptions are
-      // listed in REPORTS_WITHOUT_PROJECT_SCOPE.
-      const scopedProjectId = REPORTS_WITHOUT_PROJECT_SCOPE.includes(activeReport) ? '' : projectId;
+      // Scope applies to every report that supports it; the exceptions are
+      // listed in REPORTS_WITHOUT_STORE_SCOPE.
+      //
+      // This used to send `projectId`, which the API has never read -- it takes
+      // `storeId`. Every store filter was therefore silently ignored and the
+      // screen showed group-wide figures while claiming to be scoped.
+      const scopedStoreId = REPORTS_WITHOUT_STORE_SCOPE.includes(activeReport) ? '' : storeId;
 
       const params = new URLSearchParams();
       if (from) params.set('from', from);
       if (to) params.set('to', to);
-      if (scopedProjectId) params.set('projectId', scopedProjectId);
+      if (scopedStoreId) params.set('storeId', scopedStoreId);
 
       // For as-of reports the date lives in `asOf` rather than `to`.
       const asOfParams = new URLSearchParams();
       if (to) asOfParams.set('asOf', to);
-      if (scopedProjectId) asOfParams.set('projectId', scopedProjectId);
+      if (scopedStoreId) asOfParams.set('storeId', scopedStoreId);
       const asOfQuery = asOfParams.toString() ? `?${asOfParams.toString()}` : '';
 
       let path = '';
@@ -228,22 +237,14 @@ export default function FinancialReportsPage() {
         case 'ap-aging':
           path = `/reports/ap-aging${asOfQuery}`;
           break;
-        case 'project-cost':
-          if (!scopedProjectId) {
-            // The report is meaningless company-wide: it answers what one
-            // project has cost.
-            setReportData(null);
-            setReportDataKey(null);
-            setReportLoading(false);
-            return;
-          }
-          path = `/reports/project-cost?${params.toString()}`;
+        case 'store-performance':
+          path = `/reports/store-performance?${params.toString()}`;
           break;
-        case 'project-profitability':
-          path = `/reports/project-profitability?${params.toString()}`;
+        case 'product-profitability':
+          path = `/reports/product-profitability?${params.toString()}`;
           break;
-        case 'project-analytics':
-          path = `/reports/project-analytics?${params.toString()}`;
+        case 'consignment-exposure':
+          path = `/reports/consignment-exposure${asOfQuery}`;
           break;
         case 'tax':
           path = `/reports/tax?${params.toString()}`;
@@ -260,67 +261,15 @@ export default function FinancialReportsPage() {
     } finally {
       setReportLoading(false);
     }
-  }, [token, activeReport, from, to, glAccountId, projectId]);
+  }, [token, activeReport, from, to, glAccountId, storeId]);
 
   useEffect(() => {
     if (!token || !profile) return;
     void runReport();
-    // Re-runs on scope change too, so switching project reflects immediately
+    // Re-runs on scope change too, so switching store reflects immediately
     // without needing to press Run Report.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, profile, activeReport, projectId]);
-
-  const canManageBudgets = hasPermission(profile, 'project-budget.create');
-  // Budgets are expense plans, so offering revenue/asset accounts here would
-  // only produce variance rows that can never be meaningful.
-  const expenseAccounts = useMemo(() => accounts.filter((account) => account.type === 'EXPENSE'), [accounts]);
-
-  async function onCreateBudget() {
-    if (!token || budgetSaving) return;
-    if (!budgetForm.projectId || !budgetForm.accountId || !budgetForm.budgetAmount) {
-      setBudgetError('Project, account and amount are all required.');
-      return;
-    }
-
-    setBudgetSaving(true);
-    setBudgetError(null);
-    try {
-      await apiRequest(
-        '/project-budgets',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            projectId: budgetForm.projectId,
-            accountId: budgetForm.accountId,
-            budgetAmount: Number(budgetForm.budgetAmount),
-            periodStart: budgetForm.periodStart || undefined,
-            periodEnd: budgetForm.periodEnd || undefined,
-          }),
-        },
-        token,
-      );
-      setBudgetForm({ projectId: '', accountId: '', budgetAmount: '', periodStart: '', periodEnd: '' });
-      await runReport();
-    } catch (error) {
-      setBudgetError(error instanceof Error ? error.message : 'Unable to save the budget.');
-    } finally {
-      setBudgetSaving(false);
-    }
-  }
-
-  async function onDeleteBudget(budgetId: string) {
-    if (!token || budgetSaving) return;
-    setBudgetSaving(true);
-    setBudgetError(null);
-    try {
-      await apiRequest(`/project-budgets/${budgetId}`, { method: 'DELETE' }, token);
-      await runReport();
-    } catch (error) {
-      setBudgetError(error instanceof Error ? error.message : 'Unable to delete the budget.');
-    } finally {
-      setBudgetSaving(false);
-    }
-  }
+  }, [token, profile, activeReport, storeId]);
 
   const roleLabel = useMemo(() => roleLabelFor(profile), [profile]);
 
@@ -368,7 +317,7 @@ export default function FinancialReportsPage() {
             tourIsAdmin={profile.role === 'ADMIN' || (profile.roles || []).some((r: { name: string }) => r.name === 'ADMIN')}
             active="accounting"
             pageTitle="Financial Reports"
-            pageSubtitle="Project analytics plus Trial Balance, General Ledger, P&L, Balance Sheet, Cash Flow, Aging and Tax — company-wide or scoped to a single project."
+            pageSubtitle="Store performance, product margin and consignment exposure, plus Trial Balance, General Ledger, P&L, Balance Sheet, Cash Flow, Aging and Tax — company-wide or scoped to one store."
             email={profile.email}
             roleLabel={roleLabel}
             permissionCount={profile.permissions?.length || 0}
@@ -420,14 +369,14 @@ export default function FinancialReportsPage() {
                       </select>
                     </label>
                   ) : null}
-                  {!REPORTS_WITHOUT_PROJECT_SCOPE.includes(activeReport) ? (
+                  {!REPORTS_WITHOUT_STORE_SCOPE.includes(activeReport) ? (
                     <label>
-                      <span>Project</span>
-                      <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-                        <option value="">All projects</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.code} — {project.name}
+                      <span>Store</span>
+                      <select value={storeId} onChange={(event) => setStoreId(event.target.value)}>
+                        <option value="">All stores</option>
+                        {stores.map((store) => (
+                          <option key={store.id} value={store.id}>
+                            {store.code} — {store.name}
                           </option>
                         ))}
                       </select>
@@ -454,104 +403,22 @@ export default function FinancialReportsPage() {
 
               {reportLoading ? (
                 <div className="portal-empty-state">Loading report...</div>
-              ) : activeReport === 'project-cost' && !projectId ? (
-                <div className="portal-empty-state">
-                  Choose a project above to see what it has cost.
-                </div>
               ) : !reportData || reportDataKey !== activeReport ? (
                 <div className="portal-empty-state">No data for this report yet.</div>
               ) : (
                 <>
-                  {/* Caveats the API attaches to project-scoped cuts (e.g. that a
-                      per-project balance sheet is not expected to balance). */}
+                  {/* Caveats the API attaches to store-scoped cuts (e.g. that a
+                      per-store balance sheet is not expected to balance). */}
                   {reportData.note ? (
                     <p className="portal-muted" style={{ marginTop: 0 }}>
                       {reportData.note}
                     </p>
                   ) : null}
-                  <ReportView reportKey={activeReport} data={reportData} onDeleteBudget={canManageBudgets ? onDeleteBudget : undefined} />
+                  <ReportView reportKey={activeReport} data={reportData} />
                 </>
               )}
             </article>
 
-            {activeReport === 'project-analytics' && canManageBudgets ? (
-              <article className="portal-card" style={{ marginTop: 16 }} data-tour="reports.budget">
-                <h2 style={{ margin: '0 0 8px' }}>Set a Project Budget</h2><TourLauncher tour="read-the-reports" />
-                <p className="portal-muted" style={{ margin: '0 0 12px' }}>
-                  Budget an expense account for a project. Actuals are read from posted journal lines tagged with that
-                  project, so the variance always tracks the ledger. Leave the dates blank to budget the whole project.
-                </p>
-                {budgetError ? <div className="portal-error" style={{ marginBottom: 12 }}>{budgetError}</div> : null}
-                <div className="portal-entity-form">
-                  <div className="portal-entity-grid-3">
-                    <label>
-                      <span>Project</span>
-                      <select
-                        value={budgetForm.projectId}
-                        onChange={(event) => setBudgetForm((prev) => ({ ...prev, projectId: event.target.value }))}
-                      >
-                        <option value="">Select project</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.code} — {project.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Expense Account</span>
-                      <select
-                        value={budgetForm.accountId}
-                        onChange={(event) => setBudgetForm((prev) => ({ ...prev, accountId: event.target.value }))}
-                      >
-                        <option value="">Select account</option>
-                        {expenseAccounts.map((account) => (
-                          <option key={account.id} value={account.id}>
-                            {account.code} — {account.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Budget Amount</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={budgetForm.budgetAmount}
-                        onChange={(event) => setBudgetForm((prev) => ({ ...prev, budgetAmount: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      <span>Period Start (optional)</span>
-                      <input
-                        type="date"
-                        value={budgetForm.periodStart}
-                        onChange={(event) => setBudgetForm((prev) => ({ ...prev, periodStart: event.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      <span>Period End (optional)</span>
-                      <input
-                        type="date"
-                        value={budgetForm.periodEnd}
-                        onChange={(event) => setBudgetForm((prev) => ({ ...prev, periodEnd: event.target.value }))}
-                      />
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                      <button
-                        type="button"
-                        className="portal-primary-btn"
-                        disabled={budgetSaving}
-                        onClick={() => void onCreateBudget()}
-                      >
-                        {budgetSaving ? 'Saving...' : 'Save Budget'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            ) : null}
           </PortalShell>
         </section>
       </main>
@@ -566,323 +433,64 @@ function formatPercent(value: number | null | undefined) {
   return value === null || value === undefined ? '—' : `${value}%`;
 }
 
-function ProjectAnalyticsView({ data, onDeleteBudget }: { data: any; onDeleteBudget?: (budgetId: string) => void }) {
-  const rows: any[] = data.rows || [];
-  const totals = data.totals || {};
-
-  if (rows.length === 0) {
-    return <div className="portal-empty-state">No projects to analyse yet.</div>;
-  }
-
-  return (
-    <div>
-      <h3 style={{ marginTop: 0 }}>Portfolio Totals</h3>
-      <div className="portal-detail-stats" style={{ marginBottom: 8 }}>
-        <div>
-          <span>Revenue</span>
-          <strong>{formatMoney(totals.revenue || 0)}</strong>
-        </div>
-        <div>
-          <span>Expenses</span>
-          <strong>{formatMoney(totals.expenses || 0)}</strong>
-        </div>
-        <div>
-          <span>Profit</span>
-          <strong>{formatMoney(totals.profit || 0)}</strong>
-        </div>
-        <div>
-          <span>Margin</span>
-          <strong>{formatPercent(totals.marginPercent)}</strong>
-        </div>
-        <div>
-          <span>Units Sold</span>
-          <strong>
-            {totals.unitsSold || 0} / {totals.unitsTotal || 0}
-          </strong>
-        </div>
-        <div>
-          <span>Absorption</span>
-          <strong>{formatPercent(totals.absorptionPercent)}</strong>
-        </div>
-        <div>
-          <span>Collected</span>
-          <strong>{formatMoney(totals.collected || 0)}</strong>
-        </div>
-        <div>
-          <span>Outstanding</span>
-          <strong>{formatMoney(totals.outstanding || 0)}</strong>
-        </div>
-      </div>
-      <p className="portal-muted" style={{ marginTop: 0, marginBottom: 24 }}>
-        Figures cover journal lines tagged with a project. Untagged activity is excluded, so these totals can be lower
-        than the company-wide reports.
-      </p>
-
-      {rows.map((row) => (
-        <article key={row.projectId} className="portal-card" style={{ marginBottom: 16 }}>
-          <div className="portal-card-header-row">
-            <h3 style={{ margin: 0 }}>
-              {row.projectName} <span className="portal-muted">({row.projectCode})</span>
-            </h3>
-            <Link href={`/portal/projects/${row.projectId}`} className="portal-inline-btn">
-              Open Project
-            </Link>
-          </div>
-
-          <h4 style={{ marginBottom: 8 }}>Profitability</h4>
-          <div className="portal-detail-stats" style={{ marginBottom: 16 }}>
-            <div>
-              <span>Revenue</span>
-              <strong>{formatMoney(row.revenue)}</strong>
-            </div>
-            <div>
-              <span>Expenses</span>
-              <strong>{formatMoney(row.expenses)}</strong>
-            </div>
-            <div>
-              <span>Profit</span>
-              <strong>{formatMoney(row.profit)}</strong>
-            </div>
-            <div>
-              <span>Margin</span>
-              <strong>{formatPercent(row.marginPercent)}</strong>
-            </div>
-          </div>
-
-          <h4 style={{ marginBottom: 8 }}>Sales & Absorption</h4>
-          <div className="portal-detail-stats" style={{ marginBottom: 16 }}>
-            <div>
-              <span>Units</span>
-              <strong>{row.unitsTotal}</strong>
-            </div>
-            <div>
-              <span>Sold</span>
-              <strong>{row.unitsSold}</strong>
-            </div>
-            <div>
-              <span>Reserved</span>
-              <strong>{row.unitsReserved}</strong>
-            </div>
-            <div>
-              <span>Available</span>
-              <strong>{row.unitsAvailable}</strong>
-            </div>
-            <div>
-              <span>Absorption</span>
-              <strong>{formatPercent(row.absorptionPercent)}</strong>
-            </div>
-            <div>
-              <span>Avg Unit Price</span>
-              <strong>{row.averageUnitPrice === null ? '—' : formatMoney(row.averageUnitPrice)}</strong>
-            </div>
-            <div>
-              <span>Avg Price / sq ft</span>
-              <strong>
-                {row.averagePricePerSqm === null
-                  ? '—'
-                  : formatMoney(perSqftFromPerSqm(row.averagePricePerSqm))}
-              </strong>
-            </div>
-            <div>
-              <span>Contract Value</span>
-              <strong>{formatMoney(row.contractValue)}</strong>
-            </div>
-          </div>
-
-          <h4 style={{ marginBottom: 8 }}>Collections</h4>
-          <div className="portal-detail-stats" style={{ marginBottom: 16 }}>
-            <div>
-              <span>Invoiced</span>
-              <strong>{formatMoney(row.invoiced)}</strong>
-            </div>
-            <div>
-              <span>Collected</span>
-              <strong>{formatMoney(row.collected)}</strong>
-            </div>
-            <div>
-              <span>Outstanding</span>
-              <strong>{formatMoney(row.outstanding)}</strong>
-            </div>
-            <div>
-              <span>Collection Rate</span>
-              <strong>{formatPercent(row.collectionRatePercent)}</strong>
-            </div>
-            <div>
-              <span>Contract Collected</span>
-              <strong>{formatMoney(row.contractCollected)}</strong>
-            </div>
-            <div>
-              <span>Contract Outstanding</span>
-              <strong>{formatMoney(row.contractOutstanding)}</strong>
-            </div>
-          </div>
-
-          <h4 style={{ marginBottom: 8 }}>Budget vs Actual</h4>
-          {(row.budgetLines || []).length === 0 ? (
-            <div className="portal-empty-state">
-              No budget set for this project. Add one to track spend against plan.
-            </div>
-          ) : (
-            <>
-              <div className="portal-detail-stats" style={{ marginBottom: 12 }}>
-                <div>
-                  <span>Budgeted</span>
-                  <strong>{formatMoney(row.totalBudgeted)}</strong>
-                </div>
-                <div>
-                  <span>Actual</span>
-                  <strong>{formatMoney(row.budgetedActual)}</strong>
-                </div>
-                <div>
-                  <span>Variance</span>
-                  <strong>{formatMoney(row.budgetVariance)}</strong>
-                </div>
-                <div>
-                  <span>Utilisation</span>
-                  <strong>{formatPercent(row.budgetUtilisationPercent)}</strong>
-                </div>
-              </div>
-              <div className="portal-list-stack">
-                {row.budgetLines.map((line: any) => (
-                  <div key={line.budgetId} className="portal-list-row">
-                    <div>
-                      <strong>
-                        {line.accountCode} — {line.accountName}
-                      </strong>
-                      <p>
-                        {line.periodStart || line.periodEnd
-                          ? `${formatDate(line.periodStart)} → ${formatDate(line.periodEnd)}`
-                          : 'Whole project'}
-                      </p>
-                    </div>
-                    <span>Budget {formatMoney(line.budgeted)}</span>
-                    <span>Actual {formatMoney(line.actual)}</span>
-                    {/* Negative variance means the line is over budget. */}
-                    <span className={line.variance < 0 ? 'portal-error' : undefined}>
-                      {line.variance < 0 ? 'Over by ' : 'Under by '}
-                      {formatMoney(Math.abs(line.variance))}
-                    </span>
-                    {onDeleteBudget ? (
-                      <button
-                        type="button"
-                        className="portal-inline-btn is-danger"
-                        onClick={() => onDeleteBudget(line.budgetId)}
-                      >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function ReportView({
-  reportKey,
-  data: rawData,
-  onDeleteBudget,
-}: {
-  reportKey: ReportKey;
-  data: any;
-  onDeleteBudget?: (budgetId: string) => void;
-}) {
+function ReportView({ reportKey, data: rawData }: { reportKey: ReportKey; data: any }) {
   const data = rawData || {};
   switch (reportKey) {
-    case 'project-cost': {
-      const groups = data.groups || [];
-      if (!groups.length) {
-        return (
-          <div className="portal-empty-state">
-            No project cost accounts are configured yet. Add expense accounts with a parent account to
-            build the cost structure.
-          </div>
-        );
+    case 'store-performance': {
+      const rows = data.rows || [];
+      const totals = data.totals || {};
+      if (!rows.length) {
+        return <div className="portal-empty-state">No stores to report on yet.</div>;
       }
       return (
         <div>
-          {groups.map((group: any) => (
-            <div key={group.accountId} style={{ marginBottom: 22 }}>
-              <h3 style={{ margin: '0 0 10px', fontSize: 15, letterSpacing: '0.04em' }}>
-                {group.code} — {group.name.toUpperCase()}
-              </h3>
-              <div className="portal-list-stack">
-                {(group.categories || []).map((category: any) => (
-                  <div key={category.accountId} className="portal-list-row">
-                    <div>
-                      <strong>{category.name}</strong>
-                      <p>{category.code}</p>
-                    </div>
-                    <span>{formatMoney(category.amount)}</span>
-                  </div>
+          <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+            <div className="portal-stat"><span>Orders</span><h3>{totals.orderCount ?? 0}</h3></div>
+            <div className="portal-stat"><span>Revenue</span><h3>{formatMoney(totals.revenue)}</h3></div>
+            <div className="portal-stat"><span>Cost of goods</span><h3>{formatMoney(totals.cogs)}</h3></div>
+            <div className="portal-stat"><span>Gross profit</span><h3>{formatMoney(totals.grossProfit)}</h3></div>
+            <div className="portal-stat"><span>Margin</span><h3>{formatPercent(totals.grossMarginPercent)}</h3></div>
+          </div>
+          <div className="portal-table-wrap">
+            <table className="portal-data-table">
+              <thead>
+                <tr>
+                  <th>Store</th>
+                  <th className="portal-num">Orders</th>
+                  <th className="portal-num">Revenue</th>
+                  <th className="portal-num">Cost of goods</th>
+                  <th className="portal-num">Gross profit</th>
+                  <th className="portal-num">Margin</th>
+                  <th className="portal-num">Collected</th>
+                  <th className="portal-num">Outstanding</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row: any) => (
+                  <tr key={row.storeId}>
+                    <td>
+                      {row.name}
+                      <span className="portal-muted"> · {row.code}</span>
+                    </td>
+                    <td className="portal-num">{row.orderCount}</td>
+                    <td className="portal-num">{formatMoney(row.revenue)}</td>
+                    <td className="portal-num">{formatMoney(row.cogs)}</td>
+                    <td className="portal-num">{formatMoney(row.grossProfit)}</td>
+                    <td className="portal-num">{formatPercent(row.grossMarginPercent)}</td>
+                    <td className="portal-num">{formatMoney(row.collected)}</td>
+                    <td className="portal-num">{formatMoney(row.outstanding)}</td>
+                  </tr>
                 ))}
-              </div>
-              <p style={{ margin: '10px 0 0', fontWeight: 700, textAlign: 'right' }}>
-                {group.name} subtotal {formatMoney(group.subtotal)}
-              </p>
-            </div>
-          ))}
-
-          {(data.ungrouped || []).length ? (
-            <div style={{ marginBottom: 22 }}>
-              <h3 style={{ margin: '0 0 6px', fontSize: 15 }}>OUTSIDE THE PROJECT COST STRUCTURE</h3>
-              <p className="portal-muted" style={{ margin: '0 0 10px' }}>
-                Posted to expense accounts that sit outside the construction and management groups. Move
-                these to the right category from the General Ledger if they belong to this project.
-              </p>
-              <div className="portal-list-stack">
-                {data.ungrouped.map((row: any) => (
-                  <div key={row.accountId} className="portal-list-row">
-                    <div>
-                      <strong>{row.name}</strong>
-                      <p>{row.code}</p>
-                    </div>
-                    <span>{formatMoney(row.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <p style={{ marginTop: 16, fontWeight: 700, fontSize: 16, textAlign: 'right' }}>
-            Total project cost {formatMoney(data.grandTotal || 0)}
-          </p>
-
-          {data.reconciliation ? (
-            <div className="portal-record" style={{ marginTop: 16 }}>
-              <strong>Reconciliation</strong>
-              <p className="portal-muted" style={{ margin: '4px 0 8px' }}>
-                Use these when checking a completed data-entry run against your source records.
-              </p>
-              <div className="portal-info-list">
-                <div className="portal-info-row">
-                  <span>Postings included</span>
-                  <strong>
-                    {data.reconciliation.lineCount} lines across {data.reconciliation.entryCount} entries
-                  </strong>
-                </div>
-                <div className="portal-info-row">
-                  <span>Expense with no project</span>
-                  <strong>
-                    {data.reconciliation.untaggedExpenseLines === 0
-                      ? 'None'
-                      : `${data.reconciliation.untaggedExpenseLines} lines — ${formatMoney(
-                          data.reconciliation.untaggedExpenseAmount,
-                        )}`}
-                  </strong>
-                </div>
-              </div>
-              {data.reconciliation.untaggedExpenseLines > 0 ? (
-                <p className="portal-muted" style={{ margin: '8px 0 0' }}>
-                  These are not counted here or against any other project, and are the usual reason a
-                  total does not tally. Recategorise them from the General Ledger.
-                </p>
-              ) : null}
-            </div>
+              </tbody>
+            </table>
+          </div>
+          {/* Head-office spend carries no store tag, so it is reported on its
+              own rather than being spread across the shops on a guess. */}
+          {data.unallocatedExpense ? (
+            <p className="portal-muted" style={{ marginTop: 12 }}>
+              {formatMoney(data.unallocatedExpense)} of spend is not attributed to any store, so the
+              store rows above sum to less than the company total.
+            </p>
           ) : null}
         </div>
       );
@@ -1074,7 +682,7 @@ function ReportView({
             </div>
             <div>
               <span>Balanced</span>
-              {/* null when scoped to a project, where balancing is not expected. */}
+              {/* null when scoped to a store, where balancing is not expected. */}
               <strong>{data.balanced === null || data.balanced === undefined ? 'N/A' : data.balanced ? 'Yes' : 'No'}</strong>
             </div>
           </div>
@@ -1152,27 +760,140 @@ function ReportView({
       );
     }
 
-    case 'project-analytics':
-      return <ProjectAnalyticsView data={data} onDeleteBudget={onDeleteBudget} />;
-
-    case 'project-profitability': {
-      const profitabilityRows = data.rows || [];
+    case 'consignment-exposure': {
+      const rows = data.rows || [];
+      const totals = data.totals || {};
+      if (!rows.length) {
+        return <div className="portal-empty-state">Nothing is out with resellers right now.</div>;
+      }
       return (
-        <div className="portal-list-stack">
-          {profitabilityRows.length === 0 ? (
-            <div className="portal-empty-state">No project-scoped activity in this period.</div>
-          ) : (
-            profitabilityRows.map((row: any) => (
-              <div key={row.projectId} className="portal-list-row">
-                <div>
-                  <strong>{row.projectName}</strong>
-                </div>
-                <span>Rev {formatMoney(row.revenue)}</span>
-                <span>Exp {formatMoney(row.expenses)}</span>
-                <span>Profit {formatMoney(row.profit)}</span>
-              </div>
-            ))
-          )}
+        <div>
+          <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+            <div className="portal-stat"><span>Open pickups</span><h3>{totals.openConsignments ?? 0}</h3></div>
+            <div className="portal-stat">
+              <span>Pairs still out</span>
+              <h3>{totals.unitsStillOut ?? 0}</h3>
+            </div>
+            <div className="portal-stat">
+              <span>Stock at risk</span>
+              <h3>{formatMoney(totals.stockAtRisk)}</h3>
+              <span className="portal-stat-note">Ours, but not sellable</span>
+            </div>
+            <div className="portal-stat"><span>Owed to us</span><h3>{formatMoney(totals.balanceOwed)}</h3></div>
+            <div className="portal-stat">
+              <span>Overdue</span>
+              <h3>{totals.overdueCount ?? 0}</h3>
+              <span className="portal-stat-note">{formatMoney(totals.overdueStockAtRisk)} past due</span>
+            </div>
+          </div>
+          <div className="portal-table-wrap">
+            <table className="portal-data-table">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Reseller</th>
+                  <th>Store</th>
+                  <th className="portal-num">Days out</th>
+                  <th>Due</th>
+                  <th className="portal-num">Still out</th>
+                  <th className="portal-num">At risk</th>
+                  <th className="portal-num">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row: any) => (
+                  <tr key={row.consignmentId}>
+                    <td>{row.reference}</td>
+                    <td>
+                      {row.resellerName}
+                      {row.resellerPhone ? (
+                        <span className="portal-muted"> · {row.resellerPhone}</span>
+                      ) : null}
+                    </td>
+                    <td>{row.storeName}</td>
+                    <td className="portal-num">{row.daysOut}</td>
+                    <td>
+                      {row.dueDate ? formatDate(row.dueDate) : '—'}
+                      {/* Overdue is the number worth chasing, so it is called
+                          out in words as well as by the count above. */}
+                      {row.overdue ? (
+                        <strong className="portal-overdue-flag">Overdue</strong>
+                      ) : null}
+                    </td>
+                    <td className="portal-num">{row.unitsStillOut}</td>
+                    <td className="portal-num">{formatMoney(row.stockAtRisk)}</td>
+                    <td className="portal-num">{formatMoney(row.balance)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    case 'product-profitability': {
+      const rows = data.rows || [];
+      const totals = data.totals || {};
+      if (!rows.length) {
+        return <div className="portal-empty-state">No sales in this period.</div>;
+      }
+      return (
+        <div>
+          {/* Says so plainly when some variants have no cost recorded: the
+              margin below is then a ceiling, not a figure to bank on. */}
+          {data.costIncomplete ? (
+            <p className="portal-muted" style={{ marginTop: 0 }}>
+              Some items sold have no cost recorded, so the margin shown is higher than the real one.
+              Set a cost on those variants for a true figure.
+            </p>
+          ) : null}
+          <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+            <div className="portal-stat"><span>Units sold</span><h3>{totals.unitsSold ?? 0}</h3></div>
+            <div className="portal-stat"><span>Revenue</span><h3>{formatMoney(totals.revenue)}</h3></div>
+            <div className="portal-stat"><span>Gross profit</span><h3>{formatMoney(totals.grossProfit)}</h3></div>
+            <div className="portal-stat"><span>Margin</span><h3>{formatPercent(totals.grossMarginPercent)}</h3></div>
+            <div className="portal-stat">
+              <span>Given away</span>
+              <h3>{formatMoney(totals.discount)}</h3>
+              <span className="portal-stat-note">Against marked price</span>
+            </div>
+          </div>
+          <div className="portal-table-wrap">
+            <table className="portal-data-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th className="portal-num">Units</th>
+                  <th className="portal-num">Revenue</th>
+                  <th className="portal-num">Cost</th>
+                  <th className="portal-num">Gross profit</th>
+                  <th className="portal-num">Margin</th>
+                  <th className="portal-num">Avg price</th>
+                  <th className="portal-num">Discount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row: any) => (
+                  <tr key={row.productId}>
+                    <td>
+                      {row.name}
+                      {row.brand ? <span className="portal-muted"> · {row.brand}</span> : null}
+                    </td>
+                    <td className="portal-num">{row.unitsSold}</td>
+                    <td className="portal-num">{formatMoney(row.revenue)}</td>
+                    <td className="portal-num">{row.cost === null ? '—' : formatMoney(row.cost)}</td>
+                    <td className="portal-num">
+                      {row.grossProfit === null ? '—' : formatMoney(row.grossProfit)}
+                    </td>
+                    <td className="portal-num">{formatPercent(row.grossMarginPercent)}</td>
+                    <td className="portal-num">{formatMoney(row.averagePrice)}</td>
+                    <td className="portal-num">{formatMoney(row.discount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       );
     }

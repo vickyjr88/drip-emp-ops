@@ -28,15 +28,15 @@ export class FinancialReportsController {
   > = {
     'profit-and-loss': {
       title: 'Profit and Loss',
-      run: (service, q) => service.profitAndLoss(q.from, q.to),
+      run: (service, q) => service.profitAndLoss(q.from, q.to, q.storeId),
     },
     'balance-sheet': {
       title: 'Balance Sheet',
-      run: (service, q) => service.balanceSheet(q.asOf),
+      run: (service, q) => service.balanceSheet(q.asOf, q.storeId),
     },
     'cash-flow': {
       title: 'Cash Flow',
-      run: (service, q) => service.cashFlow(q.from, q.to),
+      run: (service, q) => service.cashFlow(q.from, q.to, q.storeId),
     },
     'ap-aging': {
       title: 'Accounts Payable Ageing',
@@ -45,6 +45,18 @@ export class FinancialReportsController {
     tax: {
       title: 'Tax Report',
       run: (service, q) => service.taxReport(q.from, q.to),
+    },
+    'store-performance': {
+      title: 'Store Performance',
+      run: (service, q) => service.storePerformance(q.from, q.to),
+    },
+    'product-profitability': {
+      title: 'Product Profitability',
+      run: (service, q) => service.productProfitability(q.from, q.to, q.storeId),
+    },
+    'consignment-exposure': {
+      title: 'Consignment Exposure',
+      run: (service, q) => service.consignmentExposure(q.asOf, q.storeId),
     },
   };
 
@@ -56,7 +68,7 @@ export class FinancialReportsController {
     @Query('to') to?: string,
     @Query('asOf') asOf?: string,
     @Query('storeId') storeId?: string,
-    @Query('projectName') projectName?: string,
+    @Query('storeName') storeName?: string,
   ) {
     const definition = FinancialReportsController.REPORTS[report];
     if (!definition) {
@@ -70,12 +82,12 @@ export class FinancialReportsController {
       unknown
     >;
 
-    // The project name is passed through from the caller rather than looked up:
-    // the reports service does not resolve it, and a PDF headed "Project Cost
-    // Report" with no indication of which project is close to useless.
+    // The store name is passed through from the caller rather than looked up:
+    // the reports service does not resolve it, and a PDF headed "Profit and
+    // Loss" with no indication of which store is close to useless.
     const html = reportPdfTemplate({
       title: definition.title,
-      subtitle: projectName ? `Project: ${projectName}` : undefined,
+      subtitle: storeName ? `Store: ${storeName}` : undefined,
       data,
     });
 
@@ -93,5 +105,70 @@ export class FinancialReportsController {
   @Permissions(buildPermissionKey('JournalEntry', 'read'))
   taxReport(@Query('from') from?: string, @Query('to') to?: string) {
     return this.service.taxReport(from, to);
+  }
+
+  /*
+   * The statements below were reachable only as PDF: the service methods
+   * existed and the picker offered them, but there was no JSON route, so every
+   * one of them 404'd on screen.
+   */
+
+  @Get('profit-and-loss')
+  @Permissions(buildPermissionKey('JournalEntry', 'read'))
+  profitAndLoss(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    return this.service.profitAndLoss(from, to, storeId);
+  }
+
+  @Get('balance-sheet')
+  @Permissions(buildPermissionKey('JournalEntry', 'read'))
+  balanceSheet(@Query('asOf') asOf?: string, @Query('storeId') storeId?: string) {
+    return this.service.balanceSheet(asOf, storeId);
+  }
+
+  @Get('cash-flow')
+  @Permissions(buildPermissionKey('JournalEntry', 'read'))
+  cashFlow(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    return this.service.cashFlow(from, to, storeId);
+  }
+
+  @Get('ap-aging')
+  @Permissions(buildPermissionKey('JournalEntry', 'read'))
+  apAging(@Query('asOf') asOf?: string) {
+    return this.service.apAging(asOf);
+  }
+
+  /*
+   * The retail reports that replace Project Cost, Project Profitability and
+   * Project Analytics.
+   */
+
+  @Get('store-performance')
+  @Permissions(buildPermissionKey('JournalEntry', 'read'))
+  storePerformance(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.service.storePerformance(from, to);
+  }
+
+  @Get('product-profitability')
+  @Permissions(buildPermissionKey('JournalEntry', 'read'))
+  productProfitability(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    return this.service.productProfitability(from, to, storeId);
+  }
+
+  @Get('consignment-exposure')
+  @Permissions(buildPermissionKey('JournalEntry', 'read'))
+  consignmentExposure(@Query('asOf') asOf?: string, @Query('storeId') storeId?: string) {
+    return this.service.consignmentExposure(asOf, storeId);
   }
 }

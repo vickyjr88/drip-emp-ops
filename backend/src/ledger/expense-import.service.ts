@@ -9,6 +9,7 @@ export type ImportRow = {
   description?: string;
   amount?: string | number;
   accountCode?: string;
+  storeCode?: string;
 };
 
 export type RowResult = {
@@ -19,12 +20,13 @@ export type RowResult = {
   amount?: number;
   accountCode?: string;
   accountName?: string;
-  projectName?: string;
+  storeCode?: string;
+  storeName?: string;
   errors: string[];
 };
 
 /**
- * Bulk import of historical project expenditure.
+ * Bulk import of historical expenditure.
  *
  * Every row is validated before anything is written, and the whole batch posts
  * in one transaction: a spreadsheet that half-imports is worse than one that
@@ -77,10 +79,25 @@ export class ExpenseImportService {
    * Validates without writing. The UI runs this first so an operator sees every
    * problem in one pass rather than fixing one row per attempt.
    */
-  async validate(rows: ImportRow[], creditAccountCode = '1000') {
-    const accounts = await this.prisma.chartOfAccount.findMany({ where: { isActive: true } });
+  async validate(rows: ImportRow[], creditAccountCode = '1000', defaultStoreCode?: string) {
+    const [accounts, stores] = await Promise.all([
+      this.prisma.chartOfAccount.findMany({ where: { isActive: true } }),
+      this.prisma.store.findMany(),
+    ]);
 
     const accountByCode = new Map(accounts.map((a) => [a.code.toUpperCase(), a]));
+    const storeByCode = new Map(stores.map((store) => [store.code.toUpperCase(), store]));
+
+    // A typo'd store code is caught here rather than posting the spend
+    // untagged, where it would quietly disappear from every per-store report.
+    const fallbackStore = defaultStoreCode?.trim()
+      ? storeByCode.get(defaultStoreCode.trim().toUpperCase())
+      : undefined;
+    if (defaultStoreCode?.trim() && !fallbackStore) {
+      throw new BadRequestException(
+        `Default store "${defaultStoreCode}" does not exist. Use a store code from Stores.`,
+      );
+    }
 
     const creditAccount = accountByCode.get(creditAccountCode.toUpperCase());
     const results: RowResult[] = [];
@@ -99,6 +116,10 @@ export class ExpenseImportService {
       const description = String(row.description ?? '').trim();
       if (!description) errors.push('Description is required');
 
+      const rowStoreCode = String(row.storeCode ?? '').trim();
+      const store = rowStoreCode ? storeByCode.get(rowStoreCode.toUpperCase()) : fallbackStore;
+      if (rowStoreCode && !store) errors.push(`Store "${rowStoreCode}" does not exist`);
+
       const accountCode = String(row.accountCode ?? '').trim();
       const account = accountCode ? accountByCode.get(accountCode.toUpperCase()) : undefined;
       if (!accountCode) errors.push('Account code is required');
@@ -115,6 +136,8 @@ export class ExpenseImportService {
         amount: amount ?? undefined,
         accountCode: account?.code,
         accountName: account?.name,
+        storeCode: store?.code,
+        storeName: store?.name,
         errors,
       });
     }
@@ -140,14 +163,19 @@ export class ExpenseImportService {
 
   /**
    * Posts a validated batch. Each row becomes one balanced entry: the expense
-   * debited against its project, and the funding account credited.
+   * debited against its store, and the funding account credited.
    */
   async commit(
     rows: ImportRow[],
-    options: { creditAccountCode?: string; postedBy?: string; batchRef?: string },
+    options: {
+      creditAccountCode?: string;
+      postedBy?: string;
+      batchRef?: string;
+      defaultStoreCode?: string;
+    },
   ) {
     const creditAccountCode = options.creditAccountCode || '1000';
-    const preview = await this.validate(rows, creditAccountCode);
+    const preview = await this.validate(rows, creditAccountCode, options.defaultStoreCode);
 
     if (preview.invalidRows > 0) {
       throw new BadRequestException(
@@ -158,9 +186,16 @@ export class ExpenseImportService {
       throw new BadRequestException('There are no rows to import.');
     }
 
-    const accounts = await this.prisma.chartOfAccount.findMany({ where: { isActive: true } });
+    const [accounts, stores] = await Promise.all([
+      this.prisma.chartOfAccount.findMany({ where: { isActive: true } }),
+      this.prisma.store.findMany(),
+    ]);
     const accountByCode = new Map(accounts.map((a) => [a.code.toUpperCase(), a]));
+    const storeByCode = new Map(stores.map((store) => [store.code.toUpperCase(), store]));
     const creditAccount = accountByCode.get(creditAccountCode.toUpperCase())!;
+    const fallbackStoreId = options.defaultStoreCode?.trim()
+      ? storeByCode.get(options.defaultStoreCode.trim().toUpperCase())?.id
+      : undefined;
 
     // Stamped on every entry so an entire import can be found -- and undone --
     // as a unit afterwards.
@@ -171,6 +206,10 @@ export class ExpenseImportService {
         const ids: string[] = [];
         for (const row of preview.rows) {
           const account = accountByCode.get((row.accountCode || '').toUpperCase())!;
+          const rowStoreCode = String(row.storeCode ?? '').trim();
+          const storeId = rowStoreCode
+            ? storeByCode.get(rowStoreCode.toUpperCase())?.id
+            : fallbackStoreId;
           const entry = await this.ledger.postJournal(
             {
               entryDate: new Date(`${row.date}T00:00:00.000Z`),
@@ -184,6 +223,9 @@ export class ExpenseImportService {
                   debit: row.amount!,
                   credit: 0,
                   memo: row.description,
+                  // Only the expense side is tagged: the credit is the shared
+                  // cash or bank account, which belongs to no single store.
+                  storeId,
                 },
                 { accountId: creditAccount.id, debit: 0, credit: row.amount! },
               ],
@@ -207,7 +249,7 @@ export class ExpenseImportService {
   }
 
   /**
-   * A ready-to-fill CSV listing the real account and project codes.
+   * A ready-to-fill CSV listing the real account and store codes.
    *
    * Instructions ship inside the file as comment lines rather than a separate
    * document, so whoever opens the spreadsheet has the codes in front of them.
@@ -237,12 +279,14 @@ export class ExpenseImportService {
       '#   description Required. What the money was spent on, e.g. "somo steel".',
       '#   amount      Required. Positive number. 1,250,000 and KES 1250000 both work.',
       '#   accountCode Required. The expense category — see the list below.',
-      '#               otherwise required. Set it per row to mix projects in one file.',
+      '#   storeCode   Optional. Which shop the spend belongs to. Leave blank for',
+      '#               head-office costs that belong to no single shop. Set it per',
+      '#               row to mix shops in one file, or pick a default at import.',
       '#',
       '# HOW TO TAG A CATEGORY',
       '#   Put the account code in the accountCode column. Every row must use one',
-      '#   of the codes below. These are the categories the project cost report',
-      '#   groups by, so a wrong code puts the spend under the wrong heading.',
+      '#   of the codes below. These are the categories the reports group by, so a',
+      '#   wrong code puts the spend under the wrong heading.',
       '#',
     ];
 
@@ -256,8 +300,16 @@ export class ExpenseImportService {
       lines.push(`#     ${account.code}  ${account.name}`);
     }
 
-    lines.push(
-    );
+    const templateStores = await this.prisma.store.findMany({
+      where: { isActive: true },
+      orderBy: { code: 'asc' },
+    });
+    if (templateStores.length) {
+      lines.push('#', '# STORE CODES');
+      for (const store of templateStores) {
+        lines.push(`#     ${store.code}  ${store.name}`);
+      }
+    }
 
     lines.push(
       '#',
@@ -265,19 +317,20 @@ export class ExpenseImportService {
       '#   Each row is posted as a balanced entry: the category is debited and the',
       '#   funding account (cash/bank, chosen at import) is credited. You do not',
       '#   enter the other side.',
-      '#   Shared costs such as salaries or office rent: enter the share that',
-      '#   belongs to each project as its own row.',
+      '#   Shared costs such as salaries or rent: enter the share that belongs to',
+      '#   each shop as its own row, or leave storeCode blank to keep it central.',
       '#   Do not include subtotal or running-total rows — periods come from the',
       '#   dates, and a total row would be imported as another expense.',
       '#',
-      'date,description,amount,accountCode',
+      'date,description,amount,accountCode,storeCode',
     );
 
     // A couple of worked examples using codes that actually exist.
     const example = postable[0];
     if (example) {
-      lines.push(`17/7/2024,plumbing materials,147400,${example.code}`);
-      lines.push(`26/7/2024,timber,152000,${example.code}`);
+      const exampleStore = templateStores[0]?.code || '';
+      lines.push(`17/7/2024,shop cleaning,4500,${example.code},${exampleStore}`);
+      lines.push(`26/7/2024,accountant fees,15000,${example.code},`);
     }
 
     // Trailing newline: without it, appending rows in a plain text editor

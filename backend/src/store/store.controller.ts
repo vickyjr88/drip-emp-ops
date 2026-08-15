@@ -5,6 +5,7 @@ import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { StoreService } from './store.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { UpdateStoreDto } from './dto/update-store.dto';
+import { CreateStoreAccountAssignmentDto } from './dto/account-assignment.dto';
 
 @ApiBearerAuth()
 @ApiTags('stores')
@@ -46,5 +47,22 @@ export class StoreController {
   @Permissions(buildPermissionKey('Store', 'delete'))
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+  @Get(':id/account-assignments')
+  @Permissions(buildPermissionKey('StoreAccountAssignment', 'read'))
+  listAccountAssignments(@Param('id') id: string) {
+    return this.service.listAccountAssignments(id);
+  }
+
+  @Post(':id/account-assignments')
+  @Permissions(buildPermissionKey('StoreAccountAssignment', 'create'))
+  createAccountAssignment(@Param('id') id: string, @Body() dto: CreateStoreAccountAssignmentDto) {
+    return this.service.createAccountAssignment(id, dto);
+  }
+
+  @Delete(':id/account-assignments/:assignmentId')
+  @Permissions(buildPermissionKey('StoreAccountAssignment', 'delete'))
+  removeAccountAssignment(@Param('id') id: string, @Param('assignmentId') assignmentId: string) {
+    return this.service.removeAccountAssignment(id, assignmentId);
   }
 }

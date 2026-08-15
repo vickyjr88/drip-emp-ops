@@ -33,10 +33,10 @@ export class ExpenseImportRowDto {
   @IsString()
   accountCode?: string;
 
-  @ApiPropertyOptional({ description: 'Project code. Falls back to defaultProjectCode.' })
+  @ApiPropertyOptional({ description: 'Store code. Falls back to defaultStoreCode.' })
   @IsOptional()
   @IsString()
-  projectCode?: string;
+  storeCode?: string;
 }
 
 export class ExpenseImportDto {
@@ -53,6 +53,14 @@ export class ExpenseImportDto {
   @IsOptional()
   @IsString()
   creditAccountCode?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Store code applied to rows that do not name one. Optional: head-office spend belongs to no store.',
+  })
+  @IsOptional()
+  @IsString()
+  defaultStoreCode?: string;
 
   @ApiPropertyOptional({ description: 'Label for this batch, so it can be undone as a unit.' })
   @IsOptional()

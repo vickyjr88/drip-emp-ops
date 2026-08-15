@@ -48,8 +48,8 @@ const MODULES: ModuleLink[] = [
   },
   {
     href: '/portal/accounting/import',
-    title: 'Import Project Expenses',
-    description: 'Bulk-load historical spend from a spreadsheet, with a template and per-batch undo.',
+    title: 'Import Expenses',
+    description: 'Bulk-load spend from a spreadsheet, tagged per store, with a template and per-batch undo.',
     permission: 'journal-entry.create',
   },
   {
@@ -67,7 +67,7 @@ const MODULES: ModuleLink[] = [
   {
     href: '/portal/accounting/reports',
     title: 'Financial Reports',
-    description: 'Trial Balance, P&L, Balance Sheet, Cash Flow, AR/AP Aging, Project Profitability, Tax.',
+    description: 'Store Performance, Product Profitability, Consignment Exposure, Trial Balance, P&L, Balance Sheet, Cash Flow, AR/AP Aging, Tax.',
     permission: 'journal-entry.read',
   },
   {

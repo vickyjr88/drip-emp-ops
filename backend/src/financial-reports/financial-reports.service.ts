@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -8,31 +9,23 @@ function round2(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-const EMPTY_ANALYTICS_TOTALS = {
-  revenue: 0,
-  expenses: 0,
-  profit: 0,
-  marginPercent: null as number | null,
-  unitsTotal: 0,
-  unitsSold: 0,
-  unitsAvailable: 0,
-  absorptionPercent: null as number | null,
-  invoiced: 0,
-  collected: 0,
-  outstanding: 0,
-  collectionRatePercent: null as number | null,
-  totalBudgeted: 0,
-  budgetedActual: 0,
-  budgetVariance: 0,
-};
-
 @Injectable()
 export class FinancialReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async postedLines(params: { from?: string; to?: string; accountTypes?: string[] }) {
+  private async postedLines(params: {
+    from?: string;
+    to?: string;
+    accountTypes?: string[];
+    storeId?: string;
+  }) {
     return this.prisma.journalLine.findMany({
       where: {
+        // Every posting path tags its lines with a store, so scoping here
+        // covers sales, COGS, consignment settlement, shrinkage and receipts
+        // alike. Head-office costs carry no store and are excluded from a
+        // scoped cut by construction, which is the intended reading.
+        ...(params.storeId ? { storeId: params.storeId } : {}),
         entry: {
           status: 'POSTED',
           ...(params.from || params.to
@@ -50,8 +43,8 @@ export class FinancialReportsService {
     });
   }
 
-  async profitAndLoss(from?: string, to?: string) {
-    const lines = await this.postedLines({ from, to, accountTypes: ['REVENUE', 'EXPENSE'] });
+  async profitAndLoss(from?: string, to?: string, storeId?: string) {
+    const lines = await this.postedLines({ from, to, storeId, accountTypes: ['REVENUE', 'EXPENSE'] });
 
     const byAccount = new Map<string, { code: string; name: string; type: string; amount: number }>();
     for (const line of lines) {
@@ -75,6 +68,7 @@ export class FinancialReportsService {
     return {
       from: from || null,
       to: to || new Date().toISOString(),
+      storeId: storeId || null,
       revenue,
       expenses,
       totalRevenue,
@@ -85,15 +79,19 @@ export class FinancialReportsService {
 
 
   /**
-   * Company-wide this is a true balance sheet. Scoped to a project it is a
-   * *statement of project-attributable balances*: only journal lines tagged
-   * with the project are included, and equity, shared cash and any untagged
+   * Company-wide this is a true balance sheet. Scoped to a store it is a
+   * *statement of store-attributable balances*: only journal lines tagged
+   * with the store are included, and equity, shared cash and any untagged
    * activity are excluded by construction. Such a statement does not balance,
    * so `balanced` is reported as null rather than false when scoped -- a false
    * would read as a bookkeeping error rather than a property of the cut.
    */
-  async balanceSheet(asOf?: string) {
-    const lines = await this.postedLines({ to: asOf, accountTypes: ['ASSET', 'LIABILITY', 'EQUITY'] });
+  async balanceSheet(asOf?: string, storeId?: string) {
+    const lines = await this.postedLines({
+      to: asOf,
+      storeId,
+      accountTypes: ['ASSET', 'LIABILITY', 'EQUITY'],
+    });
 
     const byAccount = new Map<string, { code: string; name: string; type: string; amount: number }>();
     for (const line of lines) {
@@ -113,7 +111,7 @@ export class FinancialReportsService {
     const liabilities = [...byAccount.values()].filter((row) => row.type === 'LIABILITY');
     const equity = [...byAccount.values()].filter((row) => row.type === 'EQUITY');
 
-    const { netIncome } = await this.profitAndLoss(undefined, asOf);
+    const { netIncome } = await this.profitAndLoss(undefined, asOf, storeId);
 
     const totalAssets = assets.reduce((sum, row) => sum + row.amount, 0);
     const totalLiabilities = liabilities.reduce((sum, row) => sum + row.amount, 0);
@@ -121,6 +119,7 @@ export class FinancialReportsService {
 
     return {
       asOf: asOf || new Date().toISOString(),
+      storeId: storeId || null,
       assets,
       liabilities,
       equity,
@@ -128,7 +127,11 @@ export class FinancialReportsService {
       totalAssets,
       totalLiabilities,
       totalEquity,
-      balanced: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < ROUNDING_TOLERANCE,
+      // Null rather than false when scoped: a store cut legitimately does not
+      // balance, and reporting false would read as a bookkeeping error.
+      balanced: storeId
+        ? null
+        : Math.abs(totalAssets - (totalLiabilities + totalEquity)) < ROUNDING_TOLERANCE,
     };
   }
 
@@ -140,16 +143,17 @@ export class FinancialReportsService {
    * it does not split investing/financing since the chart of accounts
    * doesn't yet distinguish them beyond fixed-asset and AR/AP activity.
    */
-  async cashFlow(from?: string, to?: string) {
-    const { netIncome } = await this.profitAndLoss(from, to);
+  async cashFlow(from?: string, to?: string, storeId?: string) {
+    const { netIncome } = await this.profitAndLoss(from, to, storeId);
 
-    const depreciationLines = await this.postedLines({ from, to });
+    const depreciationLines = await this.postedLines({ from, to, storeId });
     const depreciation = depreciationLines
-      .filter((line) => line.account.code === '5900')
+      .filter((line) => line.account.code === DEFAULT_ACCOUNT_CODES.DEPRECIATION_EXPENSE)
       .reduce((sum, line) => sum + Number(line.baseDebit), 0);
 
     const cashLines = await this.prisma.journalLine.findMany({
       where: {
+        ...(storeId ? { storeId } : {}),
         entry: {
           status: 'POSTED',
           ...(from || to
@@ -164,6 +168,7 @@ export class FinancialReportsService {
     return {
       from: from || null,
       to: to || new Date().toISOString(),
+      storeId: storeId || null,
       netIncome,
       addBackDepreciation: depreciation,
       operatingCashFlowApprox: netIncome + depreciation,
@@ -266,6 +271,300 @@ export class FinancialReportsService {
         accountIds.length === 0
           ? 'No VAT/WHT accounts configured yet — create ChartOfAccount entries with subtype VAT_OUTPUT, VAT_INPUT, or WHT_PAYABLE and post tax journal lines to them.'
           : undefined,
+    };
+  }
+
+  /**
+   * Sales excluded from every retail report.
+   *
+   * Cancelled and refunded orders are not trade: counting them would inflate
+   * revenue and, worse, credit a product with margin the shop never kept.
+   */
+  private static readonly DEAD_ORDER_STATUSES = ['CANCELLED', 'REFUNDED'] as const;
+
+  private orderWhere(from?: string, to?: string, storeId?: string) {
+    return {
+      status: { notIn: [...FinancialReportsService.DEAD_ORDER_STATUSES] as any },
+      ...(storeId ? { storeId } : {}),
+      ...(from || to
+        ? {
+            placedAt: {
+              ...(from ? { gte: new Date(from) } : {}),
+              ...(to ? { lte: new Date(to) } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * Per-store trading performance.
+   *
+   * Replaces the old Project Cost report. Revenue and COGS come from the
+   * ledger rather than from order totals, so this agrees with the P&L by
+   * construction instead of being a second, subtly different set of numbers.
+   * Order counts come from the orders themselves, which the ledger cannot
+   * answer.
+   */
+  async storePerformance(from?: string, to?: string) {
+    const [stores, lines, orders] = await Promise.all([
+      this.prisma.store.findMany({ orderBy: { name: 'asc' } }),
+      this.postedLines({ from, to, accountTypes: ['REVENUE', 'EXPENSE'] }),
+      this.prisma.order.groupBy({
+        by: ['storeId'],
+        where: this.orderWhere(from, to),
+        _count: { _all: true },
+        _sum: { total: true, amountPaid: true },
+      }),
+    ]);
+
+    const ledger = new Map<string, { revenue: number; cogs: number; otherExpense: number }>();
+    for (const line of lines) {
+      // Untagged lines are head-office costs and belong to no store; they are
+      // reported separately rather than being spread across stores on a guess.
+      const key = line.storeId || 'unallocated';
+      const current = ledger.get(key) || { revenue: 0, cogs: 0, otherExpense: 0 };
+      const net = Number(line.baseCredit) - Number(line.baseDebit);
+      if (line.account.type === 'REVENUE') current.revenue += net;
+      else if (line.account.code === DEFAULT_ACCOUNT_CODES.COST_OF_GOODS_SOLD) current.cogs += -net;
+      else current.otherExpense += -net;
+      ledger.set(key, current);
+    }
+
+    const orderStats = new Map(orders.map((row) => [row.storeId, row]));
+
+    const rows = stores.map((store) => {
+      const money = ledger.get(store.id) || { revenue: 0, cogs: 0, otherExpense: 0 };
+      const stats = orderStats.get(store.id);
+      const orderCount = stats?._count._all ?? 0;
+      const grossProfit = money.revenue - money.cogs;
+      return {
+        storeId: store.id,
+        code: store.code,
+        name: store.name,
+        location: store.location,
+        orderCount,
+        revenue: round2(money.revenue),
+        cogs: round2(money.cogs),
+        grossProfit: round2(grossProfit),
+        // Null, not zero, when there is no revenue: a margin on nothing is
+        // undefined, and 0% would read as "sold at cost".
+        grossMarginPercent: money.revenue ? round2((grossProfit / money.revenue) * 100) : null,
+        otherExpense: round2(money.otherExpense),
+        netProfit: round2(grossProfit - money.otherExpense),
+        collected: round2(Number(stats?._sum.amountPaid ?? 0)),
+        outstanding: round2(Number(stats?._sum.total ?? 0) - Number(stats?._sum.amountPaid ?? 0)),
+        averageOrderValue: orderCount ? round2(money.revenue / orderCount) : null,
+      };
+    });
+
+    const unallocated = ledger.get('unallocated');
+    const totals = rows.reduce(
+      (sum, row) => ({
+        orderCount: sum.orderCount + row.orderCount,
+        revenue: sum.revenue + row.revenue,
+        cogs: sum.cogs + row.cogs,
+        grossProfit: sum.grossProfit + row.grossProfit,
+        otherExpense: sum.otherExpense + row.otherExpense,
+        netProfit: sum.netProfit + row.netProfit,
+      }),
+      { orderCount: 0, revenue: 0, cogs: 0, grossProfit: 0, otherExpense: 0, netProfit: 0 },
+    );
+
+    return {
+      from: from || null,
+      to: to || new Date().toISOString(),
+      rows,
+      unallocatedExpense: round2(unallocated ? unallocated.cogs + unallocated.otherExpense : 0),
+      totals: {
+        ...totals,
+        revenue: round2(totals.revenue),
+        cogs: round2(totals.cogs),
+        grossProfit: round2(totals.grossProfit),
+        otherExpense: round2(totals.otherExpense),
+        netProfit: round2(totals.netProfit),
+        grossMarginPercent: totals.revenue ? round2((totals.grossProfit / totals.revenue) * 100) : null,
+      },
+    };
+  }
+
+  /**
+   * Margin by product, and what the counter actually charged.
+   *
+   * Replaces Project Profitability. Cost comes from the variant, so a product
+   * with no cost recorded reports a null margin rather than a fictitious 100%
+   * -- the shop should see that the cost is missing, not a flattering number.
+   *
+   * `discount` is the gap between the marked price and what was taken, which
+   * is the negotiated walk-in price made visible.
+   */
+  async productProfitability(from?: string, to?: string, storeId?: string) {
+    const lines = await this.prisma.orderLine.findMany({
+      where: { order: this.orderWhere(from, to, storeId) },
+      include: {
+        variant: {
+          select: {
+            id: true,
+            sku: true,
+            costKes: true,
+            product: { select: { id: true, name: true, brand: true } },
+          },
+        },
+      },
+    });
+
+    type Row = {
+      productId: string;
+      name: string;
+      brand: string | null;
+      unitsSold: number;
+      revenue: number;
+      cost: number;
+      listValue: number;
+      costKnown: boolean;
+    };
+    const byProduct = new Map<string, Row>();
+
+    for (const line of lines) {
+      const product = line.variant.product;
+      const current = byProduct.get(product.id) || {
+        productId: product.id,
+        name: product.name,
+        brand: product.brand,
+        unitsSold: 0,
+        revenue: 0,
+        cost: 0,
+        listValue: 0,
+        costKnown: true,
+      };
+      const unitCost = line.variant.costKes;
+      current.unitsSold += line.quantity;
+      current.revenue += Number(line.lineTotal);
+      if (unitCost === null || unitCost === undefined) current.costKnown = false;
+      else current.cost += Number(unitCost) * line.quantity;
+      current.listValue += Number(line.listPrice ?? line.unitPrice) * line.quantity;
+      byProduct.set(product.id, current);
+    }
+
+    const rows = [...byProduct.values()]
+      .map((row) => {
+        const grossProfit = row.costKnown ? row.revenue - row.cost : null;
+        return {
+          productId: row.productId,
+          name: row.name,
+          brand: row.brand,
+          unitsSold: row.unitsSold,
+          revenue: round2(row.revenue),
+          cost: row.costKnown ? round2(row.cost) : null,
+          grossProfit: grossProfit === null ? null : round2(grossProfit),
+          grossMarginPercent:
+            grossProfit === null || !row.revenue ? null : round2((grossProfit / row.revenue) * 100),
+          // What was given away against the marked price. Positive means
+          // discounted; negative means sold above list, which happens.
+          discount: round2(row.listValue - row.revenue),
+          averagePrice: row.unitsSold ? round2(row.revenue / row.unitsSold) : null,
+        };
+      })
+      .sort((a, b) => b.revenue - a.revenue);
+
+    const totalRevenue = rows.reduce((sum, row) => sum + row.revenue, 0);
+    const totalCost = rows.reduce((sum, row) => sum + (row.cost ?? 0), 0);
+    const anyCostMissing = rows.some((row) => row.cost === null);
+
+    return {
+      from: from || null,
+      to: to || new Date().toISOString(),
+      storeId: storeId || null,
+      rows,
+      totals: {
+        unitsSold: rows.reduce((sum, row) => sum + row.unitsSold, 0),
+        revenue: round2(totalRevenue),
+        cost: round2(totalCost),
+        grossProfit: round2(totalRevenue - totalCost),
+        grossMarginPercent: totalRevenue ? round2(((totalRevenue - totalCost) / totalRevenue) * 100) : null,
+        discount: round2(rows.reduce((sum, row) => sum + row.discount, 0)),
+      },
+      // Flags that the totals understate cost, so the margin above is a
+      // ceiling rather than a figure to bank on.
+      costIncomplete: anyCostMissing,
+    };
+  }
+
+  /**
+   * What is sitting with resellers, and what is late.
+   *
+   * Replaces Project Analytics. Consignment stock is still owned by the shop
+   * but cannot be sold, so its value is real exposure. Anything past its due
+   * date -- three days from pickup by agreement -- is called out, because that
+   * is the number worth chasing on a Monday morning.
+   */
+  async consignmentExposure(asOf?: string, storeId?: string) {
+    const cutoff = asOf ? new Date(asOf) : new Date();
+
+    const consignments = await this.prisma.consignment.findMany({
+      where: { status: 'OPEN', ...(storeId ? { storeId } : {}) },
+      include: {
+        reseller: { select: { id: true, name: true, phone: true } },
+        store: { select: { id: true, name: true } },
+        lines: true,
+      },
+      orderBy: { issuedAt: 'asc' },
+    });
+
+    const rows = consignments.map((consignment) => {
+      const unitsOut = consignment.lines.reduce((sum, line) => sum + line.quantityOut, 0);
+      const unitsSold = consignment.lines.reduce((sum, line) => sum + line.quantitySold, 0);
+      const unitsReturned = consignment.lines.reduce((sum, line) => sum + line.quantityReturned, 0);
+      const unitsStillOut = unitsOut - unitsSold - unitsReturned;
+      const balance = Number(consignment.soldValue) - Number(consignment.amountPaid);
+      const due = consignment.dueDate;
+      const overdue = Boolean(due && due < cutoff && unitsStillOut > 0);
+
+      return {
+        consignmentId: consignment.id,
+        reference: consignment.reference,
+        resellerId: consignment.reseller.id,
+        resellerName: consignment.reseller.name,
+        resellerPhone: consignment.reseller.phone,
+        storeId: consignment.store.id,
+        storeName: consignment.store.name,
+        issuedAt: consignment.issuedAt.toISOString(),
+        dueDate: due ? due.toISOString() : null,
+        daysOut: Math.floor((cutoff.getTime() - consignment.issuedAt.getTime()) / 86400000),
+        unitsOut,
+        unitsSold,
+        unitsReturned,
+        unitsStillOut,
+        // Value of stock physically with the reseller, at the agreed tier.
+        stockAtRisk: round2(
+          consignment.lines.reduce(
+            (sum, line) =>
+              sum +
+              Number(line.unitPrice) * (line.quantityOut - line.quantitySold - line.quantityReturned),
+            0,
+          ),
+        ),
+        soldValue: round2(Number(consignment.soldValue)),
+        amountPaid: round2(Number(consignment.amountPaid)),
+        balance: round2(balance),
+        overdue,
+      };
+    });
+
+    const overdueRows = rows.filter((row) => row.overdue);
+
+    return {
+      asOf: cutoff.toISOString(),
+      storeId: storeId || null,
+      rows,
+      totals: {
+        openConsignments: rows.length,
+        unitsStillOut: rows.reduce((sum, row) => sum + row.unitsStillOut, 0),
+        stockAtRisk: round2(rows.reduce((sum, row) => sum + row.stockAtRisk, 0)),
+        balanceOwed: round2(rows.reduce((sum, row) => sum + row.balance, 0)),
+        overdueCount: overdueRows.length,
+        overdueStockAtRisk: round2(overdueRows.reduce((sum, row) => sum + row.stockAtRisk, 0)),
+      },
     };
   }
 }

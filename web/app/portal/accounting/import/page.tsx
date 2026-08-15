@@ -17,7 +17,7 @@ import {
   roleLabelFor,
 } from '../lib';
 
-type Project = { id: string; code: string; name: string };
+type Store = { id: string; code: string; name: string };
 type ChartOfAccount = { id: string; code: string; name: string; type: string; parentId?: string | null };
 
 type ImportRow = {
@@ -26,7 +26,7 @@ type ImportRow = {
   description?: string;
   amount?: string;
   accountCode?: string;
-  projectCode?: string;
+  storeCode?: string;
 };
 
 type RowResult = {
@@ -37,8 +37,8 @@ type RowResult = {
   amount?: number;
   accountCode?: string;
   accountName?: string;
-  projectCode?: string;
-  projectName?: string;
+  storeCode?: string;
+  storeName?: string;
   errors: string[];
 };
 
@@ -89,7 +89,7 @@ function parseCsv(text: string): ImportRow[] {
   const iDesc = index('description');
   const iAmount = index('amount');
   const iAccount = index('accountcode');
-  const iProject = index('projectcode');
+  const iStore = index('storecode');
 
   const rows: ImportRow[] = [];
   for (let i = 1; i < lines.length; i++) {
@@ -103,7 +103,7 @@ function parseCsv(text: string): ImportRow[] {
       description: iDesc >= 0 ? values[iDesc] : undefined,
       amount: iAmount >= 0 ? values[iAmount] : undefined,
       accountCode: iAccount >= 0 ? values[iAccount] : undefined,
-      projectCode: iProject >= 0 ? values[iProject] : undefined,
+      storeCode: iStore >= 0 ? values[iStore] : undefined,
     });
   }
   return rows;
@@ -121,14 +121,14 @@ export default function ExpenseImportPage() {
   const [errorMessage, setErrorMessage] = useErrorState();
   const [feedback, setFeedback] = useFeedbackState();
 
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [batches, setBatches] = useState<Batch[]>([]);
 
   const [fileName, setFileName] = useState('');
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [preview, setPreview] = useState<ValidationResult | null>(null);
-  const [defaultProjectCode, setDefaultProjectCode] = useState('');
+  const [defaultStoreCode, setDefaultStoreCode] = useState('');
   const [creditAccountCode, setCreditAccountCode] = useState('1000');
 
   useEffect(() => {
@@ -141,9 +141,9 @@ export default function ExpenseImportPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [nextProjects, nextAccounts, nextBatches] = await Promise.all([
-        hasPermission(nextProfile, 'project.read')
-          ? apiRequest<Project[]>('/projects', { method: 'GET' }, authToken)
+      const [nextStores, nextAccounts, nextBatches] = await Promise.all([
+        hasPermission(nextProfile, 'store.read')
+          ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'chart-of-account.read')
           ? apiRequest<ChartOfAccount[]>('/chart-of-accounts', { method: 'GET' }, authToken)
@@ -152,7 +152,7 @@ export default function ExpenseImportPage() {
           ? apiRequest<Batch[]>('/expense-imports/batches', { method: 'GET' }, authToken)
           : Promise.resolve([]),
       ]);
-      setProjects(nextProjects);
+      setStores(nextStores);
       setAccounts(nextAccounts);
       setBatches(nextBatches);
     } catch (error) {
@@ -195,7 +195,7 @@ export default function ExpenseImportPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'project-expense-template.csv';
+      link.download = 'store-expense-template.csv';
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
@@ -229,7 +229,7 @@ export default function ExpenseImportPage() {
         '/expense-imports/validate',
         {
           method: 'POST',
-          body: JSON.stringify({ rows, defaultProjectCode: defaultProjectCode || undefined, creditAccountCode }),
+          body: JSON.stringify({ rows, defaultStoreCode: defaultStoreCode || undefined, creditAccountCode }),
         },
         token,
       );
@@ -258,7 +258,7 @@ export default function ExpenseImportPage() {
         '/expense-imports',
         {
           method: 'POST',
-          body: JSON.stringify({ rows, defaultProjectCode: defaultProjectCode || undefined, creditAccountCode }),
+          body: JSON.stringify({ rows, defaultStoreCode: defaultStoreCode || undefined, creditAccountCode }),
         },
         token,
       );
@@ -341,7 +341,7 @@ export default function ExpenseImportPage() {
         <section className="lp-container portal-auth-section">
           <PortalShell
             active="accounting"
-            pageTitle="Import Project Expenses"
+            pageTitle="Import Expenses"
             pageSubtitle="Bring historical spend in from a spreadsheet, one row per payment."
             email={profile.email}
             roleLabel={roleLabel}
@@ -361,7 +361,7 @@ export default function ExpenseImportPage() {
                     <div>
                       <h2 style={{ margin: 0 }}>1. Start from the template</h2>
                       <p className="portal-muted" style={{ margin: '4px 0 0' }}>
-                        The template lists every category and project code, with instructions inside the
+                        The template lists every category and store code, with instructions inside the
                         file.
                       </p>
                     </div>
@@ -374,27 +374,27 @@ export default function ExpenseImportPage() {
                     <div className="portal-info-row">
                       <span>Columns</span>
                       <strong style={{ fontWeight: 400, fontSize: 13 }}>
-                        date, description, amount, accountCode, projectCode
+                        date, description, amount, accountCode, storeCode
                       </strong>
                     </div>
                     <div className="portal-info-row">
                       <span>Tag the category</span>
                       <strong style={{ fontWeight: 400, fontSize: 13 }}>
                         Put an expense account code in <code>accountCode</code> — this decides which
-                        heading the spend appears under on the project cost report.
+                        heading the spend appears under on the store cost report.
                       </strong>
                     </div>
                     <div className="portal-info-row">
-                      <span>Tag the project</span>
+                      <span>Tag the store</span>
                       <strong style={{ fontWeight: 400, fontSize: 13 }}>
-                        Put a project code in <code>projectCode</code>, or leave it blank and choose a
-                        default below. Set it per row to mix projects in one file.
+                        Put a store code in <code>storeCode</code>, or leave it blank and choose a
+                        default below. Set it per row to mix stores in one file.
                       </strong>
                     </div>
                     <div className="portal-info-row">
                       <span>Shared costs</span>
                       <strong style={{ fontWeight: 400, fontSize: 13 }}>
-                        Enter each project&apos;s share as its own row.
+                        Enter each store&apos;s share as its own row.
                       </strong>
                     </div>
                     <div className="portal-info-row">
@@ -419,12 +419,12 @@ export default function ExpenseImportPage() {
                       ))}
                   </div>
 
-                  <h3 style={{ margin: '18px 0 8px', fontSize: 15 }}>Project codes</h3>
+                  <h3 style={{ margin: '18px 0 8px', fontSize: 15 }}>Store codes</h3>
                   <div className="portal-list-stack">
-                    {projects.map((project) => (
-                      <div key={project.id} className="portal-list-row" style={{ fontSize: 13 }}>
+                    {stores.map((store) => (
+                      <div key={store.id} className="portal-list-row" style={{ fontSize: 13 }}>
                         <span>
-                          <strong>{project.code}</strong> — {project.name}
+                          <strong>{store.code}</strong> — {store.name}
                         </span>
                       </div>
                     ))}
@@ -448,15 +448,15 @@ export default function ExpenseImportPage() {
                         />
                       </label>
                       <label>
-                        <span>Default Project (for rows with none)</span>
+                        <span>Default store (for rows with none)</span>
                         <select
-                          value={defaultProjectCode}
-                          onChange={(event) => setDefaultProjectCode(event.target.value)}
+                          value={defaultStoreCode}
+                          onChange={(event) => setDefaultStoreCode(event.target.value)}
                         >
                           <option value="">Each row must specify one</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.code}>
-                              {project.code} — {project.name}
+                          {stores.map((store) => (
+                            <option key={store.id} value={store.code}>
+                              {store.code} — {store.name}
                             </option>
                           ))}
                         </select>
@@ -551,8 +551,8 @@ export default function ExpenseImportPage() {
                               <div>
                                 <strong>{row.description}</strong>
                                 <p>
-                                  {row.date} • {row.accountCode} {row.accountName} • {row.projectCode}{' '}
-                                  {row.projectName}
+                                  {row.date} • {row.accountCode} {row.accountName} • {row.storeCode}{' '}
+                                  {row.storeName}
                                 </p>
                               </div>
                               <span>{formatMoney(row.amount || 0)}</span>

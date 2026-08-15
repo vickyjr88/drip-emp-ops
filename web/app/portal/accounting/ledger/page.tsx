@@ -28,7 +28,7 @@ type JournalLine = {
   debit: string | number;
   credit: string | number;
   memo?: string | null;
-  projectId?: string | null;
+  storeId?: string | null;
 };
 
 type JournalEntry = {
@@ -51,11 +51,11 @@ type BankAccount = {
   branch?: string | null;
   currencyCode: string;
   glAccountId: string;
-  projectId?: string | null;
+  storeId?: string | null;
   isActive: boolean;
 };
 
-type Project = { id: string; code: string; name: string };
+type Store = { id: string; code: string; name: string };
 
 type AccountTransfer = {
   id: string;
@@ -71,9 +71,9 @@ type AccountTransfer = {
 const ACCOUNT_PURPOSES = ['SALES', 'RENT', 'UTILITIES', 'SUPPLIER_PAYMENTS', 'TAX_REMITTANCE', 'GENERAL'] as const;
 type AccountPurpose = (typeof ACCOUNT_PURPOSES)[number];
 
-type ProjectAccountAssignment = {
+type StoreAccountAssignment = {
   id: string;
-  projectId: string;
+  storeId: string;
   purpose: AccountPurpose;
   bankAccountId: string;
   bankAccount: BankAccount;
@@ -85,7 +85,7 @@ type JournalPage = { items: JournalEntry[]; total: number; skip: number; take: n
 
 type JournalFilters = {
   search: string;
-  projectId: string;
+  storeId: string;
   accountId: string;
   source: string;
   status: string;
@@ -114,7 +114,7 @@ function journalQuery(filters: JournalFilters, skip: number) {
   params.set('take', String(JOURNAL_PAGE_SIZE));
   params.set('skip', String(skip));
   if (filters.search.trim()) params.set('search', filters.search.trim());
-  if (filters.projectId) params.set('projectId', filters.projectId);
+  if (filters.storeId) params.set('storeId', filters.storeId);
   if (filters.accountId) params.set('accountId', filters.accountId);
   if (filters.source) params.set('source', filters.source);
   if (filters.status) params.set('status', filters.status);
@@ -130,9 +130,9 @@ type ManualJournalLineForm = {
   debit: string;
   credit: string;
   memo: string;
-  // Per line, not per entry: one payment can be split across projects, and an
-  // untagged line never reaches a project cost report.
-  projectId: string;
+  // Per line, not per entry: one payment can be split across stores, and an
+  // untagged line never reaches a store cost report.
+  storeId: string;
 };
 
 type BankAccountForm = {
@@ -142,7 +142,7 @@ type BankAccountForm = {
   accountNumber: string;
   branch: string;
   glAccountId: string;
-  projectId: string;
+  storeId: string;
   isActive: boolean;
 };
 
@@ -154,7 +154,7 @@ function makeBankAccountForm(bank?: BankAccount | null): BankAccountForm {
     accountNumber: bank?.accountNumber || '',
     branch: bank?.branch || '',
     glAccountId: bank?.glAccountId || '',
-    projectId: bank?.projectId || '',
+    storeId: bank?.storeId || '',
     isActive: bank?.isActive ?? true,
   };
 }
@@ -183,10 +183,10 @@ export default function GeneralLedgerPage() {
   const [journals, setJournals] = useState<JournalEntry[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankBalances, setBankBalances] = useState<Record<string, number>>({});
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [transfers, setTransfers] = useState<AccountTransfer[]>([]);
-  const [assignmentsByProject, setAssignmentsByProject] = useState<Record<string, ProjectAccountAssignment[]>>({});
-  const [assignmentProjectId, setAssignmentProjectId] = useState('');
+  const [assignmentsByStore, setAssignmentsByStore] = useState<Record<string, StoreAccountAssignment[]>>({});
+  const [assignmentStoreId, setAssignmentStoreId] = useState('');
 
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [accountCode, setAccountCode] = useState('');
@@ -196,20 +196,20 @@ export default function GeneralLedgerPage() {
   const [showJournalForm, setShowJournalForm] = useState(false);
   const [journalMemo, setJournalMemo] = useState('');
   const [journalLines, setJournalLines] = useState<ManualJournalLineForm[]>([
-    { accountId: '', debit: '', credit: '', memo: '', projectId: '' },
-    { accountId: '', debit: '', credit: '', memo: '', projectId: '' },
+    { accountId: '', debit: '', credit: '', memo: '', storeId: '' },
+    { accountId: '', debit: '', credit: '', memo: '', storeId: '' },
   ]);
   const [journalDate, setJournalDate] = useState('');
-  // Kept between postings: entering a project's spend line by line means the
-  // same project and date repeat for dozens of consecutive entries.
-  const [journalDefaultProjectId, setJournalDefaultProjectId] = useState('');
+  // Kept between postings: entering a store's spend line by line means the
+  // same store and date repeat for dozens of consecutive entries.
+  const [journalDefaultStoreId, setJournalDefaultStoreId] = useState('');
 
   const [journalTotal, setJournalTotal] = useState(0);
   const [journalsLoading, setJournalsLoading] = useState(false);
   const [journalSkip, setJournalSkip] = useState(0);
   const [filters, setFilters] = useState({
     search: '',
-    projectId: '',
+    storeId: '',
     accountId: '',
     source: '',
     status: '',
@@ -223,7 +223,7 @@ export default function GeneralLedgerPage() {
 
   const [recategoriseEntryId, setRecategoriseEntryId] = useState<string | null>(null);
   const [recategoriseLines, setRecategoriseLines] = useState<
-    Array<{ lineId: string; accountId: string; projectId: string; amountLabel: string }>
+    Array<{ lineId: string; accountId: string; storeId: string; amountLabel: string }>
   >([]);
 
   const [showBankForm, setShowBankForm] = useState(false);
@@ -249,7 +249,7 @@ export default function GeneralLedgerPage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextAccounts, nextJournals, nextBanks, nextProjects, nextTransfers] = await Promise.all([
+      const [nextAccounts, nextJournals, nextBanks, nextStores, nextTransfers] = await Promise.all([
         hasPermission(nextProfile, 'chart-of-account.read')
           ? apiRequest<ChartOfAccount[]>('/chart-of-accounts', { method: 'GET' }, authToken)
           : Promise.resolve([]),
@@ -259,8 +259,8 @@ export default function GeneralLedgerPage() {
         hasPermission(nextProfile, 'bank-account.read')
           ? apiRequest<BankAccount[]>('/bank-accounts', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'project.read')
-          ? apiRequest<Project[]>('/projects', { method: 'GET' }, authToken)
+        hasPermission(nextProfile, 'store.read')
+          ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'account-transfer.read')
           ? apiRequest<AccountTransfer[]>('/account-transfers?take=500', { method: 'GET' }, authToken)
@@ -271,7 +271,7 @@ export default function GeneralLedgerPage() {
       setJournals(nextJournals.items);
       setJournalTotal(nextJournals.total);
       setBankAccounts(nextBanks);
-      setProjects(nextProjects);
+      setStores(nextStores);
       setTransfers(nextTransfers);
 
       if (hasPermission(nextProfile, 'bank-account.read')) {
@@ -301,21 +301,21 @@ export default function GeneralLedgerPage() {
   }, [initialized, token, load]);
 
   const loadAssignments = useCallback(
-    async (projectId: string) => {
-      if (!token || !projectId) return;
-      const result = await apiRequest<ProjectAccountAssignment[]>(
-        `/projects/${projectId}/account-assignments`,
+    async (storeId: string) => {
+      if (!token || !storeId) return;
+      const result = await apiRequest<StoreAccountAssignment[]>(
+        `/stores/${storeId}/account-assignments`,
         { method: 'GET' },
         token,
       );
-      setAssignmentsByProject((prev) => ({ ...prev, [projectId]: result }));
+      setAssignmentsByStore((prev) => ({ ...prev, [storeId]: result }));
     },
     [token],
   );
 
   useEffect(() => {
-    if (assignmentProjectId) void loadAssignments(assignmentProjectId);
-  }, [assignmentProjectId, loadAssignments]);
+    if (assignmentStoreId) void loadAssignments(assignmentStoreId);
+  }, [assignmentStoreId, loadAssignments]);
 
   /** Refetches just the journal list, so changing a filter does not reload
    *  accounts, banks, transfers and balances as well. */
@@ -345,11 +345,11 @@ export default function GeneralLedgerPage() {
     return map;
   }, [accounts]);
 
-  const projectMap = useMemo(() => {
-    const map = new Map<string, Project>();
-    for (const project of projects) map.set(project.id, project);
+  const storeMap = useMemo(() => {
+    const map = new Map<string, Store>();
+    for (const store of stores) map.set(store.id, store);
     return map;
-  }, [projects]);
+  }, [stores]);
 
   const canCreateAccount = hasPermission(profile, 'chart-of-account.create');
   const canCreateJournal = hasPermission(profile, 'journal-entry.create');
@@ -359,9 +359,9 @@ export default function GeneralLedgerPage() {
   const canUpdateBank = hasPermission(profile, 'bank-account.update');
   const canDeleteBank = hasPermission(profile, 'bank-account.delete');
   const canCreateTransfer = hasPermission(profile, 'account-transfer.create');
-  const canReadAssignments = hasPermission(profile, 'project-account-assignment.read');
-  const canCreateAssignment = hasPermission(profile, 'project-account-assignment.create');
-  const canDeleteAssignment = hasPermission(profile, 'project-account-assignment.delete');
+  const canReadAssignments = hasPermission(profile, 'store-account-assignment.read');
+  const canCreateAssignment = hasPermission(profile, 'store-account-assignment.create');
+  const canDeleteAssignment = hasPermission(profile, 'store-account-assignment.delete');
 
   function applyJournalFilters() {
     if (!token) return;
@@ -373,7 +373,7 @@ export default function GeneralLedgerPage() {
   function resetJournalFilters() {
     const cleared: JournalFilters = {
       search: '',
-      projectId: '',
+      storeId: '',
       accountId: '',
       source: '',
       status: '',
@@ -461,19 +461,19 @@ export default function GeneralLedgerPage() {
                 credit: Number(line.credit || 0),
                 memo: line.memo || undefined,
                 // Fall back to the form default so a line is never silently
-                // untagged and missing from project reports.
-                projectId: line.projectId || journalDefaultProjectId || undefined,
+                // untagged and missing from store reports.
+                storeId: line.storeId || journalDefaultStoreId || undefined,
               })),
           }),
         },
         token,
       );
-      // Form stays open and keeps project/date: this screen is used to enter
+      // Form stays open and keeps store/date: this screen is used to enter
       // long runs of historical spend one line at a time.
       setJournalMemo('');
       setJournalLines([
-        { accountId: '', debit: '', credit: '', memo: '', projectId: journalDefaultProjectId },
-        { accountId: '', debit: '', credit: '', memo: '', projectId: '' },
+        { accountId: '', debit: '', credit: '', memo: '', storeId: journalDefaultStoreId },
+        { accountId: '', debit: '', credit: '', memo: '', storeId: '' },
       ]);
     }, 'Journal entry posted.');
   }
@@ -484,7 +484,7 @@ export default function GeneralLedgerPage() {
       entry.lines.map((line) => ({
         lineId: line.id,
         accountId: line.accountId,
-        projectId: line.projectId || '',
+        storeId: line.storeId || '',
         amountLabel:
           Number(line.debit) > 0
             ? `${formatMoney(line.debit)} Dr`
@@ -506,8 +506,8 @@ export default function GeneralLedgerPage() {
             lines: recategoriseLines.map((line) => ({
               lineId: line.lineId,
               accountId: line.accountId,
-              // Empty means detach from any project, which the API accepts as null.
-              projectId: line.projectId || null,
+              // Empty means detach from any store, which the API accepts as null.
+              storeId: line.storeId || null,
             })),
           }),
         },
@@ -560,7 +560,7 @@ export default function GeneralLedgerPage() {
             accountNumber: bankForm.accountNumber,
             branch: bankForm.branch || undefined,
             glAccountId: bankForm.glAccountId,
-            projectId: bankForm.projectId || undefined,
+            storeId: bankForm.storeId || undefined,
           }),
         },
         token,
@@ -585,7 +585,7 @@ export default function GeneralLedgerPage() {
             accountNumber: bankEditForm.accountNumber,
             branch: bankEditForm.branch || undefined,
             isActive: bankEditForm.isActive,
-            projectId: bankEditForm.projectId || null,
+            storeId: bankEditForm.storeId || null,
           }),
         },
         token,
@@ -633,23 +633,23 @@ export default function GeneralLedgerPage() {
 
   async function onCreateAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!token || !canCreateAssignment || !assignmentProjectId) return;
+    if (!token || !canCreateAssignment || !assignmentStoreId) return;
     await runMutation(async () => {
       await apiRequest(
-        `/projects/${assignmentProjectId}/account-assignments`,
+        `/stores/${assignmentStoreId}/account-assignments`,
         { method: 'POST', body: JSON.stringify(assignmentForm) },
         token,
       );
-      await loadAssignments(assignmentProjectId);
+      await loadAssignments(assignmentStoreId);
       setAssignmentForm({ purpose: 'SALES', bankAccountId: '' });
     }, 'Assignment saved.');
   }
 
   async function onDeleteAssignment(id: string) {
-    if (!token || !canDeleteAssignment || !assignmentProjectId) return;
+    if (!token || !canDeleteAssignment || !assignmentStoreId) return;
     await runMutation(async () => {
-      await apiRequest(`/projects/${assignmentProjectId}/account-assignments/${id}`, { method: 'DELETE' }, token);
-      await loadAssignments(assignmentProjectId);
+      await apiRequest(`/stores/${assignmentStoreId}/account-assignments/${id}`, { method: 'DELETE' }, token);
+      await loadAssignments(assignmentStoreId);
     }, 'Assignment removed.');
   }
 
@@ -720,7 +720,7 @@ export default function GeneralLedgerPage() {
                 Transfers
               </button>
               <button type="button" className={`portal-inline-btn${tab === 'assignments' ? ' is-active' : ''}`} onClick={() => setTab('assignments')}>
-                Project Account Assignments
+                Store Account Assignments
               </button>
             </div>
 
@@ -751,31 +751,31 @@ export default function GeneralLedgerPage() {
                         />
                       </label>
                       <label>
-                        <span>Default Project</span>
+                        <span>Default Store</span>
                         <select
-                          value={journalDefaultProjectId}
+                          value={journalDefaultStoreId}
                           onChange={(event) => {
                             const next = event.target.value;
-                            setJournalDefaultProjectId(next);
+                            setJournalDefaultStoreId(next);
                             // Apply to lines the user has not set individually,
                             // so a whole batch can be tagged in one action.
                             setJournalLines((prev) =>
-                              prev.map((item) => (item.projectId ? item : { ...item, projectId: next })),
+                              prev.map((item) => (item.storeId ? item : { ...item, storeId: next })),
                             );
                           }}
                         >
-                          <option value="">No project</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.code} — {project.name}
+                          <option value="">No store</option>
+                          {stores.map((store) => (
+                            <option key={store.id} value={store.id}>
+                              {store.code} — {store.name}
                             </option>
                           ))}
                         </select>
                       </label>
                     </div>
                     <p className="portal-muted" style={{ margin: 0 }}>
-                      Expense lines need a project to appear on that project&apos;s cost report. Date and
-                      default project are kept after posting so consecutive entries stay quick.
+                      Expense lines need a store to appear on that store&apos;s cost report. Date and
+                      default store are kept after posting so consecutive entries stay quick.
                     </p>
 
                     {journalLines.map((line, index) => (
@@ -826,21 +826,21 @@ export default function GeneralLedgerPage() {
                           />
                         </label>
                         <label>
-                          <span>Project</span>
+                          <span>Store</span>
                           <select
-                            value={line.projectId}
+                            value={line.storeId}
                             onChange={(event) =>
                               setJournalLines((prev) =>
                                 prev.map((item, itemIndex) =>
-                                  itemIndex === index ? { ...item, projectId: event.target.value } : item,
+                                  itemIndex === index ? { ...item, storeId: event.target.value } : item,
                                 ),
                               )
                             }
                           >
-                            <option value="">No project</option>
-                            {projects.map((project) => (
-                              <option key={project.id} value={project.id}>
-                                {project.code} — {project.name}
+                            <option value="">No store</option>
+                            {stores.map((store) => (
+                              <option key={store.id} value={store.id}>
+                                {store.code} — {store.name}
                               </option>
                             ))}
                           </select>
@@ -855,7 +855,7 @@ export default function GeneralLedgerPage() {
                         onClick={() =>
                           setJournalLines((prev) => [
                             ...prev,
-                            { accountId: '', debit: '', credit: '', memo: '', projectId: journalDefaultProjectId },
+                            { accountId: '', debit: '', credit: '', memo: '', storeId: journalDefaultStoreId },
                           ])
                         }
                       >
@@ -893,15 +893,15 @@ export default function GeneralLedgerPage() {
                       />
                     </label>
                     <label>
-                      <span>Project</span>
+                      <span>Store</span>
                       <select
-                        value={filters.projectId}
-                        onChange={(event) => setFilters((prev) => ({ ...prev, projectId: event.target.value }))}
+                        value={filters.storeId}
+                        onChange={(event) => setFilters((prev) => ({ ...prev, storeId: event.target.value }))}
                       >
-                        <option value="">All projects</option>
-                        {projects.map((project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.code} — {project.name}
+                        <option value="">All stores</option>
+                        {stores.map((store) => (
+                          <option key={store.id} value={store.id}>
+                            {store.code} — {store.name}
                           </option>
                         ))}
                       </select>
@@ -982,7 +982,7 @@ export default function GeneralLedgerPage() {
                           setFilters((prev) => ({ ...prev, untaggedOnly: event.target.checked }))
                         }
                       />
-                      <span>Only expense with no project</span>
+                      <span>Only expense with no store</span>
                     </label>
                   </div>
                   <div className="portal-inline-actions">
@@ -1022,15 +1022,15 @@ export default function GeneralLedgerPage() {
                         <div className="portal-list-stack" style={{ marginTop: 8 }}>
                           {entry.lines.map((line) => {
                             const account = line.account || accountMap.get(line.accountId);
-                            const untaggedExpense = account?.type === 'EXPENSE' && !line.projectId;
+                            const untaggedExpense = account?.type === 'EXPENSE' && !line.storeId;
                             return (
                               <div key={line.id} className="portal-list-row" style={{ fontSize: 13 }}>
                                 <span>
                                   {account?.code} — {account?.name}
-                                  {line.projectId ? (
-                                    <> • {projectMap.get(line.projectId)?.code || 'project'}</>
+                                  {line.storeId ? (
+                                    <> • {storeMap.get(line.storeId)?.code || 'store'}</>
                                   ) : untaggedExpense ? (
-                                    <> • no project</>
+                                    <> • no store</>
                                   ) : null}
                                 </span>
                                 <span>{Number(line.debit) > 0 ? formatMoney(line.debit) : ''}</span>
@@ -1070,7 +1070,7 @@ export default function GeneralLedgerPage() {
                         {recategoriseEntryId === entry.id && canUpdateJournal ? (
                           <form className="portal-entity-form portal-inline-form" onSubmit={onRecategorise}>
                             <p className="portal-muted" style={{ margin: 0 }}>
-                              Move these lines to the right account or project. Amounts and dates cannot be
+                              Move these lines to the right account or store. Amounts and dates cannot be
                               changed here — use Reverse if the figures themselves are wrong.
                             </p>
                             {recategoriseLines.map((line, index) => (
@@ -1095,21 +1095,21 @@ export default function GeneralLedgerPage() {
                                   </select>
                                 </label>
                                 <label>
-                                  <span>Project</span>
+                                  <span>Store</span>
                                   <select
-                                    value={line.projectId}
+                                    value={line.storeId}
                                     onChange={(event) =>
                                       setRecategoriseLines((prev) =>
                                         prev.map((item, itemIndex) =>
-                                          itemIndex === index ? { ...item, projectId: event.target.value } : item,
+                                          itemIndex === index ? { ...item, storeId: event.target.value } : item,
                                         ),
                                       )
                                     }
                                   >
-                                    <option value="">No project</option>
-                                    {projects.map((project) => (
-                                      <option key={project.id} value={project.id}>
-                                        {project.code} — {project.name}
+                                    <option value="">No store</option>
+                                    {stores.map((store) => (
+                                      <option key={store.id} value={store.id}>
+                                        {store.code} — {store.name}
                                       </option>
                                     ))}
                                   </select>
@@ -1286,12 +1286,12 @@ export default function GeneralLedgerPage() {
                     </div>
                     <div className="portal-entity-grid-2">
                       <label>
-                        <span>Project (optional — leave blank for a shared company account)</span>
-                        <select value={bankForm.projectId} onChange={(event) => setBankForm((prev) => ({ ...prev, projectId: event.target.value }))}>
+                        <span>Store (optional — leave blank for a shared company account)</span>
+                        <select value={bankForm.storeId} onChange={(event) => setBankForm((prev) => ({ ...prev, storeId: event.target.value }))}>
                           <option value="">Shared / company-level account</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.code} — {project.name}
+                          {stores.map((store) => (
+                            <option key={store.id} value={store.id}>
+                              {store.code} — {store.name}
                             </option>
                           ))}
                         </select>
@@ -1317,7 +1317,7 @@ export default function GeneralLedgerPage() {
                             <p>
                               {bank.type === 'MOBILE_MONEY' ? 'Mobile Money' : 'Bank'} • {bank.bankName} • {bank.accountNumber}
                             </p>
-                            <p>{bank.projectId ? `Project: ${projects.find((project) => project.id === bank.projectId)?.name || bank.projectId}` : 'Shared / company-level account'}</p>
+                            <p>{bank.storeId ? `Store: ${stores.find((store) => store.id === bank.storeId)?.name || bank.storeId}` : 'Shared / company-level account'}</p>
                           </div>
                           <span>{bank.currencyCode}</span>
                           <span>{formatMoney(bankBalances[bank.id] ?? 0, bank.currencyCode)}</span>
@@ -1406,15 +1406,15 @@ export default function GeneralLedgerPage() {
                             </div>
                             <div className="portal-entity-grid-2">
                               <label>
-                                <span>Project (optional)</span>
+                                <span>Store (optional)</span>
                                 <select
-                                  value={bankEditForm.projectId}
-                                  onChange={(event) => setBankEditForm((prev) => ({ ...prev, projectId: event.target.value }))}
+                                  value={bankEditForm.storeId}
+                                  onChange={(event) => setBankEditForm((prev) => ({ ...prev, storeId: event.target.value }))}
                                 >
                                   <option value="">Shared / company-level account</option>
-                                  {projects.map((project) => (
-                                    <option key={project.id} value={project.id}>
-                                      {project.code} — {project.name}
+                                  {stores.map((store) => (
+                                    <option key={store.id} value={store.id}>
+                                      {store.code} — {store.name}
                                     </option>
                                   ))}
                                 </select>
@@ -1531,28 +1531,28 @@ export default function GeneralLedgerPage() {
 
             {tab === 'assignments' ? (
               <article className="portal-card">
-                <h2 style={{ margin: 0 }}>Project Account Assignments</h2>
+                <h2 style={{ margin: 0 }}>Store Account Assignments</h2>
                 <p style={{ fontSize: 13, color: '#5b6161' }}>
-                  Choose which bank or mobile money account each project uses for a given purpose — e.g. unit sales
+                  Choose which bank or mobile money account each store uses for a given purpose — e.g. unit sales
                   can collect into one account while rent and utilities post to others. Unassigned purposes fall back
-                  to the project&apos;s account of that type, then the default company Cash and Bank account.
+                  to the store&apos;s account of that type, then the default company Cash and Bank account.
                 </p>
 
                 <form className="portal-entity-form portal-detail-form" onSubmit={(event) => event.preventDefault()}>
                   <label>
-                    <span>Project</span>
-                    <select value={assignmentProjectId} onChange={(event) => setAssignmentProjectId(event.target.value)}>
-                      <option value="">Select a project</option>
-                      {projects.map((project) => (
-                        <option key={project.id} value={project.id}>
-                          {project.code} — {project.name}
+                    <span>Store</span>
+                    <select value={assignmentStoreId} onChange={(event) => setAssignmentStoreId(event.target.value)}>
+                      <option value="">Select a store</option>
+                      {stores.map((store) => (
+                        <option key={store.id} value={store.id}>
+                          {store.code} — {store.name}
                         </option>
                       ))}
                     </select>
                   </label>
                 </form>
 
-                {assignmentProjectId ? (
+                {assignmentStoreId ? (
                   <>
                     {canCreateAssignment ? (
                       <form className="portal-entity-form portal-detail-form" onSubmit={onCreateAssignment}>
@@ -1593,10 +1593,10 @@ export default function GeneralLedgerPage() {
                     ) : null}
 
                     <div className="portal-list-stack">
-                      {(assignmentsByProject[assignmentProjectId] || []).length === 0 ? (
-                        <div className="portal-empty-state">No assignments configured for this project yet.</div>
+                      {(assignmentsByStore[assignmentStoreId] || []).length === 0 ? (
+                        <div className="portal-empty-state">No assignments configured for this store yet.</div>
                       ) : (
-                        (assignmentsByProject[assignmentProjectId] || []).map((assignment) => (
+                        (assignmentsByStore[assignmentStoreId] || []).map((assignment) => (
                           <div key={assignment.id} className="portal-list-row">
                             <div>
                               <strong>{PURPOSE_LABELS[assignment.purpose]}</strong>

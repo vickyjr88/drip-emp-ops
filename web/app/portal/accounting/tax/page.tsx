@@ -36,7 +36,7 @@ type TaxRate = {
   isActive: boolean;
 };
 
-type Project = { id: string; code: string; name: string };
+type Store = { id: string; code: string; name: string };
 type BankAccount = { id: string; name: string; currencyCode: string };
 
 type TaxRemittance = {
@@ -44,7 +44,7 @@ type TaxRemittance = {
   remittanceNumber: string;
   taxRate: TaxRate;
   bankAccount?: BankAccount | null;
-  project?: Project | null;
+  store?: Store | null;
   amount: string | number;
   periodStart: string;
   periodEnd: string;
@@ -73,7 +73,7 @@ export default function TaxPage() {
 
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [glAccounts, setGlAccounts] = useState<ChartOfAccount[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [remittances, setRemittances] = useState<TaxRemittance[]>([]);
 
@@ -93,7 +93,7 @@ export default function TaxPage() {
   const [remittanceForm, setRemittanceForm] = useState({
     taxRateId: '',
     bankAccountId: '',
-    projectId: '',
+    storeId: '',
     amount: '',
     periodStart: '',
     periodEnd: '',
@@ -110,15 +110,15 @@ export default function TaxPage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextRates, nextAccounts, nextProjects, nextBanks, nextRemittances] = await Promise.all([
+      const [nextRates, nextAccounts, nextStores, nextBanks, nextRemittances] = await Promise.all([
         hasPermission(nextProfile, 'tax-rate.read')
           ? apiRequest<TaxRate[]>('/tax-rates', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'chart-of-account.read')
           ? apiRequest<ChartOfAccount[]>('/chart-of-accounts', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'project.read')
-          ? apiRequest<Project[]>('/projects', { method: 'GET' }, authToken)
+        hasPermission(nextProfile, 'store.read')
+          ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'bank-account.read')
           ? apiRequest<BankAccount[]>('/bank-accounts', { method: 'GET' }, authToken)
@@ -130,7 +130,7 @@ export default function TaxPage() {
       setProfile(nextProfile);
       setTaxRates(nextRates);
       setGlAccounts(nextAccounts);
-      setProjects(nextProjects);
+      setStores(nextStores);
       setBankAccounts(nextBanks);
       setRemittances(nextRemittances);
     } catch (error) {
@@ -315,7 +315,7 @@ export default function TaxPage() {
           body: JSON.stringify({
             taxRateId: remittanceForm.taxRateId,
             bankAccountId: remittanceForm.bankAccountId || undefined,
-            projectId: remittanceForm.projectId || undefined,
+            storeId: remittanceForm.storeId || undefined,
             amount: Number(remittanceForm.amount),
             periodStart: remittanceForm.periodStart,
             periodEnd: remittanceForm.periodEnd,
@@ -326,7 +326,7 @@ export default function TaxPage() {
         token,
       );
       setShowRemittanceForm(false);
-      setRemittanceForm({ taxRateId: '', bankAccountId: '', projectId: '', amount: '', periodStart: '', periodEnd: '', reference: '' });
+      setRemittanceForm({ taxRateId: '', bankAccountId: '', storeId: '', amount: '', periodStart: '', periodEnd: '', reference: '' });
     }, 'Remittance recorded.');
   }
 
@@ -707,12 +707,12 @@ export default function TaxPage() {
                     </div>
                     <div className="portal-entity-grid-2">
                       <label>
-                        <span>Project (optional)</span>
-                        <select value={remittanceForm.projectId} onChange={(event) => setRemittanceForm((prev) => ({ ...prev, projectId: event.target.value }))}>
+                        <span>Store (optional)</span>
+                        <select value={remittanceForm.storeId} onChange={(event) => setRemittanceForm((prev) => ({ ...prev, storeId: event.target.value }))}>
                           <option value="">Company-wide</option>
-                          {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                              {project.code} — {project.name}
+                          {stores.map((store) => (
+                            <option key={store.id} value={store.id}>
+                              {store.code} — {store.name}
                             </option>
                           ))}
                         </select>
@@ -723,7 +723,7 @@ export default function TaxPage() {
                           value={remittanceForm.bankAccountId}
                           onChange={(event) => setRemittanceForm((prev) => ({ ...prev, bankAccountId: event.target.value }))}
                         >
-                          <option value="">Auto-resolve from project / default</option>
+                          <option value="">Auto-resolve from store / default</option>
                           {bankAccounts.map((bank) => (
                             <option key={bank.id} value={bank.id}>
                               {bank.name}
@@ -751,7 +751,7 @@ export default function TaxPage() {
                             {formatDate(remittance.periodStart)} – {formatDate(remittance.periodEnd)}
                           </p>
                           <p>
-                            {remittance.project?.name || 'Company-wide'} • {remittance.bankAccount?.name || '—'}
+                            {remittance.store?.name || 'Company-wide'} • {remittance.bankAccount?.name || '—'}
                             {remittance.reference ? ` • Ref ${remittance.reference}` : ''}
                           </p>
                         </div>
