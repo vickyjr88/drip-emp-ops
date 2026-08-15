@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, ReminderChannel, ReminderRule } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../notifications/sms.service';
-import { BrevoService } from '../email-log/brevo.service';
+import { EmailSenderService } from '../email-log/email-sender.service';
 import { ReminderTargetService, daysBetween, startOfDay } from './reminder-target.service';
 import { ReminderTarget } from './reminder.types';
 
@@ -49,7 +49,7 @@ export class ReminderEngineService {
     private readonly prisma: PrismaService,
     private readonly targets: ReminderTargetService,
     private readonly sms: SmsService,
-    private readonly email: BrevoService,
+    private readonly email: EmailSenderService,
   ) {}
 
   /**

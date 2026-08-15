@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EmailLogService } from './email-log.service';
-import { BrevoService } from './brevo.service';
+import { EmailSenderService } from './email-sender.service';
+import { BrevoProvider } from './providers/brevo.provider';
+import { BillionMailProvider } from './providers/billionmail.provider';
 
 @Module({
   imports: [PrismaModule],
-  providers: [EmailLogService, BrevoService],
-  exports: [EmailLogService, BrevoService],
+  providers: [EmailLogService, EmailSenderService, BrevoProvider, BillionMailProvider],
+  exports: [EmailLogService, EmailSenderService],
 })
 export class EmailLogModule {}

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { BrevoService } from './brevo.service';
+import { EmailSenderService } from './email-sender.service';
 
 @Injectable()
 export class EmailLogService {
@@ -8,7 +8,7 @@ export class EmailLogService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly brevo: BrevoService,
+    private readonly sender: EmailSenderService,
   ) {}
 
   /**
@@ -28,7 +28,7 @@ export class EmailLogService {
     supplierInvoiceId?: string;
   }) {
     const result = params.html
-      ? await this.brevo.send({
+      ? await this.sender.send({
           to: params.recipient,
           subject: params.subject,
           html: params.html,
