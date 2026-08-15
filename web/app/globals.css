@@ -9920,9 +9920,20 @@ img {
 /* --- Home and About, shop edition -------------------------------------- */
 .de-home-search {
   display: flex;
+  /* stretch, so the button takes the input's height rather than its own. The
+     input is taller -- 1rem text against the button's 0.66rem uppercase -- and
+     .lp-button being inline-flex meant it kept its own box and sat short of
+     the field it belongs to. */
+  align-items: stretch;
   gap: 8px;
   margin: 18px 0 14px;
   max-width: 520px;
+}
+
+/* Overrides .lp-button's inline-flex, which otherwise ignores the stretch. */
+.de-home-search button {
+  display: flex;
+  flex-shrink: 0;
 }
 
 .de-home-search input {
@@ -9980,11 +9991,18 @@ img {
 
 .de-home-new-head {
   display: flex;
-  align-items: flex-end;
+  /* Centred against the heading block as a whole. flex-end pinned the button
+     to the bottom of the paragraph's box, which sits below its last line, so
+     it hung low against the text it reads with. */
+  align-items: center;
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
   margin-bottom: 24px;
+}
+
+.de-home-new-head .lp-button {
+  flex-shrink: 0;
 }
 
 .de-home-new-head h2 {
