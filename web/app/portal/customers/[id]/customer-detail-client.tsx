@@ -5,6 +5,7 @@ import { useErrorState, useFeedbackState } from '../../components/notifications'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { formatDate, formatMoney } from '../../accounting/lib';
 
 type Customer = {
   id: string;
@@ -17,42 +18,21 @@ type Customer = {
   createdAt?: string;
 };
 
-type UnitOwnership = {
-  id: string;
-  unitId: string;
-  customerId: string;
-  ownershipPercentage: string | number;
-  isPrimaryOwner: boolean;
-};
 
-type Unit = {
+
+
+
+type CustomerOrder = {
   id: string;
-  unitNumber: string;
+  orderNumber: string;
   status: string;
-  floorNumber: number;
-  bedrooms?: number;
+  total: string | number;
+  amountPaid: string | number;
+  placedAt: string;
+  store?: { name: string } | null;
 };
 
-type SalesContract = {
-  id: string;
-  contractNumber: string;
-  unitId: string;
-  primaryCustomerId: string;
-  currency: string;
-  totalAgreedPrice: string | number;
-  contractStatus: string;
-};
-
-type Tenancy = {
-  id: string;
-  unitId: string;
-  tenantId: string;
-  leaseStart: string;
-  leaseEnd?: string | null;
-  status: string;
-  monthlyRent: string | number;
-  currency: string;
-};
+type OrderPage = { items: CustomerOrder[] };
 
 type CustomerDocument = {
   id: string;
@@ -125,10 +105,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [ownerships, setOwnerships] = useState<UnitOwnership[]>([]);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [contracts, setContracts] = useState<SalesContract[]>([]);
-  const [tenancies, setTenancies] = useState<Tenancy[]>([]);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
   const [showPortalForm, setShowPortalForm] = useState(false);
   const [portalPassword, setPortalPassword] = useState('');
@@ -146,20 +123,19 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
     try {
       const nextProfile = await apiRequest<AuthProfile>('/auth/profile', { method: 'GET' }, authToken);
 
-      const [nextCustomer, nextOwnerships, nextUnits, nextContracts, nextTenancies, nextDocuments] = await Promise.all([
+      // Units, sales contracts and tenancies used to be fetched here. Those
+      // endpoints went with the property business, and their permissions went
+      // with them, so hasPermission was returning false and the screen quietly
+      // rendered three empty cards.
+      const [nextCustomer, nextOrders, nextDocuments] = await Promise.all([
         apiRequest<Customer>(`/customers/${customerId}`, { method: 'GET' }, authToken),
-        hasPermission(nextProfile, 'unit-ownership.read')
-          ? apiRequest<UnitOwnership[]>('/unit-ownerships?take=500', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'unit.read')
-          ? apiRequest<Unit[]>('/units?take=500', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'sales-contract.read')
-          ? apiRequest<SalesContract[]>('/sales-contracts?take=500', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'tenancy.read')
-          ? apiRequest<Tenancy[]>(`/tenancies?tenantId=${customerId}&take=200`, { method: 'GET' }, authToken)
-          : Promise.resolve([]),
+        hasPermission(nextProfile, 'order.read')
+          ? apiRequest<OrderPage>(
+              `/orders?customerId=${customerId}&take=100`,
+              { method: 'GET' },
+              authToken,
+            )
+          : Promise.resolve({ items: [] as CustomerOrder[] }),
         hasPermission(nextProfile, 'customer-document.read')
           ? apiRequest<CustomerDocument[]>(
               `/customer-documents?customerId=${customerId}&take=200`,
@@ -171,10 +147,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
 
       setProfile(nextProfile);
       setCustomer(nextCustomer);
-      setOwnerships(nextOwnerships);
-      setUnits(nextUnits);
-      setContracts(nextContracts);
-      setTenancies(nextTenancies);
+      setOrders(Array.isArray(nextOrders) ? nextOrders : nextOrders.items || []);
       setDocuments(nextDocuments);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load customer details.');
@@ -196,23 +169,8 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
     void loadCustomer(token);
   }, [initialized, token, loadCustomer]);
 
-  const unitMap = useMemo(() => {
-    const map = new Map<string, Unit>();
-    for (const unit of units) {
-      map.set(unit.id, unit);
-    }
-    return map;
-  }, [units]);
 
-  const matchedOwnerships = useMemo(
-    () => ownerships.filter((ownership) => ownership.customerId === customerId),
-    [ownerships, customerId],
-  );
 
-  const matchedContracts = useMemo(
-    () => contracts.filter((contract) => contract.primaryCustomerId === customerId),
-    [contracts, customerId],
-  );
 
   const canUpdateCustomer = hasPermission(profile, 'customer.update');
 
@@ -340,7 +298,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
           <PortalShell
             active="customers"
             pageTitle={`${customer.firstName} ${customer.lastName}`}
-            pageSubtitle="Customer profile, next of kin, ownership, and documents"
+            pageSubtitle="Contact details, orders and documents"
             email={profile.email}
             roleLabel={roleLabel}
             permissionCount={profile.permissions?.length || 0}
@@ -349,8 +307,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
           >
           <div className="portal-detail-header" style={{ marginBottom: 0, paddingBottom: 0, border: 0 }}>
             <div className="portal-detail-meta">
-              <span>{matchedOwnerships.length} unit{matchedOwnerships.length === 1 ? '' : 's'}</span>
-              <span>{matchedContracts.length} contract{matchedContracts.length === 1 ? '' : 's'}</span>
+              <span>{orders.length} order{orders.length === 1 ? '' : 's'}</span>
               <span>{documents.length} document{documents.length === 1 ? '' : 's'}</span>
             </div>
             <div className="portal-detail-header-actions">
@@ -466,79 +423,39 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
 
             <div className="portal-section-grid">
               <article className="portal-card">
-                <h2>Owned Units</h2>
+                <h2>Orders</h2>
                 <div className="portal-list-stack">
-                  {matchedOwnerships.length === 0 ? (
-                    <div className="portal-empty-state">This customer is not linked to any units.</div>
+                  {orders.length === 0 ? (
+                    <div className="portal-empty-state">
+                      No orders for this customer yet. Walk-in sales are not tied to a customer
+                      record.
+                    </div>
                   ) : (
-                    matchedOwnerships.map((ownership) => {
-                      const unit = unitMap.get(ownership.unitId);
-                      return (
-                        <div key={ownership.id} className="portal-record">
-                          <div className="portal-list-row">
-                            <div>
-                              <strong>
-                                {unit ? (
-                                  <Link href={`/portal/units/${unit.id}`}>{unit.unitNumber}</Link>
-                                ) : (
-                                  ownership.unitId
-                                )}
-                              </strong>
-                              <p>
-                                {unit ? `${unit.status} • Floor ${unit.floorNumber}` : 'Unit record'}
-                                {unit?.bedrooms != null ? ` • ${unit.bedrooms} bed` : ''}
-                              </p>
-                            </div>
-                            <span>{ownership.isPrimaryOwner ? 'PRIMARY' : 'CO-OWNER'}</span>
-                            <span>{Number(ownership.ownershipPercentage).toFixed(1)}%</span>
-                          </div>
-                          {unit ? (
-                            <div className="portal-action-row">
-                              <Link href={`/portal/units/${unit.id}`} className="portal-inline-btn">
-                                Open Unit
-                              </Link>
-                            </div>
-                          ) : null}
+                    orders.map((order) => (
+                      <div key={order.id} className="portal-list-row">
+                        <div>
+                          <strong>{order.orderNumber}</strong>
+                          <p className="portal-muted" style={{ margin: '2px 0 0' }}>
+                            {order.store?.name || 'Store not set'} · {formatDate(order.placedAt)}
+                          </p>
                         </div>
-                      );
-                    })
+                        <div className="portal-list-meta">
+                          <span>{formatMoney(order.total)}</span>
+                          {/* What is still owed matters more than the status word:
+                              it is the reason to ring them. */}
+                          <span className="portal-muted">
+                            {Number(order.total) - Number(order.amountPaid) > 0
+                              ? `${formatMoney(Number(order.total) - Number(order.amountPaid))} owing`
+                              : 'Paid in full'}
+                          </span>
+                        </div>
+                        <span>{order.status}</span>
+                      </div>
+                    ))
                   )}
                 </div>
               </article>
 
-              <article className="portal-card">
-                <h2>Sales Contracts</h2>
-                <div className="portal-list-stack">
-                  {matchedContracts.length === 0 ? (
-                    <div className="portal-empty-state">No contracts where this customer is the primary buyer.</div>
-                  ) : (
-                    matchedContracts.map((contract) => {
-                      const unit = unitMap.get(contract.unitId);
-                      return (
-                        <div key={contract.id} className="portal-record">
-                          <div className="portal-list-row">
-                            <div>
-                              <strong>{contract.contractNumber}</strong>
-                              <p>
-                                Unit:{' '}
-                                {unit ? (
-                                  <Link href={`/portal/units/${unit.id}`}>{unit.unitNumber}</Link>
-                                ) : (
-                                  contract.unitId
-                                )}
-                              </p>
-                            </div>
-                            <span>{contract.contractStatus}</span>
-                            <span>
-                              {contract.currency} {Number(contract.totalAgreedPrice).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </article>
             </div>
 
             <article className="portal-card">
@@ -581,49 +498,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
               </div>
             </article>
 
-            <article className="portal-card">
-              <h2>Tenancies (as Tenant)</h2>
-              <div className="portal-list-stack">
-                {tenancies.length === 0 ? (
-                  <div className="portal-empty-state">This customer has no rental tenancies.</div>
-                ) : (
-                  tenancies.map((tenancy) => {
-                    const unit = unitMap.get(tenancy.unitId);
-                    return (
-                      <div key={tenancy.id} className="portal-record">
-                        <div className="portal-list-row">
-                          <div>
-                            <strong>
-                              {unit ? (
-                                <Link href={`/portal/units/${unit.id}`}>{unit.unitNumber}</Link>
-                              ) : (
-                                tenancy.unitId
-                              )}
-                            </strong>
-                            <p>
-                              {new Date(tenancy.leaseStart).toLocaleDateString('en-GB')} →{' '}
-                              {tenancy.leaseEnd
-                                ? new Date(tenancy.leaseEnd).toLocaleDateString('en-GB')
-                                : 'Open'}{' '}
-                              • {tenancy.currency} {Number(tenancy.monthlyRent).toLocaleString()}/mo
-                            </p>
-                          </div>
-                          <span>{tenancy.status}</span>
-                          <span>{tenancy.currency}</span>
-                        </div>
-                        {unit ? (
-                          <div className="portal-action-row">
-                            <Link href={`/portal/units/${unit.id}`} className="portal-inline-btn">
-                              Open Unit
-                            </Link>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </article>
           </div>
           </PortalShell>
         </section>

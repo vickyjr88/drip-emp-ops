@@ -55,6 +55,14 @@ export default function CataloguePage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(BLANK);
   const [price, setPrice] = useState('');
+  // The three trade tiers and the buying cost. Cost is what makes margin and
+  // cost of goods work at all: without it every report reads 100% margin.
+  const [cost, setCost] = useState('');
+  const [resellerPrice, setResellerPrice] = useState('');
+  const [wholesalePrice, setWholesalePrice] = useState('');
+  /** variantId -> draft cost, while a row is being edited. */
+  const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
+  const [savingVariant, setSavingVariant] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // Managing images on a product that already exists, which is most of them:
@@ -113,12 +121,47 @@ export default function CataloguePage() {
   const canUpdate = hasPermission(profile, 'product.update');
   const canDelete = hasPermission(profile, 'product.delete');
 
+  /**
+   * Saves one variant's buying cost.
+   *
+   * Cost is edited per size rather than per product because sizes are often
+   * bought at different prices, and it is the per-variant figure that cost of
+   * goods and margin are calculated from.
+   */
+  async function onSaveCost(variantId: string) {
+    if (!token || savingVariant) return;
+    const raw = (costDrafts[variantId] ?? '').trim();
+    setSavingVariant(variantId);
+    try {
+      await apiRequest(`/products/variants/${variantId}`, {
+        method: 'PATCH',
+        // Clearing the field sets cost back to unrecorded rather than to zero.
+        body: JSON.stringify({ costKes: raw === '' ? null : Number(raw) }),
+      }, token);
+      setCostDrafts((prev) => {
+        const next = { ...prev };
+        delete next[variantId];
+        return next;
+      });
+      setFeedback('Cost updated.');
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setSavingVariant(null);
+    }
+  }
+
   async function onCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
     setSaving(true);
     try {
       const unitPrice = Number(price);
+      // Blank stays blank rather than becoming 0: an unset cost is "we have
+      // not recorded it", which the reports flag, while 0 would claim the
+      // shoes were free and show a 100% margin as though it were real.
+      const optionalNumber = (value: string) => (value.trim() === '' ? undefined : Number(value));
       await apiRequest('/products', {
         method: 'POST',
         body: JSON.stringify({
@@ -131,11 +174,15 @@ export default function CataloguePage() {
             name: size,
             attributes: { size },
             priceKes: unitPrice,
+            costKes: optionalNumber(cost),
+            resellerPriceKes: optionalNumber(resellerPrice),
+            wholesalePriceKes: optionalNumber(wholesalePrice),
           })),
         }),
       }, token);
       setFeedback(`${form.name} added with ${DEFAULT_SIZES.length} sizes.`);
-      setForm(BLANK); setPrice(''); setImages([]); setShowForm(false);
+      setForm(BLANK); setPrice(''); setCost(''); setResellerPrice('');
+      setWholesalePrice(''); setImages([]); setShowForm(false);
       await load(token);
     } catch (error) {
       setErrorMessage(error);
@@ -291,9 +338,32 @@ export default function CataloguePage() {
                       </select>
                     </label>
                     <label>
-                      <span>Price (KES)</span>
+                      <span>Retail price (KES)</span>
                       <input type="number" min="0" value={price} placeholder="3499" required
                         onChange={(event) => setPrice(event.target.value)} />
+                    </label>
+                  </div>
+
+                  <div className="portal-entity-grid-3">
+                    <label>
+                      <span>Cost (KES)</span>
+                      <input type="number" min="0" value={cost} placeholder="2000"
+                        onChange={(event) => setCost(event.target.value)} />
+                      <small className="portal-muted">
+                        What you paid. Without it margin and cost of goods read as zero.
+                      </small>
+                    </label>
+                    <label>
+                      <span>Reseller price (KES)</span>
+                      <input type="number" min="0" value={resellerPrice} placeholder="2800"
+                        onChange={(event) => setResellerPrice(event.target.value)} />
+                      <small className="portal-muted">Competing shops. Falls back to retail.</small>
+                    </label>
+                    <label>
+                      <span>Wholesale price (KES)</span>
+                      <input type="number" min="0" value={wholesalePrice} placeholder="2500"
+                        onChange={(event) => setWholesalePrice(event.target.value)} />
+                      <small className="portal-muted">Bulk. The keenest of the three.</small>
                     </label>
                   </div>
 
@@ -529,17 +599,89 @@ export default function CataloguePage() {
                         <div className="portal-table-wrap">
                           <table className="portal-data-table is-doc">
                             <thead>
-                              <tr><th>Size</th><th>SKU</th><th>Price</th><th>Status</th></tr>
+                              <tr>
+                                <th>Size</th><th>SKU</th><th>Price</th><th>Cost</th>
+                                <th>Margin</th><th>Status</th>
+                              </tr>
                             </thead>
                             <tbody>
-                              {product.variants.map((variant) => (
+                              {product.variants.map((variant) => {
+                                const cost =
+                                  variant.costKes === null || variant.costKes === undefined
+                                    ? null
+                                    : Number(variant.costKes);
+                                const priceValue = Number(variant.priceKes);
+                                const margin =
+                                  cost === null || !priceValue
+                                    ? null
+                                    : ((priceValue - cost) / priceValue) * 100;
+                                const draft = costDrafts[variant.id];
+                                const editing = draft !== undefined;
+                                return (
                                 <tr key={variant.id}>
                                   <td>{variant.name}</td>
                                   <td><code>{variant.sku}</code></td>
                                   <td>{formatMoney(variant.priceKes)}</td>
+                                  <td>
+                                    {editing ? (
+                                      <span className="portal-inline-actions">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          autoFocus
+                                          value={draft}
+                                          style={{ width: 92 }}
+                                          onChange={(event) =>
+                                            setCostDrafts((prev) => ({
+                                              ...prev,
+                                              [variant.id]: event.target.value,
+                                            }))
+                                          }
+                                        />
+                                        <button
+                                          type="button"
+                                          className="portal-inline-btn"
+                                          disabled={savingVariant === variant.id}
+                                          onClick={() => void onSaveCost(variant.id)}
+                                        >
+                                          {savingVariant === variant.id ? 'Saving' : 'Save'}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="portal-inline-btn"
+                                          onClick={() =>
+                                            setCostDrafts((prev) => {
+                                              const next = { ...prev };
+                                              delete next[variant.id];
+                                              return next;
+                                            })
+                                          }
+                                        >
+                                          Cancel
+                                        </button>
+                                      </span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="portal-linkish"
+                                        onClick={() =>
+                                          setCostDrafts((prev) => ({
+                                            ...prev,
+                                            [variant.id]: cost === null ? '' : String(cost),
+                                          }))
+                                        }
+                                      >
+                                        {/* An unset cost is called out rather than shown as a
+                                            dash: it is the reason margin reads 100%. */}
+                                        {cost === null ? 'Set cost' : formatMoney(cost)}
+                                      </button>
+                                    )}
+                                  </td>
+                                  <td>{margin === null ? '—' : `${margin.toFixed(1)}%`}</td>
                                   <td>{variant.isActive ? 'Active' : 'Inactive'}</td>
                                 </tr>
-                              ))}
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

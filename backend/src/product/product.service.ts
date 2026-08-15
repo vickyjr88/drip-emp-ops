@@ -9,6 +9,11 @@ const INCLUDE = {
   variants: { orderBy: { name: 'asc' } },
 } satisfies Prisma.ProductInclude;
 
+/** Null clears the column; a number becomes a Decimal. */
+function toNullableDecimal(value: number | null | undefined) {
+  return value === null || value === undefined ? null : new Prisma.Decimal(value);
+}
+
 @Injectable()
 export class ProductService {
   constructor(private readonly prisma: PrismaService) {}
@@ -187,9 +192,16 @@ export class ProductService {
           ? { attributes: dto.attributes as Prisma.InputJsonValue }
           : {}),
         ...(dto.priceKes !== undefined ? { priceKes: new Prisma.Decimal(dto.priceKes) } : {}),
-        ...(dto.resellerPriceKes !== undefined ? { resellerPriceKes: new Prisma.Decimal(dto.resellerPriceKes) } : {}),
-        ...(dto.wholesalePriceKes !== undefined ? { wholesalePriceKes: new Prisma.Decimal(dto.wholesalePriceKes) } : {}),
-        ...(dto.costKes !== undefined ? { costKes: new Prisma.Decimal(dto.costKes) } : {}),
+        // The three optional money fields are nullable: clearing one means
+        // "not recorded", which the margin reports flag, and is different from
+        // zero. new Prisma.Decimal(null) throws, so null has to pass through.
+        ...(dto.resellerPriceKes !== undefined
+          ? { resellerPriceKes: toNullableDecimal(dto.resellerPriceKes) }
+          : {}),
+        ...(dto.wholesalePriceKes !== undefined
+          ? { wholesalePriceKes: toNullableDecimal(dto.wholesalePriceKes) }
+          : {}),
+        ...(dto.costKes !== undefined ? { costKes: toNullableDecimal(dto.costKes) } : {}),
         ...(dto.barcode !== undefined ? { barcode: dto.barcode } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
