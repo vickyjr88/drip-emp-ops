@@ -7,6 +7,7 @@ import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { PdfService } from '../pdf/pdf.service';
 import { receiptPdfTemplate } from '../pdf/pdf.templates';
 import { AllocateReceiptDto, CancelReceiptDto, CreateReceiptDto } from './dto/create-receipt.dto';
+import { nextReference } from '../common/next-reference';
 
 const PURPOSE_BY_SOURCE_TYPE: Record<InvoiceSourceType, AccountPurpose> = {
   ORDER: AccountPurpose.SALES,
@@ -25,11 +26,7 @@ export class ReceiptService {
   ) {}
 
   private async nextReceiptNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.receipt.count({
-      where: { receiptNumber: { startsWith: `RCT-${year}-` } },
-    });
-    return `RCT-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(this.prisma.receipt, 'receiptNumber', 'RCT');
   }
 
   private async invoiceBalance(invoiceId: string, tx: any) {

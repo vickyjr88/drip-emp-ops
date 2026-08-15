@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateOrderDto, RecordOrderPaymentDto } from './dto/create-order.dto';
+import { nextReference } from '../common/next-reference';
 
 const INCLUDE = {
   store: { select: { id: true, code: true, name: true } },
@@ -58,9 +59,7 @@ export class OrderService {
   ) {}
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
-    const year = new Date().getFullYear();
-    const count = await tx.order.count({ where: { orderNumber: { startsWith: `DE-${year}-` } } });
-    return `DE-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(tx.order, 'orderNumber', 'DE');
   }
 
   /**

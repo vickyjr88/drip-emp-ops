@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateConsignmentDto, SettleConsignmentDto } from './dto/consignment.dto';
 import { customerDisplayName } from '../customer/customer-name';
+import { nextReference } from '../common/next-reference';
 
 /** The agreed holding period before unsold stock is due back. */
 export const HOLDING_DAYS = 3;
@@ -48,9 +49,7 @@ export class ConsignmentService {
   }
 
   private async nextReference(tx: Prisma.TransactionClient) {
-    const year = new Date().getFullYear();
-    const count = await tx.consignment.count({ where: { reference: { startsWith: `CON-${year}-` } } });
-    return `CON-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(tx.consignment, 'reference', 'CON');
   }
 
   /**

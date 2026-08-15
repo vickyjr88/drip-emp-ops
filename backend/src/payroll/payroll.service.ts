@@ -3,6 +3,7 @@ import { JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { Rule, calculatePayslip } from './payroll-calculator';
+import { nextReference } from '../common/next-reference';
 
 const SALARY_EXPENSE = '5210';
 const CASH = '1000';
@@ -182,11 +183,7 @@ export class PayrollService {
   // --- Payroll runs ----------------------------------------------------
 
   private async nextRunNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.payrollRun.count({
-      where: { runNumber: { startsWith: `PR-${year}-` } },
-    });
-    return `PR-${year}-${String(count + 1).padStart(4, '0')}`;
+    return nextReference(this.prisma.payrollRun, 'runNumber', 'PR', new Date().getFullYear(), 4);
   }
 
   /**

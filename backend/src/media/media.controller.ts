@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Controller,
+  Logger,
   Get,
   Param,
   Post,
@@ -17,6 +18,8 @@ import { MediaService } from './media.service';
 @ApiTags('media')
 @Controller('media')
 export class MediaController {
+  private readonly logger = new Logger(MediaController.name);
+
   constructor(private readonly mediaService: MediaService) {}
 
   @ApiBearerAuth()
@@ -62,9 +65,26 @@ export class MediaController {
   async getObject(@Param('objectKey') objectKey: string) {
     const asset = await this.mediaService.getObject(objectKey);
 
-    return new StreamableFile(asset.stream, {
+    const file = new StreamableFile(asset.stream, {
       type: asset.contentType,
       disposition: `inline; filename="${asset.fileName}"`,
     });
+
+    // A browser that navigates away, or swaps an <img> src, drops the
+    // connection mid-download. Nest logs that as ERROR "aborted" with a stack
+    // trace, which is noise -- nothing failed, the reader just left. Real
+    // stream failures are still logged; only the client-disconnect case is
+    // quietened.
+    file.setErrorHandler((error, response) => {
+      const clientLeft =
+        (error as NodeJS.ErrnoException)?.code === 'ECONNRESET' ||
+        error?.message === 'aborted';
+      if (!clientLeft) {
+        this.logger.error(`Streaming ${objectKey} failed: ${error?.message}`);
+      }
+      if (!response.destroyed) response.end();
+    });
+
+    return file;
   }
 }

@@ -3,6 +3,7 @@ import { JournalSource } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { CreateAccountTransferDto } from './dto/create-account-transfer.dto';
+import { nextReference } from '../common/next-reference';
 
 @Injectable()
 export class AccountTransferService {
@@ -12,11 +13,7 @@ export class AccountTransferService {
   ) {}
 
   private async nextTransferNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.accountTransfer.count({
-      where: { transferNumber: { startsWith: `XFR-${year}-` } },
-    });
-    return `XFR-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(this.prisma.accountTransfer, 'transferNumber', 'XFR');
   }
 
   async create(dto: CreateAccountTransferDto) {

@@ -5,6 +5,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import { AccountResolverService } from '../ledger/account-resolver.service';
 import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { CreateSupplierPaymentDto } from './dto/create-supplier-payment.dto';
+import { nextReference } from '../common/next-reference';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -17,11 +18,7 @@ export class SupplierPaymentService {
   ) {}
 
   private async nextPaymentNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.supplierPayment.count({
-      where: { paymentNumber: { startsWith: `SP-${year}-` } },
-    });
-    return `SP-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(this.prisma.supplierPayment, 'paymentNumber', 'SP');
   }
 
   private async invoiceOutstanding(supplierInvoiceId: string, tx: any) {

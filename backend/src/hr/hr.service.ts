@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { nextReference } from '../common/next-reference';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -19,11 +20,7 @@ export class HrService {
   // --- Employees -------------------------------------------------------
 
   private async nextEmployeeNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.employee.count({
-      where: { employeeNumber: { startsWith: `EMP-${year}-` } },
-    });
-    return `EMP-${year}-${String(count + 1).padStart(4, '0')}`;
+    return nextReference(this.prisma.employee, 'employeeNumber', 'EMP', new Date().getFullYear(), 4);
   }
 
   async createEmployee(data: any) {

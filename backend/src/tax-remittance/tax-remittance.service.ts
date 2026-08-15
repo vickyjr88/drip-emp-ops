@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountResolverService } from '../ledger/account-resolver.service';
 import { CreateTaxRemittanceDto } from './dto/create-tax-remittance.dto';
+import { nextReference } from '../common/next-reference';
 
 @Injectable()
 export class TaxRemittanceService {
@@ -14,11 +15,7 @@ export class TaxRemittanceService {
   ) {}
 
   private async nextRemittanceNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.taxRemittance.count({
-      where: { remittanceNumber: { startsWith: `TXR-${year}-` } },
-    });
-    return `TXR-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(this.prisma.taxRemittance, 'remittanceNumber', 'TXR');
   }
 
   async create(dto: CreateTaxRemittanceDto) {

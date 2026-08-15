@@ -8,6 +8,7 @@ import { invoicePdfTemplate } from '../pdf/pdf.templates';
 import { CreateInvoiceDto, BulkGenerateInvoicesDto, InvoiceSourceType } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto, CancelInvoiceDto } from './dto/update-invoice.dto';
 import { JournalSource } from '@prisma/client';
+import { nextReference } from '../common/next-reference';
 
 @Injectable()
 export class InvoiceService {
@@ -19,11 +20,7 @@ export class InvoiceService {
   ) {}
 
   private async nextInvoiceNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.invoice.count({
-      where: { invoiceNumber: { startsWith: `INV-${year}-` } },
-    });
-    return `INV-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(this.prisma.invoice, 'invoiceNumber', 'INV');
   }
 
   private async postInvoiceJournal(

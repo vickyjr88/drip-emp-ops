@@ -6,6 +6,7 @@ import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { PdfService } from '../pdf/pdf.service';
 import { pettyCashVoucherPdfTemplate } from '../pdf/pdf.templates';
 import { CreatePettyCashVoucherDto } from './dto/create-petty-cash-voucher.dto';
+import { nextReference } from '../common/next-reference';
 
 @Injectable()
 export class PettyCashVoucherService {
@@ -16,11 +17,7 @@ export class PettyCashVoucherService {
   ) {}
 
   private async nextVoucherNumber() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.pettyCashVoucher.count({
-      where: { voucherNumber: { startsWith: `PCV-${year}-` } },
-    });
-    return `PCV-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(this.prisma.pettyCashVoucher, 'voucherNumber', 'PCV');
   }
 
   async create(dto: CreatePettyCashVoucherDto) {

@@ -6,10 +6,23 @@ import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { PaystackService } from '../paystack/paystack.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
+import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 
 /** Free delivery over this, as advertised on the storefront. */
 const FREE_DELIVERY_OVER = 15000;
 const DELIVERY_FEE = 500;
+
+/**
+ * The order a payment reference belongs to.
+ *
+ * References are "DE-2026-00007-M1A2B3": the order number plus a per-attempt
+ * suffix, because Paystack will not accept the same reference twice. Anything
+ * without a suffix is an older reference and is already an order number.
+ */
+export function orderNumberFromReference(reference: string): string {
+  const match = /^([A-Z]+-\d{4}-\d{5})(?:-.+)?$/.exec(reference.trim());
+  return match ? match[1] : reference.trim();
+}
 
 @Injectable()
 export class CheckoutService {
@@ -80,9 +93,7 @@ export class CheckoutService {
   }
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
-    const year = new Date().getFullYear();
-    const count = await tx.order.count({ where: { orderNumber: { startsWith: `DE-${year}-` } } });
-    return `DE-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(tx.order, 'orderNumber', 'DE');
   }
 
   /**
@@ -107,7 +118,11 @@ export class CheckoutService {
       );
     }
 
-    const { order, customer } = await this.prisma.$transaction(async (tx) => {
+    // Retried as a whole: the order number is read inside the transaction, and
+    // a unique violation rolls the transaction back, so re-running the create
+    // alone is not possible -- the stock reservation goes with it.
+    const { order, customer } = await retryOnDuplicateReference(() =>
+      this.prisma.$transaction(async (tx) => {
       const store = dto.storeId
         ? await tx.store.findUnique({ where: { id: dto.storeId } })
         : await tx.store.findFirst({ where: { isActive: true }, orderBy: { name: 'asc' } });
@@ -178,15 +193,25 @@ export class CheckoutService {
       }
 
       return { order, customer };
-    });
+      }),
+    );
 
     // Paystack is called outside the transaction: an external call inside one
     // holds a database lock for as long as the network takes.
+    // The payment reference is per attempt, not per order.
+    //
+    // Paystack keeps every reference it has ever seen, including abandoned
+    // ones, and refuses a repeat with "Duplicate Transaction Reference". Using
+    // the order number directly meant an order whose first payment was
+    // abandoned could never be paid at all -- and a retry would strand a
+    // second order row with stock held against it.
+    const paymentReference = `${order.orderNumber}-${Date.now().toString(36).toUpperCase()}`;
+
     const init = await this.paystack.initialise({
       email: customer.email,
       amountKes: Number(order.total),
-      reference: order.orderNumber,
-      callbackUrl: `${origin}/checkout/complete?ref=${order.orderNumber}`,
+      reference: paymentReference,
+      callbackUrl: `${origin}/checkout/complete?ref=${paymentReference}`,
       metadata: { orderId: order.id, orderNumber: order.orderNumber },
     });
 
@@ -209,8 +234,10 @@ export class CheckoutService {
   async settle(reference: string) {
     const verified = await this.paystack.verify(reference);
 
+    // A payment reference is "<orderNumber>-<attempt>"; older ones are the
+    // bare order number, so both have to resolve.
     const order = await this.prisma.order.findFirst({
-      where: { orderNumber: reference },
+      where: { orderNumber: orderNumberFromReference(reference) },
       include: { payments: true },
     });
     if (!order) throw new NotFoundException(`No order for reference ${reference}`);
@@ -260,7 +287,7 @@ export class CheckoutService {
   /** What the confirmation page shows. Safe to expose: no pricing internals. */
   async lookup(reference: string) {
     const order = await this.prisma.order.findFirst({
-      where: { orderNumber: reference },
+      where: { orderNumber: orderNumberFromReference(reference) },
       include: {
         lines: true,
         store: { select: { name: true, location: true } },

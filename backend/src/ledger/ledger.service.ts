@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJournalEntryDto, JournalLineInputDto } from './dto/create-journal-entry.dto';
+import { nextReference } from '../common/next-reference';
 
 export type PostJournalLine = {
   accountId: string;
@@ -39,11 +40,7 @@ export class LedgerService {
   }
 
   private async nextEntryNumber(tx: any) {
-    const year = new Date().getFullYear();
-    const count = await tx.journalEntry.count({
-      where: { entryNumber: { startsWith: `JE-${year}-` } },
-    });
-    return `JE-${year}-${String(count + 1).padStart(5, '0')}`;
+    return nextReference(tx.journalEntry, 'entryNumber', 'JE');
   }
 
   private validateBalance(lines: PostJournalLine[] | JournalLineInputDto[]) {
