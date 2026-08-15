@@ -211,7 +211,13 @@ img {
 .lp-hero-image {
   position: absolute;
   inset: 0;
-  background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCpAdUMYHOoIhCvpInNokOc6wasUUY6hgDIWZxwU-1pBCbNjLSClTxERt5oOVX6ALYY3_VQUkCncpz4r6GiOa1Sunxk1ZwMk7IA2VINkuY92c3fch9rewicJC5IKi_2-ZA_C71w66hiHuuSdAvOEbQO4kqD7iEKkfSsBktCZT0JN3NunZ4D9HzX5AAY8ybXsTa1XxynOD6F8f1Y6uC0kHTbFgOHBenTDcib86GUlCnctCpQIy6QjO_i');
+  /* No hardcoded photograph. This carried a stock apartment tower from the
+     property project, which showed on every install where no hero image had
+     been set in the CMS -- a block of flats behind "Quality Affordable
+     Sneakers". A brand-coloured wash is honest until a real photo is
+     uploaded, and the CMS still overrides it inline. */
+  background-color: var(--de-900, #020721);
+  background-image: linear-gradient(160deg, #06166e 0%, #020721 62%, #0d2088 100%);
   background-size: cover;
   background-position: center;
   transform: scale(1.02);
@@ -9926,8 +9932,12 @@ img {
      the field it belongs to. */
   align-items: stretch;
   gap: 8px;
-  margin: 18px 0 14px;
+  /* Centred under the heading. The hero sets text-align:center, which centres
+     the heading and the paragraph but does nothing to a flex container, so the
+     search bar and the buttons below sat hard left against centred text. */
+  margin: 18px auto 14px;
   max-width: 520px;
+  width: 100%;
 }
 
 /* Overrides .lp-button's inline-flex, which otherwise ignores the stretch. */
@@ -9946,6 +9956,9 @@ img {
 
 .de-home-hero-actions {
   display: flex;
+  /* Same reason as the search bar above: a flex row ignores the hero's
+     text-align, so it has to centre its own items. */
+  justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
 }
