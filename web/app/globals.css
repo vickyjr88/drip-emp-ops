@@ -1292,6 +1292,15 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 26px;
+  flex-wrap: wrap;
+}
+
+/* Takes the squeeze so the buttons do not. min-width:0 lets it actually
+   shrink -- a flex item's default min-width is its content, which is what let
+   it push the buttons instead. */
+.lp-cta-inner > :first-child {
+  flex: 1 1 320px;
+  min-width: 0;
 }
 
 .lp-cta h2 {
@@ -1309,6 +1318,16 @@ img {
 .lp-cta-actions {
   display: flex;
   gap: 16px;
+  /* The row sits opposite a heading under space-between, which was free to
+     squeeze it until both labels wrapped onto two lines inside boxes barely
+     wider than the words. The buttons keep their own width and the heading
+     gives instead. */
+  flex-shrink: 0;
+}
+
+.lp-cta-actions .lp-button {
+  /* Two short labels, so wrapping them is never right. */
+  white-space: nowrap;
 }
 
 .lp-footer {
