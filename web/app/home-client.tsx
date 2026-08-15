@@ -115,8 +115,11 @@ export default function HomeClient() {
 
             <div className="de-home-hero-actions">
               <Link className="lp-button lp-button-primary" href="/shop">Shop All Shoes</Link>
+              {/* Green, like every other WhatsApp action on the site. It was
+                  lp-button-ghost -- near-black text on transparent -- which
+                  over the dark hero came out at 1.08:1 and was invisible. */}
               <a
-                className="lp-button lp-button-ghost"
+                className="lp-button de-whatsapp"
                 href={enquiry.whatsappHref('Hello Drip Emporium, I am looking for a pair of shoes.')}
                 target="_blank"
                 rel="noreferrer"
