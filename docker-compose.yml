@@ -58,6 +58,10 @@ services:
       - BREVO_API_KEY=${BREVO_API_KEY:-}
       - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
       - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-}
+      # Where the customer's browser is. Paystack callbacks and password-reset
+      # links must point at the storefront, not at this API -- derived from the
+      # request they would point at :3101, where those pages do not exist.
+      - STOREFRONT_ORIGIN=${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
       # Paystack. The secret key never leaves the server; without it the API
       # reports checkout as unavailable and refuses to take an order.
       - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY:-}

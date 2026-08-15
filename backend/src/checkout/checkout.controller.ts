@@ -7,6 +7,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { CheckoutService } from './checkout.service';
 import { PaystackService } from '../paystack/paystack.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
+import { storefrontOrigin } from '../common/storefront-origin';
 
 /**
  * Checkout, all public: a shopper has no portal token.
@@ -39,12 +40,10 @@ export class CheckoutController {
   @Public()
   @Post()
   start(@Body() dto: CheckoutDto, @Req() request: Request) {
-    // The origin the customer is actually on, so the callback returns them to
-    // the site they left rather than a hardcoded host.
-    const origin =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      `${request.protocol}://${request.get('host')}`;
-    return this.service.start(dto, origin.replace(/\/$/, ''));
+    // Must be the storefront, not this API. Falling back to the request's own
+    // host sent Paystack's callback to :3101/checkout/complete, which 404s --
+    // that page lives on the web app.
+    return this.service.start(dto, storefrontOrigin(request.headers.origin as string));
   }
 
   /** Called when the browser returns from Paystack. */

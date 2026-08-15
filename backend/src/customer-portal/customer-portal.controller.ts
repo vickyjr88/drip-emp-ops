@@ -10,6 +10,7 @@ import {
   CustomerSelfSignupDto,
   RequestRentChangeDto,
 } from './dto/customer-portal.dto';
+import { storefrontOrigin } from '../common/storefront-origin';
 import { Public } from '../auth/decorators/public.decorator';
 
 /**
@@ -48,13 +49,13 @@ export class CustomerPortalController {
   @Public()
   @Post('forgot-password')
   forgotPassword(@Body() dto: CustomerForgotPasswordDto, @Req() request: any) {
-    // The reset link has to point back at the site the request came from, so
-    // it works in development and production without a hardcoded host.
-    const origin =
-      request.headers?.origin ||
-      process.env.STOREFRONT_ORIGIN ||
-      'http://localhost:3002';
-    return this.service.forgotPassword(dto.email, origin);
+    // Configuration wins over the request's Origin header: this becomes a link
+    // in an email, and an attacker who controls that header could otherwise
+    // point the reset link at their own host and collect the token.
+    return this.service.forgotPassword(
+      dto.email,
+      storefrontOrigin(request.headers?.origin),
+    );
   }
 
   @Public()
