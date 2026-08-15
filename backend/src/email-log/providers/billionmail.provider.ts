@@ -35,6 +35,15 @@ export class BillionMailProvider implements EmailProvider {
 
   private readonly apiKey = process.env.BILLIONMAIL_API_KEY || '';
   private readonly baseUrl = (process.env.BILLIONMAIL_BASE_URL || '').replace(/\/+$/, '');
+  /**
+   * Optional sender override, normally left unset.
+   *
+   * BillionMail can only send as a mailbox that exists on its server with a
+   * password. Naming an address that was never created there fails the whole
+   * send with code 1005. Unset, BillionMail uses the sender configured on the
+   * API entry, which is a real mailbox by construction -- so the safe default
+   * is to send nothing and let the server decide.
+   */
   private readonly senderEmail = process.env.BILLIONMAIL_SENDER_EMAIL || '';
 
   get isConfigured() {
@@ -92,7 +101,19 @@ export class BillionMailProvider implements EmailProvider {
       // 1004 missing template, 1005 send failed). Trusting the status alone
       // would log every one of those as delivered.
       if (body && body.success === false) {
-        const error = `BillionMail error ${body.code ?? '?'}: ${body.msg || 'send failed'}`;
+        let error = `BillionMail error ${body.code ?? '?'}: ${body.msg || 'send failed'}`;
+
+        // Two rejections have a cause that is not obvious from the message, and
+        // both are configuration rather than code. Saying so here saves the
+        // next person the round of guessing this one took.
+        if (String(body.msg || '').includes('password not found')) {
+          error += this.senderEmail
+            ? ` — BILLIONMAIL_SENDER_EMAIL is set to "${this.senderEmail}", which is not a mailbox on the BillionMail server. Create it there, or clear the variable to use the API entry's own sender.`
+            : ' — the API entry\'s sender is not a mailbox with a password on the BillionMail server.';
+        } else if (body.code === 1001) {
+          error += ' — the key must come from an API entry created in the BillionMail dashboard.';
+        }
+
         this.logger.error(error);
         return { delivered: false, error };
       }
