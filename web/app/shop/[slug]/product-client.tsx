@@ -191,6 +191,16 @@ export function ProductClient({ product }: { product: ShopProduct }) {
                 {added ? 'Added ✓' : chosen ? `Add ${chosen.size} to Cart` : 'Select a size'}
               </button>
 
+              {/* Once something is in the cart, checking out is the next thing
+                  a shopper wants, so it looks like an action rather than the
+                  line of status text it used to be. Sits right under Add to
+                  Cart because that is where their eye already is. */}
+              {cart.count > 0 ? (
+                <Link href="/cart" className="lp-button de-checkout-btn">
+                  Checkout ({cart.count} item{cart.count === 1 ? '' : 's'})
+                </Link>
+              ) : null}
+
               <a
                 className="lp-button de-whatsapp"
                 href={enquiry.whatsappHref(message)}
@@ -203,14 +213,6 @@ export function ProductClient({ product }: { product: ShopProduct }) {
                 Call {enquiry.phone}
               </a>
             </div>
-
-            {cart.count > 0 ? (
-              <p className="de-cart-hint">
-                <Link href="/cart">
-                  {cart.count} item{cart.count === 1 ? '' : 's'} in your cart — checkout
-                </Link>
-              </p>
-            ) : null}
 
             {/* The three things a shopper checks before committing. */}
             <ul className="de-assurances">

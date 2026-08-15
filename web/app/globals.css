@@ -10453,11 +10453,21 @@ img {
   border-radius: 50%;
 }
 
-.de-cart-hint {
-  display: inline-block;
-  margin-top: 10px;
-  font-size: 13px;
+/* Checkout, once there is something to check out.
+   Outlined rather than filled: Add to Cart is the primary action on a product
+   page, and two solid buttons stacked would make the shopper choose between
+   them instead of just adding the shoe. */
+.de-checkout-btn {
+  justify-content: center;
   color: var(--de-royal);
+  background: transparent;
+  border: 1px solid var(--de-royal);
+}
+
+.de-checkout-btn:hover {
+  color: #fff;
+  background: var(--de-royal);
+  border-color: var(--de-royal);
 }
 
 @media (max-width: 900px) {
