@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
+import { customerDisplayName } from '../customer/customer-name';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -504,7 +505,7 @@ export class FinancialReportsService {
     const consignments = await this.prisma.consignment.findMany({
       where: { status: 'OPEN', ...(storeId ? { storeId } : {}) },
       include: {
-        reseller: { select: { id: true, name: true, phone: true } },
+        customer: { select: { id: true, businessName: true, firstName: true, lastName: true, phone: true } },
         store: { select: { id: true, name: true } },
         lines: true,
       },
@@ -523,9 +524,9 @@ export class FinancialReportsService {
       return {
         consignmentId: consignment.id,
         reference: consignment.reference,
-        resellerId: consignment.reseller.id,
-        resellerName: consignment.reseller.name,
-        resellerPhone: consignment.reseller.phone,
+        customerId: consignment.customer.id,
+        resellerName: customerDisplayName(consignment.customer),
+        resellerPhone: consignment.customer.phone,
         storeId: consignment.store.id,
         storeName: consignment.store.name,
         issuedAt: consignment.issuedAt.toISOString(),

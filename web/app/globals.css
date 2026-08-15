@@ -10446,3 +10446,195 @@ img {
   }
 
 }
+
+/* ---------------------------------------------------------------------------
+   Customer accounts: sign in, sign up, reset, and the account area.
+   --------------------------------------------------------------------------- */
+
+.de-auth {
+  display: flex;
+  justify-content: center;
+  padding: 56px 0 80px;
+}
+
+.de-auth-card {
+  width: min(430px, 100%);
+  padding: 30px;
+  background: #fff;
+  border: 1px solid var(--de-line);
+  border-radius: 16px;
+}
+
+.de-auth-card h1 {
+  margin: 0 0 8px;
+  font-size: 25px;
+  color: var(--de-ink);
+}
+
+.de-auth-intro {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--de-muted);
+}
+
+.de-auth-notice {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0b5a31;
+  background: #e8f6ee;
+  border: 1px solid #b8e0c8;
+  border-radius: 10px;
+}
+
+.de-auth-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 18px;
+  padding-top: 16px;
+  font-size: 13px;
+  color: var(--de-muted);
+  border-top: 1px solid var(--de-line);
+}
+
+.de-auth-link {
+  color: var(--de-royal);
+  font-weight: 600;
+}
+
+/* A dot rather than a count: it says "signed in" without implying a number. */
+.lp-account-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  background: var(--de-go);
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+
+.de-account {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 28px;
+  align-items: start;
+  padding-bottom: 72px;
+}
+
+.de-account-main > h2,
+.de-account-side h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  color: var(--de-ink);
+}
+
+.de-account-order {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid var(--de-line);
+  border-radius: 14px;
+}
+
+.de-account-order header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.de-account-order header strong {
+  font-size: 15px;
+  color: var(--de-ink);
+}
+
+.de-account-date {
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--de-muted);
+}
+
+.de-account-status {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--de-royal);
+  background: var(--de-100);
+  border-radius: 999px;
+}
+
+.de-account-order ul {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.de-account-order li {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 3px 0;
+  font-size: 14px;
+  color: var(--de-muted);
+}
+
+.de-account-order li em {
+  font-style: normal;
+  color: var(--de-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.de-account-order footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding-top: 10px;
+  font-size: 13px;
+  color: var(--de-muted);
+  border-top: 1px solid var(--de-line);
+}
+
+.de-account-order footer strong {
+  color: var(--de-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.de-account-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.de-account-signout {
+  justify-content: center;
+  width: 100%;
+}
+
+/* Sign-in nudge on the cart. */
+.de-cart-signin {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--de-muted);
+  background: var(--de-050);
+  border: 1px solid var(--de-line);
+  border-radius: 10px;
+}
+
+.de-cart-signin a {
+  color: var(--de-royal);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .de-account {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

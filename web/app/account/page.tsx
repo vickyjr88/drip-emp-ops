@@ -1,11 +1,10 @@
-import AccountClient from './account-client';
+import type { Metadata } from 'next';
+import { AccountClient } from './account-client';
 
-export const metadata = {
-  title: 'My Account | Drip Emporium',
-  description: 'View your unit, monthly charges, and payment history.',
-  // robots.txt disallows crawling this path, but that does not stop the URL
-  // being indexed if something links to it. noindex is what actually keeps a
-  // signed-in area out of results.
+export const metadata: Metadata = {
+  title: 'Your Account',
+  description: 'Your Drip Emporium orders and details.',
+  // Someone's order history is nobody else's business.
   robots: { index: false, follow: false },
 };
 

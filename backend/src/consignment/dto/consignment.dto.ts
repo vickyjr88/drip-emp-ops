@@ -30,7 +30,7 @@ export class CreateConsignmentDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  resellerId!: string;
+  customerId!: string;
 
   @ApiProperty()
   @IsString()

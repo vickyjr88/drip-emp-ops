@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { useCart } from '../lib/cart';
+import { useCustomerAuth } from '../lib/customer-auth';
 import { formatKes } from '../lib/shop';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
 
@@ -27,6 +28,7 @@ const DELIVERY_FEE = 500;
 export function CartClient() {
   const cart = useCart();
   const enquiry = useEnquiryContact();
+  const auth = useCustomerAuth();
 
   const [online, setOnline] = useState<boolean | null>(null);
   const [deliver, setDeliver] = useState(false);
@@ -37,6 +39,19 @@ export function CartClient() {
     firstName: '', lastName: '', email: '', phone: '', shippingAddress: '', password: '',
   });
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Prefills from the signed-in customer so a returning buyer does not retype
+  // what we already hold. Only fills blanks, so anything typed already wins.
+  useEffect(() => {
+    if (!auth.customer) return;
+    setForm((prev) => ({
+      ...prev,
+      firstName: prev.firstName || auth.customer!.firstName,
+      lastName: prev.lastName || auth.customer!.lastName,
+      email: prev.email || auth.customer!.email,
+      phone: prev.phone || auth.customer!.phone,
+    }));
+  }, [auth.customer]);
 
   useEffect(() => {
     let cancelled = false;
@@ -241,6 +256,15 @@ export function CartClient() {
               </p>
             ) : null}
 
+            {/* Only offered to signed-out visitors, and never as a barrier:
+                the form below works either way. */}
+            {auth.ready && !auth.customer ? (
+              <p className="de-cart-signin">
+                Bought from us before?{' '}
+                <Link href="/account/login?next=/cart">Sign in</Link> to fill this in automatically.
+              </p>
+            ) : null}
+
             {error ? <p className="de-checkout-error">{error}</p> : null}
 
             <form className="de-checkout-form" ref={formRef} onSubmit={onSubmit}>
@@ -280,13 +304,15 @@ export function CartClient() {
                 </label>
               ) : null}
 
-              <label className="de-check">
-                <input type="checkbox" checked={wantAccount}
-                  onChange={(event) => setWantAccount(event.target.checked)} />
-                <span>Create an account to track my orders</span>
-              </label>
+              {auth.customer ? null : (
+                <label className="de-check">
+                  <input type="checkbox" checked={wantAccount}
+                    onChange={(event) => setWantAccount(event.target.checked)} />
+                  <span>Create an account to track my orders</span>
+                </label>
+              )}
 
-              {wantAccount ? (
+              {wantAccount && !auth.customer ? (
                 <label>
                   <span>Password</span>
                   <input type="password" minLength={8} value={form.password} required

@@ -12,24 +12,24 @@ export class ResellerController {
   constructor(private readonly service: ResellerService) {}
 
   @Post()
-  @Permissions(buildPermissionKey('Reseller', 'create'))
+  @Permissions(buildPermissionKey('Customer', 'create'))
   create(@Body() dto: CreateResellerDto) { return this.service.create(dto); }
 
   @Get()
-  @Permissions(buildPermissionKey('Reseller', 'read'))
+  @Permissions(buildPermissionKey('Customer', 'read'))
   findAll(@Query('includeInactive') includeInactive?: string) {
     return this.service.findAll(includeInactive === 'true');
   }
 
   @Get(':id')
-  @Permissions(buildPermissionKey('Reseller', 'read'))
+  @Permissions(buildPermissionKey('Customer', 'read'))
   findOne(@Param('id') id: string) { return this.service.findOne(id); }
 
   @Patch(':id')
-  @Permissions(buildPermissionKey('Reseller', 'update'))
+  @Permissions(buildPermissionKey('Customer', 'update'))
   update(@Param('id') id: string, @Body() dto: UpdateResellerDto) { return this.service.update(id, dto); }
 
   @Delete(':id')
-  @Permissions(buildPermissionKey('Reseller', 'delete'))
+  @Permissions(buildPermissionKey('Customer', 'delete'))
   remove(@Param('id') id: string) { return this.service.remove(id); }
 }

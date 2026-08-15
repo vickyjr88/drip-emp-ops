@@ -78,3 +78,31 @@ export class SetCustomerPortalAccessDto {
   @MinLength(8)
   password!: string;
 }
+
+export class CustomerSelfSignupDto {
+  @ApiProperty() @IsString() @IsNotEmpty() firstName!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() lastName!: string;
+  @ApiProperty() @IsEmail() email!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() phone!: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
+export class CustomerForgotPasswordDto {
+  @ApiProperty() @IsEmail() email!: string;
+}
+
+export class CustomerResetPasswordDto {
+  @ApiProperty({ description: 'The token from the emailed link.' })
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}

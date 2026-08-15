@@ -41,7 +41,7 @@ type Consignment = {
   totalValue: string | number; soldValue: string | number; amountPaid: string | number;
   dueDate?: string | null; issuedAt: string; notes?: string | null;
   unitsStillOut: number; balance: number; isOverdue: boolean;
-  reseller: Reseller; store: Store; lines: Line[];
+  customer: Reseller; store: Store; lines: Line[];
   payments: Array<{ id: string; amount: string | number; method: string; reference?: string | null }>;
 };
 
@@ -64,7 +64,7 @@ export default function ConsignmentsPage() {
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
-  const [head, setHead] = useState({ resellerId: '', storeId: '', notes: '' });
+  const [head, setHead] = useState({ customerId: '', storeId: '', notes: '' });
   const [draft, setDraft] = useState<Draft[]>([]);
   const [pick, setPick] = useState({ variantId: '', quantity: '1' });
   // Settlement is per line: sold and returned reported together.
@@ -93,7 +93,7 @@ export default function ConsignmentsPage() {
       setHead((prev) => ({
         ...prev,
         storeId: prev.storeId || storeRows[0]?.id || '',
-        resellerId: prev.resellerId || resellerRows[0]?.id || '',
+        customerId: prev.customerId || resellerRows[0]?.id || '',
       }));
     } catch (error) {
       setErrorMessage(error);
@@ -113,7 +113,7 @@ export default function ConsignmentsPage() {
       .filter((row) => !statusFilter || row.status === statusFilter)
       // Overdue first: those are the pickups to chase.
       .sort((a, b) => Number(b.isOverdue) - Number(a.isOverdue))
-      .map((row) => ({ ...row, resellerName: row.reseller.name, storeName: row.store.name })),
+      .map((row) => ({ ...row, resellerName: row.customer.name, storeName: row.store.name })),
     [consignments, statusFilter],
   );
 
@@ -151,7 +151,7 @@ export default function ConsignmentsPage() {
       const created = await apiRequest<Consignment>('/consignments', {
         method: 'POST',
         body: JSON.stringify({
-          resellerId: head.resellerId,
+          customerId: head.customerId,
           storeId: head.storeId,
           notes: head.notes || undefined,
           lines: draft.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
@@ -307,8 +307,8 @@ export default function ConsignmentsPage() {
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>Reseller</span>
-                      <select value={head.resellerId} required
-                        onChange={(event) => setHead((prev) => ({ ...prev, resellerId: event.target.value }))}>
+                      <select value={head.customerId} required
+                        onChange={(event) => setHead((prev) => ({ ...prev, customerId: event.target.value }))}>
                         {resellers.map((reseller) => (
                           <option key={reseller.id} value={reseller.id}>
                             {reseller.name} ({reseller.priceTier.toLowerCase()})

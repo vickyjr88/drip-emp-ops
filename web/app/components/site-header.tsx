@@ -15,6 +15,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useCart } from '../lib/cart';
+import { useCustomerAuth } from '../lib/customer-auth';
 import { PageContentDocument, contentValue, fetchPageContent } from '../lib/page-content';
 import { MobileNav } from './mobile-nav';
 
@@ -49,6 +50,7 @@ export function navKeyForHref(href: string): string {
 export function SiteHeader({ active }: { active: string }) {
   const [content, setContent] = useState<PageContentDocument | null>(null);
   const cart = useCart();
+  const auth = useCustomerAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +92,18 @@ export function SiteHeader({ active }: { active: string }) {
             where most of them are. The count only appears once the cart has
             read localStorage, so the server HTML and the first client paint
             agree. */}
+        {/* Account before cart: signing in is what a returning customer is
+            looking for, and it is where people expect it. Renders nothing
+            until the token has been read so the label cannot flip. */}
+        <Link
+          className="lp-cart-link"
+          href={auth.customer ? '/account' : '/account/login'}
+          aria-label={auth.customer ? `Account, signed in as ${auth.customer.firstName}` : 'Sign in'}
+        >
+          <AccountIcon />
+          {auth.ready && auth.customer ? <span className="lp-account-dot" aria-hidden="true" /> : null}
+        </Link>
+
         <Link className="lp-cart-link" href="/cart" aria-label={cartLabel(cart.ready, cart.count)}>
           <CartIcon />
           {cart.ready && cart.count > 0 ? (
@@ -112,6 +126,21 @@ export function SiteHeader({ active }: { active: string }) {
 function cartLabel(ready: boolean, count: number) {
   if (!ready || count === 0) return 'Cart, empty';
   return `Cart, ${count} item${count === 1 ? '' : 's'}`;
+}
+
+function AccountIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="8" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M4.8 20a7.2 7.2 0 0 1 14.4 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 function CartIcon() {

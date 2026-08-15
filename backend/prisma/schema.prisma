@@ -7,17 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
-
-
-
-
-
-
-
-
-
 /// Which GL account money of a given kind should land in.
 ///
 /// Restored after the property strip removed it as "unused": receipts and
@@ -56,30 +45,57 @@ model Store {
   payslips         Payslip[]
   employees        Employee[]
 
-  stockLevels    StockLevel[]
-  stockMovements StockMovement[]
-  orders         Order[]
+  stockLevels        StockLevel[]
+  stockMovements     StockMovement[]
+  orders             Order[]
   accountAssignments StoreAccountAssignment[]
-  consignments   Consignment[]
+  consignments       Consignment[]
 }
 
+/// Everyone who buys from us, from a walk-in to a competing shop.
+///
+/// Resellers and wholesalers used to be a separate table, which meant a shop
+/// that also bought a pair for itself existed twice and could not sign in.
+/// They are the same thing with a different price list, so they are one record
+/// with a tier.
 model Customer {
-  id                  String                 @id @default(uuid())
-  firstName           String
-  lastName            String
-  email               String                 @unique
-  phone               String
+  id                String    @id @default(uuid())
+  firstName         String
+  lastName          String
+  email             String    @unique
+  phone             String
   /// Bcrypt hash for the customer-facing portal. Null means no portal access
   /// has been granted yet; staff set it explicitly.
-  portalPassword      String?
+  portalPassword    String?
   /// Lets staff revoke portal access without destroying the credential.
-  portalEnabled       Boolean                @default(false)
-  portalLastLoginAt   DateTime?
-  createdAt           DateTime               @default(now())
-  documents           CustomerDocument[]
-  invoices            Invoice[]
-  receipts            Receipt[]
-  orders              Order[]
+  portalEnabled     Boolean   @default(false)
+  portalLastLoginAt DateTime?
+
+  /// Which price list this customer buys on. A walk-in is RETAIL; a competing
+  /// shop is RESELLER or WHOLESALE.
+  priceTier    PriceTier @default(RETAIL)
+  /// Trading name, when the customer is a shop rather than a person.
+  businessName String?
+  /// Short code for a trade account, as used on consignment paperwork.
+  code         String?   @unique
+  location     String?
+  /// Most stock, at cost, we will have out with them at once. Zero means no
+  /// limit. Only meaningful above RETAIL.
+  creditLimit  Decimal   @default(0)
+  isActive     Boolean   @default(true)
+  notes        String?
+
+  /// Single-use token for a forgotten password, stored hashed so a leaked
+  /// database row cannot be used to take an account over.
+  resetTokenHash      String?
+  resetTokenExpiresAt DateTime?
+
+  createdAt    DateTime           @default(now())
+  documents    CustomerDocument[]
+  invoices     Invoice[]
+  receipts     Receipt[]
+  orders       Order[]
+  consignments Consignment[]
 }
 
 model CustomerDocument {
@@ -109,10 +125,6 @@ enum CustomerDocumentType {
   OTHER
 }
 
-
-
-
-
 enum RentalPaymentCategory {
   RENT
   WATER
@@ -125,22 +137,15 @@ enum RentalPaymentCategory {
   OTHER
 }
 
-
-
-
-
-
-
-
 model User {
-  id                  String     @id @default(uuid())
-  email               String     @unique
-  password            String
-  name                String
-  role                String?
-  createdAt           DateTime   @default(now())
-  roles               UserRole[]
-  employee            Employee?
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  name      String
+  role      String?
+  createdAt DateTime   @default(now())
+  roles     UserRole[]
+  employee  Employee?
 }
 
 model Role {
@@ -221,21 +226,21 @@ enum AccountType {
 }
 
 model ChartOfAccount {
-  id             String           @id @default(uuid())
-  code           String           @unique
-  name           String
-  type           AccountType
-  subtype        String?
-  parent         ChartOfAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id])
-  parentId       String?
-  children       ChartOfAccount[] @relation("AccountHierarchy")
-  isSystem       Boolean          @default(false)
-  isActive       Boolean          @default(true)
-  description    String?
-  createdAt      DateTime         @default(now())
-  journalLines   JournalLine[]
-  bankAccounts   BankAccount[]
-  taxRates       TaxRate[]
+  id           String           @id @default(uuid())
+  code         String           @unique
+  name         String
+  type         AccountType
+  subtype      String?
+  parent       ChartOfAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  parentId     String?
+  children     ChartOfAccount[] @relation("AccountHierarchy")
+  isSystem     Boolean          @default(false)
+  isActive     Boolean          @default(true)
+  description  String?
+  createdAt    DateTime         @default(now())
+  journalLines JournalLine[]
+  bankAccounts BankAccount[]
+  taxRates     TaxRate[]
 }
 
 enum BankAccountType {
@@ -280,34 +285,33 @@ model TaxRemittance {
   remittedAt       DateTime     @default(now())
   journalEntryId   String?
   /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
+  store            Store?       @relation(fields: [storeId], references: [id])
+  storeId          String?
 }
 
 model BankAccount {
-  id                 String                     @id @default(uuid())
-  type               BankAccountType            @default(BANK)
+  id                 String                   @id @default(uuid())
+  type               BankAccountType          @default(BANK)
   name               String
   accountNumber      String
   bankName           String
   branch             String?
-  currencyCode       String                     @default("KES")
-  glAccount          ChartOfAccount             @relation(fields: [glAccountId], references: [id])
-  glAccountId        String                     @unique
-  isActive           Boolean                    @default(true)
-  createdAt          DateTime                   @default(now())
+  currencyCode       String                   @default("KES")
+  glAccount          ChartOfAccount           @relation(fields: [glAccountId], references: [id])
+  glAccountId        String                   @unique
+  isActive           Boolean                  @default(true)
+  createdAt          DateTime                 @default(now())
   reconciliations    BankReconciliation[]
-  transfersOut       AccountTransfer[]          @relation("TransferFrom")
-  transfersIn        AccountTransfer[]          @relation("TransferTo")
+  transfersOut       AccountTransfer[]        @relation("TransferFrom")
+  transfersIn        AccountTransfer[]        @relation("TransferTo")
   taxRemittances     TaxRemittance[]
   receipts           Receipt[]
   refunds            Refund[]
   /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
+  store              Store?                   @relation(fields: [storeId], references: [id])
+  storeId            String?
   purposeAssignments StoreAccountAssignment[]
 }
-
 
 model AccountTransfer {
   id             String      @id @default(uuid())
@@ -379,12 +383,12 @@ model JournalLine {
   supplier     Supplier?      @relation(fields: [supplierId], references: [id])
   supplierId   String?
   memo         String?
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store        Store?         @relation(fields: [storeId], references: [id])
+  storeId      String?
 
   @@index([accountId])
   @@index([supplierId])
-  /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
 }
 
 enum BankReconciliationStatus {
@@ -445,8 +449,8 @@ model Invoice {
   allocations     ReceiptAllocation[]
   emailLogs       EmailLog[]
   /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
+  store           Store?              @relation(fields: [storeId], references: [id])
+  storeId         String?
 }
 
 model InvoiceLine {
@@ -548,7 +552,6 @@ model EmailLog {
 
 // -------------------- Inquiries --------------------
 
-
 // -------------------- Accounts Payable --------------------
 
 model Supplier {
@@ -599,11 +602,11 @@ model SupplierInvoice {
   attachments        SupplierInvoiceAttachment[]
   payments           SupplierPaymentAllocation[]
   emailLogs          EmailLog[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store              Store?                      @relation(fields: [storeId], references: [id])
+  storeId            String?
 
   @@unique([supplierId, invoiceNumber])
-  /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
 }
 
 model SupplierInvoiceAttachment {
@@ -687,8 +690,8 @@ model PettyCashBox {
   vouchers        PettyCashVoucher[]
   reconciliations PettyCashReconciliation[]
   /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
+  store           Store?                    @relation(fields: [storeId], references: [id])
+  storeId         String?
 }
 
 enum PettyCashVoucherType {
@@ -763,8 +766,8 @@ model FixedAsset {
   depreciationSchedule AssetDepreciationSchedule[]
   transfers            AssetTransfer[]
   /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
+  store                Store?                      @relation(fields: [storeId], references: [id])
+  storeId              String?
 }
 
 model AssetDepreciationSchedule {
@@ -793,7 +796,6 @@ model AssetTransfer {
   transferredBy  String     @default("system")
   journalEntryId String?
 }
-
 
 /// Editable copy for a public marketing page, keyed by URL slug.
 ///
@@ -875,33 +877,33 @@ model ReminderRule {
   /// Message bodies. Support {{customerName}}, {{amount}}, {{dueDate}},
   /// {{daysUntilDue}}, {{daysOverdue}}, {{unitNumber}}, {{projectName}},
   /// {{description}} and {{reference}}.
-  smsTemplate     String?
-  emailSubject    String?
-  emailTemplate   String?
+  smsTemplate   String?
+  emailSubject  String?
+  emailTemplate String?
 
   /// Sends outside this window are held to the next run rather than waking
   /// someone at 3am. Null means no restriction.
   quietHoursStart Int?
   quietHoursEnd   Int?
 
-  createdBy String   @default("system")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdBy String        @default("system")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
   logs      ReminderLog[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store     Store?        @relation(fields: [storeId], references: [id])
+  storeId   String?
 
   @@index([targetType, isActive])
-  /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
 }
 
 /// One delivery attempt. Doubles as the dedupe key: the unique constraint
 /// stops a rule firing twice for the same charge on the same day, however many
 /// times the scheduler runs or someone hits the manual trigger.
 model ReminderLog {
-  id       String       @id @default(uuid())
-  rule     ReminderRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
-  ruleId   String?
+  id     String        @id @default(uuid())
+  rule   ReminderRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  ruleId String?
 
   targetType ReminderTargetType
   /// Id of the installment, tenancy or invoice this concerns.
@@ -910,26 +912,26 @@ model ReminderLog {
   /// dedupe key so a monthly rent charge is distinct each period.
   dueDate    DateTime
 
-  customerId String?
-  channel    ReminderChannel
+  customerId     String?
+  channel        ReminderChannel
   recipientPhone String?
   recipientEmail String?
-  smsBody    String?
-  emailSubject String?
-  emailBody  String?
+  smsBody        String?
+  emailSubject   String?
+  emailBody      String?
 
   status       ReminderDispatchStatus @default(PENDING)
   /// Populated on SKIPPED and FAILED so the portal can explain what happened.
   statusReason String?
   /// True when a human pressed send rather than the scheduler.
-  isManual     Boolean @default(false)
+  isManual     Boolean                @default(false)
   triggeredBy  String?
 
-  amount     Decimal?
-  currency   String?
-  attempts   Int      @default(0)
-  sentAt     DateTime?
-  createdAt  DateTime @default(now())
+  amount    Decimal?
+  currency  String?
+  attempts  Int       @default(0)
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@unique([ruleId, targetType, targetId, dueDate])
   @@index([targetType, targetId])
@@ -974,36 +976,36 @@ enum PayrollRunStatus {
 /// calculating against the version that was in force when they were run, so
 /// history stays reproducible.
 model DeductionRule {
-  id              String         @id @default(uuid())
-  code            String
-  name            String
-  kind            DeductionKind
-  basis           DeductionBasis @default(GROSS)
-  effectiveFrom   DateTime
-  effectiveTo     DateTime?
+  id                         String          @id @default(uuid())
+  code                       String
+  name                       String
+  kind                       DeductionKind
+  basis                      DeductionBasis  @default(GROSS)
+  effectiveFrom              DateTime
+  effectiveTo                DateTime?
   /// Flat rate for PERCENTAGE, or the amount for FIXED.
-  rate            Decimal?
-  fixedAmount     Decimal?
+  rate                       Decimal?
+  fixedAmount                Decimal?
   /// Bands for GRADUATED and TIERED kinds.
-  bands           DeductionBand[]
+  bands                      DeductionBand[]
   /// Monthly relief subtracted after the bands, e.g. PAYE personal relief.
-  reliefAmount    Decimal?
+  reliefAmount               Decimal?
   /// Employer's matching contribution, where one applies.
-  employerRate    Decimal?
-  employerFixed   Decimal?
+  employerRate               Decimal?
+  employerFixed              Decimal?
   /// Whether this reduces pay before TAXABLE-basis deductions are worked out.
-  reducesTaxable  Boolean        @default(false)
+  reducesTaxable             Boolean         @default(false)
   /// Liability account the deduction is credited to.
-  liabilityAccountCode String
+  liabilityAccountCode       String
   /// Employer cost account, when the employer also contributes.
   employerExpenseAccountCode String?
-  isStatutory     Boolean        @default(true)
-  isActive        Boolean        @default(true)
-  notes           String?
-  createdBy       String         @default("system")
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  lines           PayslipLine[]
+  isStatutory                Boolean         @default(true)
+  isActive                   Boolean         @default(true)
+  notes                      String?
+  createdBy                  String          @default("system")
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  lines                      PayslipLine[]
 
   @@unique([code, effectiveFrom])
   @@index([code])
@@ -1028,78 +1030,78 @@ model DeductionBand {
 }
 
 model PayrollRun {
-  id            String           @id @default(uuid())
-  runNumber     String           @unique
+  id                String           @id @default(uuid())
+  runNumber         String           @unique
   /// The month being paid, stored as the first of that month.
-  periodMonth   DateTime
-  periodLabel   String
-  status        PayrollRunStatus @default(DRAFT)
+  periodMonth       DateTime
+  periodLabel       String
+  status            PayrollRunStatus @default(DRAFT)
   /// Date the rules are resolved against, so a re-run is reproducible.
-  ruleDate      DateTime
-  grossTotal    Decimal          @default(0)
-  deductionTotal Decimal         @default(0)
-  employerCostTotal Decimal      @default(0)
-  netTotal      Decimal          @default(0)
-  employeeCount Int              @default(0)
-  notes         String?
-  approvedBy    String?
-  approvedAt    DateTime?
-  paidAt        DateTime?
-  journalEntryId String?
-  createdBy     String           @default("system")
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  payslips      Payslip[]
+  ruleDate          DateTime
+  grossTotal        Decimal          @default(0)
+  deductionTotal    Decimal          @default(0)
+  employerCostTotal Decimal          @default(0)
+  netTotal          Decimal          @default(0)
+  employeeCount     Int              @default(0)
+  notes             String?
+  approvedBy        String?
+  approvedAt        DateTime?
+  paidAt            DateTime?
+  journalEntryId    String?
+  createdBy         String           @default("system")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  payslips          Payslip[]
 
   @@index([status])
   @@index([periodMonth])
 }
 
 model Payslip {
-  id            String        @id @default(uuid())
-  run           PayrollRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
-  runId         String
-  employee      Employee      @relation(fields: [employeeId], references: [id])
-  employeeId    String
+  id              String        @id @default(uuid())
+  run             PayrollRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  runId           String
+  employee        Employee      @relation(fields: [employeeId], references: [id])
+  employeeId      String
   /// Snapshot of the employee at the time of the run, so a later change of
   /// name or rate does not rewrite a payslip already issued.
-  employeeName  String
-  employeeNumber String
-  basicPay      Decimal       @default(0)
-  allowances    Decimal       @default(0)
-  overtime      Decimal       @default(0)
-  bonus         Decimal       @default(0)
-  grossPay      Decimal       @default(0)
-  taxablePay    Decimal       @default(0)
-  totalDeductions Decimal     @default(0)
-  employerCost  Decimal       @default(0)
-  netPay        Decimal       @default(0)
+  employeeName    String
+  employeeNumber  String
+  basicPay        Decimal       @default(0)
+  allowances      Decimal       @default(0)
+  overtime        Decimal       @default(0)
+  bonus           Decimal       @default(0)
+  grossPay        Decimal       @default(0)
+  taxablePay      Decimal       @default(0)
+  totalDeductions Decimal       @default(0)
+  employerCost    Decimal       @default(0)
+  netPay          Decimal       @default(0)
   /// Days worked, for daily-rated staff.
-  daysWorked    Decimal?
-  notes         String?
-  createdAt     DateTime      @default(now())
-  lines         PayslipLine[]
+  daysWorked      Decimal?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  lines           PayslipLine[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store           Store?        @relation(fields: [storeId], references: [id])
+  storeId         String?
 
   @@unique([runId, employeeId])
   @@index([employeeId])
-  /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
 }
 
 /// One deduction as applied to one payslip, with the figures it was based on.
 model PayslipLine {
-  id          String         @id @default(uuid())
-  payslip     Payslip        @relation(fields: [payslipId], references: [id], onDelete: Cascade)
-  payslipId   String
-  rule        DeductionRule? @relation(fields: [ruleId], references: [id])
-  ruleId      String?
-  code        String
-  name        String
+  id                   String         @id @default(uuid())
+  payslip              Payslip        @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  payslipId            String
+  rule                 DeductionRule? @relation(fields: [ruleId], references: [id])
+  ruleId               String?
+  code                 String
+  name                 String
   /// Amount the calculation was applied to, kept so a payslip can be explained.
-  basisAmount Decimal        @default(0)
-  amount      Decimal        @default(0)
-  employerAmount Decimal     @default(0)
+  basisAmount          Decimal        @default(0)
+  amount               Decimal        @default(0)
+  employerAmount       Decimal        @default(0)
   liabilityAccountCode String?
 
   @@index([payslipId])
@@ -1137,67 +1139,67 @@ enum LeaveRequestStatus {
 /// account for a different reason. The optional link lets the two be joined
 /// where both exist.
 model Employee {
-  id               String       @id @default(uuid())
-  employeeNumber   String       @unique
-  firstName        String
-  lastName         String
-  email            String?
-  phone            String?
-  nationalId       String?
-  kraPin           String?
-  nssfNumber       String?
-  shifNumber       String?
-  jobTitle         String?
-  department       String?
+  id                String         @id @default(uuid())
+  employeeNumber    String         @unique
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String?
+  nationalId        String?
+  kraPin            String?
+  nssfNumber        String?
+  shifNumber        String?
+  jobTitle          String?
+  department        String?
   /// Where this person's cost belongs. Null means shared across projects.
-  contractType     ContractType @default(PERMANENT)
-  payType          PayType      @default(MONTHLY)
+  contractType      ContractType   @default(PERMANENT)
+  payType           PayType        @default(MONTHLY)
   /// Monthly salary, or the daily rate when payType is DAILY.
-  payRate          Decimal      @default(0)
-  currency         String       @default("KES")
-  bankName         String?
+  payRate           Decimal        @default(0)
+  currency          String         @default("KES")
+  bankName          String?
   bankAccountNumber String?
-  startDate        DateTime
-  endDate          DateTime?
-  status           EmployeeStatus @default(ACTIVE)
+  startDate         DateTime
+  endDate           DateTime?
+  status            EmployeeStatus @default(ACTIVE)
   /// Set when this person also signs in to the portal.
-  user             User?        @relation(fields: [userId], references: [id])
-  userId           String?      @unique
-  notes            String?
-  createdBy        String       @default("system")
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  leaveRequests    LeaveRequest[]
-  leaveBalances    LeaveBalance[]
-  payslips         Payslip[]
+  user              User?          @relation(fields: [userId], references: [id])
+  userId            String?        @unique
+  notes             String?
+  createdBy         String         @default("system")
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  leaveRequests     LeaveRequest[]
+  leaveBalances     LeaveBalance[]
+  payslips          Payslip[]
+  /// Which store this belongs to. Optional: head-office costs belong to no single store.
+  store             Store?         @relation(fields: [storeId], references: [id])
+  storeId           String?
 
   @@index([status])
-  /// Which store this belongs to. Optional: head-office costs belong to no single store.
-  store     Store?  @relation(fields: [storeId], references: [id])
-  storeId   String?
 }
 
 /// A category of leave and how much of it staff are entitled to each year.
 model LeaveType {
-  id            String   @id @default(uuid())
-  name          String   @unique
-  code          String   @unique
+  id               String         @id @default(uuid())
+  name             String         @unique
+  code             String         @unique
   /// Days granted for a full leave year.
-  annualDays    Decimal  @default(0)
+  annualDays       Decimal        @default(0)
   /// Whether unused days survive the year end.
-  carriesOver   Boolean  @default(false)
+  carriesOver      Boolean        @default(false)
   /// Cap on days carried into the next year, when carriesOver is true.
-  maxCarryOver  Decimal?
+  maxCarryOver     Decimal?
   /// Unpaid types are tracked for records but cost nothing.
-  isPaid        Boolean  @default(true)
+  isPaid           Boolean        @default(true)
   /// Casual staff typically accrue nothing; this excludes them.
-  accruesForCasual Boolean @default(false)
-  description   String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  requests      LeaveRequest[]
-  balances      LeaveBalance[]
+  accruesForCasual Boolean        @default(false)
+  description      String?
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  requests         LeaveRequest[]
+  balances         LeaveBalance[]
 }
 
 /// One employee's entitlement and usage for a leave type in a given year.
@@ -1206,55 +1208,52 @@ model LeaveType {
 /// the moment it is opened, and carry-over is a decision taken once at year
 /// end. Recomputing either later would silently rewrite history.
 model LeaveBalance {
-  id            String    @id @default(uuid())
-  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  employeeId    String
-  leaveType     LeaveType @relation(fields: [leaveTypeId], references: [id])
-  leaveTypeId   String
-  year          Int
+  id             String    @id @default(uuid())
+  employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId     String
+  leaveType      LeaveType @relation(fields: [leaveTypeId], references: [id])
+  leaveTypeId    String
+  year           Int
   /// Days for the year, already pro-rated for a mid-year start.
-  entitledDays  Decimal   @default(0)
+  entitledDays   Decimal   @default(0)
   /// Days brought forward from the previous year.
-  broughtForward Decimal  @default(0)
+  broughtForward Decimal   @default(0)
   /// Days consumed by approved requests.
-  takenDays     Decimal   @default(0)
+  takenDays      Decimal   @default(0)
   /// Manual correction, positive or negative, with a reason.
-  adjustmentDays Decimal  @default(0)
+  adjustmentDays Decimal   @default(0)
   adjustmentNote String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([employeeId, leaveTypeId, year])
   @@index([employeeId])
 }
 
 model LeaveRequest {
-  id            String             @id @default(uuid())
-  employee      Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  employeeId    String
-  leaveType     LeaveType          @relation(fields: [leaveTypeId], references: [id])
-  leaveTypeId   String
-  startDate     DateTime
-  endDate       DateTime
+  id          String             @id @default(uuid())
+  employee    Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+  leaveType   LeaveType          @relation(fields: [leaveTypeId], references: [id])
+  leaveTypeId String
+  startDate   DateTime
+  endDate     DateTime
   /// Working days requested, excluding weekends. Stored because the figure is
   /// what the balance was decremented by.
-  days          Decimal
-  reason        String?
-  status        LeaveRequestStatus @default(PENDING)
-  reviewedBy    String?
-  reviewedAt    DateTime?
-  reviewNote    String?
-  createdBy     String             @default("system")
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  days        Decimal
+  reason      String?
+  status      LeaveRequestStatus @default(PENDING)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  reviewNote  String?
+  createdBy   String             @default("system")
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([employeeId])
   @@index([status])
   @@index([startDate])
 }
-
-
-
 
 enum AuditActorType {
   STAFF
@@ -1312,13 +1311,13 @@ model AuditLog {
 /// Maps a purpose to a GL account, optionally per store, so a shop can post
 /// its sales somewhere different from head office.
 model StoreAccountAssignment {
-  id        String         @id @default(uuid())
-  store     Store?         @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  storeId   String?
+  id            String         @id @default(uuid())
+  store         Store?         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId       String?
   purpose       AccountPurpose
-  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id])
+  bankAccount   BankAccount    @relation(fields: [bankAccountId], references: [id])
   bankAccountId String
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime       @default(now())
 
   @@unique([storeId, purpose])
 }
@@ -1327,23 +1326,23 @@ model StoreAccountAssignment {
 /// "Sony WH-1000XM5" -- while what is actually picked, priced and counted is a
 /// variant of it.
 model Product {
-  id          String   @id @default(uuid())
-  sku         String   @unique
-  name        String
-  slug        String   @unique
-  description String?
-  brand       String?
-  category    ProductCategory? @relation(fields: [categoryId], references: [id])
-  categoryId  String?
+  id               String           @id @default(uuid())
+  sku              String           @unique
+  name             String
+  slug             String           @unique
+  description      String?
+  brand            String?
+  category         ProductCategory? @relation(fields: [categoryId], references: [id])
+  categoryId       String?
   /// Every image, in display order.
-  imageUrls   Json?
+  imageUrls        Json?
   /// The one shown on a card, a search result and a share preview. Held
   /// explicitly rather than taken as imageUrls[0], so removing an image cannot
   /// silently promote a different one to the front of the shop.
   featuredImageUrl String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   variants ProductVariant[]
 
@@ -1369,57 +1368,57 @@ model ProductCategory {
 /// 512GB one are the same product at different prices, and shoes in one size
 /// can outsell another to the point of being discounted separately.
 model ProductVariant {
-  id          String   @id @default(uuid())
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId   String
-  sku         String   @unique
-  name        String
+  id                String   @id @default(uuid())
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId         String
+  sku               String   @unique
+  name              String
   /// Free-form so footwear can carry size and colour while electronics carry
   /// capacity, without a column per attribute.
-  attributes  Json?
+  attributes        Json?
   /// Retail: the marked price a walk-in normally pays. A walk-in can still be
   /// charged above or below it, and the difference is recorded on the line.
-  priceKes    Decimal
+  priceKes          Decimal
   /// What a competing shop pays, whether they buy outright or settle after
   /// selling on consignment. Falls back to retail when unset.
-  resellerPriceKes Decimal?
+  resellerPriceKes  Decimal?
   /// The keenest price, for bulk. Lowest of the three.
   wholesalePriceKes Decimal?
   /// What it cost to buy, for margin. Not shown to customers.
-  costKes     Decimal?
-  barcode     String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  costKes           Decimal?
+  barcode           String?
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  stock      StockLevel[]
-  orderLines OrderLine[]
-  movements  StockMovement[]
+  stock            StockLevel[]
+  orderLines       OrderLine[]
+  movements        StockMovement[]
+  consignmentLines ConsignmentLine[]
 
   @@index([productId])
-  consignmentLines ConsignmentLine[]
 }
 
 /// Stock of one variant at one store. Quantity is derived from movements but
 /// kept here too, because a list of a hundred products should not have to sum
 /// a movement history per row.
 model StockLevel {
-  id        String         @id @default(uuid())
-  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  variantId String
-  store     Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  storeId   String
+  id            String         @id @default(uuid())
+  variant       ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variantId     String
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId       String
   /// On the shop floor: what can be sold today.
-  quantity  Int            @default(0)
+  quantity      Int            @default(0)
   /// Held by unpaid orders: sellable is quantity minus this.
-  reserved  Int            @default(0)
+  reserved      Int            @default(0)
   /// Out with a reseller, unsold. Still owned -- it comes back or gets paid
   /// for -- but it is in another shop, so it cannot be sold from here. Owned
   /// stock is quantity + onConsignment.
-  onConsignment Int        @default(0)
+  onConsignment Int            @default(0)
   /// Below this, the variant shows as needing a reorder.
-  reorderAt Int            @default(0)
-  updatedAt DateTime       @updatedAt
+  reorderAt     Int            @default(0)
+  updatedAt     DateTime       @updatedAt
 
   @@unique([variantId, storeId])
   @@index([storeId])
@@ -1475,24 +1474,24 @@ model Order {
   /// a shop buying outright is RESELLER or WHOLESALE.
   priceTier   PriceTier   @default(RETAIL)
 
-  subtotal    Decimal  @default(0)
-  discount    Decimal  @default(0)
-  taxAmount   Decimal  @default(0)
-  shipping    Decimal  @default(0)
-  total       Decimal  @default(0)
-  amountPaid  Decimal  @default(0)
-  currency    String   @default("KES")
+  subtotal   Decimal @default(0)
+  discount   Decimal @default(0)
+  taxAmount  Decimal @default(0)
+  shipping   Decimal @default(0)
+  total      Decimal @default(0)
+  amountPaid Decimal @default(0)
+  currency   String  @default("KES")
 
-  customerName  String?
-  customerPhone String?
-  customerEmail String?
+  customerName    String?
+  customerPhone   String?
+  customerEmail   String?
   shippingAddress String?
-  notes         String?
+  notes           String?
 
-  placedAt   DateTime  @default(now())
+  placedAt    DateTime  @default(now())
   fulfilledAt DateTime?
   cancelledAt DateTime?
-  createdBy  String    @default("system")
+  createdBy   String    @default("system")
 
   lines    OrderLine[]
   payments OrderPayment[]
@@ -1539,14 +1538,14 @@ model OrderLine {
 /// Money against an order. Several are allowed: a deposit now, the balance on
 /// collection, or a split between cash and M-Pesa.
 model OrderPayment {
-  id         String   @id @default(uuid())
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId    String
-  amount     Decimal
-  method     String
-  reference  String?
-  receivedAt DateTime @default(now())
-  receivedBy String   @default("system")
+  id             String   @id @default(uuid())
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId        String
+  amount         Decimal
+  method         String
+  reference      String?
+  receivedAt     DateTime @default(now())
+  receivedBy     String   @default("system")
   /// Set once posted to the ledger, so a payment is never double-counted.
   journalEntryId String?
   /// Paystack's own reference, unique so a webhook replay cannot record the
@@ -1565,29 +1564,6 @@ enum PriceTier {
 
 /// A shop that takes goods from us, sells them, and pays for what sold.
 ///
-/// Separate from Customer because the relationship is different in kind: a
-/// reseller holds our stock, carries a running balance, and is settled
-/// periodically rather than at a till.
-model Reseller {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  name         String
-  contactName  String?
-  phone        String?
-  email        String?
-  location     String?
-  /// Which price list this shop is on.
-  priceTier    PriceTier @default(RESELLER)
-  /// Most stock, at cost, we are willing to have out with them at once.
-  /// Zero means no limit.
-  creditLimit  Decimal   @default(0)
-  isActive     Boolean   @default(true)
-  notes        String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  consignments Consignment[]
-}
 
 /// One pickup: the goods a reseller took on a given day.
 ///
@@ -1595,34 +1571,34 @@ model Reseller {
 /// taken, what has been sold and paid for, and what came back, so the cycle
 /// is answerable per pair rather than only in total.
 model Consignment {
-  id             String            @id @default(uuid())
-  reference      String            @unique
-  reseller       Reseller          @relation(fields: [resellerId], references: [id])
-  resellerId     String
-  store          Store             @relation(fields: [storeId], references: [id])
-  storeId        String
-  status         ConsignmentStatus @default(OPEN)
+  id         String            @id @default(uuid())
+  reference  String            @unique
+  customer   Customer          @relation(fields: [customerId], references: [id])
+  customerId String
+  store      Store             @relation(fields: [storeId], references: [id])
+  storeId    String
+  status     ConsignmentStatus @default(OPEN)
   /// Fixed when the goods leave: a later price rise does not change what is
   /// owed on stock already out.
-  priceTier      PriceTier         @default(RESELLER)
+  priceTier  PriceTier         @default(RESELLER)
   /// Value of everything taken, at the agreed tier.
-  totalValue     Decimal           @default(0)
+  totalValue Decimal           @default(0)
   /// Value of what has been reported sold.
-  soldValue      Decimal           @default(0)
-  amountPaid     Decimal           @default(0)
+  soldValue  Decimal           @default(0)
+  amountPaid Decimal           @default(0)
   /// When unsold goods are due back. Defaults to three days from pickup,
   /// which is the agreed holding period; it is stored per pickup rather than
   /// assumed at read time so a one-off extension is possible and visible.
-  dueDate        DateTime?
-  notes          String?
-  issuedAt       DateTime          @default(now())
-  closedAt       DateTime?
-  createdBy      String            @default("system")
+  dueDate    DateTime?
+  notes      String?
+  issuedAt   DateTime          @default(now())
+  closedAt   DateTime?
+  createdBy  String            @default("system")
 
   lines    ConsignmentLine[]
   payments ConsignmentPayment[]
 
-  @@index([resellerId])
+  @@index([customerId])
   @@index([status])
 }
 
@@ -1637,31 +1613,31 @@ enum ConsignmentStatus {
 
 /// One product on a pickup. quantityOut = sold + returned + still held.
 model ConsignmentLine {
-  id            String      @id @default(uuid())
-  consignment   Consignment @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
-  consignmentId String
-  variant       ProductVariant @relation(fields: [variantId], references: [id])
-  variantId     String
-  description   String
-  quantityOut   Int
-  quantitySold  Int         @default(0)
-  quantityReturned Int      @default(0)
+  id               String         @id @default(uuid())
+  consignment      Consignment    @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
+  consignmentId    String
+  variant          ProductVariant @relation(fields: [variantId], references: [id])
+  variantId        String
+  description      String
+  quantityOut      Int
+  quantitySold     Int            @default(0)
+  quantityReturned Int            @default(0)
   /// Agreed price per pair, fixed at pickup.
-  unitPrice     Decimal
+  unitPrice        Decimal
 
   @@index([consignmentId])
 }
 
 /// Money from a reseller against a pickup.
 model ConsignmentPayment {
-  id            String      @id @default(uuid())
-  consignment   Consignment @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
-  consignmentId String
-  amount        Decimal
-  method        String
-  reference     String?
-  receivedAt    DateTime    @default(now())
-  receivedBy    String      @default("system")
+  id             String      @id @default(uuid())
+  consignment    Consignment @relation(fields: [consignmentId], references: [id], onDelete: Cascade)
+  consignmentId  String
+  amount         Decimal
+  method         String
+  reference      String?
+  receivedAt     DateTime    @default(now())
+  receivedBy     String      @default("system")
   journalEntryId String?
 
   @@index([consignmentId])

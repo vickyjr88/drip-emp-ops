@@ -21,12 +21,12 @@ export class ConsignmentController {
   @Get()
   @Permissions(buildPermissionKey('Consignment', 'read'))
   findAll(
-    @Query('resellerId') resellerId?: string,
+    @Query('customerId') customerId?: string,
     @Query('storeId') storeId?: string,
     @Query('status') status?: ConsignmentStatus,
     @Query('overdueOnly') overdueOnly?: string,
   ) {
-    return this.service.findAll({ resellerId, storeId, status, overdueOnly });
+    return this.service.findAll({ customerId, storeId, status, overdueOnly });
   }
 
   @Get(':id')

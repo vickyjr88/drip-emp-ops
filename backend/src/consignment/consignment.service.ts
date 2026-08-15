@@ -3,12 +3,18 @@ import { ConsignmentStatus, PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateConsignmentDto, SettleConsignmentDto } from './dto/consignment.dto';
+import { customerDisplayName } from '../customer/customer-name';
 
 /** The agreed holding period before unsold stock is due back. */
 export const HOLDING_DAYS = 3;
 
 const INCLUDE = {
-  reseller: { select: { id: true, code: true, name: true, phone: true, priceTier: true } },
+  customer: {
+    select: {
+      id: true, code: true, businessName: true, firstName: true, lastName: true,
+      phone: true, priceTier: true,
+    },
+  },
   store: { select: { id: true, code: true, name: true } },
   lines: {
     include: {
@@ -57,17 +63,24 @@ export class ConsignmentService {
    */
   async create(dto: CreateConsignmentDto, actor = 'system') {
     return this.prisma.$transaction(async (tx) => {
-      const [reseller, store] = await Promise.all([
-        tx.reseller.findUnique({ where: { id: dto.resellerId } }),
+      const [customer, store] = await Promise.all([
+        tx.customer.findUnique({ where: { id: dto.customerId } }),
         tx.store.findUnique({ where: { id: dto.storeId } }),
       ]);
-      if (!reseller) throw new NotFoundException(`Reseller ${dto.resellerId} not found`);
+      if (!customer) throw new NotFoundException(`Customer ${dto.customerId} not found`);
       if (!store) throw new NotFoundException(`Store ${dto.storeId} not found`);
-      if (!reseller.isActive) {
-        throw new BadRequestException(`${reseller.name} is not active.`);
+      if (!customer.isActive) {
+        throw new BadRequestException(`${customerDisplayName(customer)} is not active.`);
+      }
+      // Stock only goes out on consignment to a trade account. A retail
+      // customer taking stock away unpaid is not a consignment, it is a debt.
+      if (customer.priceTier === 'RETAIL') {
+        throw new BadRequestException(
+          `${customerDisplayName(customer)} is a retail customer. Set them to reseller or wholesale first.`,
+        );
       }
 
-      const tier = dto.priceTier ?? reseller.priceTier;
+      const tier = dto.priceTier ?? customer.priceTier;
       const variants = await tx.productVariant.findMany({
         where: { id: { in: dto.lines.map((line) => line.variantId) } },
       });
@@ -92,11 +105,11 @@ export class ConsignmentService {
         0,
       );
 
-      if (Number(reseller.creditLimit) > 0) {
-        const outstanding = await this.outstandingFor(reseller.id, tx);
-        if (outstanding + totalValue > Number(reseller.creditLimit)) {
+      if (Number(customer.creditLimit) > 0) {
+        const outstanding = await this.outstandingFor(customer.id, tx);
+        if (outstanding + totalValue > Number(customer.creditLimit)) {
           throw new BadRequestException(
-            `${reseller.name} would be holding ${(outstanding + totalValue).toLocaleString()} against a limit of ${Number(reseller.creditLimit).toLocaleString()}.`,
+            `${customerDisplayName(customer)} would be holding ${(outstanding + totalValue).toLocaleString()} against a limit of ${Number(customer.creditLimit).toLocaleString()}.`,
           );
         }
       }
@@ -108,7 +121,7 @@ export class ConsignmentService {
       const consignment = await tx.consignment.create({
         data: {
           reference: await this.nextReference(tx),
-          resellerId: dto.resellerId,
+          customerId: dto.customerId,
           storeId: dto.storeId,
           priceTier: tier,
           totalValue: new Prisma.Decimal(totalValue),
@@ -222,9 +235,9 @@ export class ConsignmentService {
   }
 
   /** Value a reseller is holding that is neither paid for nor returned. */
-  private async outstandingFor(resellerId: string, tx: Prisma.TransactionClient) {
+  private async outstandingFor(customerId: string, tx: Prisma.TransactionClient) {
     const open = await tx.consignment.findMany({
-      where: { resellerId, status: 'OPEN' },
+      where: { customerId, status: 'OPEN' },
       include: { lines: true },
     });
     return open.reduce((sum, consignment) => {
@@ -334,10 +347,10 @@ export class ConsignmentService {
     });
   }
 
-  async findAll(query: { resellerId?: string; storeId?: string; status?: ConsignmentStatus; overdueOnly?: string }) {
+  async findAll(query: { customerId?: string; storeId?: string; status?: ConsignmentStatus; overdueOnly?: string }) {
     const rows = await this.prisma.consignment.findMany({
       where: {
-        ...(query.resellerId ? { resellerId: query.resellerId } : {}),
+        ...(query.customerId ? { customerId: query.customerId } : {}),
         ...(query.storeId ? { storeId: query.storeId } : {}),
         ...(query.status ? { status: query.status } : {}),
       },

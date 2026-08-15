@@ -1,7 +1,11 @@
 "use client";
 
 /**
- * Resellers: the shops that take our stock and pay for what they sell.
+ * Trade accounts: the shops that take our stock and pay for what they sell.
+ *
+ * These are customers on a non-retail price list, not a separate kind of
+ * record. The same shop can buy a pair for itself and sign in to the
+ * storefront, which two separate tables made impossible.
  *
  * Each row leads with what they are holding and what they owe, because those
  * are the two questions worth asking about a reseller, and an overdue count
@@ -72,9 +76,9 @@ export default function ResellersPage() {
   const rows = useMemo(() => resellers, [resellers]);
   const controls = useListControls(rows, (row) => [row.name, row.code, row.phone || '', row.location || '']);
 
-  const canCreate = hasPermission(profile, 'reseller.create');
-  const canUpdate = hasPermission(profile, 'reseller.update');
-  const canDelete = hasPermission(profile, 'reseller.delete');
+  const canCreate = hasPermission(profile, 'customer.create');
+  const canUpdate = hasPermission(profile, 'customer.update');
+  const canDelete = hasPermission(profile, 'customer.delete');
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
