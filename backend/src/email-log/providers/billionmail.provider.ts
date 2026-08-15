@@ -21,6 +21,12 @@ import { EmailProvider, EmailSendParams, EmailSendResult } from './email-provide
  *
  * BILLIONMAIL_BASE_URL is required as well as the key: BillionMail runs on the
  * operator's own server, so there is no default host to fall back on.
+ *
+ * Verified against a live install: POST {base}/api/batch_mail/api/send with an
+ * X-API-Key header and a {recipient, addresser?, attribs} body. TLS is not
+ * bypassed -- the published docs show curl -k, but a real deployment behind a
+ * proper certificate does not need it, and disabling verification to save one
+ * line of setup would expose every send to interception.
  */
 @Injectable()
 export class BillionMailProvider implements EmailProvider {
