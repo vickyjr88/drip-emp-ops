@@ -301,8 +301,8 @@ export default function OffersPage() {
             <article className="portal-card">
               <div className="portal-card-head">
                 <h2 style={{ margin: 0 }}>Not selling</h2>
-                <label className="portal-inline-actions" style={{ fontSize: 13 }}>
-                  <span className="portal-muted">Idle for at least</span>
+                <label className="portal-inline-filter">
+                  <span>Idle for at least</span>
                   <select value={days} onChange={(event) => setDays(Number(event.target.value))}>
                     <option value={30}>30 days</option>
                     <option value={60}>60 days</option>

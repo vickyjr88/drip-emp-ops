@@ -4717,19 +4717,22 @@ img {
     gap: 12px;
   }
 
-  .portal-entity-form label {
+  .portal-entity-form label,
+  .portal-dialog label {
     display: grid;
     gap: 6px;
     min-width: 0;
   }
 
-  .portal-entity-form label.portal-check {
+  .portal-entity-form label.portal-check,
+  .portal-dialog label.portal-check {
     display: inline-flex;
     align-items: center;
     gap: 8px;
   }
 
-  .portal-entity-form label.portal-check span {
+  .portal-entity-form label.portal-check span,
+  .portal-dialog label.portal-check span {
     font-size: 13px;
     font-weight: 400;
     letter-spacing: normal;
@@ -4737,7 +4740,8 @@ img {
     color: #2f3131;
   }
 
-  .portal-entity-form label span {
+  .portal-entity-form label span,
+  .portal-dialog label span {
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -4747,7 +4751,10 @@ img {
 
   .portal-entity-form input,
   .portal-entity-form select,
-  .portal-entity-form textarea {
+  .portal-entity-form textarea,
+  .portal-dialog input,
+  .portal-dialog select,
+  .portal-dialog textarea {
     border: 1px solid var(--eef-border);
     border-radius: 6px;
     min-height: 42px;
@@ -10788,4 +10795,58 @@ img {
   font-weight: 400;
   color: var(--de-muted);
   text-decoration-thickness: 1px;
+}
+
+/* A button that reads as a link, for an action inside a table cell where a
+   full button would crowd the row. Used by "Put on offer" and "Set cost";
+   both were unstyled browser buttons before this existed. */
+.portal-linkish {
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--de-royal, #06166e);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.portal-linkish:hover {
+  color: var(--de-500, #2438a8);
+}
+
+.portal-linkish:focus-visible {
+  outline: 2px solid var(--de-500, #2438a8);
+  outline-offset: 2px;
+}
+
+/* A single label-and-control filter sitting beside a heading. Distinct from
+   .portal-filter-bar, which is the users screen's multi-column grid -- reusing
+   that name here redefined it as flex and broke that layout. */
+.portal-inline-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #5b6480;
+}
+
+.portal-inline-filter select,
+.portal-inline-filter input {
+  min-height: 38px;
+  padding: 7px 12px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 13px;
+  color: #1c1c1c;
+  background: #fff;
+  border: 1px solid var(--eef-border, #dfe2f0);
+  border-radius: 6px;
+}
+
+.portal-inline-filter select:focus-visible,
+.portal-inline-filter input:focus-visible {
+  outline: 2px solid var(--de-500, #2438a8);
+  outline-offset: 1px;
 }

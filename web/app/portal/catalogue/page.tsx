@@ -27,6 +27,8 @@ import {
 type Variant = {
   id: string; sku: string; name: string; priceKes: string | number;
   costKes?: string | number | null; isActive: boolean;
+  resellerPriceKes?: string | number | null;
+  wholesalePriceKes?: string | number | null;
   attributes?: Record<string, unknown> | null;
 };
 
@@ -604,8 +606,13 @@ export default function CataloguePage() {
                           <table className="portal-data-table is-doc">
                             <thead>
                               <tr>
-                                <th>Size</th><th>SKU</th><th>Price</th><th>Cost</th>
-                                <th>Margin</th><th>Status</th><th />
+                                <th>Size</th><th>SKU</th>
+                                <th className="portal-num">Retail</th>
+                                <th className="portal-num">Reseller</th>
+                                <th className="portal-num">Wholesale</th>
+                                <th className="portal-num">Cost</th>
+                                <th className="portal-num">Margin</th>
+                                <th>Status</th><th />
                               </tr>
                             </thead>
                             <tbody>
@@ -625,8 +632,21 @@ export default function CataloguePage() {
                                 <tr key={variant.id}>
                                   <td>{variant.name}</td>
                                   <td><code>{variant.sku}</code></td>
-                                  <td>{formatMoney(variant.priceKes)}</td>
-                                  <td>
+                                  <td className="portal-num">{formatMoney(variant.priceKes)}</td>
+                                  <td className="portal-num">
+                                    {/* Falls back to retail, which is what the
+                                        API does when a tier is unset -- showing
+                                        a dash would imply a shop cannot buy. */}
+                                    {variant.resellerPriceKes
+                                      ? formatMoney(variant.resellerPriceKes)
+                                      : <span className="portal-muted">{formatMoney(variant.priceKes)}</span>}
+                                  </td>
+                                  <td className="portal-num">
+                                    {variant.wholesalePriceKes
+                                      ? formatMoney(variant.wholesalePriceKes)
+                                      : <span className="portal-muted">{formatMoney(variant.priceKes)}</span>}
+                                  </td>
+                                  <td className="portal-num">
                                     {editing ? (
                                       <span className="portal-inline-actions">
                                         <input
@@ -681,7 +701,7 @@ export default function CataloguePage() {
                                       </button>
                                     )}
                                   </td>
-                                  <td>{margin === null ? '—' : `${margin.toFixed(1)}%`}</td>
+                                  <td className="portal-num">{margin === null ? '—' : `${margin.toFixed(1)}%`}</td>
                                   <td>{variant.isActive ? 'Active' : 'Inactive'}</td>
                                   <td>
                                     {/* Straight from the row: someone looking
