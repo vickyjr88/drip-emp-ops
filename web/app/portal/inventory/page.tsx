@@ -15,6 +15,7 @@ import { PortalShell } from '../components/portal-shell';
 import { ListPager, ListSearch, useListControls } from '../components/list-controls';
 import { ListExport } from '../components/list-export';
 import { useErrorState, useFeedbackState } from '../components/notifications';
+import { OfferQuickAdd, OfferTarget } from '../components/offer-quick-add';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDate, formatMoney,
   hasPermission, loadProfile, roleLabelFor,
@@ -56,6 +57,7 @@ export default function InventoryPage() {
   const [lowOnly, setLowOnly] = useState(false);
   const [tab, setTab] = useState<'levels' | 'movements'>('levels');
   const [form, setForm] = useState({ variantId: '', storeId: '', type: 'PURCHASE', quantity: '', reference: '' });
+  const [offerTarget, setOfferTarget] = useState<OfferTarget | null>(null);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
@@ -106,6 +108,7 @@ export default function InventoryPage() {
 
   const controls = useListControls(levelRows, (row) => [row.productName, row.sku, row.size, row.storeName]);
   const canRecord = hasPermission(profile, 'stock-movement.create');
+  const canCreateOffer = hasPermission(profile, 'offer.create');
 
   async function onRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -299,6 +302,29 @@ export default function InventoryPage() {
                             </div>
                             <span>{row.sellable} sellable</span>
                             <span>{row.needsReorder ? 'REORDER' : `${row.quantity} on hand`}</span>
+                            {/* Stock sitting on the shelf is exactly where the
+                                thought "discount this" occurs. */}
+                            {canCreateOffer ? (
+                              <button
+                                type="button"
+                                className="portal-inline-btn"
+                                onClick={() =>
+                                  setOfferTarget({
+                                    variantId: row.variant.id,
+                                    sku: row.sku,
+                                    label: `${row.productName} · ${row.size}`,
+                                    priceKes: Number(row.variant.priceKes),
+                                    // The levels endpoint does not return
+                                    // cost, so the below-cost warning is left
+                                    // to the catalogue, which does. Undefined
+                                    // means unknown, not zero.
+                                    costKes: undefined,
+                                  })
+                                }
+                              >
+                                Put on offer
+                              </button>
+                            ) : null}
                           </div>
                         </div>
                       ))
@@ -333,6 +359,14 @@ export default function InventoryPage() {
                 </div>
               )}
             </article>
+            {offerTarget && token ? (
+              <OfferQuickAdd
+                target={offerTarget}
+                token={token}
+                onClose={() => setOfferTarget(null)}
+                onDone={(message) => setFeedback(message)}
+              />
+            ) : null}
           </PortalShell>
         </section>
       </main>

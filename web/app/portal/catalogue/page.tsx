@@ -17,6 +17,7 @@ import { ListExport } from '../components/list-export';
 import { ListThumb } from '../components/list-thumb';
 import { ImagePicker } from '../components/image-picker';
 import { usePortalDialog } from '../components/portal-dialog';
+import { OfferQuickAdd, OfferTarget } from '../components/offer-quick-add';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatMoney,
@@ -63,6 +64,8 @@ export default function CataloguePage() {
   /** variantId -> draft cost, while a row is being edited. */
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
   const [savingVariant, setSavingVariant] = useState<string | null>(null);
+  /** The variant being put on offer, or null when the dialog is closed. */
+  const [offerTarget, setOfferTarget] = useState<OfferTarget | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // Managing images on a product that already exists, which is most of them:
@@ -119,6 +122,7 @@ export default function CataloguePage() {
 
   const canCreate = hasPermission(profile, 'product.create');
   const canUpdate = hasPermission(profile, 'product.update');
+  const canCreateOffer = hasPermission(profile, 'offer.create');
   const canDelete = hasPermission(profile, 'product.delete');
 
   /**
@@ -601,7 +605,7 @@ export default function CataloguePage() {
                             <thead>
                               <tr>
                                 <th>Size</th><th>SKU</th><th>Price</th><th>Cost</th>
-                                <th>Margin</th><th>Status</th>
+                                <th>Margin</th><th>Status</th><th />
                               </tr>
                             </thead>
                             <tbody>
@@ -679,6 +683,28 @@ export default function CataloguePage() {
                                   </td>
                                   <td>{margin === null ? '—' : `${margin.toFixed(1)}%`}</td>
                                   <td>{variant.isActive ? 'Active' : 'Inactive'}</td>
+                                  <td>
+                                    {/* Straight from the row: someone looking
+                                        at a size that is not moving should not
+                                        have to find it again elsewhere. */}
+                                    {canCreateOffer ? (
+                                      <button
+                                        type="button"
+                                        className="portal-linkish"
+                                        onClick={() =>
+                                          setOfferTarget({
+                                            variantId: variant.id,
+                                            sku: variant.sku,
+                                            label: `${product.name} · ${variant.name}`,
+                                            priceKes: priceValue,
+                                            costKes: cost,
+                                          })
+                                        }
+                                      >
+                                        Put on offer
+                                      </button>
+                                    ) : null}
+                                  </td>
                                 </tr>
                                 );
                               })}
@@ -692,6 +718,17 @@ export default function CataloguePage() {
               </div>
               <ListPager controls={controls} noun="products" />
             </article>
+            {offerTarget && token ? (
+              <OfferQuickAdd
+                target={offerTarget}
+                token={token}
+                onClose={() => setOfferTarget(null)}
+                onDone={(message) => {
+                  setFeedback(message);
+                  void load(token);
+                }}
+              />
+            ) : null}
           </PortalShell>
         </section>
       </main>
