@@ -473,6 +473,9 @@ export default function CataloguePage() {
                           >
                             {expanded === product.id ? 'Hide Sizes' : 'Sizes'}
                           </button>
+                          <Link href={`/portal/catalogue/${product.id}`} className="portal-inline-btn">
+                            Manage
+                          </Link>
                           {canUpdate ? (
                             <button
                               type="button"
