@@ -20,6 +20,8 @@ export type RowResult = {
   amount?: number;
   accountCode?: string;
   accountName?: string;
+  /** Not wrong, but worth a second look before posting. */
+  warnings?: string[];
   storeCode?: string;
   storeName?: string;
   errors: string[];
@@ -86,6 +88,9 @@ export class ExpenseImportService {
     ]);
 
     const accountByCode = new Map(accounts.map((a) => [a.code.toUpperCase(), a]));
+    const parentIds = new Set(
+      accounts.map((account) => (account as any).parentId).filter(Boolean) as string[],
+    );
     const storeByCode = new Map(stores.map((store) => [store.code.toUpperCase(), store]));
 
     // A typo'd store code is caught here rather than posting the spend
@@ -104,6 +109,7 @@ export class ExpenseImportService {
 
     for (const row of rows) {
       const errors: string[] = [];
+      const warnings: string[] = [];
 
       const date = this.parseDate(String(row.date ?? ''));
       if (!row.date || String(row.date).trim() === '') errors.push('Date is required');
@@ -126,6 +132,11 @@ export class ExpenseImportService {
       else if (!account) errors.push(`Account code "${accountCode}" does not exist`);
       else if (account.type !== 'EXPENSE') {
         errors.push(`Account ${account.code} is ${account.type}, not an expense account`);
+      } else if (parentIds.has(account.id)) {
+        // A heading rather than a category. Not fatal -- the P&L lists
+        // accounts flat, so nothing double-counts -- but spend posted here
+        // sits outside the split the reports are read by.
+        warnings.push(`${account.code} is a heading; prefer one of its categories`);
       }
 
       results.push({
@@ -139,6 +150,7 @@ export class ExpenseImportService {
         storeCode: store?.code,
         storeName: store?.name,
         errors,
+        warnings,
       });
     }
 
@@ -191,6 +203,9 @@ export class ExpenseImportService {
       this.prisma.store.findMany(),
     ]);
     const accountByCode = new Map(accounts.map((a) => [a.code.toUpperCase(), a]));
+    const parentIds = new Set(
+      accounts.map((account) => (account as any).parentId).filter(Boolean) as string[],
+    );
     const storeByCode = new Map(stores.map((store) => [store.code.toUpperCase(), store]));
     const creditAccount = accountByCode.get(creditAccountCode.toUpperCase())!;
     const fallbackStoreId = options.defaultStoreCode?.trim()
@@ -200,6 +215,23 @@ export class ExpenseImportService {
     // Stamped on every entry so an entire import can be found -- and undone --
     // as a unit afterwards.
     const batchRef = options.batchRef?.trim() || `IMPORT-${new Date().toISOString().slice(0, 19)}`;
+
+    // Refuse a reference that has already been posted.
+    //
+    // Importing the same file twice used to succeed silently, so a month of
+    // rent could be booked twice and only surface when someone questioned the
+    // P&L. The batch reference is the one thing that identifies a file, so it
+    // is what the check hangs on -- and the batch-undo route means recovering
+    // from a genuine mistake is still one call.
+    const alreadyPosted = await this.prisma.journalEntry.count({
+      where: { sourceId: batchRef },
+    });
+    if (alreadyPosted > 0) {
+      throw new BadRequestException(
+        `Batch "${batchRef}" has already been imported (${alreadyPosted} entries). ` +
+          'Use a different reference, or undo that batch first.',
+      );
+    }
 
     const created = await this.prisma.$transaction(
       async (tx) => {
