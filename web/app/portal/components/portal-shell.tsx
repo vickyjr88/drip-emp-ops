@@ -9,6 +9,7 @@ export type PortalNavKey =
   | 'dashboard'
   | 'stores'
   | 'catalogue'
+  | 'categories'
   | 'inventory'
   | 'orders'
   | 'resellers'
@@ -31,6 +32,7 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
   // Catalogue before inventory before orders: the order things are set up in.
   { key: 'stores', href: '/portal/stores', label: 'Stores' },
   { key: 'catalogue', href: '/portal/catalogue', label: 'Catalogue' },
+  { key: 'categories', href: '/portal/categories', label: 'Categories' },
   { key: 'inventory', href: '/portal/inventory', label: 'Inventory' },
   { key: 'orders', href: '/portal/orders', label: 'Orders' },
   { key: 'consignments', href: '/portal/consignments', label: 'Consignments' },
@@ -53,6 +55,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   dashboard: 'Dashboard',
   stores: 'Stores',
   catalogue: 'Catalogue',
+  categories: 'Categories',
   inventory: 'Inventory',
   orders: 'Orders',
   resellers: 'Resellers',
