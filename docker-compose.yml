@@ -25,16 +25,14 @@ services:
       # host:container. Next binds 3002 inside the container and logs that
       # port on startup -- the site is reached on WEB_PORT from the host.
       #
-      # Bound on all interfaces because nginx runs in its own container: to it,
-      # 127.0.0.1 is that container, not the host, so a loopback binding here is
-      # unreachable from the proxy. It reaches this port via the host's Docker
-      # bridge address (172.17.0.1) or host.docker.internal.
+      # Bound on all interfaces, matching the dirrir-realtors stack that already
+      # works behind this server's containerised nginx: to that container,
+      # 127.0.0.1 is itself rather than the host, so a loopback binding is
+      # unreachable from the proxy.
       #
-      # That does leave the site answering on http://<ip>:3003, bypassing TLS.
-      # The firewall is what closes that: allow only 80/443/SSH/panel, and never
-      # open 3003 or 3101. Set WEB_BIND=127.0.0.1 if nginx ever moves onto the
-      # host, where loopback is both reachable and stricter.
-      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-3003}:3002"
+      # That leaves the site answering on http://<ip>:3003, bypassing TLS. The
+      # firewall is what closes that -- see docs/DEPLOYMENT.md.
+      - "${WEB_PORT:-3003}:3002"
     environment:
       # Server-side rendering runs inside this container, where localhost is the
       # web app itself. Server fetches must go to the backend service directly;
@@ -51,9 +49,8 @@ services:
       dockerfile: Dockerfile
     ports:
       # All interfaces, same reasoning as the web service: the nginx container
-      # cannot reach a host loopback binding. Closed off by the firewall, not by
-      # the binding. Set API_BIND=127.0.0.1 if nginx moves onto the host.
-      - "${API_BIND:-0.0.0.0}:${API_PORT:-3101}:3100"
+      # cannot reach a host loopback binding. Closed off by the firewall.
+      - "${API_PORT:-3101}:3100"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       # No default: auth falls back to a hardcoded dev key when this is unset,
@@ -171,7 +168,7 @@ services:
       # uploaded media (MEDIA_PUBLIC_BASE_URL), and nginx runs in a container
       # that cannot reach a host loopback binding. The firewall keeps it closed
       # from outside; only 80/443 are open.
-      - "${MINIO_BIND:-0.0.0.0}:${MINIO_HOST_PORT:-19002}:9000"
+      - "${MINIO_HOST_PORT:-19002}:9000"
       # The console stays on loopback regardless: it is an admin login, nothing
       # proxies it, and it has no business being on a public IP. Reach it with
       # an SSH tunnel: ssh -L 19003:127.0.0.1:19003 user@host
