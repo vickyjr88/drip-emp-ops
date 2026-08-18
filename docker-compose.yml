@@ -137,7 +137,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      # -d is not optional: without it libpq defaults the database name to the
+      # username, so a POSTGRES_USER that is not also a database name fails with
+      # 'database "<user>" does not exist'. That went unnoticed while the user
+      # was `postgres`, which always has a matching database.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5

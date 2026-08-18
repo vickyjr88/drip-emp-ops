@@ -156,7 +156,11 @@ fi
 SAFETY_DIR="./backups/pre-restore-$(date -u +%Y%m%d-%H%M%S)"
 mkdir -p "${SAFETY_DIR}"
 log "Snapshotting current state to ${SAFETY_DIR}"
-if "${COMPOSE[@]}" exec -T db pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1; then
+# -d is required: without it libpq defaults the database name to the username,
+# so a POSTGRES_USER that is not also a database name makes this probe fail. It
+# would then take the else branch, report "nothing to snapshot", and go on to
+# overwrite the live database with no safety copy taken.
+if "${COMPOSE[@]}" exec -T db pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
   "${COMPOSE[@]}" exec -T db pg_dump -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
     --clean --if-exists --no-owner --no-privileges 2>/dev/null \
     | gzip -9 > "${SAFETY_DIR}/db-before-restore.sql.gz" || true
@@ -170,7 +174,7 @@ if [[ "${MEDIA_ONLY}" != "true" ]]; then
   log "Restoring database"
   "${COMPOSE[@]}" up -d db >/dev/null
   for _ in $(seq 1 60); do
-    "${COMPOSE[@]}" exec -T db pg_isready -U "${POSTGRES_USER}" >/dev/null 2>&1 && break
+    "${COMPOSE[@]}" exec -T db pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1 && break
     sleep 1
   done
 
