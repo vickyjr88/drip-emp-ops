@@ -25,11 +25,16 @@ services:
       # host:container. Next binds 3002 inside the container and logs that
       # port on startup -- the site is reached on WEB_PORT from the host.
       #
-      # Loopback only: nginx terminates TLS and proxies to this port from the
-      # same host. Published on 0.0.0.0 the site is also reachable on
-      # http://<ip>:3003, bypassing TLS and the panel's vhost entirely.
-      # Set WEB_BIND=0.0.0.0 for a bare host with no reverse proxy in front.
-      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3003}:3002"
+      # Bound on all interfaces because nginx runs in its own container: to it,
+      # 127.0.0.1 is that container, not the host, so a loopback binding here is
+      # unreachable from the proxy. It reaches this port via the host's Docker
+      # bridge address (172.17.0.1) or host.docker.internal.
+      #
+      # That does leave the site answering on http://<ip>:3003, bypassing TLS.
+      # The firewall is what closes that: allow only 80/443/SSH/panel, and never
+      # open 3003 or 3101. Set WEB_BIND=127.0.0.1 if nginx ever moves onto the
+      # host, where loopback is both reachable and stricter.
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-3003}:3002"
     environment:
       # Server-side rendering runs inside this container, where localhost is the
       # web app itself. Server fetches must go to the backend service directly;
@@ -45,10 +50,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      # Loopback only, same reasoning as the web service: nginx proxies the
-      # public API origin here. Override with API_BIND=0.0.0.0 if the API must
-      # be reachable directly, without a proxy in front.
-      - "${API_BIND:-127.0.0.1}:${API_PORT:-3101}:3100"
+      # All interfaces, same reasoning as the web service: the nginx container
+      # cannot reach a host loopback binding. Closed off by the firewall, not by
+      # the binding. Set API_BIND=127.0.0.1 if nginx moves onto the host.
+      - "${API_BIND:-0.0.0.0}:${API_PORT:-3101}:3100"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       # No default: auth falls back to a hardcoded dev key when this is unset,
@@ -162,12 +167,14 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      # Loopback only, for both. nginx proxies the S3 API port to serve uploaded
-      # media publicly (see MEDIA_PUBLIC_BASE_URL in docs/DEPLOYMENT.md), and it
-      # runs on this host, so it reaches 127.0.0.1 fine. The console is an admin
-      # login that has no business being on a public IP -- reach it through an
-      # SSH tunnel: ssh -L 19003:127.0.0.1:19003 user@host
-      - "127.0.0.1:${MINIO_HOST_PORT:-19002}:9000"
+      # The S3 port is on all interfaces because nginx proxies it to serve
+      # uploaded media (MEDIA_PUBLIC_BASE_URL), and nginx runs in a container
+      # that cannot reach a host loopback binding. The firewall keeps it closed
+      # from outside; only 80/443 are open.
+      - "${MINIO_BIND:-0.0.0.0}:${MINIO_HOST_PORT:-19002}:9000"
+      # The console stays on loopback regardless: it is an admin login, nothing
+      # proxies it, and it has no business being on a public IP. Reach it with
+      # an SSH tunnel: ssh -L 19003:127.0.0.1:19003 user@host
       - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-19003}:9001"
     volumes:
       - minio-data:/data

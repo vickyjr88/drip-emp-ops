@@ -38,31 +38,47 @@ the script does `git fetch` as that user.
 The VPS runs aaPanel with nginx. nginx owns 80/443 and terminates TLS; every
 container port is bound to `127.0.0.1` and is reachable only through it.
 
-### Ports
+### Ports and how nginx reaches them
 
-Compose publishes on loopback only — `127.0.0.1:<port>` rather than `0.0.0.0`.
-Published on all interfaces, Postgres and the MinIO console would be exposed on
-a public Contabo IP behind nothing but a password, and the site would also be
-reachable on `http://<ip>:3003`, bypassing TLS and the vhost.
+**nginx runs in a container here.** That decides the bindings: to a
+containerised nginx, `127.0.0.1` is the nginx container itself, not the host, so
+anything published on host loopback is unreachable from the proxy. The three
+ports nginx proxies are therefore published on all interfaces, and the three it
+never touches stay on loopback.
 
-| Service | Host port | Reached via |
-|---|---|---|
-| web (Next.js) | `3003` | nginx vhost for the site domain |
-| backend (API) | `3101` | nginx vhost for the API domain |
-| MinIO S3 | `19002` | nginx, for `MEDIA_PUBLIC_BASE_URL` |
-| MinIO console | `19003` | SSH tunnel only — never proxy this |
-| Postgres | `15433` | SSH tunnel only |
-| Redis | `16380` | SSH tunnel only |
+| Service | Host port | Binding | Reached via |
+|---|---|---|---|
+| web (Next.js) | `3003` | `0.0.0.0` | nginx vhost, site domain |
+| backend (API) | `3101` | `0.0.0.0` | nginx vhost, API domain |
+| MinIO S3 | `19002` | `0.0.0.0` | nginx, for `MEDIA_PUBLIC_BASE_URL` |
+| MinIO console | `19003` | `127.0.0.1` | SSH tunnel only — never proxy this |
+| Postgres | `15433` | `127.0.0.1` | SSH tunnel only |
+| Redis | `16380` | `127.0.0.1` | SSH tunnel only |
 
 None collide with aaPanel itself (panel on `8888`, phpMyAdmin on `888`). To
-reach an admin-only port, tunnel rather than open the firewall:
+reach a loopback-only port, tunnel rather than open the firewall:
 
 ```bash
 ssh -L 19003:127.0.0.1:19003 deploy@<host>   # then http://127.0.0.1:19003
 ```
 
-If you ever run this on a bare host with no proxy in front, `WEB_BIND=0.0.0.0`
-and `API_BIND=0.0.0.0` restore the old behaviour.
+In the proxy config, point upstreams at the **host's Docker bridge address**,
+not at `127.0.0.1`:
+
+```bash
+docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}'
+```
+
+That is usually `172.17.0.1`. So the site proxies to `http://172.17.0.1:3003`
+and the API to `http://172.17.0.1:3101`. On Docker Desktop and newer Engine
+releases `host.docker.internal` resolves to the same place and is more readable,
+provided the nginx container has it mapped.
+
+Because the app ports are on `0.0.0.0`, the site also answers on
+`http://<ip>:3003`, bypassing TLS and the vhost. **The firewall is what closes
+that** — see below. If nginx ever moves onto the host itself, set
+`WEB_BIND=127.0.0.1`, `API_BIND=127.0.0.1` and `MINIO_BIND=127.0.0.1`, which is
+both reachable and stricter in that arrangement.
 
 ### Order of operations — TLS before the first deploy
 
@@ -86,8 +102,11 @@ aaPanel rewrites vhosts when site settings change and will silently discard
 hand edits. Anything the UI cannot express belongs in the site's
 **Config File** panel, which aaPanel preserves.
 
-For the site domain, proxy to `http://127.0.0.1:3003`; for the API domain, to
-`http://127.0.0.1:3101`. The generated config needs two additions:
+For the site domain, proxy to `http://172.17.0.1:3003`; for the API domain, to
+`http://172.17.0.1:3101` — the Docker bridge address, not `127.0.0.1`, which
+from inside the nginx container points at that container itself. Confirm the
+address with the `docker network inspect` command above. The generated config
+needs two additions:
 
 ```nginx
 # Uploads: floor plans and photos exceed nginx's 1MB default, which fails as a
@@ -109,22 +128,41 @@ images from it, so a localhost value means blank social cards as well as broken
 images. MinIO's S3 port is on loopback, so it needs its own proxy.
 
 Simplest is a subdomain (`media.example.com`) reverse-proxied to
-`http://127.0.0.1:19002`, with `MEDIA_PUBLIC_BASE_URL=https://media.example.com`.
+`http://172.17.0.1:19002`, with `MEDIA_PUBLIC_BASE_URL=https://media.example.com`.
 Proxy only port 19002 — never the 19003 console, which is an admin login.
 
 Because this value is read at runtime by the backend rather than inlined, it
 takes effect on restart without a rebuild.
 
-### Firewall
+### Firewall — the only thing closing the app ports
 
-In aaPanel → Security, only 80, 443, the SSH port and the panel port should be
-open. The loopback bindings above mean the container ports are unreachable from
-outside regardless, but the two together are what keeps a future
-`0.0.0.0` mapping from quietly becoming an exposure.
+Because nginx is containerised, `3003`, `3101` and `19002` are published on
+`0.0.0.0`. Nothing but the firewall keeps them off the public internet. In
+aaPanel → Security, only 80, 443, the SSH port and the panel port should be
+open.
 
-Note that Docker's iptables rules normally bypass host firewalls entirely — a
-`0.0.0.0` published port is reachable even when the panel shows it closed. That
-is precisely why the bindings, not the firewall, are the real control here.
+**Verify rather than assume.** Docker writes its own iptables rules in the
+`DOCKER` chain, which are consulted before the `INPUT` chain most firewall UIs
+manage — so a published port can stay reachable even when the panel shows it
+closed. Check from somewhere other than the server:
+
+```bash
+curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://<server-ip>:3003   # want: timeout/refused
+curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://<server-ip>:3101   # want: timeout/refused
+```
+
+If either answers, the firewall is not actually filtering Docker's traffic. Add
+an explicit DOCKER-USER rule, which Docker consults before its own published-port
+rules and does not rewrite:
+
+```bash
+sudo iptables -I DOCKER-USER ! -i docker0 -p tcp -m multiport \
+  --dports 3003,3101,19002 -j DROP
+```
+
+Persist it (`iptables-persistent`, or aaPanel's startup hooks), or it is lost on
+reboot. Postgres, Redis and the MinIO console are on loopback and unaffected
+either way.
 
 ### Required — the deploy fails without these
 
