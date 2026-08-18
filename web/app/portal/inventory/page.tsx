@@ -21,6 +21,19 @@ import {
   hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
+/**
+ * The catalogue, for the movement form's picker.
+ *
+ * Loaded separately from stock levels because a variant only gets a StockLevel
+ * row once stock has been recorded against it -- so a product that has just
+ * been added has none, and driving the picker from levels made its first
+ * purchase impossible to record.
+ */
+type CatalogueProduct = {
+  id: string; name: string; sku: string; brand?: string | null; isActive: boolean;
+  variants: { id: string; sku: string; name: string; isActive: boolean }[];
+};
+
 type Store = { id: string; code: string; name: string };
 
 type Level = {
@@ -53,6 +66,9 @@ export default function InventoryPage() {
   const [levels, setLevels] = useState<Level[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [catalogue, setCatalogue] = useState<CatalogueProduct[]>([]);
+  /** What is typed into the Product / size autocomplete. */
+  const [variantQuery, setVariantQuery] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
   const [tab, setTab] = useState<'levels' | 'movements'>('levels');
@@ -71,14 +87,16 @@ export default function InventoryPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [levelRows, movementRows, storeRows] = await Promise.all([
+      const [levelRows, movementRows, storeRows, productRows] = await Promise.all([
         apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Movement[]>('/inventory/movements?take=200', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
+        apiRequest<CatalogueProduct[]>('/products', { method: 'GET' }, authToken),
       ]);
       setLevels(levelRows);
       setMovements(movementRows);
       setStores(storeRows);
+      setCatalogue(productRows);
       setForm((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
     } catch (error) {
       setErrorMessage(error);
@@ -106,6 +124,43 @@ export default function InventoryPage() {
     [levels, storeFilter, lowOnly],
   );
 
+  /**
+   * Every sellable variant, whether or not it has stock anywhere.
+   *
+   * Quantity is looked up per store so the picker can still show "12 in stock",
+   * but a variant with no StockLevel row shows "no stock yet" instead of being
+   * omitted -- which is the whole point: that is exactly the variant someone is
+   * here to record a first purchase against.
+   */
+  const variantOptions = useMemo(() => {
+    const quantityFor = new Map(
+      levels
+        .filter((row) => !form.storeId || row.store.id === form.storeId)
+        .map((row) => [row.variant.id, row.quantity] as const),
+    );
+    return catalogue
+      .filter((product) => product.isActive)
+      .flatMap((product) =>
+        product.variants
+          .filter((variant) => variant.isActive)
+          .map((variant) => ({
+            id: variant.id,
+            sku: variant.sku,
+            label: `${product.name} — ${variant.name}`,
+            // Brand and SKU are searchable but not shown: someone types "AF1"
+            // or "Nike" as readily as the full product name.
+            haystack: `${product.name} ${product.sku} ${product.brand ?? ''} ${variant.name} ${variant.sku}`.toLowerCase(),
+            quantity: quantityFor.get(variant.id) ?? null,
+          })),
+      );
+  }, [catalogue, levels, form.storeId]);
+
+  const variantMatches = useMemo(() => {
+    const query = variantQuery.trim().toLowerCase();
+    if (!query) return variantOptions.slice(0, 50);
+    return variantOptions.filter((option) => option.haystack.includes(query)).slice(0, 50);
+  }, [variantOptions, variantQuery]);
+
   const controls = useListControls(levelRows, (row) => [row.productName, row.sku, row.size, row.storeName]);
   const canRecord = hasPermission(profile, 'stock-movement.create');
   const canCreateOffer = hasPermission(profile, 'offer.create');
@@ -113,6 +168,14 @@ export default function InventoryPage() {
   async function onRecord(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
+    // Typing a product name without picking a suggestion leaves variantId
+    // empty. Checked here rather than with a required attribute: the field
+    // holding the id is hidden, and browsers exempt hidden inputs from
+    // constraint validation, so the form would have submitted regardless.
+    if (!form.variantId) {
+      setErrorMessage('Pick a product and size from the list.');
+      return;
+    }
     setSaving(true);
     try {
       await apiRequest('/inventory/movements', {
@@ -121,6 +184,7 @@ export default function InventoryPage() {
       }, token);
       setFeedback('Stock movement recorded.');
       setForm((prev) => ({ ...prev, variantId: '', quantity: '', reference: '' }));
+      setVariantQuery('');
       await load(token);
     } catch (error) {
       setErrorMessage(error);
@@ -197,17 +261,43 @@ export default function InventoryPage() {
                     </label>
                     <label>
                       <span>Product / size</span>
-                      <select value={form.variantId} required
-                        onChange={(event) => setForm((prev) => ({ ...prev, variantId: event.target.value }))}>
-                        <option value="">Choose…</option>
-                        {levels
-                          .filter((row) => !form.storeId || row.store.id === form.storeId)
-                          .map((row) => (
-                            <option key={row.variant.id} value={row.variant.id}>
-                              {row.variant.product.name} — {row.variant.name} ({row.quantity} in stock)
-                            </option>
-                          ))}
-                      </select>
+                      {/*
+                        A datalist rather than a select: the catalogue is a few
+                        hundred variants once every size is listed, and scrolling
+                        that to find one shoe is slower than typing three letters
+                        of it. Falls back to a plain text input everywhere, and
+                        the hidden required field below is what actually gates
+                        submission, so a typed-but-unmatched value cannot be sent.
+                      */}
+                      <input
+                        list="inventory-variant-options"
+                        value={variantQuery}
+                        placeholder="Type a product, size or SKU…"
+                        onChange={(event) => {
+                          const typed = event.target.value;
+                          setVariantQuery(typed);
+                          // The datalist submits the option's value, which is
+                          // the SKU: unique, and what someone reading a delivery
+                          // note has in front of them.
+                          const picked = variantOptions.find((option) => option.sku === typed);
+                          setForm((prev) => ({ ...prev, variantId: picked?.id ?? '' }));
+                        }}
+                      />
+                      <datalist id="inventory-variant-options">
+                        {variantMatches.map((option) => (
+                          <option key={option.id} value={option.sku}>
+                            {option.label}
+                            {option.quantity === null
+                              ? ' · no stock yet'
+                              : ` · ${option.quantity} in stock`}
+                          </option>
+                        ))}
+                      </datalist>
+                      <small className="portal-muted">
+                        {form.variantId
+                          ? variantOptions.find((option) => option.id === form.variantId)?.label
+                          : 'Products with no stock yet are listed too — that is how a first purchase is recorded.'}
+                      </small>
                     </label>
                   </div>
                   <div className="portal-entity-grid-3">
