@@ -42,8 +42,23 @@ type Product = {
 type Category = { id: string; name: string; slug: string };
 
 const BLANK = { sku: '', name: '', brand: '', categoryId: '', description: '' };
-/** Shoes sell by size, so a new product starts with the usual run. */
-const DEFAULT_SIZES = ['EUR 39', 'EUR 41', 'EUR 42', 'EUR 43', 'EUR 44'];
+
+/**
+ * Every size the shop stocks, smallest to largest.
+ *
+ * The picker offers this whole span and the user ticks what a given shoe
+ * actually came in -- runs vary by model (36-42 on one, 40-45 on another), and
+ * gaps within a run are normal rather than exceptional.
+ */
+const SIZE_RANGE = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
+/** Stored as "EUR 39" -- matches every variant already in the catalogue. */
+const sizeLabel = (size: number) => `EUR ${size}`;
+/**
+ * The run a new product starts with. Previously every product was created with
+ * exactly these sizes and no way to change it, which is why the catalogue has
+ * no 40s: the default was silently the only option.
+ */
+const DEFAULT_SIZES = [39, 41, 42, 43, 44];
 
 export default function CataloguePage() {
   const dialog = usePortalDialog();
@@ -63,6 +78,12 @@ export default function CataloguePage() {
   const [cost, setCost] = useState('');
   const [resellerPrice, setResellerPrice] = useState('');
   const [wholesalePrice, setWholesalePrice] = useState('');
+  /** Sizes ticked for the product being created, as numbers from SIZE_RANGE. */
+  const [sizes, setSizes] = useState<number[]>(DEFAULT_SIZES);
+  /** The product being duplicated, or null when the panel is closed. */
+  const [duplicateOf, setDuplicateOf] = useState<Product | null>(null);
+  const [duplicateForm, setDuplicateForm] = useState({ sku: '', name: '' });
+  const [duplicating, setDuplicating] = useState(false);
   /** variantId -> draft cost, while a row is being edited. */
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({});
   const [savingVariant, setSavingVariant] = useState<string | null>(null);
@@ -158,9 +179,47 @@ export default function CataloguePage() {
     }
   }
 
+  /**
+   * Creates a copy of a product with its whole size run and price tiers.
+   *
+   * The copy is inactive and unstocked, so it lands in the list needing a
+   * deliberate Reactivate before it can be sold -- a colourway that has not
+   * been received yet should not be orderable.
+   */
+  async function onDuplicate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !duplicateOf) return;
+    setDuplicating(true);
+    try {
+      const created = await apiRequest<Product>(`/products/${duplicateOf.id}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          sku: duplicateForm.sku.trim().toUpperCase(),
+          name: duplicateForm.name.trim(),
+        }),
+      }, token);
+      setFeedback(
+        `${created.name} created from ${duplicateOf.name} with ${created.variants.length} size(s). It is inactive until you reactivate it.`,
+      );
+      setDuplicateOf(null);
+      setDuplicateForm({ sku: '', name: '' });
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setDuplicating(false);
+    }
+  }
+
   async function onCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
+    // A product with no variants cannot be sold at all, so this is refused
+    // here rather than creating a shell someone has to notice and fix later.
+    if (sizes.length === 0) {
+      setErrorMessage('Pick at least one size — a product with no sizes cannot be sold.');
+      return;
+    }
     setSaving(true);
     try {
       const unitPrice = Number(price);
@@ -174,11 +233,13 @@ export default function CataloguePage() {
           ...form,
           categoryId: form.categoryId || undefined,
           imageUrls: images.length ? images : undefined,
-          // One variant per size at the same price; edit individually after.
-          variants: DEFAULT_SIZES.map((size) => ({
-            sku: `${form.sku}-${size.replace(/\s+/g, '')}`,
-            name: size,
-            attributes: { size },
+          // One variant per ticked size at the same price; edit individually
+          // after. Sorted so the sizes read smallest-first however they were
+          // ticked, which is also the order the table shows them in.
+          variants: [...sizes].sort((a, b) => a - b).map((size) => ({
+            sku: `${form.sku}-EUR${size}`,
+            name: sizeLabel(size),
+            attributes: { size: sizeLabel(size) },
             priceKes: unitPrice,
             costKes: optionalNumber(cost),
             resellerPriceKes: optionalNumber(resellerPrice),
@@ -186,9 +247,9 @@ export default function CataloguePage() {
           })),
         }),
       }, token);
-      setFeedback(`${form.name} added with ${DEFAULT_SIZES.length} sizes.`);
+      setFeedback(`${form.name} added with ${sizes.length} size${sizes.length === 1 ? '' : 's'}.`);
       setForm(BLANK); setPrice(''); setCost(''); setResellerPrice('');
-      setWholesalePrice(''); setImages([]); setShowForm(false);
+      setWholesalePrice(''); setImages([]); setSizes(DEFAULT_SIZES); setShowForm(false);
       await load(token);
     } catch (error) {
       setErrorMessage(error);
@@ -374,6 +435,51 @@ export default function CataloguePage() {
                   </div>
 
                   <label>
+                    <span>Sizes</span>
+                    <div className="portal-size-picker">
+                      {SIZE_RANGE.map((size) => {
+                        const picked = sizes.includes(size);
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            aria-pressed={picked}
+                            className={`portal-size-toggle${picked ? ' is-picked' : ''}`}
+                            onClick={() =>
+                              setSizes((prev) =>
+                                prev.includes(size)
+                                  ? prev.filter((value) => value !== size)
+                                  : [...prev, size],
+                              )
+                            }
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="portal-inline-actions">
+                      <button type="button" className="portal-inline-btn"
+                        onClick={() => setSizes(SIZE_RANGE)}>
+                        All
+                      </button>
+                      <button type="button" className="portal-inline-btn"
+                        onClick={() => setSizes(DEFAULT_SIZES)}>
+                        Usual run
+                      </button>
+                      <button type="button" className="portal-inline-btn"
+                        onClick={() => setSizes([])}>
+                        Clear
+                      </button>
+                    </div>
+                    <small className="portal-muted">
+                      {sizes.length
+                        ? `${sizes.length} size${sizes.length === 1 ? '' : 's'}, all at the price above. Adjust individually afterwards.`
+                        : 'Pick at least one size.'}
+                    </small>
+                  </label>
+
+                  <label>
                     <span>Images</span>
                     <div className="portal-inline-actions">
                       <button type="button" className="portal-inline-btn" onClick={() => setPickerOpen(true)}>
@@ -476,6 +582,21 @@ export default function CataloguePage() {
                           <Link href={`/portal/catalogue/${product.id}`} className="portal-inline-btn">
                             Manage
                           </Link>
+                          {canCreate ? (
+                            <button
+                              type="button"
+                              className="portal-inline-btn"
+                              onClick={() => {
+                                setDuplicateOf(product);
+                                // Prefilled from the source so the usual case --
+                                // another colourway -- is an edit rather than
+                                // retyping the model name from scratch.
+                                setDuplicateForm({ sku: '', name: product.name });
+                              }}
+                            >
+                              Duplicate
+                            </button>
+                          ) : null}
                           {canUpdate ? (
                             <button
                               type="button"
@@ -499,6 +620,57 @@ export default function CataloguePage() {
                           ) : null}
                         </div>
                       </div>
+
+                      {duplicateOf?.id === product.id ? (
+                        <div className="portal-media-section">
+                          <h3 style={{ margin: 0 }}>Duplicate {product.name}</h3>
+                          <p className="portal-muted" style={{ margin: '4px 0 12px' }}>
+                            Copies the description, images and all {product.variants.length} size(s)
+                            with their prices. Stock is not copied, and the copy starts inactive.
+                          </p>
+                          <form className="portal-entity-form" onSubmit={onDuplicate}>
+                            <div className="portal-entity-grid-2">
+                              <label>
+                                <span>New SKU</span>
+                                <input
+                                  value={duplicateForm.sku}
+                                  placeholder={`${product.sku}-2`}
+                                  required
+                                  onChange={(event) => setDuplicateForm((prev) => ({
+                                    ...prev, sku: event.target.value.toUpperCase(),
+                                  }))}
+                                />
+                                <small className="portal-muted">
+                                  Each size gets its own SKU built from this one.
+                                </small>
+                              </label>
+                              <label>
+                                <span>New name</span>
+                                <input
+                                  value={duplicateForm.name}
+                                  placeholder="Air Force 1 Black"
+                                  required
+                                  onChange={(event) => setDuplicateForm((prev) => ({
+                                    ...prev, name: event.target.value,
+                                  }))}
+                                />
+                              </label>
+                            </div>
+                            <div className="portal-inline-actions">
+                              <button type="submit" className="portal-primary-btn" disabled={duplicating}>
+                                {duplicating ? 'Copying...' : 'Create Copy'}
+                              </button>
+                              <button
+                                type="button"
+                                className="portal-ghost-btn"
+                                onClick={() => setDuplicateOf(null)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      ) : null}
 
                       {imageFor?.id === product.id ? (
                         <div className="portal-media-section">

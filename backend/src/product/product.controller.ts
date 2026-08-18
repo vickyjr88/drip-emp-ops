@@ -5,6 +5,7 @@ import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { ProductService } from './product.service';
 import { CreateProductDto, CreateVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto, UpdateVariantDto } from './dto/update-product.dto';
+import { DuplicateProductDto } from './dto/duplicate-product.dto';
 
 @ApiBearerAuth()
 @ApiTags('products')
@@ -60,6 +61,14 @@ export class ProductController {
   @Permissions(buildPermissionKey('Product', 'delete'))
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  // Creating a new product from an existing one, so 'create' rather than
+  // 'update': the caller ends up with a product they did not have before.
+  @Post(':id/duplicate')
+  @Permissions(buildPermissionKey('Product', 'create'))
+  duplicate(@Param('id') id: string, @Body() dto: DuplicateProductDto) {
+    return this.service.duplicate(id, dto);
   }
 
   @Post(':id/variants')

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, CreateVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto, UpdateVariantDto } from './dto/update-product.dto';
+import { DuplicateProductDto } from './dto/duplicate-product.dto';
 
 const INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -168,6 +169,80 @@ export class ProductService {
       );
     }
     return this.prisma.product.delete({ where: { id } });
+  }
+
+  /**
+   * Copy a product, its details and its whole size run.
+   *
+   * The shop sells the same shoe in several colourways, each with the same
+   * sizes and the same three price tiers, so creating the second one by hand
+   * means re-entering a dozen rows that differ only by SKU.
+   *
+   * The copy starts inactive and unstocked. Stock levels and movements are
+   * deliberately not copied: the shoes have not been received yet, and a copy
+   * that claimed stock it does not have would be sellable immediately.
+   */
+  async duplicate(id: string, dto: DuplicateProductDto) {
+    const source = await this.findOne(id);
+
+    const clash = await this.prisma.product.findFirst({
+      where: { sku: dto.sku },
+      select: { id: true },
+    });
+    if (clash) {
+      throw new BadRequestException(`SKU ${dto.sku} is already used by another product.`);
+    }
+
+    // Variant SKUs are rebuilt from the new product SKU, keeping whatever
+    // suffix distinguished them on the source ("AF1-WHT-EUR39" -> "AF1-BLK-EUR39").
+    // A variant whose SKU did not follow that shape falls back to its name, so
+    // hand-entered SKUs still produce something unique rather than colliding.
+    const variants = source.variants.map((variant) => {
+      const suffix = variant.sku.startsWith(`${source.sku}-`)
+        ? variant.sku.slice(source.sku.length + 1)
+        : variant.name.replace(/\s+/g, '');
+      return {
+        sku: `${dto.sku}-${suffix}`.toUpperCase(),
+        name: variant.name,
+        attributes: (variant.attributes ?? undefined) as Prisma.InputJsonValue | undefined,
+        priceKes: variant.priceKes,
+        resellerPriceKes: variant.resellerPriceKes,
+        wholesalePriceKes: variant.wholesalePriceKes,
+        costKes: variant.costKes,
+        isActive: variant.isActive,
+      };
+    });
+
+    // Every variant SKU is unique overall, not just within this product, so a
+    // second copy of the same source would collide. Caught here to name the
+    // offending SKU rather than surfacing a raw Prisma constraint error.
+    const taken = await this.prisma.productVariant.findFirst({
+      where: { sku: { in: variants.map((variant) => variant.sku) } },
+      select: { sku: true },
+    });
+    if (taken) {
+      throw new BadRequestException(
+        `Variant SKU ${taken.sku} already exists. Choose a different product SKU for the copy.`,
+      );
+    }
+
+    return this.prisma.product.create({
+      data: {
+        sku: dto.sku,
+        name: dto.name,
+        slug: await this.uniqueSlug(dto.name),
+        description: source.description,
+        brand: dto.brand ?? source.brand,
+        categoryId: dto.categoryId ?? source.categoryId,
+        imageUrls: (source.imageUrls ?? undefined) as Prisma.InputJsonValue | undefined,
+        featuredImageUrl: source.featuredImageUrl,
+        // Inactive so the copy cannot be sold before someone has checked the
+        // details and received stock against it.
+        isActive: false,
+        ...(variants.length ? { variants: { create: variants } } : {}),
+      },
+      include: INCLUDE,
+    });
   }
 
   // --- variants ------------------------------------------------------------

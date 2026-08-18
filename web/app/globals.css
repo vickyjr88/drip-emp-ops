@@ -5030,6 +5030,42 @@ img {
     gap: 10px;
   }
 
+  /* Size picker: the 36-46 run on the Add Product form. Toggles rather than a
+     multi-select, because the shop is answering "which sizes did this come
+     in", scanning a short numeric row, not searching a list. */
+  .portal-size-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 8px;
+  }
+
+  .portal-size-toggle {
+    box-sizing: border-box;
+    min-width: 44px;
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid var(--eef-border);
+    background: #fff;
+    color: #1f2121;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .portal-size-toggle:hover {
+    border-color: #1a1c1c;
+  }
+
+  /* Picked reads as filled rather than merely outlined: at a glance the row
+     should show the run as a block, so a gap in the middle is obvious. */
+  .portal-size-toggle.is-picked {
+    background: #1a1c1c;
+    border-color: #1a1c1c;
+    color: #fff;
+  }
+
   .portal-inline-actions .portal-primary-btn,
   .portal-inline-actions .portal-ghost-btn {
     min-height: 40px;
