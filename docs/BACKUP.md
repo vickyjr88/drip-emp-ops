@@ -52,11 +52,25 @@ It should not be the machine being backed up.
    cd /opt/drip-emporium && ./scripts/backup.sh
    ```
 
-4. **Schedule it**, as the deploy user:
+4. **Schedule it**, as the deploy user (`crontab -e`):
 
    ```cron
-   30 2 * * * cd /opt/drip-emporium && ./scripts/backup.sh >> /var/log/dripemporium-backup.log 2>&1
+   30 2 * * * cd /opt/drip-emporium && ./scripts/backup.sh >> /opt/drip-emporium/backups/backup.log 2>&1
    ```
+
+   The log deliberately does **not** go in `/var/log`: that is not writable by a
+   non-root user, so the redirect fails, cron discards the output, and a failing
+   backup reports nothing at all. `backups/` is created by the script and is
+   gitignored.
+
+   Do not schedule this through aaPanel's Cron UI. Its jobs run as root, and a
+   root-run backup writes `backups/` and the rsync key usage as root — after
+   which the deploy user's own runs fail on permissions. Use the deploy user's
+   own crontab, since that is the user whose SSH key the backup host trusts.
+
+   Check after the first scheduled night that the log has content and that the
+   remote `daily/` directory gained a dated folder. A cron job that never fires
+   looks identical to one that fires and succeeds silently.
 
 ## What the nightly run does
 

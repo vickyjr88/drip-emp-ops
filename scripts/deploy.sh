@@ -11,7 +11,6 @@
 set -Eeuo pipefail
 
 DEPLOY_REF="${DEPLOY_REF:-origin/main}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3100/health}"
 HEALTH_RETRIES="${HEALTH_RETRIES:-30}"
 HEALTH_DELAY="${HEALTH_DELAY:-5}"
 # Off by default: prisma/seed.js inserts demo projects, units, customers and
@@ -72,6 +71,17 @@ if grep -qE '^NEXT_PUBLIC_SITE_URL=https?://(localhost|127\.0\.0\.1)' .env; then
   [[ "${ALLOW_LOCALHOST_SITE_URL:-false}" == "true" ]] || exit 1
 fi
 echo "Deploying as $(whoami) in $(pwd)"
+
+# The health gate polls from the host, so it has to use the *published* port,
+# not the container-internal 3100 that compose maps onto it. Hardcoding 3100
+# here meant the gate could never connect: it burned all its attempts and
+# failed every deploy that got that far. Read API_PORT from .env so an
+# overridden port still works, matching the default in docker-compose.yml.
+#
+# Parsed rather than sourced for the same reason as backup.sh: an unquoted
+# value with spaces would make `source` run the rest of the line as a command.
+API_PORT="$(sed -nE 's/^API_PORT=([0-9]+).*/\1/p' .env | tail -1)"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:${API_PORT:-3101}/health}"
 
 log "Pulling ${DEPLOY_REF}"
 # SKIP_FETCH lets a manual run redeploy the checkout that is already on disk,

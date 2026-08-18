@@ -24,7 +24,12 @@ services:
     ports:
       # host:container. Next binds 3002 inside the container and logs that
       # port on startup -- the site is reached on WEB_PORT from the host.
-      - "${WEB_PORT:-3003}:3002"
+      #
+      # Loopback only: nginx terminates TLS and proxies to this port from the
+      # same host. Published on 0.0.0.0 the site is also reachable on
+      # http://<ip>:3003, bypassing TLS and the panel's vhost entirely.
+      # Set WEB_BIND=0.0.0.0 for a bare host with no reverse proxy in front.
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3003}:3002"
     environment:
       # Server-side rendering runs inside this container, where localhost is the
       # web app itself. Server fetches must go to the backend service directly;
@@ -40,7 +45,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "${API_PORT:-3101}:3100"
+      # Loopback only, same reasoning as the web service: nginx proxies the
+      # public API origin here. Override with API_BIND=0.0.0.0 if the API must
+      # be reachable directly, without a proxy in front.
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-3101}:3100"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       # No default: auth falls back to a hardcoded dev key when this is unset,
@@ -115,7 +123,11 @@ services:
     volumes:
       - redis-data:/data
     ports:
-      - "${REDIS_PORT:-16380}:6379"
+      # Bound to the loopback interface. Published as 0.0.0.0 this is an open
+      # Redis on a public Contabo IP, which takes no password at all by default.
+      # Nothing outside the Compose network needs it; the backend reaches it as
+      # `redis:6379` over the internal network, not through this mapping.
+      - "127.0.0.1:${REDIS_PORT:-16380}:6379"
     restart: unless-stopped
 
   db:
@@ -132,7 +144,11 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     ports:
-      - "${DB_PORT:-15433}:5432"
+      # Loopback only. Published on all interfaces this is the customer database
+      # exposed to the internet behind nothing but POSTGRES_PASSWORD. The mapping
+      # is kept for psql/pg_dump over an SSH tunnel; the backend and backup.sh
+      # both reach Postgres as `db:5432` inside the Compose network instead.
+      - "127.0.0.1:${DB_PORT:-15433}:5432"
     restart: unless-stopped
 
   minio:
@@ -142,8 +158,13 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "${MINIO_HOST_PORT:-19002}:9000"
-      - "${MINIO_CONSOLE_HOST_PORT:-19003}:9001"
+      # Loopback only, for both. nginx proxies the S3 API port to serve uploaded
+      # media publicly (see MEDIA_PUBLIC_BASE_URL in docs/DEPLOYMENT.md), and it
+      # runs on this host, so it reaches 127.0.0.1 fine. The console is an admin
+      # login that has no business being on a public IP -- reach it through an
+      # SSH tunnel: ssh -L 19003:127.0.0.1:19003 user@host
+      - "127.0.0.1:${MINIO_HOST_PORT:-19002}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-19003}:9001"
     volumes:
       - minio-data:/data
     restart: unless-stopped

@@ -16,8 +16,11 @@
 #   BACKUP_REMOTE_DIR    absolute path on the target, e.g. /srv/dripemporium-backups
 #   BACKUP_SSH_KEY       optional path to the private key
 #
-# Cron, as the deploy user:
-#   30 2 * * * cd /opt/drip-emporium && ./scripts/backup.sh >> /var/log/dripemporium-backup.log 2>&1
+# Cron, as the deploy user. The log lives under the deploy dir because /var/log
+# is not writable by a non-root user: that redirect fails, cron discards the
+# output, and a failing backup then reports nothing at all -- the exact silent
+# failure the verification below exists to prevent.
+#   30 2 * * * cd /opt/drip-emporium && ./scripts/backup.sh >> /opt/drip-emporium/backups/backup.log 2>&1
 
 set -Eeuo pipefail
 
@@ -40,6 +43,10 @@ trap cleanup EXIT
 if [[ ! -f .env ]]; then
   fail "no .env in $(pwd)"
 fi
+
+# The documented cron line redirects into here. Create it so the very first
+# scheduled run cannot fail on a missing directory before it logs anything.
+mkdir -p ./backups
 # Parse .env rather than sourcing it: an unquoted value containing spaces
 # (BREVO_SENDER_NAME, for one) makes `source` try to run the rest as a command.
 # This reads KEY=VALUE lines literally, which is what compose does too.

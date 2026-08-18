@@ -9,3 +9,8 @@ stitch_realtor_landing_page/
 stitch_realtor_landing_page.zip
 **/.next/
 **/tsconfig.tsbuildinfo
+
+# Local backup artefacts: the cron log, and the pre-restore safety snapshots
+# restore.sh takes. These are database dumps of live customer data -- they must
+# never be committable.
+backups/

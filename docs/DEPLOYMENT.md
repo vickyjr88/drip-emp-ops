@@ -33,6 +33,99 @@ run `docker` without `sudo` (`sudo usermod -aG docker "$USER"`, then re-login).
 The server also needs a deploy key or PAT with read access to the repo, since
 the script does `git fetch` as that user.
 
+## Reverse proxy: aaPanel and nginx
+
+The VPS runs aaPanel with nginx. nginx owns 80/443 and terminates TLS; every
+container port is bound to `127.0.0.1` and is reachable only through it.
+
+### Ports
+
+Compose publishes on loopback only — `127.0.0.1:<port>` rather than `0.0.0.0`.
+Published on all interfaces, Postgres and the MinIO console would be exposed on
+a public Contabo IP behind nothing but a password, and the site would also be
+reachable on `http://<ip>:3003`, bypassing TLS and the vhost.
+
+| Service | Host port | Reached via |
+|---|---|---|
+| web (Next.js) | `3003` | nginx vhost for the site domain |
+| backend (API) | `3101` | nginx vhost for the API domain |
+| MinIO S3 | `19002` | nginx, for `MEDIA_PUBLIC_BASE_URL` |
+| MinIO console | `19003` | SSH tunnel only — never proxy this |
+| Postgres | `15433` | SSH tunnel only |
+| Redis | `16380` | SSH tunnel only |
+
+None collide with aaPanel itself (panel on `8888`, phpMyAdmin on `888`). To
+reach an admin-only port, tunnel rather than open the firewall:
+
+```bash
+ssh -L 19003:127.0.0.1:19003 deploy@<host>   # then http://127.0.0.1:19003
+```
+
+If you ever run this on a bare host with no proxy in front, `WEB_BIND=0.0.0.0`
+and `API_BIND=0.0.0.0` restore the old behaviour.
+
+### Order of operations — TLS before the first deploy
+
+`NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_API_BASE_URL` are inlined into the
+browser bundle at build time (see the build-time table below). They must
+already be the `https://` origins when the deploy builds, so the certificate
+has to exist first. Deploying before issuing certs bakes `http://` URLs into
+the bundle, which then fail as mixed content once TLS is on — and the fix is a
+full rebuild, not a restart.
+
+1. Point the site and API DNS records at the VPS.
+2. In aaPanel → Website, create a site for each domain (site + API). Let it
+   create the vhost; there is no PHP or document root involved.
+3. Issue Let's Encrypt certificates for both, and turn on Force HTTPS.
+4. Only then set the `https://` origins in `.env` and deploy.
+
+### Proxy configuration
+
+Use aaPanel's **Website → Reverse Proxy** UI, not hand-edited vhost files.
+aaPanel rewrites vhosts when site settings change and will silently discard
+hand edits. Anything the UI cannot express belongs in the site's
+**Config File** panel, which aaPanel preserves.
+
+For the site domain, proxy to `http://127.0.0.1:3003`; for the API domain, to
+`http://127.0.0.1:3101`. The generated config needs two additions:
+
+```nginx
+# Uploads: floor plans and photos exceed nginx's 1MB default, which fails as a
+# 413 the portal surfaces only as a generic upload error.
+client_max_body_size 50m;
+
+# Long-running report and export requests outlive the 60s default.
+proxy_read_timeout 300s;
+```
+
+Keep the forwarding headers the UI generates — `Host`, `X-Forwarded-For` and
+especially `X-Forwarded-Proto`, without which the app builds `http://` links
+behind an `https://` proxy.
+
+### Serving uploaded media
+
+`MEDIA_PUBLIC_BASE_URL` must be publicly reachable: link-preview scrapers fetch
+images from it, so a localhost value means blank social cards as well as broken
+images. MinIO's S3 port is on loopback, so it needs its own proxy.
+
+Simplest is a subdomain (`media.example.com`) reverse-proxied to
+`http://127.0.0.1:19002`, with `MEDIA_PUBLIC_BASE_URL=https://media.example.com`.
+Proxy only port 19002 — never the 19003 console, which is an admin login.
+
+Because this value is read at runtime by the backend rather than inlined, it
+takes effect on restart without a rebuild.
+
+### Firewall
+
+In aaPanel → Security, only 80, 443, the SSH port and the panel port should be
+open. The loopback bindings above mean the container ports are unreachable from
+outside regardless, but the two together are what keeps a future
+`0.0.0.0` mapping from quietly becoming an exposure.
+
+Note that Docker's iptables rules normally bypass host firewalls entirely — a
+`0.0.0.0` published port is reachable even when the panel shows it closed. That
+is precisely why the bindings, not the firewall, are the real control here.
+
 ### Required — the deploy fails without these
 
 | Variable | Notes |
@@ -152,9 +245,11 @@ reviewers there if you want deploys gated on approval.
    deductions, reminder ladders — are applied by `prisma/bootstrap.js` from the
    container entrypoint on every start.
 7. **Restart** — `docker compose up -d --remove-orphans`.
-8. **Health gate** — polls `/health` (up to 30 × 5s). The endpoint runs
-   `SELECT 1`, so a container that is listening but cannot reach Postgres fails
-   the deploy rather than being reported as a success.
+8. **Health gate** — polls `/health` on the published API port (`API_PORT`,
+   default `3101`) up to 30 × 5s. The endpoint runs `SELECT 1`, so a container
+   that is listening but cannot reach Postgres fails the deploy rather than
+   being reported as a success. Override the whole URL with `HEALTH_URL` if the
+   API is published somewhere unusual.
 9. **Complete** — the run summary records commit, ref, host, and whether seeding
    ran.
 
