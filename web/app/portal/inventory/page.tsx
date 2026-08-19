@@ -387,7 +387,7 @@ export default function InventoryPage() {
               </article>
             ) : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="inventory.levels">
               <div className="portal-card-header-row">
                 <div className="portal-action-row">
                   <button type="button"

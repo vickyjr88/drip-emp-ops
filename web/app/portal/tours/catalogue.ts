@@ -170,6 +170,35 @@ export const TOURS: Tour[] = [
     ],
   },
   {
+    id: 'work-with-resellers',
+    title: 'Work with resellers',
+    goal: 'Hand out stock and settle what comes back',
+    permission: 'consignment.create',
+    steps: [
+      {
+        route: '/portal/resellers',
+        anchor: 'resellers.list',
+        placement: 'bottom',
+        title: 'Resellers are trade accounts',
+        body: 'A reseller buys or holds stock on different terms to a retail customer. Register them here before issuing anything to them on consignment.',
+      },
+      {
+        route: '/portal/consignments',
+        anchor: 'consignments.issue',
+        placement: 'right',
+        title: 'Issuing a pickup',
+        body: 'Goods leave the shop floor but stay owned by you until sold or returned -- the price is fixed at the moment of issue, not when it eventually sells.',
+      },
+      {
+        route: '/portal/consignments',
+        anchor: 'consignments.list',
+        placement: 'top',
+        title: 'Settling what comes back',
+        body: 'When a reseller reports back, record what sold and what returned against the same pickup. What is still out and what is owed both show here until it is settled.',
+      },
+    ],
+  },
+  {
     id: 'offers-and-promos',
     title: 'Offers & Discounts',
     goal: 'Manage promotional pricing',
