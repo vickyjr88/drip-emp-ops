@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ReminderDispatchStatus, ReminderTargetType } from '@prisma/client';
+import { Prisma, ReminderTargetType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReminderEngineService } from './reminder-engine.service';
 import { ReminderQueueService } from './reminder-queue.service';
 import { CreateReminderRuleDto, UpdateReminderRuleDto } from './dto/reminder-rule.dto';
+import { ReminderLogQueryDto } from './dto/reminder-log-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class ReminderService {
@@ -125,24 +127,27 @@ export class ReminderService {
     });
   }
 
-  findLogs(params: {
-    status?: ReminderDispatchStatus;
-    targetType?: ReminderTargetType;
-    customerId?: string;
-    ruleId?: string;
-    take?: number;
-  }) {
-    return this.prisma.reminderLog.findMany({
-      where: {
-        ...(params.status ? { status: params.status } : {}),
-        ...(params.targetType ? { targetType: params.targetType } : {}),
-        ...(params.customerId ? { customerId: params.customerId } : {}),
-        ...(params.ruleId ? { ruleId: params.ruleId } : {}),
-      },
-      include: { rule: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(params.take ?? 100, 500),
-    });
+  findLogs(query: ReminderLogQueryDto) {
+    const { skip, take, search, status, targetType, customerId, ruleId } = query;
+    const where: Prisma.ReminderLogWhereInput = {
+      ...(status ? { status } : {}),
+      ...(targetType ? { targetType } : {}),
+      ...(customerId ? { customerId } : {}),
+      ...(ruleId ? { ruleId } : {}),
+      ...searchOr(search, (term) => containsAny(['recipientPhone', 'recipientEmail', 'rule.name'], term)),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.reminderLog.findMany({
+          where,
+          include: { rule: { select: { id: true, name: true } } },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.reminderLog.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async stats() {

@@ -137,11 +137,11 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
             )
           : Promise.resolve({ items: [] as CustomerOrder[] }),
         hasPermission(nextProfile, 'customer-document.read')
-          ? apiRequest<CustomerDocument[]>(
+          ? apiRequest<{ items: CustomerDocument[] }>(
               `/customer-documents?customerId=${customerId}&take=200`,
               { method: 'GET' },
               authToken,
-            )
+            ).then((page) => page.items)
           : Promise.resolve([]),
       ]);
 

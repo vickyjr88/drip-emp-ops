@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { OfferStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOfferDto, OfferLineDto, UpdateOfferDto } from './dto/offer.dto';
+import { OfferQueryDto } from './dto/offer-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 /** Below this, stock is old enough to be worth clearing. */
 const DEAD_STOCK_DAYS = 60;
@@ -191,13 +193,20 @@ export class OfferService {
     return round2(retail * (1 - (dto.percentOff ?? 0) / 100));
   }
 
-  async findAll(includeEnded = false) {
-    const offers = await this.prisma.offer.findMany({
-      where: includeEnded ? undefined : { status: { not: OfferStatus.ENDED } },
-      include: { lines: true },
-      orderBy: { createdAt: 'desc' },
-    });
-    return offers.map((offer) => this.decorate(offer));
+  async findAll(query: OfferQueryDto) {
+    const { skip, take, search, includeEnded } = query;
+    const where: Prisma.OfferWhereInput = {
+      ...(includeEnded ? {} : { status: { not: OfferStatus.ENDED } }),
+      ...searchOr(search, (term) => containsAny(['name', 'label'], term)),
+    };
+    const page = await paginate(
+      (args) =>
+        this.prisma.offer.findMany({ where, include: { lines: true }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...args }),
+      () => this.prisma.offer.count({ where }),
+      skip,
+      take,
+    );
+    return { ...page, items: page.items.map((offer) => this.decorate(offer)) };
   }
 
   async findOne(id: string, belowCostSkus: string[] = []) {

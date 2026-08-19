@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { nextReference } from '../common/next-reference';
+import { EmployeeQueryDto } from './dto/employee-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -41,35 +43,25 @@ export class HrService {
     });
   }
 
-  findEmployees(params: {
-    search?: string;
-    status?: string;
-    department?: string;
-    storeId?: string;
-    payType?: string;
-  } = {}) {
+  findEmployees(query: EmployeeQueryDto) {
+    const { skip, take, search, status, department, storeId, payType } = query;
     const where: Prisma.EmployeeWhereInput = {
-      ...(params.status ? { status: params.status as any } : {}),
-      ...(params.department ? { department: params.department } : {}),
-      ...(params.storeId ? { storeId: params.storeId } : {}),
-      ...(params.payType ? { payType: params.payType as any } : {}),
-      ...(params.search
-        ? {
-            OR: [
-              { firstName: { contains: params.search, mode: 'insensitive' } },
-              { lastName: { contains: params.search, mode: 'insensitive' } },
-              { employeeNumber: { contains: params.search, mode: 'insensitive' } },
-              { jobTitle: { contains: params.search, mode: 'insensitive' } },
-              { department: { contains: params.search, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...(status ? { status: status as any } : {}),
+      ...(department ? { department } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...(payType ? { payType: payType as any } : {}),
+      ...searchOr(search, (term) =>
+        containsAny(['firstName', 'lastName', 'employeeNumber', 'jobTitle', 'department'], term),
+      ),
     };
 
-    return this.prisma.employee.findMany({
-      where,
-      orderBy: [{ status: 'asc' }, { firstName: 'asc' }],
-    });
+    return paginate(
+      (args) =>
+        this.prisma.employee.findMany({ where, orderBy: [{ status: 'asc' }, { firstName: 'asc' }, { id: 'asc' }], ...args }),
+      () => this.prisma.employee.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async findEmployee(id: string) {

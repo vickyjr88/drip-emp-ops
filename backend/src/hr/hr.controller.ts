@@ -10,6 +10,7 @@ import {
   ReviewLeaveRequestDto,
   UpdateEmployeeDto,
 } from './dto/hr.dto';
+import { EmployeeQueryDto } from './dto/employee-query.dto';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 
@@ -29,14 +30,8 @@ export class HrController {
 
   @Get('employees')
   @Permissions(buildPermissionKey('Employee', 'read'))
-  findEmployees(
-    @Query('search') search?: string,
-    @Query('status') status?: string,
-    @Query('department') department?: string,
-    @Query('storeId') storeId?: string,
-    @Query('payType') payType?: string,
-  ) {
-    return this.service.findEmployees({ search: search?.trim() || undefined, status, department, storeId, payType });
+  findEmployees(@Query() query: EmployeeQueryDto) {
+    return this.service.findEmployees(query);
   }
 
   // Declared before :id so the literal path is not read as an employee id.

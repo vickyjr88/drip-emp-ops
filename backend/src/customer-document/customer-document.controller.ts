@@ -1,19 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
-import { IsOptional, IsUUID } from 'class-validator';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CustomerDocumentService } from './customer-document.service';
 import { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
 import { UpdateCustomerDocumentDto } from './dto/update-customer-document.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { CustomerDocumentQueryDto } from './dto/customer-document-query.dto';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
-
-class CustomerDocumentQueryDto extends PaginationDto {
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  customerId?: string;
-}
 
 @ApiBearerAuth()
 @ApiTags('customer-documents')

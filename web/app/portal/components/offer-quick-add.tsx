@@ -60,7 +60,9 @@ export function OfferQuickAdd({
 
   const load = useCallback(async () => {
     try {
-      const rows = await apiRequest<OfferSummary[]>('/offers', { method: 'GET' }, token);
+      const rows = await apiRequest<{ items: OfferSummary[] }>('/offers?take=500', { method: 'GET' }, token).then(
+        (page) => page.items,
+      );
       // Ended offers cannot take new items; adding to one would look like it
       // worked and change no price.
       const open = rows.filter((row) => row.status !== 'ENDED');

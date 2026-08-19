@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useFeedbackState } from '../components/notifications';
 import { useErrorState } from '../components/notifications';
 import { ListExport } from '../components/list-export';
-import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { TourLauncher } from '../tours/tour-launcher';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
@@ -181,9 +181,9 @@ export default function RemindersPage() {
   const [previewItems, setPreviewItems] = useState<PreviewItem[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  const [logs, setLogs] = useState<ReminderLog[]>([]);
   const [logStatus, setLogStatus] = useState<DispatchStatus | ''>('');
   const [logTarget, setLogTarget] = useState<TargetType | ''>('');
+  const [logExportRows, setLogExportRows] = useState<ReminderLog[]>([]);
 
   const canEdit = hasPermission(profile, 'reminder-rule.update');
   const canCreate = hasPermission(profile, 'reminder-rule.create');
@@ -238,22 +238,37 @@ export default function RemindersPage() {
     void init(token);
   }, [initialized, token, init]);
 
-  const loadLogs = useCallback(async () => {
-    if (!token) return;
-    const params = new URLSearchParams();
-    if (logStatus) params.set('status', logStatus);
-    if (logTarget) params.set('targetType', logTarget);
-    params.set('take', '100');
-    try {
-      setLogs(await apiRequest<ReminderLog[]>(`/reminders/logs?${params}`, { method: 'GET' }, token));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to load delivery log.');
-    }
-  }, [token, logStatus, logTarget]);
+  const fetchLogsPage = useCallback(
+    async (
+      params: { skip: number; take: number; search: string } & { status: DispatchStatus | ''; targetType: TargetType | '' },
+    ): Promise<ServerPage<ReminderLog>> => {
+      if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      if (params.status) query.set('status', params.status);
+      if (params.targetType) query.set('targetType', params.targetType);
+      return apiRequest<ServerPage<ReminderLog>>(`/reminders/logs?${query}`, { method: 'GET' }, token);
+    },
+    [token],
+  );
+
+  const logsPager = useServerPager<ReminderLog, { status: DispatchStatus | ''; targetType: TargetType | '' }>({
+    fetchPage: (params) => fetchLogsPage(params),
+    filters: { status: logStatus, targetType: logTarget },
+    enabled: Boolean(token && view === 'logs'),
+  });
 
   useEffect(() => {
-    if (view === 'logs') void loadLogs();
-  }, [view, loadLogs]);
+    if (!token || view !== 'logs') return;
+    const timer = setTimeout(() => {
+      void fetchLogsPage({ skip: 0, take: 500, search: logsPager.search, status: logStatus, targetType: logTarget }).then(
+        (page) => setLogExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchLogsPage, logsPager.search, logStatus, logTarget, token, view]);
 
   /** Rules grouped into ladders, so the cadence per target reads at a glance. */
   const laddersByTarget = useMemo(() => {
@@ -459,13 +474,6 @@ export default function RemindersPage() {
     window.location.href = '/portal';
   }
 
-  const logControls = useListControls(logs, (row) => [
-    row.targetType,
-    row.channel,
-    row.status,
-    row.recipientPhone,
-    row.recipientEmail,
-  ]);
 
   if (!initialized || loading) {
     return (
@@ -881,7 +889,7 @@ export default function RemindersPage() {
               <article className="portal-card" data-tour="reminders.log">
                 <div className="portal-card-header-row">
                   <h2 style={{ margin: 0 }}>Delivery log</h2>
-                  <button type="button" className="portal-inline-btn" onClick={() => void loadLogs()}>
+                  <button type="button" className="portal-inline-btn" onClick={() => logsPager.reload()}>
                     Refresh
                   </button>
                 </div>
@@ -916,9 +924,9 @@ export default function RemindersPage() {
                 </div>
 
                 <div className="list-toolbar">
-                  <ListSearch controls={logControls} placeholder="Search delivery log…" />
+                  <ServerListSearch pager={logsPager} placeholder="Search delivery log…" />
                     <ListExport
-                      rows={logControls.filtered}
+                      rows={logExportRows}
                       config={{
                         fileName: 'reminder-delivery-log',
                         dateOf: (row) => row.dueDate,
@@ -935,10 +943,12 @@ export default function RemindersPage() {
                     />
                 </div>
                 <div className="portal-list-stack">
-                  {logs.length === 0 ? (
-                    <div className="portal-empty-state">No reminders have been sent yet.</div>
+                  {!logsPager.loading && logsPager.items.length === 0 ? (
+                    <div className="portal-empty-state">
+                      {logsPager.search ? 'No log entries match.' : 'No reminders have been sent yet.'}
+                    </div>
                   ) : (
-                    logControls.visible.map((log) => (
+                    logsPager.items.map((log) => (
                       <div key={log.id} className="portal-list-row">
                         <div>
                           <strong>{log.rule?.name || 'Deleted rule'}</strong>
@@ -958,7 +968,7 @@ export default function RemindersPage() {
                     ))
                   )}
                 </div>
-                <ListPager controls={logControls} noun="entries" />
+                <ServerListPager pager={logsPager} noun="entries" />
               </article>
             ) : null}
           </PortalShell>

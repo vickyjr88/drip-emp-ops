@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
@@ -52,7 +53,6 @@ export default function OffersPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   const [dead, setDead] = useState<{ rows: DeadRow[]; totals: any } | null>(null);
-  const [offers, setOffers] = useState<Offer[]>([]);
   const [days, setDays] = useState(60);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [form, setForm] = useState(BLANK);
@@ -70,12 +70,7 @@ export default function OffersPage() {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
       if (hasPermission(nextProfile, 'offer.read')) {
-        const [nextDead, nextOffers] = await Promise.all([
-          apiRequest<any>(`/offers/dead-stock?days=${forDays}`, { method: 'GET' }, authToken),
-          apiRequest<Offer[]>('/offers?includeEnded=true', { method: 'GET' }, authToken),
-        ]);
-        setDead(nextDead);
-        setOffers(nextOffers);
+        setDead(await apiRequest<any>(`/offers/dead-stock?days=${forDays}`, { method: 'GET' }, authToken));
       }
     } catch (error) {
       setErrorMessage(error);
@@ -91,6 +86,26 @@ export default function OffersPage() {
     if (!token) { setLoading(false); return; }
     void load(token, days);
   }, [initialized, token, days, load]);
+
+  const fetchOffersPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Offer>> => {
+      if (!token || !profile || !hasPermission(profile, 'offer.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      query.set('includeEnded', 'true');
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Offer>>(`/offers?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const offersPager = useServerPager<Offer>({
+    fetchPage: (params) => fetchOffersPage(params),
+    enabled: Boolean(token && profile),
+  });
 
   const rows = dead?.rows || [];
   const controls = useListControls(rows, (row) => [row.sku, row.productName, row.brand || '', row.size]);
@@ -163,6 +178,7 @@ export default function OffersPage() {
       setForm(BLANK);
       setPicked(new Set());
       await load(token, days);
+      offersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -184,6 +200,7 @@ export default function OffersPage() {
       await apiRequest(`/offers/${offer.id}`, { method: 'PATCH', body: JSON.stringify({ status }) }, token);
       setFeedback(status === 'ACTIVE' ? `"${offer.name}" is live.` : `"${offer.name}" ended.`);
       await load(token, days);
+      offersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -248,13 +265,16 @@ export default function OffersPage() {
             {/* ---- Running offers -------------------------------------- */}
             <article className="portal-card" style={{ marginBottom: 20 }}>
               <h2 style={{ marginTop: 0 }}>Offers</h2>
-              {offers.length === 0 ? (
+              <div className="list-toolbar">
+                <ServerListSearch pager={offersPager} placeholder="Search offers…" />
+              </div>
+              {!offersPager.loading && offersPager.items.length === 0 ? (
                 <div className="portal-empty-state">
-                  No offers yet. Pick the slow movers below to make one.
+                  {offersPager.search ? 'No offers match.' : 'No offers yet. Pick the slow movers below to make one.'}
                 </div>
               ) : (
                 <div className="portal-list-stack">
-                  {offers.map((offer) => (
+                  {offersPager.items.map((offer) => (
                     <div key={offer.id} className="portal-list-row">
                       <div>
                         <strong>{offer.name}</strong>
@@ -295,6 +315,7 @@ export default function OffersPage() {
                   ))}
                 </div>
               )}
+              <ServerListPager pager={offersPager} noun="offers" />
             </article>
 
             {/* ---- Dead stock ------------------------------------------- */}

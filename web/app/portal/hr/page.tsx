@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import { ListExport } from '../components/list-export';
-import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { TourLauncher } from '../tours/tour-launcher';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
@@ -130,14 +130,14 @@ export default function HrPage() {
   const [feedback, setFeedback] = useFeedbackState();
   const [tab, setTab] = useState<HrTab>('employees');
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [activeEmployees, setActiveEmployees] = useState<Employee[]>([]);
+  const [employeeExportRows, setEmployeeExportRows] = useState<Employee[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
 
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [year, setYear] = useState(new Date().getUTCFullYear());
 
@@ -167,14 +167,12 @@ export default function HrPage() {
         const nextProfile = await loadProfile(authToken);
         setProfile(nextProfile);
 
-        const params = new URLSearchParams();
-        if (search.trim()) params.set('search', search.trim());
-        if (statusFilter) params.set('status', statusFilter);
-
-        const [nextEmployees, nextTypes, nextRequests, nextBalances, nextProjects, nextStats] =
+        const [nextActiveEmployees, nextTypes, nextRequests, nextBalances, nextProjects, nextStats] =
           await Promise.all([
             hasPermission(nextProfile, 'employee.read')
-              ? apiRequest<Employee[]>(`/employees?${params}`, { method: 'GET' }, authToken)
+              ? apiRequest<ServerPage<Employee>>('/employees?take=500&status=ACTIVE', { method: 'GET' }, authToken).then(
+                  (page) => page.items,
+                )
               : Promise.resolve([]),
             hasPermission(nextProfile, 'leave-type.read')
               ? apiRequest<LeaveType[]>('/leave-types', { method: 'GET' }, authToken)
@@ -193,7 +191,7 @@ export default function HrPage() {
               : Promise.resolve(null),
           ]);
 
-        setEmployees(nextEmployees);
+        setActiveEmployees(nextActiveEmployees);
         setLeaveTypes(nextTypes);
         setRequests(nextRequests);
         setBalances(nextBalances);
@@ -205,7 +203,7 @@ export default function HrPage() {
         setLoading(false);
       }
     },
-    [search, statusFilter, year],
+    [year],
   );
 
   useEffect(() => {
@@ -216,6 +214,39 @@ export default function HrPage() {
     }
     void load(token);
   }, [initialized, token, load]);
+
+  const fetchEmployeesPage = useCallback(
+    async (
+      params: { skip: number; take: number; search: string } & { status: string },
+    ): Promise<ServerPage<Employee>> => {
+      if (!token || !profile || !hasPermission(profile, 'employee.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      if (params.status) query.set('status', params.status);
+      return apiRequest<ServerPage<Employee>>(`/employees?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const employeesPager = useServerPager<Employee, { status: string }>({
+    fetchPage: (params) => fetchEmployeesPage(params),
+    filters: { status: statusFilter },
+    enabled: Boolean(token && profile && tab === 'employees'),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'employee.read')) return;
+    const timer = setTimeout(() => {
+      void fetchEmployeesPage({ skip: 0, take: 500, search: employeesPager.search, status: statusFilter }).then(
+        (page) => setEmployeeExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchEmployeesPage, employeesPager.search, statusFilter, token, profile]);
 
   const canReadEmployees = hasPermission(profile, 'employee.read');
   const canManageEmployees = hasPermission(profile, 'employee.create');
@@ -243,6 +274,7 @@ export default function HrPage() {
       await action();
       setFeedback(message);
       await load(token);
+      employeesPager.reload();
     } catch (error) {
       const raw = error instanceof Error ? error.message : '';
       let text = raw || 'Operation failed.';
@@ -347,15 +379,6 @@ export default function HrPage() {
       await apiRequest(`/leave-requests/${request.id}/cancel`, { method: 'PATCH' }, token);
     }, 'Leave cancelled.');
   }
-
-  const employeeControls = useListControls(employees, (row) => [
-    row.firstName,
-    row.lastName,
-    row.email,
-    row.employeeNumber,
-    row.jobTitle,
-    row.department,
-  ]);
 
   if (!initialized || loading) {
     return (
@@ -678,14 +701,6 @@ export default function HrPage() {
                     <div className="portal-entity-form" style={{ marginBottom: 14 }}>
                       <div className="portal-entity-grid-3">
                         <label>
-                          <span>Search</span>
-                          <input
-                            value={search}
-                            placeholder="Name, number, job title…"
-                            onChange={(event) => setSearch(event.target.value)}
-                          />
-                        </label>
-                        <label>
                           <span>Status</span>
                           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                             <option value="">All statuses</option>
@@ -700,9 +715,9 @@ export default function HrPage() {
                     </div>
 
                     <div className="list-toolbar">
-                      <ListSearch controls={employeeControls} placeholder="Search staff…" />
+                      <ServerListSearch pager={employeesPager} placeholder="Search staff…" />
                       <ListExport
-                        rows={employeeControls.filtered}
+                        rows={employeeExportRows}
                         config={{
                           fileName: 'employees',
                           dateOf: (row) => row.startDate,
@@ -725,10 +740,10 @@ export default function HrPage() {
                       />
                     </div>
                     <div className="portal-list-stack">
-                      {employees.length === 0 ? (
+                      {!employeesPager.loading && employeesPager.items.length === 0 ? (
                         <div className="portal-empty-state">No employees match.</div>
                       ) : (
-                        employeeControls.visible.map((employee) => (
+                        employeesPager.items.map((employee) => (
                           <div key={employee.id} className="portal-record">
                             <div className="portal-list-row">
                               <div>
@@ -795,7 +810,7 @@ export default function HrPage() {
                         ))
                       )}
                     </div>
-                    <ListPager controls={employeeControls} noun="employees" />
+                    <ServerListPager pager={employeesPager} noun="employees" />
                   </article>
                 ) : null}
 
@@ -827,13 +842,11 @@ export default function HrPage() {
                               required
                             >
                               <option value="">Select employee</option>
-                              {employees
-                                .filter((employee) => employee.status === 'ACTIVE')
-                                .map((employee) => (
-                                  <option key={employee.id} value={employee.id}>
-                                    {employee.firstName} {employee.lastName}
-                                  </option>
-                                ))}
+                              {activeEmployees.map((employee) => (
+                                <option key={employee.id} value={employee.id}>
+                                  {employee.firstName} {employee.lastName}
+                                </option>
+                              ))}
                             </select>
                           </label>
                           <label>

@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
-import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
@@ -54,10 +54,10 @@ export default function ConsignmentsPage() {
   const [saving, setSaving] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [consignments, setConsignments] = useState<Consignment[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [resellers, setResellers] = useState<Reseller[]>([]);
+  const [stats, setStats] = useState({ unitsHeld: 0, owed: 0, overdue: 0 });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showIssue, setShowIssue] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
@@ -80,13 +80,11 @@ export default function ConsignmentsPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [rows, levelRows, storeRows, resellerRows] = await Promise.all([
-        apiRequest<Consignment[]>('/consignments', { method: 'GET' }, authToken),
+      const [levelRows, storeRows, resellerRows] = await Promise.all([
         apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
         apiRequest<{ items: Reseller[] }>('/resellers?take=500', { method: 'GET' }, authToken).then((page) => page.items),
       ]);
-      setConsignments(rows);
       setLevels(levelRows);
       setStores(storeRows);
       setResellers(resellerRows);
@@ -108,16 +106,50 @@ export default function ConsignmentsPage() {
     void load(token);
   }, [initialized, token, load]);
 
-  const rows = useMemo(
-    () => consignments
-      .filter((row) => !statusFilter || row.status === statusFilter)
-      // Overdue first: those are the pickups to chase.
-      .sort((a, b) => Number(b.isOverdue) - Number(a.isOverdue))
-      .map((row) => ({ ...row, resellerName: row.customer.name, storeName: row.store.name })),
-    [consignments, statusFilter],
+  const refreshStats = useCallback(async () => {
+    if (!token) return;
+    try {
+      setStats(await apiRequest<{ unitsHeld: number; owed: number; overdue: number }>('/consignments/stats', { method: 'GET' }, token));
+    } catch {
+      // Non-fatal: the list itself still loads.
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void refreshStats();
+  }, [refreshStats]);
+
+  const fetchConsignmentsPage = useCallback(
+    async (
+      params: { skip: number; take: number; search: string } & { status: string },
+    ): Promise<ServerPage<Consignment>> => {
+      if (!token || !profile) return { items: [], total: 0, skip: params.skip, take: params.take };
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      if (params.status) query.set('status', params.status);
+      return apiRequest<ServerPage<Consignment>>(`/consignments?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
   );
 
-  const controls = useListControls(rows, (row) => [row.reference, row.resellerName, row.storeName]);
+  const consignmentsPager = useServerPager<Consignment, { status: string }>({
+    fetchPage: (params) => fetchConsignmentsPage(params),
+    filters: { status: statusFilter },
+    enabled: Boolean(token && profile),
+  });
+
+  const [exportRows, setExportRows] = useState<Consignment[]>([]);
+  useEffect(() => {
+    if (!token || !profile) return;
+    const timer = setTimeout(() => {
+      void fetchConsignmentsPage({ skip: 0, take: 500, search: consignmentsPager.search, status: statusFilter }).then(
+        (page) => setExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchConsignmentsPage, consignmentsPager.search, statusFilter, token, profile]);
 
   const canCreate = hasPermission(profile, 'consignment.create');
   const canUpdate = hasPermission(profile, 'consignment.update');
@@ -160,6 +192,8 @@ export default function ConsignmentsPage() {
       setFeedback(`${created.reference} issued — ${formatMoney(created.totalValue)}, due back ${formatDate(created.dueDate)}.`);
       setDraft([]); setHead((prev) => ({ ...prev, notes: '' })); setShowIssue(false);
       await load(token);
+      consignmentsPager.reload();
+      void refreshStats();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -200,6 +234,8 @@ export default function ConsignmentsPage() {
       );
       setSettle(null);
       await load(token);
+      consignmentsPager.reload();
+      void refreshStats();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -223,6 +259,8 @@ export default function ConsignmentsPage() {
       }, token);
       setFeedback(`${consignment.reference} written off.`);
       await load(token);
+      consignmentsPager.reload();
+      void refreshStats();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -257,10 +295,6 @@ export default function ConsignmentsPage() {
     );
   }
 
-  const overdue = consignments.filter((row) => row.isOverdue).length;
-  const unitsOut = consignments.reduce((sum, row) => sum + row.unitsStillOut, 0);
-  const owed = consignments.reduce((sum, row) => sum + row.balance, 0);
-
   return (
     <EliteLayout active="portal">
       <main className="lp-main-content portal-main is-authenticated">
@@ -284,15 +318,15 @@ export default function ConsignmentsPage() {
 
             <div className="portal-stat-grid">
               <article className="portal-stat-card">
-                <p>Units out</p><h3>{unitsOut}</h3>
+                <p>Units out</p><h3>{stats.unitsHeld}</h3>
                 <span className="portal-stat-note">owned, not sellable</span>
               </article>
               <article className="portal-stat-card">
-                <p>Owed</p><h3>{formatMoney(owed)}</h3>
+                <p>Owed</p><h3>{formatMoney(stats.owed)}</h3>
                 <span className="portal-stat-note">sold, not yet paid</span>
               </article>
               <article className="portal-stat-card">
-                <p>Overdue</p><h3>{overdue}</h3>
+                <p>Overdue</p><h3>{stats.overdue}</h3>
                 <span className="portal-stat-note">past three days</span>
               </article>
             </div>
@@ -407,7 +441,7 @@ export default function ConsignmentsPage() {
                     <table className="portal-data-table is-doc">
                       <thead><tr><th>Item</th><th>Still out</th><th>Sold</th><th>Returned</th></tr></thead>
                       <tbody>
-                        {consignments.find((row) => row.id === settle.id)?.lines.map((line) => {
+                        {consignmentsPager.items.find((row) => row.id === settle.id)?.lines.map((line) => {
                           const stillOut = line.quantityOut - line.quantitySold - line.quantityReturned;
                           return (
                             <tr key={line.id}>
@@ -481,7 +515,7 @@ export default function ConsignmentsPage() {
               </div>
 
               <div className="list-toolbar">
-                <ListSearch controls={controls} placeholder="Search reference or reseller…" />
+                <ServerListSearch pager={consignmentsPager} placeholder="Search reference or reseller…" />
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="">All statuses</option>
                   {['OPEN', 'SETTLED', 'WRITTEN_OFF'].map((status) => (
@@ -489,12 +523,12 @@ export default function ConsignmentsPage() {
                   ))}
                 </select>
                 <ListExport
-                  rows={controls.filtered}
+                  rows={exportRows}
                   config={{
                     fileName: 'consignments',
                     columns: [
                       { header: 'Reference', value: (row) => row.reference },
-                      { header: 'Reseller', value: (row) => row.resellerName },
+                      { header: 'Reseller', value: (row) => row.customer.name },
                       { header: 'Issued', value: (row) => formatDate(row.issuedAt) },
                       { header: 'Due', value: (row) => formatDate(row.dueDate) },
                       { header: 'Status', value: (row) => row.status },
@@ -508,21 +542,21 @@ export default function ConsignmentsPage() {
               </div>
 
               <div className="portal-list-stack">
-                {controls.visible.length === 0 ? (
+                {!consignmentsPager.loading && consignmentsPager.items.length === 0 ? (
                   <div className="portal-empty-state">
-                    {controls.search || statusFilter ? 'No pickups match.' : 'No pickups yet.'}
+                    {consignmentsPager.search || statusFilter ? 'No pickups match.' : 'No pickups yet.'}
                   </div>
                 ) : (
-                  controls.visible.map((consignment) => (
+                  consignmentsPager.items.map((consignment) => (
                     <div key={consignment.id} className="portal-record">
                       <div className="portal-list-row">
                         <div>
                           <strong>
-                            {consignment.reference} · {consignment.resellerName}
+                            {consignment.reference} · {consignment.customer.name}
                             {consignment.isOverdue ? ' — OVERDUE' : ''}
                           </strong>
                           <p className="portal-muted">
-                            {consignment.storeName} · issued {formatDate(consignment.issuedAt)}
+                            {consignment.store.name} · issued {formatDate(consignment.issuedAt)}
                             {consignment.dueDate ? ` · due ${formatDate(consignment.dueDate)}` : ''}
                           </p>
                           <p>
@@ -582,7 +616,7 @@ export default function ConsignmentsPage() {
                   ))
                 )}
               </div>
-              <ListPager controls={controls} noun="pickups" />
+              <ServerListPager pager={consignmentsPager} noun="pickups" />
             </article>
           </PortalShell>
         </section>

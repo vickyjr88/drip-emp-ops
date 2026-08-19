@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDocumentDto } from './dto/create-customer-document.dto';
 import { UpdateCustomerDocumentDto } from './dto/update-customer-document.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { CustomerDocumentQueryDto } from './dto/customer-document-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class CustomerDocumentService {
@@ -12,14 +14,18 @@ export class CustomerDocumentService {
     return this.prisma.customerDocument.create({ data: dto as any });
   }
 
-  findAll(pagination: PaginationDto & { customerId?: string }) {
-    const { skip, take, customerId } = pagination;
-    return this.prisma.customerDocument.findMany({
-      where: customerId ? { customerId } : undefined,
+  findAll(query: CustomerDocumentQueryDto) {
+    const { skip, take, search, customerId } = query;
+    const where: Prisma.CustomerDocumentWhereInput = {
+      ...(customerId ? { customerId } : {}),
+      ...searchOr(search, (term) => containsAny(['fileName', 'documentType', 'notes'], term)),
+    };
+    return paginate(
+      (args) => this.prisma.customerDocument.findMany({ where, orderBy: [{ uploadedAt: 'desc' }, { id: 'asc' }], ...args }),
+      () => this.prisma.customerDocument.count({ where }),
       skip,
       take,
-      orderBy: { uploadedAt: 'desc' },
-    });
+    );
   }
 
   findOne(id: string) {

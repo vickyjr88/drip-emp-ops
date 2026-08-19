@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ConsignmentStatus } from '@prisma/client';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { ConsignmentService } from './consignment.service';
 import { CreateConsignmentDto, SettleConsignmentDto } from './dto/consignment.dto';
+import { ConsignmentQueryDto } from './dto/consignment-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('consignments')
@@ -20,13 +20,15 @@ export class ConsignmentController {
 
   @Get()
   @Permissions(buildPermissionKey('Consignment', 'read'))
-  findAll(
-    @Query('customerId') customerId?: string,
-    @Query('storeId') storeId?: string,
-    @Query('status') status?: ConsignmentStatus,
-    @Query('overdueOnly') overdueOnly?: string,
-  ) {
-    return this.service.findAll({ customerId, storeId, status, overdueOnly });
+  findAll(@Query() query: ConsignmentQueryDto) {
+    return this.service.findAll(query);
+  }
+
+  // Declared before ":id" so the literal path is not read as a consignment id.
+  @Get('stats')
+  @Permissions(buildPermissionKey('Consignment', 'read'))
+  stats() {
+    return this.service.stats();
   }
 
   @Get(':id')

@@ -189,7 +189,9 @@ export default function PayrollPage() {
           ? apiRequest<Rule[]>('/deduction-rules', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'employee.read')
-          ? apiRequest<Employee[]>('/employees?status=ACTIVE', { method: 'GET' }, authToken)
+          ? apiRequest<{ items: Employee[] }>('/employees?status=ACTIVE&take=500', { method: 'GET' }, authToken).then(
+              (page) => page.items,
+            )
           : Promise.resolve([]),
         hasPermission(nextProfile, 'chart-of-account.read')
           ? apiRequest<ChartAccount[]>('/chart-of-accounts', { method: 'GET' }, authToken)

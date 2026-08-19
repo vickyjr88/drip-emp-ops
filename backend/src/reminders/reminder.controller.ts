@@ -1,8 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { ReminderDispatchStatus, ReminderTargetType } from '@prisma/client';
+import { ReminderTargetType } from '@prisma/client';
 import { ReminderService } from './reminder.service';
 import { CreateReminderRuleDto, UpdateReminderRuleDto } from './dto/reminder-rule.dto';
+import { ReminderLogQueryDto } from './dto/reminder-log-query.dto';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 
@@ -87,20 +88,8 @@ export class ReminderController {
 
   @Get('logs')
   @Permissions(buildPermissionKey('ReminderLog', 'read'))
-  findLogs(
-    @Query('status') status?: ReminderDispatchStatus,
-    @Query('targetType') targetType?: ReminderTargetType,
-    @Query('customerId') customerId?: string,
-    @Query('ruleId') ruleId?: string,
-    @Query('take') take?: string,
-  ) {
-    return this.service.findLogs({
-      status,
-      targetType,
-      customerId,
-      ruleId,
-      take: take ? Number(take) : undefined,
-    });
+  findLogs(@Query() query: ReminderLogQueryDto) {
+    return this.service.findLogs(query);
   }
 
   @Get('stats')

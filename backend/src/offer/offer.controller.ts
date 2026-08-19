@@ -4,6 +4,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { OfferService } from './offer.service';
 import { CreateOfferDto, OfferLineDto, UpdateOfferDto } from './dto/offer.dto';
+import { OfferQueryDto } from './dto/offer-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('offers')
@@ -29,8 +30,8 @@ export class OfferController {
 
   @Get()
   @Permissions(buildPermissionKey('Offer', 'read'))
-  findAll(@Query('includeEnded') includeEnded?: string) {
-    return this.service.findAll(includeEnded === 'true');
+  findAll(@Query() query: OfferQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

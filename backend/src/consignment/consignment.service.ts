@@ -3,8 +3,10 @@ import { ConsignmentStatus, PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateConsignmentDto, SettleConsignmentDto } from './dto/consignment.dto';
+import { ConsignmentQueryDto } from './dto/consignment-query.dto';
 import { customerDisplayName } from '../customer/customer-name';
 import { nextReference } from '../common/next-reference';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 /** The agreed holding period before unsold stock is due back. */
 export const HOLDING_DAYS = 3;
@@ -346,34 +348,53 @@ export class ConsignmentService {
     });
   }
 
-  async findAll(query: { customerId?: string; storeId?: string; status?: ConsignmentStatus; overdueOnly?: string }) {
-    const rows = await this.prisma.consignment.findMany({
-      where: {
-        ...(query.customerId ? { customerId: query.customerId } : {}),
-        ...(query.storeId ? { storeId: query.storeId } : {}),
-        ...(query.status ? { status: query.status } : {}),
-      },
-      include: INCLUDE,
-      orderBy: { issuedAt: 'desc' },
-    });
+  async findAll(query: ConsignmentQueryDto) {
+    const { skip, take, search, customerId, storeId, status, overdueOnly } = query;
+    const where: Prisma.ConsignmentWhereInput = {
+      ...(customerId ? { customerId } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...(status ? { status } : {}),
+      // Overdue is derived (OPEN + past due date), so it is expressed directly
+      // as a where clause rather than filtered after the fact -- that way it
+      // composes with skip/take instead of being applied to a full in-memory
+      // fetch.
+      ...(overdueOnly ? { status: ConsignmentStatus.OPEN, dueDate: { lt: new Date() } } : {}),
+      ...searchOr(search, (term) =>
+        containsAny(['reference', 'customer.businessName', 'customer.firstName', 'customer.lastName', 'store.name'], term),
+      ),
+    };
 
-    const now = Date.now();
-    const mapped = rows.map((row) => {
-      const stillOut = row.lines.reduce(
-        (sum, line) => sum + (line.quantityOut - line.quantitySold - line.quantityReturned),
-        0,
-      );
-      return {
-        ...row,
-        unitsStillOut: stillOut,
-        balance: Number(row.soldValue) - Number(row.amountPaid),
-        // Overdue matters more than any other flag here: goods past the agreed
-        // three days are the ones to chase.
-        isOverdue: row.status === 'OPEN' && !!row.dueDate && row.dueDate.getTime() < now,
-      };
-    });
+    const page = await paginate(
+      (args) => this.prisma.consignment.findMany({ where, include: INCLUDE, orderBy: [{ issuedAt: 'desc' }, { id: 'asc' }], ...args }),
+      () => this.prisma.consignment.count({ where }),
+      skip,
+      take,
+    );
 
-    return query.overdueOnly === 'true' ? mapped.filter((row) => row.isOverdue) : mapped;
+    return { ...page, items: page.items.map((row) => this.decorate(row)) };
+  }
+
+  /** Totals for the dashboard cards -- computed in SQL, not by summing a full fetch. */
+  async stats() {
+    const now = new Date();
+    const [open, overdueCount] = await Promise.all([
+      this.prisma.consignment.findMany({
+        where: { status: ConsignmentStatus.OPEN },
+        select: { soldValue: true, amountPaid: true, lines: { select: { quantityOut: true, quantitySold: true, quantityReturned: true } } },
+      }),
+      this.prisma.consignment.count({
+        where: { status: ConsignmentStatus.OPEN, dueDate: { lt: now } },
+      }),
+    ]);
+
+    const unitsHeld = open.reduce(
+      (sum, row) =>
+        sum + row.lines.reduce((lineSum, line) => lineSum + (line.quantityOut - line.quantitySold - line.quantityReturned), 0),
+      0,
+    );
+    const owed = open.reduce((sum, row) => sum + (Number(row.soldValue) - Number(row.amountPaid)), 0);
+
+    return { unitsHeld, owed, overdue: overdueCount };
   }
 
   /** Adds the figures every caller wants: what is still out, and the balance. */
