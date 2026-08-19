@@ -157,9 +157,16 @@ export default function InventoryPage() {
 
   const variantMatches = useMemo(() => {
     const query = variantQuery.trim().toLowerCase();
-    if (!query) return variantOptions.slice(0, 50);
-    return variantOptions.filter((option) => option.haystack.includes(query)).slice(0, 50);
+    // Capped because the list is rendered, not virtualised: a few hundred
+    // buttons is a slow first paint for a list nobody scrolls to the end of.
+    if (!query) return variantOptions.slice(0, 25);
+    return variantOptions.filter((option) => option.haystack.includes(query)).slice(0, 25);
   }, [variantOptions, variantQuery]);
+
+  const selectedVariant = useMemo(
+    () => variantOptions.find((option) => option.id === form.variantId),
+    [variantOptions, form.variantId],
+  );
 
   const controls = useListControls(levelRows, (row) => [row.productName, row.sku, row.size, row.storeName]);
   const canRecord = hasPermission(profile, 'stock-movement.create');
@@ -262,42 +269,72 @@ export default function InventoryPage() {
                     <label>
                       <span>Product / size</span>
                       {/*
-                        A datalist rather than a select: the catalogue is a few
-                        hundred variants once every size is listed, and scrolling
-                        that to find one shoe is slower than typing three letters
-                        of it. Falls back to a plain text input everywhere, and
-                        the hidden required field below is what actually gates
-                        submission, so a typed-but-unmatched value cannot be sent.
+                        A search box over a clickable list rather than a select
+                        or a datalist. The catalogue is a few hundred variants
+                        once every size is listed, so a select is a long scroll;
+                        a datalist only registers when the typed text matches an
+                        option exactly, which meant a half-typed product name
+                        silently selected nothing. Here the match is made by
+                        clicking, so what is selected is never in doubt.
                       */}
                       <input
-                        list="inventory-variant-options"
                         value={variantQuery}
-                        placeholder="Type a product, size or SKU…"
-                        onChange={(event) => {
-                          const typed = event.target.value;
-                          setVariantQuery(typed);
-                          // The datalist submits the option's value, which is
-                          // the SKU: unique, and what someone reading a delivery
-                          // note has in front of them.
-                          const picked = variantOptions.find((option) => option.sku === typed);
-                          setForm((prev) => ({ ...prev, variantId: picked?.id ?? '' }));
-                        }}
+                        placeholder="Search product, size or SKU…"
+                        onChange={(event) => setVariantQuery(event.target.value)}
                       />
-                      <datalist id="inventory-variant-options">
-                        {variantMatches.map((option) => (
-                          <option key={option.id} value={option.sku}>
-                            {option.label}
-                            {option.quantity === null
-                              ? ' · no stock yet'
-                              : ` · ${option.quantity} in stock`}
-                          </option>
-                        ))}
-                      </datalist>
-                      <small className="portal-muted">
-                        {form.variantId
-                          ? variantOptions.find((option) => option.id === form.variantId)?.label
-                          : 'Products with no stock yet are listed too — that is how a first purchase is recorded.'}
-                      </small>
+                      {form.variantId ? (
+                        <div className="portal-picked-row">
+                          <span>
+                            <strong>{selectedVariant?.label}</strong>
+                            <span className="portal-muted"> · {selectedVariant?.sku}</span>
+                          </span>
+                          <button
+                            type="button"
+                            className="portal-inline-btn"
+                            onClick={() => {
+                              setForm((prev) => ({ ...prev, variantId: '' }));
+                              setVariantQuery('');
+                            }}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="portal-picker-results">
+                          {variantMatches.length === 0 ? (
+                            <p className="portal-muted" style={{ margin: 8 }}>
+                              {variantQuery.trim()
+                                ? 'Nothing matches that.'
+                                : 'Start typing, or pick from the list.'}
+                            </p>
+                          ) : (
+                            variantMatches.map((option) => (
+                              <button
+                                key={option.id}
+                                type="button"
+                                className="portal-picker-option"
+                                onClick={() => {
+                                  setForm((prev) => ({ ...prev, variantId: option.id }));
+                                  setVariantQuery('');
+                                }}
+                              >
+                                <span>{option.label}</span>
+                                <span className="portal-muted">
+                                  {option.sku}
+                                  {option.quantity === null
+                                    ? ' · no stock yet'
+                                    : ` · ${option.quantity} in stock`}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                      {!form.variantId ? (
+                        <small className="portal-muted">
+                          Products with no stock yet are listed too — that is how a first purchase is recorded.
+                        </small>
+                      ) : null}
                     </label>
                   </div>
                   <div className="portal-entity-grid-3">

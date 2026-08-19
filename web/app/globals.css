@@ -5030,6 +5030,102 @@ img {
     gap: 10px;
   }
 
+    /* Restock controls above the Sizes table: store, reason and reference apply
+     to every quantity typed in the table below, so they sit together in one
+     row rather than repeating per size. */
+  .portal-restock-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    padding: 12px;
+    margin-bottom: 14px;
+    border: 1px solid var(--eef-border);
+    background: #f8f9f9;
+  }
+
+  .portal-restock-bar label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .portal-restock-bar label > span {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 10px;
+  }
+
+  .portal-restock-bar select,
+  .portal-restock-bar input {
+    box-sizing: border-box;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid var(--eef-border);
+    background: #fff;
+    color: #1f2121;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+  }
+
+  .portal-restock-bar > p {
+    flex: 1 1 220px;
+    margin: 0;
+    font-size: 12px;
+  }
+
+  /* Variant picker on the inventory movement form: a scrollable list of
+     clickable results, rather than a select nobody can find a shoe in. */
+  .portal-picker-results {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--eef-border);
+    background: #fff;
+    margin-top: 4px;
+  }
+
+  .portal-picker-option {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 0;
+    border-bottom: 1px solid var(--eef-border);
+    background: transparent;
+    color: #1f2121;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .portal-picker-option:last-child {
+    border-bottom: 0;
+  }
+
+  .portal-picker-option:hover {
+    background: #f4f5f5;
+  }
+
+  /* What is currently selected, shown instead of the result list so the choice
+     stays visible while the rest of the form is filled in. */
+  .portal-picked-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+    margin-top: 4px;
+    border: 1px solid #1a1c1c;
+    background: #f4f5f5;
+    font-size: 13px;
+  }
+
   /* Size picker: the 36-46 run on the Add Product form. Toggles rather than a
      multi-select, because the shop is answering "which sizes did this come
      in", scanning a short numeric row, not searching a list. */

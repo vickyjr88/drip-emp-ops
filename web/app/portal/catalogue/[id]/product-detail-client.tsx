@@ -14,7 +14,7 @@
  */
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
@@ -47,6 +47,26 @@ type Product = {
 
 type Category = { id: string; name: string };
 
+type Store = { id: string; name: string };
+
+/** One variant's stock in one store, as /inventory/levels returns it. */
+type Level = { variant: { id: string }; store: { id: string }; quantity: number };
+
+/**
+ * Stock-in reasons only, with the inventory page's wording.
+ *
+ * This panel is for a delivery arriving, so the outward types (SALE, DAMAGE,
+ * TRANSFER_OUT) are deliberately absent -- writing stock off from the page
+ * where you price it is not a mistake worth making easy. The inventory page
+ * still offers the full set.
+ */
+const MOVEMENT_TYPES = [
+  { value: 'PURCHASE', label: 'Received from supplier' },
+  { value: 'RETURN', label: 'Customer return' },
+  { value: 'TRANSFER_IN', label: 'Transfer in' },
+  { value: 'ADJUSTMENT', label: 'Stock count adjustment' },
+];
+
 const BLANK_SIZE = {
   name: '', sku: '', priceKes: '', resellerPriceKes: '', wholesalePriceKes: '', costKes: '',
 };
@@ -72,6 +92,14 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const [pickerOpen, setPickerOpen] = useState(false);
   const [offerTarget, setOfferTarget] = useState<OfferTarget | null>(null);
 
+  // Restock: stores and current levels, plus the quantities being entered.
+  const [stores, setStores] = useState<Store[]>([]);
+  const [levels, setLevels] = useState<Level[]>([]);
+  const [restock, setRestock] = useState({ storeId: '', type: 'PURCHASE', reference: '' });
+  /** variantId -> quantity typed against that size. */
+  const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
+  const [receiving, setReceiving] = useState(false);
+
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
@@ -85,12 +113,19 @@ export default function ProductDetailClient({ productId }: { productId: string }
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [next, cats] = await Promise.all([
+      const [next, cats, storeRows, levelRows] = await Promise.all([
         apiRequest<Product>(`/products/${productId}`, { method: 'GET' }, authToken),
         apiRequest<Category[]>('/product-categories', { method: 'GET' }, authToken).catch(() => []),
+        // Both are optional extras for the restock panel: a user without stock
+        // permissions still gets the rest of the page rather than an error.
+        apiRequest<Store[]>('/stores', { method: 'GET' }, authToken).catch(() => []),
+        apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken).catch(() => []),
       ]);
       setProduct(next);
       setCategories(cats);
+      setStores(storeRows);
+      setLevels(levelRows);
+      setRestock((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
       setDetails({
         name: next.name || '',
         brand: next.brand || '',
@@ -132,6 +167,91 @@ export default function ProductDetailClient({ productId }: { productId: string }
     } finally {
       setSaving(false);
     }
+  }
+
+  /**
+   * Stock for this product's sizes in the chosen store.
+   *
+   * /inventory/levels has no product filter, so the whole set is fetched and
+   * narrowed here -- cheap next to a bespoke endpoint, and the page already
+   * knows which variants are its own.
+   */
+  const stockByVariant = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const level of levels) {
+      if (restock.storeId && level.store.id !== restock.storeId) continue;
+      map.set(level.variant.id, (map.get(level.variant.id) ?? 0) + level.quantity);
+    }
+    return map;
+  }, [levels, restock.storeId]);
+
+  const pendingReceipts = useMemo(
+    () => Object.entries(receiveQty)
+      .map(([variantId, raw]) => ({ variantId, quantity: Number(String(raw).trim()) }))
+      .filter((entry) => Number.isFinite(entry.quantity) && entry.quantity > 0),
+    [receiveQty],
+  );
+
+  /**
+   * Records one movement per size that has a quantity against it.
+   *
+   * A delivery is several sizes of the same shoe at once, so entering them
+   * one at a time through the inventory page is six round trips for one box.
+   * The API takes a single movement per call, so these are sent in sequence
+   * and the outcome is reported per size: a partial success has to be visible,
+   * because the sizes that landed must not be entered a second time.
+   */
+  async function onReceiveStock(event: FormEvent) {
+    event.preventDefault();
+    if (!token || receiving) return;
+    if (!restock.storeId) {
+      setErrorMessage('Choose which store the stock arrived at.');
+      return;
+    }
+    if (pendingReceipts.length === 0) {
+      setErrorMessage('Enter a quantity against at least one size.');
+      return;
+    }
+
+    setReceiving(true);
+    const failures: string[] = [];
+    let recorded = 0;
+    for (const entry of pendingReceipts) {
+      const size = product?.variants.find((variant) => variant.id === entry.variantId)?.name ?? entry.variantId;
+      try {
+        await apiRequest('/inventory/movements', {
+          method: 'POST',
+          body: JSON.stringify({
+            variantId: entry.variantId,
+            storeId: restock.storeId,
+            type: restock.type,
+            quantity: entry.quantity,
+            reference: restock.reference.trim() || undefined,
+          }),
+        }, token);
+        recorded += 1;
+        // Cleared as it succeeds, so a retry after a partial failure resends
+        // only what did not land.
+        setReceiveQty((prev) => {
+          const next = { ...prev };
+          delete next[entry.variantId];
+          return next;
+        });
+      } catch (error) {
+        failures.push(`${size}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    setReceiving(false);
+
+    if (failures.length) {
+      setErrorMessage(
+        `Recorded ${recorded} of ${pendingReceipts.length}. Still to do — ${failures.join('; ')}`,
+      );
+    } else {
+      setFeedback(`Stock recorded for ${recorded} size${recorded === 1 ? '' : 's'}.`);
+      setRestock((prev) => ({ ...prev, reference: '' }));
+    }
+    await load(token);
   }
 
   async function addSize(event: FormEvent) {
@@ -301,6 +421,9 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const canUpdate = hasPermission(profile, 'product.update');
   const canDelete = hasPermission(profile, 'product.delete');
   const canCreateOffer = hasPermission(profile, 'offer.create');
+  // Restocking is a stock permission, not a catalogue one: someone who prices
+  // products is not necessarily someone who receives deliveries.
+  const canRecordStock = hasPermission(profile, 'stock-movement.create') && stores.length > 0;
 
   return (
     <EliteLayout active="portal">
@@ -332,6 +455,45 @@ export default function ProductDetailClient({ productId }: { productId: string }
             <article className="portal-card" style={{ marginBottom: 20 }}>
               <h2 style={{ marginTop: 0 }}>Sizes</h2>
 
+              {canRecordStock ? (
+                <div className="portal-restock-bar">
+                  <label>
+                    <span>Store</span>
+                    <select
+                      value={restock.storeId}
+                      onChange={(event) => setRestock((prev) => ({ ...prev, storeId: event.target.value }))}
+                    >
+                      {stores.map((store) => (
+                        <option key={store.id} value={store.id}>{store.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Reason</span>
+                    <select
+                      value={restock.type}
+                      onChange={(event) => setRestock((prev) => ({ ...prev, type: event.target.value }))}
+                    >
+                      {MOVEMENT_TYPES.map((type) => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Reference</span>
+                    <input
+                      value={restock.reference}
+                      placeholder="Delivery note"
+                      onChange={(event) => setRestock((prev) => ({ ...prev, reference: event.target.value }))}
+                    />
+                  </label>
+                  <p className="portal-muted">
+                    Type quantities in the Receive column, then record them all at once.
+                    In-stock figures are for the chosen store.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="portal-table-wrap">
                 <table className="portal-data-table">
                   <thead>
@@ -341,6 +503,12 @@ export default function ProductDetailClient({ productId }: { productId: string }
                       <th className="portal-num">Reseller</th>
                       <th className="portal-num">Wholesale</th>
                       <th className="portal-num">Cost</th>
+                      {canRecordStock ? (
+                        <>
+                          <th className="portal-num">In stock</th>
+                          <th className="portal-num">Receive</th>
+                        </>
+                      ) : null}
                       <th>Status</th><th />
                     </tr>
                   </thead>
@@ -369,6 +537,28 @@ export default function ProductDetailClient({ productId }: { productId: string }
                                 onChange={(event) => change(key, event.target.value)} />
                             </td>
                           ))}
+                          {canRecordStock ? (
+                            <>
+                              <td className="portal-num">
+                                {stockByVariant.get(variant.id) ?? 0}
+                              </td>
+                              <td className="portal-num">
+                                <input
+                                  className="portal-cell-input is-num"
+                                  type="number"
+                                  min="1"
+                                  placeholder="—"
+                                  value={receiveQty[variant.id] ?? ''}
+                                  // A hidden size can still be received: stock
+                                  // arriving is a fact about the box, not about
+                                  // whether the shop is currently selling it.
+                                  onChange={(event) => setReceiveQty((prev) => ({
+                                    ...prev, [variant.id]: event.target.value,
+                                  }))}
+                                />
+                              </td>
+                            </>
+                          ) : null}
                           <td>{variant.isActive ? 'On sale' : 'Hidden'}</td>
                           <td>
                             <span className="portal-inline-actions">
@@ -410,6 +600,31 @@ export default function ProductDetailClient({ productId }: { productId: string }
                   </tbody>
                 </table>
               </div>
+
+              {canRecordStock ? (
+                <form className="portal-inline-actions" style={{ marginTop: 14 }} onSubmit={onReceiveStock}>
+                  <button
+                    type="submit"
+                    className="portal-primary-btn"
+                    disabled={receiving || pendingReceipts.length === 0}
+                  >
+                    {receiving
+                      ? 'Recording...'
+                      : pendingReceipts.length
+                        ? `Record ${pendingReceipts.length} movement${pendingReceipts.length === 1 ? '' : 's'}`
+                        : 'Record stock'}
+                  </button>
+                  {pendingReceipts.length ? (
+                    <button
+                      type="button"
+                      className="portal-ghost-btn"
+                      onClick={() => setReceiveQty({})}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </form>
+              ) : null}
 
               {canUpdate ? (
                 <form className="portal-entity-form" style={{ marginTop: 18 }} onSubmit={addSize}>
