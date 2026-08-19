@@ -34,9 +34,51 @@ export type ImportDefinition = {
   uniqueBy?: string;
   /** Extra guidance shown in the template header. */
   notes?: string[];
+  /**
+   * Rows sharing this field describe one parent record rather than colliding.
+   *
+   * Products are the only importer where a repeated key is correct: each row is
+   * one size, and the rows for a shoe group into a single product with several
+   * variants. Set this and uniqueBy stops treating repetition as a duplicate.
+   */
+  groupBy?: string;
 };
 
 export const IMPORT_DEFINITIONS: ImportDefinition[] = [
+  {
+    key: 'products',
+    label: 'Products & Sizes',
+    model: 'product',
+    permissionSubject: 'Product',
+    description: 'The catalogue: one row per size, grouped into products.',
+    groupBy: 'productSku',
+    fields: [
+      { name: 'productSku', label: 'Product SKU', type: 'string', required: true, example: 'AF1-BLK',
+        hint: 'Repeat on every row for the same shoe. This is what groups sizes together.' },
+      { name: 'name', label: 'Product Name', type: 'string', required: true, example: 'Air Force 1 Black' },
+      { name: 'size', label: 'Size', type: 'string', required: true, example: 'EUR 42',
+        hint: 'One row per size. A bare number becomes "EUR 42".' },
+      { name: 'priceKes', label: 'Retail Price', type: 'number', required: true, min: 0, example: '3499' },
+      { name: 'brand', label: 'Brand', type: 'string', example: 'Nike' },
+      { name: 'category', label: 'Category', type: 'string', example: 'Sneakers',
+        hint: 'Created if it does not exist yet.' },
+      { name: 'description', label: 'Description', type: 'string' },
+      { name: 'variantSku', label: 'Size SKU', type: 'string',
+        hint: 'Defaults to <Product SKU>-<size>, e.g. AF1-BLK-EUR42.' },
+      { name: 'costKes', label: 'Cost', type: 'number', min: 0, hint: 'What you paid. Margin reads as 100% without it.' },
+      { name: 'resellerPriceKes', label: 'Reseller Price', type: 'number', min: 0 },
+      { name: 'wholesalePriceKes', label: 'Wholesale Price', type: 'number', min: 0 },
+      { name: 'barcode', label: 'Barcode', type: 'string' },
+    ],
+    notes: [
+      'One row per size. Repeat the product SKU, name and brand on every row of the same shoe.',
+      'Product details are taken from the first row of each group; later rows only contribute their size.',
+      'Prices are per size, so a size that sells for more can carry its own.',
+      'Sizes may differ per product: 36-42 on one shoe and 40-45 on another is normal.',
+      'Products that already exist are refused by SKU. Add sizes to those from the product page instead.',
+      'Stock is not imported. Record it on the Inventory page once the products are in.',
+    ],
+  },
   {
     key: 'customers',
     label: 'Customers',
