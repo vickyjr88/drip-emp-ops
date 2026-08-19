@@ -242,11 +242,17 @@ export function PortalShell({
               aria-label={navOpen ? 'Close navigation' : 'Open navigation'}
               onClick={() => setNavOpen((value) => !value)}
             >
-              <span className={`lp-menu-icon${navOpen ? ' is-open' : ''}`} aria-hidden>
-                <span />
-                <span />
-                <span />
-              </span>
+              {/* A side-panel glyph rather than the storefront's three-line
+                  hamburger: the two buttons sit stacked on a phone and open
+                  different things (site nav vs. portal sections), so they
+                  need to read as different controls at a glance, not just to
+                  a screen reader. */}
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                <rect x="3" y="4" width="18" height="16" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                <line x1="9.5" y1="4" x2="9.5" y2="20" stroke="currentColor" strokeWidth="1.7" />
+                <line x1="5.5" y1="8" x2="7" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="5.5" y1="11" x2="7" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
             </button>
 
             <div className="portal-topbar-copy">

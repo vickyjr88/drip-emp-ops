@@ -3577,6 +3577,18 @@ img {
     min-width: 0;
   }
 
+  /* Every direct child is a single-track grid item with no min-width: 0 of
+     its own by default, so a child that is itself a grid/flex layout (a
+     stat row, a two-up detail grid, a chart section) can report its own
+     intrinsic content width as its minimum size and win over the 100% this
+     row actually has to give it -- exactly the bug that had the analytics
+     page's charts running off the edge of a phone screen. Blanket, rather
+     than fixed on each grid class as found, so the next one added does not
+     reintroduce it. */
+  .portal-workspace-body > * {
+    min-width: 0;
+  }
+
   .portal-dropzone {
     border: 1px dashed #1a1c1c;
     background: #fafafa;
@@ -3903,10 +3915,29 @@ img {
     color: #fff;
   }
 
+  /* Scroll-shadow trick, no JS: two background gradients painted at the
+     scrolling element's edges, one pinned to the content (attachment:
+     local, so it scrolls away once there is nothing left to hint at) and
+     one pinned to the viewport (attachment: scroll, always there to give
+     the content shadow something to fade against). The left shadow is
+     invisible until scrolled right; the right shadow fades out once
+     scrolled all the way -- so the hint is only ever shown on the side
+     that actually has more to see. This is the entire reason a table with
+     more columns than a phone is wide reads as scrollable instead of cut
+     off: nothing else here signals it. */
   .portal-table-wrap {
     overflow-x: auto;
     margin-top: 16px;
     border: 1px solid var(--eef-border);
+    background:
+      linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)),
+      linear-gradient(to right, rgba(255, 255, 255, 0), #fff 70%) 100% 0,
+      linear-gradient(to right, rgba(26, 28, 28, 0.14), rgba(26, 28, 28, 0)),
+      linear-gradient(to left, rgba(26, 28, 28, 0.14), rgba(26, 28, 28, 0)) 100% 0;
+    background-repeat: no-repeat;
+    background-color: #fff;
+    background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
   }
 
   .portal-data-table {
@@ -5525,6 +5556,11 @@ img {
   }
 
   .portal-chip {
+    display: inline-block;
+    /* A chip wrapping mid-word inside a narrow table cell reads as broken --
+       better to let the cell (and the table's own horizontal scroll) push
+       out to fit it than to fold "FROM SUPPLIER" onto two lines. */
+    white-space: nowrap;
     border: 1px solid #d8dcdb;
     background: #f5f7f6;
     color: #202323;
@@ -5629,6 +5665,15 @@ img {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
+    /* Without this, the grid itself -- not just its tracks -- defaults to
+       min-width: auto as a grid item of portal-workspace-body's own
+       (columnless, single-track) grid. Its own intrinsic content width then
+       wins over the 100% the parent actually has to offer, so the whole
+       thing renders wider than the page and every chart inside reads as
+       spilling off the edge on a narrow screen. The tracks' own minmax(0,
+       1fr) below only protects overflow *inside* this grid; it does nothing
+       for the grid's own box in its parent. */
+    min-width: 0;
   }
 
   .portal-detail-grid > * {
@@ -6648,6 +6693,18 @@ img {
     gap: 16px;
   }
 
+  /* auto-fit's 320px floor is what causes a card to overflow once the
+     content column itself is narrower than that -- the grid holds every
+     track to at least 320px regardless of what actually fits, so a phone
+     with any side padding at all pushes cards past the viewport edge. Below
+     that width there is only ever room for one column anyway, so the floor
+     is dropped rather than raising the viewport to meet it. */
+  @media (max-width: 900px) {
+    .chart-grid-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .chart-card {
     display: grid;
     gap: 14px;
@@ -7612,9 +7669,12 @@ img {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1px solid var(--eef-border);
-  background: transparent;
-  color: #1a1c1c;
+  border: 1px solid var(--eef-primary);
+  /* Filled, unlike the storefront's outline-only hamburger above it: on a
+     phone the two sit one above the other and need to read as different
+     buttons on sight, not just by icon shape. */
+  background: var(--eef-primary);
+  color: var(--eef-white);
   border-radius: 0;
   width: 44px;
   height: 44px;
@@ -7623,8 +7683,8 @@ img {
 }
 
 .portal-nav-toggle:hover {
-  border-color: var(--eef-primary);
-  color: var(--eef-primary);
+  background: var(--eef-black);
+  border-color: var(--eef-black);
 }
 
 .portal-nav-toggle:focus-visible {
