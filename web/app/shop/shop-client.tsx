@@ -16,26 +16,10 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
+import { ProductCard } from '../components/product-card';
 import {
-  ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts, priceLabel,
+  ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts,
 } from '../lib/shop';
-
-/**
- * "36–44" from a list of sizes, or a single size when only one is left.
- *
- * Sorted numerically because "EUR 39" sorts before "EUR 7" as text, and a
- * range built from a text sort would be wrong.
- */
-function sizeRange(sizes: string[]) {
-  const numbers = sizes
-    .map((size) => parseInt(size.replace(/\D/g, ''), 10))
-    .filter((value) => Number.isFinite(value))
-    .sort((a, b) => a - b);
-  if (!numbers.length) return '';
-  const low = numbers[0];
-  const high = numbers[numbers.length - 1];
-  return low === high ? String(low) : `${low}–${high}`;
-}
 
 export function ShopClient() {
   const router = useRouter();
@@ -197,46 +181,7 @@ export function ShopClient() {
 
           <div className="de-grid">
             {products.map((product) => (
-              <article key={product.id} className={`de-card${product.anyInStock ? '' : ' is-out'}`}>
-                <Link href={`/shop/${product.slug}`} className="de-card-media">
-                  {product.imageUrls[0] ? (
-                    <img src={product.imageUrls[0]} alt={product.name} loading="lazy" />
-                  ) : (
-                    <span className="de-card-placeholder" aria-hidden="true">
-                      {product.name.charAt(0)}
-                    </span>
-                  )}
-                  {!product.anyInStock ? <span className="de-card-flag">Sold out</span> : null}
-                </Link>
-
-                <div className="de-card-body">
-                  {product.brand ? <p className="de-card-brand">{product.brand}</p> : null}
-                  <h2><Link href={`/shop/${product.slug}`}>{product.name}</Link></h2>
-                  <p className="de-card-price">
-                    {priceLabel(product)}
-                    {/* The badge earns its place only when something is
-                        actually cheaper, so it never becomes wallpaper. */}
-                    {product.onOffer ? (
-                      <span className="de-offer-badge">{product.offerLabel || 'Offer'}</span>
-                    ) : null}
-                  </p>
-
-                  {/* A range rather than every size: a full 36-46 run would be
-                      eleven chips per card and unreadable at a glance. The
-                      product page carries the exact grid. */}
-                  {product.sizesInStock.length ? (
-                    <p className="de-card-sizes">
-                      <span>EUR</span>
-                      <em>{sizeRange(product.sizesInStock)}</em>
-                      {product.sizesInStock.length > 1 ? (
-                        <small>{product.sizesInStock.length} sizes</small>
-                      ) : null}
-                    </p>
-                  ) : (
-                    <p className="de-card-sizes is-none">Out of stock — ask us</p>
-                  )}
-                </div>
-              </article>
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         </section>

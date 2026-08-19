@@ -17,8 +17,9 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EliteLayout } from './components/elite-layout';
+import { ProductCard } from './components/product-card';
 import { PageContentDocument, contentValue, fetchPageContent } from './lib/page-content';
-import { ShopCategory, ShopProduct, fetchCategories, fetchProducts, priceLabel } from './lib/shop';
+import { ShopCategory, ShopProduct, fetchCategories, fetchProducts } from './lib/shop';
 import { useEnquiryContact } from './lib/use-enquiry-contact';
 
 export default function HomeClient() {
@@ -34,7 +35,7 @@ export default function HomeClient() {
     let cancelled = false;
     void fetchPageContent('home').then((doc) => { if (!cancelled) setContent(doc); });
     void fetchProducts({ inStockOnly: 'true' }).then((rows) => {
-      if (!cancelled) setNewest(rows.slice(0, 8));
+      if (!cancelled) setNewest(rows.slice(0, 10));
     });
     void fetchCategories().then((rows) => { if (!cancelled) setCategories(rows); });
     return () => { cancelled = true; };
@@ -160,22 +161,7 @@ export default function HomeClient() {
 
             <div className="de-grid">
               {newest.map((product) => (
-                <article key={product.id} className="de-card">
-                  <Link href={`/shop/${product.slug}`} className="de-card-media">
-                    {product.imageUrls[0] ? (
-                      <img src={product.imageUrls[0]} alt={product.name} loading="lazy" />
-                    ) : (
-                      <span className="de-card-placeholder" aria-hidden="true">
-                        {product.name.charAt(0)}
-                      </span>
-                    )}
-                  </Link>
-                  <div className="de-card-body">
-                    {product.brand ? <p className="de-card-brand">{product.brand}</p> : null}
-                    <h3><Link href={`/shop/${product.slug}`}>{product.name}</Link></h3>
-                    <p className="de-card-price">{priceLabel(product)}</p>
-                  </div>
-                </article>
+                <ProductCard key={product.id} product={product} />
               ))}
             </div>
           </section>

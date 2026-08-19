@@ -243,7 +243,7 @@ export class StorefrontService {
     const related = await this.prisma.product.findMany({
       where: { isActive: true, id: { not: product.id }, categoryId: product.categoryId },
       include: { category: { select: { name: true, slug: true } }, variants: true },
-      take: 4,
+      take: 5,
     });
     const relatedStock = await this.stockMap(related.flatMap((p) => p.variants.map((v) => v.id)));
 

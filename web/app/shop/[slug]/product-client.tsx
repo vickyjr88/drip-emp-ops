@@ -19,9 +19,12 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
+import { ProductCard } from '../../components/product-card';
+import { ShareButton } from '../../components/share-button';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
 import { useCustomerAuth } from '../../lib/customer-auth';
+import { absoluteUrl } from '../../lib/site';
 import { ShopProduct, formatKes, priceLabel } from '../../lib/shop';
 
 export function ProductClient({ product }: { product: ShopProduct }) {
@@ -134,7 +137,14 @@ export function ProductClient({ product }: { product: ShopProduct }) {
           </div>
 
           <div className="de-product-info">
-            {product.brand ? <p className="de-product-brand">{product.brand}</p> : null}
+            <div className="de-product-title-row">
+              {product.brand ? <p className="de-product-brand">{product.brand}</p> : null}
+              <ShareButton
+                url={absoluteUrl(`/shop/${product.slug}`)}
+                title={product.name}
+                text={`${product.name}${product.brand ? ` by ${product.brand}` : ''} — ${priceLabel(product)}`}
+              />
+            </div>
             <h1>{product.name}</h1>
             <p className="de-product-price">
               {chosen ? formatKes(chosen.priceKes) : priceLabel(product)}
@@ -246,25 +256,7 @@ export function ProductClient({ product }: { product: ShopProduct }) {
             <h2>You might also like</h2>
             <div className="de-grid">
               {product.related.map((item) => (
-                <article key={item.id} className={`de-card${item.anyInStock ? '' : ' is-out'}`}>
-                  <Link href={`/shop/${item.slug}`} className="de-card-media">
-                    {item.imageUrls[0] ? (
-                      <img src={item.imageUrls[0]} alt={item.name} loading="lazy" />
-                    ) : (
-                      <span className="de-card-placeholder" aria-hidden="true">{item.name.charAt(0)}</span>
-                    )}
-                  </Link>
-                  <div className="de-card-body">
-                    {item.brand ? <p className="de-card-brand">{item.brand}</p> : null}
-                    <h3><Link href={`/shop/${item.slug}`}>{item.name}</Link></h3>
-                    <p className="de-card-price">
-                      {priceLabel(item)}
-                      {item.onOffer ? (
-                        <span className="de-offer-badge">{item.offerLabel || 'Offer'}</span>
-                      ) : null}
-                    </p>
-                  </div>
-                </article>
+                <ProductCard key={item.id} product={item} />
               ))}
             </div>
           </section>

@@ -9781,6 +9781,7 @@ img {
 }
 
 .de-card {
+  position: relative;
   background: #fff;
   border: 1px solid var(--de-line);
   display: flex;
@@ -9918,6 +9919,102 @@ img {
 .de-card-sizes.is-none {
   color: var(--de-royal);
   font-weight: 600;
+}
+
+/* Floats over the card photo rather than taking body space every card pays
+   for, since not every shopper cares to share from the grid. */
+.de-card-overlay-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+.de-card-quickadd {
+  margin-top: 10px;
+}
+
+.de-card-add-btn {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
+.de-card-size-picker {
+  border: 1px solid var(--de-line);
+  background: #fff;
+  padding: 10px;
+}
+
+.de-card-size-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--de-muted);
+  margin-bottom: 8px;
+}
+
+.de-card-size-picker-head button {
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--de-muted);
+  padding: 0 2px;
+}
+
+.de-card-size-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.de-card-size-picker-grid .de-chip {
+  min-width: 38px;
+  padding: 6px 9px;
+  font-size: 0.85rem;
+}
+
+/* Share, in both places it appears: an icon-only circle over a card photo,
+   an icon-plus-label button beside the product title. Same shape either way
+   so it reads as one control rather than two different ones. */
+.de-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--de-line);
+  background: #fff;
+  color: var(--de-ink);
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.de-share-btn:hover {
+  border-color: var(--de-royal);
+}
+
+.de-share-btn.is-compact {
+  padding: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.de-product-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.de-product-title-row .de-product-brand {
+  margin: 0;
 }
 
 .de-empty {
