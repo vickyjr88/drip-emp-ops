@@ -116,7 +116,8 @@ export default function AccountsReceivablePage() {
   const [tab, setTab] = useState<ArTab>('invoices');
 
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicePickerRows, setInvoicePickerRows] = useState<Invoice[]>([]);
+  const [invoiceExportRows, setInvoiceExportRows] = useState<Invoice[]>([]);
   const [aging, setAging] = useState<AgingReport | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
@@ -153,14 +154,14 @@ export default function AccountsReceivablePage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextCustomers, nextInvoices, nextAging, nextBanks, nextTaxRates, nextStores] = await Promise.all([
+      const [nextCustomers, nextInvoicePickerRows, nextAging, nextBanks, nextTaxRates, nextStores] = await Promise.all([
         hasPermission(nextProfile, 'customer.read')
           ? apiRequest<{ items: Customer[] }>('/customers?take=500', { method: 'GET' }, authToken).then(
               (page) => page.items,
             )
           : Promise.resolve([]),
         hasPermission(nextProfile, 'invoice.read')
-          ? apiRequest<Invoice[]>('/invoices?take=200', { method: 'GET' }, authToken)
+          ? apiRequest<ServerPage<Invoice>>('/invoices?take=500', { method: 'GET' }, authToken).then((page) => page.items)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'invoice.read')
           ? apiRequest<AgingReport>('/invoices/reports/aging', { method: 'GET' }, authToken)
@@ -177,7 +178,7 @@ export default function AccountsReceivablePage() {
       ]);
       setProfile(nextProfile);
       setCustomers(nextCustomers);
-      setInvoices(nextInvoices);
+      setInvoicePickerRows(nextInvoicePickerRows);
       setAging(nextAging);
       setBankAccounts(nextBanks);
       setTaxRates(nextTaxRates);
@@ -205,9 +206,38 @@ export default function AccountsReceivablePage() {
   }, [customers]);
 
   const openInvoices = useMemo(
-    () => invoices.filter((invoice) => ['SENT', 'PARTIALLY_PAID', 'OVERDUE'].includes(invoice.status)),
-    [invoices],
+    () => invoicePickerRows.filter((invoice) => ['SENT', 'PARTIALLY_PAID', 'OVERDUE'].includes(invoice.status)),
+    [invoicePickerRows],
   );
+
+  const fetchInvoicesPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Invoice>> => {
+      if (!token || !profile || !hasPermission(profile, 'invoice.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Invoice>>(`/invoices?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const invoicesPager = useServerPager<Invoice>({
+    fetchPage: (params) => fetchInvoicesPage(params),
+    enabled: Boolean(token && profile && tab === 'invoices'),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'invoice.read')) return;
+    const timer = setTimeout(() => {
+      void fetchInvoicesPage({ skip: 0, take: 500, search: invoicesPager.search }).then((page) =>
+        setInvoiceExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchInvoicesPage, invoicesPager.search, token, profile]);
 
   const fetchReceiptsPage = useCallback(
     async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Receipt>> => {
@@ -292,6 +322,7 @@ export default function AccountsReceivablePage() {
       await action();
       setFeedback(successMessage);
       await load(token);
+      invoicesPager.reload();
       receiptsPager.reload();
       refundsPager.reload();
       void refreshPendingRefundCount();
@@ -511,12 +542,6 @@ export default function AccountsReceivablePage() {
     }, 'Refund rejected.');
   }
 
-  const invoiceControls = useListControls(invoices, (row) => [
-    row.invoiceNumber,
-    row.status,
-    row.currency,
-    customerLabel(customers.find((entry) => entry.id === row.customerId)),
-  ]);
 
   if (!initialized || loading) {
     return (
@@ -734,9 +759,9 @@ export default function AccountsReceivablePage() {
                   ) : null}
 
                   <div className="list-toolbar">
-                    <ListSearch controls={invoiceControls} placeholder="Search invoices…" />
+                    <ServerListSearch pager={invoicesPager} placeholder="Search invoices…" />
                     <ListExport
-                      rows={invoiceControls.filtered}
+                      rows={invoiceExportRows}
                       config={{
                         fileName: 'invoices',
                         dateOf: (row) => row.issuedAt,
@@ -755,10 +780,12 @@ export default function AccountsReceivablePage() {
                     />
                   </div>
                   <div className="portal-list-stack">
-                    {invoices.length === 0 ? (
-                      <div className="portal-empty-state">No invoices yet.</div>
+                    {!invoicesPager.loading && invoicesPager.items.length === 0 ? (
+                      <div className="portal-empty-state">
+                        {invoicesPager.search ? 'No invoices match.' : 'No invoices yet.'}
+                      </div>
                     ) : (
-                      invoiceControls.visible.map((invoice) => {
+                      invoicesPager.items.map((invoice) => {
                         const balance = invoiceBalance(invoice);
                         return (
                           <div key={invoice.id} className="portal-record">
@@ -804,7 +831,7 @@ export default function AccountsReceivablePage() {
                       })
                     )}
                   </div>
-                  <ListPager controls={invoiceControls} noun="invoices" />
+                  <ServerListPager pager={invoicesPager} noun="invoices" />
                 </article>
               </div>
             ) : null}

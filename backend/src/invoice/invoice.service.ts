@@ -7,8 +7,10 @@ import { PdfService } from '../pdf/pdf.service';
 import { invoicePdfTemplate } from '../pdf/pdf.templates';
 import { CreateInvoiceDto, BulkGenerateInvoicesDto, InvoiceSourceType } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto, CancelInvoiceDto } from './dto/update-invoice.dto';
-import { JournalSource } from '@prisma/client';
+import { InvoiceQueryDto } from './dto/invoice-query.dto';
+import { JournalSource, Prisma } from '@prisma/client';
 import { nextReference } from '../common/next-reference';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class InvoiceService {
@@ -114,18 +116,27 @@ export class InvoiceService {
   }
 
 
-  findAll(params: { skip?: number; take?: number; customerId?: string; status?: string }) {
-    const { skip, take, customerId, status } = params;
-    return this.prisma.invoice.findMany({
-      where: {
-        ...(customerId ? { customerId } : {}),
-        ...(status ? { status: status as any } : {}),
-      },
-      include: { lines: true, allocations: true },
-      orderBy: { issuedAt: 'desc' },
+  findAll(query: InvoiceQueryDto) {
+    const { skip, take, search, customerId, status } = query;
+    const where: Prisma.InvoiceWhereInput = {
+      ...(customerId ? { customerId } : {}),
+      ...(status ? { status: status as any } : {}),
+      ...searchOr(search, (term) =>
+        containsAny(['invoiceNumber', 'customer.firstName', 'customer.lastName'], term),
+      ),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.invoice.findMany({
+          where,
+          include: { lines: true, allocations: true },
+          orderBy: [{ issuedAt: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.invoice.count({ where }),
       skip,
       take,
-    });
+    );
   }
 
   async findOne(id: string) {

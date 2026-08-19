@@ -3,6 +3,8 @@ import { Prisma, StockMovementType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { RecordMovementDto } from './dto/stock.dto';
+import { StockMovementQueryDto } from './dto/stock-movement-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 /**
  * Which way each movement pushes the shop-floor count.
@@ -63,19 +65,30 @@ export class InventoryService {
     return query.lowOnly === 'true' ? mapped.filter((row) => row.needsReorder) : mapped;
   }
 
-  async movements(query: { storeId?: string; variantId?: string; take?: number }) {
-    return this.prisma.stockMovement.findMany({
-      where: {
-        ...(query.storeId ? { storeId: query.storeId } : {}),
-        ...(query.variantId ? { variantId: query.variantId } : {}),
-      },
-      include: {
-        store: { select: { id: true, code: true, name: true } },
-        variant: { select: { id: true, sku: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: query.take ? Math.min(Number(query.take), 500) : 100,
-    });
+  movements(query: StockMovementQueryDto) {
+    const { skip, take, search, storeId, variantId } = query;
+    const where: Prisma.StockMovementWhereInput = {
+      ...(storeId ? { storeId } : {}),
+      ...(variantId ? { variantId } : {}),
+      ...searchOr(search, (term) =>
+        containsAny(['reference', 'notes', 'variant.sku', 'variant.name'], term),
+      ),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.stockMovement.findMany({
+          where,
+          include: {
+            store: { select: { id: true, code: true, name: true } },
+            variant: { select: { id: true, sku: true, name: true } },
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.stockMovement.count({ where }),
+      skip,
+      take,
+    );
   }
 
   /**

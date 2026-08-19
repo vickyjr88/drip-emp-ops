@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Patch, Query, StreamableFile } from
 import { InvoiceService } from './invoice.service';
 import { CreateInvoiceDto, BulkGenerateInvoicesDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto, CancelInvoiceDto } from './dto/update-invoice.dto';
+import { InvoiceQueryDto } from './dto/invoice-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -21,18 +22,8 @@ export class InvoiceController {
 
   @Get()
   @Permissions(buildPermissionKey('Invoice', 'read'))
-  findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('customerId') customerId?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.service.findAll({
-      skip: skip ? Number(skip) : undefined,
-      take: take ? Number(take) : undefined,
-      customerId,
-      status,
-    });
+  findAll(@Query() query: InvoiceQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get('reports/aging')

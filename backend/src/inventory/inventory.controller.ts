@@ -4,6 +4,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { InventoryService } from './inventory.service';
 import { RecordMovementDto, SetReorderLevelDto } from './dto/stock.dto';
+import { StockMovementQueryDto } from './dto/stock-movement-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('inventory')
@@ -23,12 +24,8 @@ export class InventoryController {
 
   @Get('movements')
   @Permissions(buildPermissionKey('StockMovement', 'read'))
-  movements(
-    @Query('storeId') storeId?: string,
-    @Query('variantId') variantId?: string,
-    @Query('take') take?: number,
-  ) {
-    return this.service.movements({ storeId, variantId, take });
+  movements(@Query() query: StockMovementQueryDto) {
+    return this.service.movements(query);
   }
 
   @Post('movements')

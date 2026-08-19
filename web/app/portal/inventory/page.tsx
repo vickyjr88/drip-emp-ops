@@ -13,6 +13,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import { OfferQuickAdd, OfferTarget } from '../components/offer-quick-add';
@@ -64,7 +65,6 @@ export default function InventoryPage() {
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [levels, setLevels] = useState<Level[]>([]);
-  const [movements, setMovements] = useState<Movement[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [catalogue, setCatalogue] = useState<CatalogueProduct[]>([]);
   /** What is typed into the Product / size autocomplete. */
@@ -87,16 +87,14 @@ export default function InventoryPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [levelRows, movementRows, storeRows, productRows] = await Promise.all([
+      const [levelRows, storeRows, productRows] = await Promise.all([
         apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
-        apiRequest<Movement[]>('/inventory/movements?take=200', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
         apiRequest<{ items: CatalogueProduct[] }>('/products?take=500', { method: 'GET' }, authToken).then(
           (page) => page.items,
         ),
       ]);
       setLevels(levelRows);
-      setMovements(movementRows);
       setStores(storeRows);
       setCatalogue(productRows);
       setForm((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
@@ -171,6 +169,24 @@ export default function InventoryPage() {
   );
 
   const controls = useListControls(levelRows, (row) => [row.productName, row.sku, row.size, row.storeName]);
+
+  const fetchMovementsPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Movement>> => {
+      if (!token || !profile) return { items: [], total: 0, skip: params.skip, take: params.take };
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Movement>>(`/inventory/movements?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const movementsPager = useServerPager<Movement>({
+    fetchPage: (params) => fetchMovementsPage(params),
+    enabled: Boolean(token && profile && tab === 'movements'),
+  });
+
   const canRecord = hasPermission(profile, 'stock-movement.create');
   const canCreateOffer = hasPermission(profile, 'offer.create');
 
@@ -195,6 +211,7 @@ export default function InventoryPage() {
       setForm((prev) => ({ ...prev, variantId: '', quantity: '', reference: '' }));
       setVariantQuery('');
       await load(token);
+      movementsPager.reload();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -462,30 +479,36 @@ export default function InventoryPage() {
                   <ListPager controls={controls} noun="stock rows" />
                 </>
               ) : (
-                <div className="portal-table-wrap">
-                  <table className="portal-data-table">
-                    <thead>
-                      <tr><th>When</th><th>Store</th><th>Item</th><th>Reason</th><th>Qty</th><th>Reference</th><th>By</th></tr>
-                    </thead>
-                    <tbody>
-                      {movements.length === 0 ? (
-                        <tr><td colSpan={7}>No movements recorded.</td></tr>
-                      ) : (
-                        movements.map((movement) => (
-                          <tr key={movement.id}>
-                            <td>{formatDate(movement.createdAt)}</td>
-                            <td>{movement.store.name}</td>
-                            <td>{movement.variant.sku}</td>
-                            <td>{movement.type}</td>
-                            <td>{movement.quantity > 0 ? `+${movement.quantity}` : movement.quantity}</td>
-                            <td>{movement.reference || '—'}</td>
-                            <td>{movement.createdBy}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  <div className="list-toolbar">
+                    <ServerListSearch pager={movementsPager} placeholder="Search reference, notes, SKU…" />
+                  </div>
+                  <div className="portal-table-wrap">
+                    <table className="portal-data-table">
+                      <thead>
+                        <tr><th>When</th><th>Store</th><th>Item</th><th>Reason</th><th>Qty</th><th>Reference</th><th>By</th></tr>
+                      </thead>
+                      <tbody>
+                        {!movementsPager.loading && movementsPager.items.length === 0 ? (
+                          <tr><td colSpan={7}>{movementsPager.search ? 'No movements match.' : 'No movements recorded.'}</td></tr>
+                        ) : (
+                          movementsPager.items.map((movement) => (
+                            <tr key={movement.id}>
+                              <td>{formatDate(movement.createdAt)}</td>
+                              <td>{movement.store.name}</td>
+                              <td>{movement.variant.sku}</td>
+                              <td>{movement.type}</td>
+                              <td>{movement.quantity > 0 ? `+${movement.quantity}` : movement.quantity}</td>
+                              <td>{movement.reference || '—'}</td>
+                              <td>{movement.createdBy}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <ServerListPager pager={movementsPager} noun="movements" />
+                </>
               )}
             </article>
             {offerTarget && token ? (
