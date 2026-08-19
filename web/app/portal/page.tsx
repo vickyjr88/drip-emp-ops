@@ -87,13 +87,12 @@ export default function PortalPage() {
           apiRequest<SalesSummary>('/orders/summary', { method: 'GET' }, authToken),
           apiRequest<OrderRow[] | { items: OrderRow[] }>('/orders?take=8', { method: 'GET' }, authToken),
         ]);
-        setSummary(sales);
-        setRecentOrders(Array.isArray(orders) ? orders : orders.items || []);
+        setSummary(sales && typeof sales === 'object' && 'orderCount' in sales ? sales : null);
+        setRecentOrders(Array.isArray(orders) ? orders : Array.isArray(orders?.items) ? orders.items : []);
       }
       if (hasPermission(nextProfile, 'stock-level.read')) {
-        setLowStock(
-          await apiRequest<StockRow[]>('/inventory/levels?lowOnly=true', { method: 'GET' }, authToken),
-        );
+        const levels = await apiRequest<StockRow[] | { items: StockRow[] }>('/inventory/levels?lowOnly=true', { method: 'GET' }, authToken);
+        setLowStock(Array.isArray(levels) ? levels : Array.isArray(levels?.items) ? levels.items : []);
       }
     } catch (error) {
       setErrorMessage(error);
@@ -231,7 +230,7 @@ export default function PortalPage() {
               </div>
             ) : null}
 
-            {lowStock.length > 0 ? (
+            {Array.isArray(lowStock) && lowStock.length > 0 ? (
               <article className="portal-card">
                 <div className="portal-card-header-row">
                   <div>
@@ -274,7 +273,7 @@ export default function PortalPage() {
                 </Link>
               </div>
               <div className="portal-list-stack">
-                {recentOrders.length === 0 ? (
+                {!Array.isArray(recentOrders) || recentOrders.length === 0 ? (
                   <div className="portal-empty-state">No orders yet.</div>
                 ) : (
                   recentOrders.map((order) => (

@@ -57,13 +57,14 @@ function escapeCell(value: string | number | null | undefined): string {
 }
 
 function toCsv<T>(rows: T[], columns: Array<ExportColumn<T>>): string {
+  const safeRows = Array.isArray(rows) ? rows : [];
   const header = columns.map((column) => escapeCell(column.header)).join(',');
-  const body = rows.map((row) =>
+  const body = safeRows.map((row) =>
     columns.map((column) => escapeCell(column.value(row))).join(','),
   );
   // CRLF and a UTF-8 BOM: without the BOM Excel reads the file as the local
   // codepage and mangles any non-ASCII name.
-  return `﻿${[header, ...body].join('\r\n')}\r\n`;
+  return `\uFEFF${[header, ...body].join('\r\n')}\r\n`;
 }
 
 function download(csv: string, fileName: string) {
@@ -99,13 +100,14 @@ export function filterByDate<T>(
   from: string,
   to: string,
 ): T[] {
-  if (!dateOf || (!from && !to)) return rows;
+  const safeRows = Array.isArray(rows) ? rows : [];
+  if (!dateOf || (!from && !to)) return safeRows;
 
   const start = from ? parseDate(from) : null;
   const end = to ? parseDate(to) : null;
   if (end) end.setHours(23, 59, 59, 999);
 
-  return rows.filter((row) => {
+  return safeRows.filter((row) => {
     const date = parseDate(dateOf(row));
     if (!date) return false;
     if (start && date < start) return false;

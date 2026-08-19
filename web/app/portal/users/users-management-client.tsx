@@ -303,12 +303,12 @@ export default function UsersManagementClient() {
                               <p>Joined {new Date(user.createdAt).toLocaleDateString('en-GB')}</p>
                             ) : null}
                           </div>
-                          <span>{user.roles.length} role{user.roles.length === 1 ? '' : 's'}</span>
-                          <span>{user.permissions.length} perms</span>
+                          <span>{(user.roles || []).length} role{(user.roles || []).length === 1 ? '' : 's'}</span>
+                          <span>{(user.permissions || []).length} perms</span>
                         </div>
                         <div className="portal-tag-cloud">
-                          {user.roles.length ? (
-                            user.roles.map((role) => (
+                          {(user.roles || []).length ? (
+                            (user.roles || []).map((role) => (
                               <span key={role.id} className="portal-chip">
                                 {role.name}
                               </span>
@@ -352,7 +352,7 @@ export default function UsersManagementClient() {
                       columns: [
                         { header: 'Name', value: (row) => row.name || '' },
                         { header: 'Email', value: (row) => row.email },
-                        { header: 'Roles', value: (row) => row.roles.map((role) => role.name).join('; ') },
+                        { header: 'Roles', value: (row) => (row.roles || []).map((role) => role.name).join('; ') },
                         { header: 'Permissions', value: (row) => row.permissions?.length ?? 0 },
                       ],
                     }}

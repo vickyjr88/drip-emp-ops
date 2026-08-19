@@ -88,16 +88,19 @@ export default function InventoryPage() {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
       const [levelRows, storeRows, productRows] = await Promise.all([
-        apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
-        apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
-        apiRequest<{ items: CatalogueProduct[] }>('/products?take=500', { method: 'GET' }, authToken).then(
-          (page) => page.items,
+        apiRequest<Level[] | { items: Level[] }>('/inventory/levels', { method: 'GET' }, authToken),
+        apiRequest<Store[] | { items: Store[] }>('/stores', { method: 'GET' }, authToken),
+        apiRequest<{ items: CatalogueProduct[] } | CatalogueProduct[]>('/products?take=500', { method: 'GET' }, authToken).then(
+          (page) => Array.isArray(page) ? page : Array.isArray(page?.items) ? page.items : [],
         ),
       ]);
-      setLevels(levelRows);
-      setStores(storeRows);
-      setCatalogue(productRows);
-      setForm((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
+      const safeLevels = Array.isArray(levelRows) ? levelRows : Array.isArray(levelRows?.items) ? levelRows.items : [];
+      const safeStores = Array.isArray(storeRows) ? storeRows : Array.isArray(storeRows?.items) ? storeRows.items : [];
+      const safeCatalogue = Array.isArray(productRows) ? productRows : [];
+      setLevels(safeLevels);
+      setStores(safeStores);
+      setCatalogue(safeCatalogue);
+      setForm((prev) => ({ ...prev, storeId: prev.storeId || safeStores[0]?.id || '' }));
     } catch (error) {
       setErrorMessage(error);
     } finally {

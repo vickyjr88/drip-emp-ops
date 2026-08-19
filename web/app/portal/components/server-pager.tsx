@@ -182,7 +182,7 @@ export function useServerPager<T, TFilters extends Record<string, unknown> = Rec
 
   const reload = useCallback(() => setReloadTick((tick) => tick + 1), []);
 
-  const items = data?.items ?? [];
+  const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? (data as unknown as T[]) : [];
   const from = total === 0 ? 0 : (effectivePage - 1) * pageSize + 1;
   const to = Math.min(effectivePage * pageSize, total);
 
