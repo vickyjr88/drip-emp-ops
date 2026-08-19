@@ -109,8 +109,8 @@ export default function CataloguePage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const cats = await apiRequest<Category[]>('/product-categories', { method: 'GET' }, authToken);
-      setCategories(cats);
+      const cats = await apiRequest<Category[] | { items: Category[] }>('/product-categories', { method: 'GET' }, authToken);
+      setCategories(Array.isArray(cats) ? cats : Array.isArray(cats?.items) ? cats.items : []);
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -146,23 +146,27 @@ export default function CataloguePage() {
     if (!token) return;
     const timer = setTimeout(() => {
       void fetchProductsPage({ skip: 0, take: 500, search: productsPager.search }).then((page) =>
-        setExportRows(page.items),
+        setExportRows(Array.isArray(page?.items) ? page.items : Array.isArray(page) ? (page as unknown as Product[]) : []),
       );
     }, 350);
     return () => clearTimeout(timer);
   }, [fetchProductsPage, productsPager.search, token]);
 
-  const shapeRow = (product: Product) => ({
-    ...product,
-    categoryName: product.category?.name || '',
-    brandName: product.brand || '',
-    priceFrom: product.variants.length
-      ? Math.min(...product.variants.map((variant) => Number(variant.priceKes)))
-      : 0,
-  });
+  const shapeRow = (product: Product) => {
+    const safeVariants = Array.isArray(product.variants) ? product.variants : [];
+    return {
+      ...product,
+      variants: safeVariants,
+      categoryName: product.category?.name || '',
+      brandName: product.brand || '',
+      priceFrom: safeVariants.length
+        ? Math.min(...safeVariants.map((variant) => Number(variant.priceKes)))
+        : 0,
+    };
+  };
 
-  const rows = useMemo(() => productsPager.items.map(shapeRow), [productsPager.items]);
-  const exportRowsShaped = useMemo(() => exportRows.map(shapeRow), [exportRows]);
+  const rows = useMemo(() => (Array.isArray(productsPager.items) ? productsPager.items : []).map(shapeRow), [productsPager.items]);
+  const exportRowsShaped = useMemo(() => (Array.isArray(exportRows) ? exportRows : []).map(shapeRow), [exportRows]);
 
   const canCreate = hasPermission(profile, 'product.create');
   const canUpdate = hasPermission(profile, 'product.update');
@@ -426,7 +430,7 @@ export default function CataloguePage() {
                       <select value={form.categoryId}
                         onChange={(event) => setForm((prev) => ({ ...prev, categoryId: event.target.value }))}>
                         <option value="">Uncategorised</option>
-                        {categories.map((category) => (
+                        {(categories || []).map((category) => (
                           <option key={category.id} value={category.id}>{category.name}</option>
                         ))}
                       </select>
@@ -565,7 +569,7 @@ export default function CataloguePage() {
                       { header: 'Name', value: (row) => row.name },
                       { header: 'Brand', value: (row) => row.brandName },
                       { header: 'Category', value: (row) => row.categoryName },
-                      { header: 'Variants', value: (row) => row.variants.length },
+                      { header: 'Variants', value: (row) => (row.variants || []).length },
                       { header: 'Price From', value: (row) => row.priceFrom },
                       { header: 'Active', value: (row) => (row.isActive ? 'Yes' : 'No') },
                     ],
@@ -594,7 +598,7 @@ export default function CataloguePage() {
                             {product.categoryName ? ` · ${product.categoryName}` : ''}
                           </p>
                           <p>
-                            {product.variants.length} size(s) from {formatMoney(product.priceFrom)}
+                            {(product.variants || []).length} size(s) from {formatMoney(product.priceFrom)}
                           </p>
                         </div>
                         <div className="portal-action-row">
@@ -614,9 +618,6 @@ export default function CataloguePage() {
                               className="portal-inline-btn"
                               onClick={() => {
                                 setDuplicateOf(product);
-                                // Prefilled from the source so the usual case --
-                                // another colourway -- is an edit rather than
-                                // retyping the model name from scratch.
                                 setDuplicateForm({ sku: '', name: product.name });
                               }}
                             >
@@ -651,7 +652,7 @@ export default function CataloguePage() {
                         <div className="portal-media-section">
                           <h3 style={{ margin: 0 }}>Duplicate {product.name}</h3>
                           <p className="portal-muted" style={{ margin: '4px 0 12px' }}>
-                            Copies the description, images and all {product.variants.length} size(s)
+                            Copies the description, images and all {(product.variants || []).length} size(s)
                             with their prices. Stock is not copied, and the copy starts inactive.
                           </p>
                           <form className="portal-entity-form" onSubmit={onDuplicate}>
@@ -729,7 +730,7 @@ export default function CataloguePage() {
 
                           {product.imageUrls?.length ? (
                             <div className="portal-project-gallery-grid" style={{ marginTop: 12 }}>
-                              {product.imageUrls.map((url, index) => (
+                              {(product.imageUrls || []).map((url, index) => (
                                 <div
                                   key={`${url}-${index}`}
                                   className={`portal-project-gallery-item${
@@ -817,7 +818,7 @@ export default function CataloguePage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {product.variants.map((variant) => {
+                              {(product.variants || []).map((variant) => {
                                 const cost =
                                   variant.costKes === null || variant.costKes === undefined
                                     ? null

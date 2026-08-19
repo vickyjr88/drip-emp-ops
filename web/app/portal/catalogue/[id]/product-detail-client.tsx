@@ -127,17 +127,24 @@ export default function ProductDetailClient({ productId }: { productId: string }
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken).catch(() => []),
         apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken).catch(() => []),
       ]);
-      setProduct(next);
-      setCategories(cats);
-      setStores(storeRows);
-      setLevels(levelRows);
-      setRestock((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
-      setDetails({
-        name: next.name || '',
-        brand: next.brand || '',
-        description: next.description || '',
-        categoryId: next.categoryId || '',
-      });
+      const safeCats = Array.isArray(cats) ? cats : Array.isArray((cats as any)?.items) ? (cats as any).items : [];
+      const safeStores = Array.isArray(storeRows) ? storeRows : Array.isArray((storeRows as any)?.items) ? (storeRows as any).items : [];
+      const safeLevels = Array.isArray(levelRows) ? levelRows : Array.isArray((levelRows as any)?.items) ? (levelRows as any).items : [];
+      const safeVariants = Array.isArray(next?.variants) ? next.variants : [];
+      const safeProduct = next ? { ...next, variants: safeVariants } : null;
+      setProduct(safeProduct);
+      setCategories(safeCats);
+      setStores(safeStores);
+      setLevels(safeLevels);
+      setRestock((prev) => ({ ...prev, storeId: prev.storeId || safeStores[0]?.id || '' }));
+      if (next) {
+        setDetails({
+          name: next.name || '',
+          brand: next.brand || '',
+          description: next.description || '',
+          categoryId: next.categoryId || '',
+        });
+      }
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -184,9 +191,12 @@ export default function ProductDetailClient({ productId }: { productId: string }
    */
   const stockByVariant = useMemo(() => {
     const map = new Map<string, number>();
-    for (const level of levels) {
-      if (restock.storeId && level.store.id !== restock.storeId) continue;
-      map.set(level.variant.id, (map.get(level.variant.id) ?? 0) + level.quantity);
+    const safeLevels = Array.isArray(levels) ? levels : [];
+    for (const level of safeLevels) {
+      if (restock.storeId && level.store?.id !== restock.storeId) continue;
+      if (level.variant?.id) {
+        map.set(level.variant.id, (map.get(level.variant.id) ?? 0) + level.quantity);
+      }
     }
     return map;
   }, [levels, restock.storeId]);
