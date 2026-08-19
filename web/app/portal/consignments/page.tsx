@@ -17,8 +17,8 @@ import { ListExport } from '../components/list-export';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
-  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDate, formatMoney,
-  hasPermission, loadProfile, roleLabelFor,
+  AuthProfile, TOKEN_KEY, apiRequest, asList, canReadRbacFor, formatDate,
+  formatMoney, hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
 type Store = { id: string; code: string; name: string };
@@ -81,11 +81,11 @@ export default function ConsignmentsPage() {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
       const [levelRows, storeRows, resellerRows] = await Promise.all([
-        apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
+        apiRequest<unknown>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
         apiRequest<{ items: Reseller[] }>('/resellers?take=500', { method: 'GET' }, authToken).then((page) => page.items),
       ]);
-      setLevels(levelRows);
+      setLevels(asList<Level>(levelRows));
       setStores(storeRows);
       setResellers(resellerRows);
       setHead((prev) => ({

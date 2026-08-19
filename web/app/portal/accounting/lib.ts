@@ -73,6 +73,29 @@ export async function uploadMedia(file: File, token: string) {
   return (await response.json()) as { objectKey: string; url: string };
 }
 
+/**
+ * The rows out of a list response, whichever shape it arrived in.
+ *
+ * Endpoints are being migrated to a { items, total, skip, take } envelope one
+ * service at a time, so at any given moment some return the envelope and some
+ * still return a bare array. A page written against the old shape does not fail
+ * at the fetch -- it stores the envelope object and throws later, on whatever
+ * .map or .filter touches it first, which is why these surface as
+ * "E.map is not a function" a long way from the call.
+ *
+ * Anything unrecognised becomes an empty list: a page with no rows is a better
+ * outcome than a blank screen, and the request having failed is already
+ * reported separately.
+ */
+export function asList<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === 'object') {
+    const items = (response as { items?: unknown }).items;
+    if (Array.isArray(items)) return items as T[];
+  }
+  return [];
+}
+
 export function hasPermission(profile: AuthProfile | null | undefined, permission: string) {
   if (!profile) return false;
   if (profile.role === 'ADMIN' || (Array.isArray(profile.roles) && profile.roles.some((role) => role?.name === 'ADMIN'))) return true;

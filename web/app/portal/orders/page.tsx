@@ -16,8 +16,8 @@ import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '.
 import { ListExport } from '../components/list-export';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
-  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDate, formatMoney,
-  hasPermission, loadProfile, roleLabelFor,
+  AuthProfile, TOKEN_KEY, apiRequest, asList, canReadRbacFor, formatDate,
+  formatMoney, hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
 type Store = { id: string; code: string; name: string };
@@ -76,10 +76,10 @@ export default function OrdersPage() {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
       const [levelRows, storeRows] = await Promise.all([
-        apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
+        apiRequest<unknown>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
       ]);
-      setLevels(levelRows);
+      setLevels(asList<Level>(levelRows));
       setStores(storeRows);
       setHead((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
     } catch (error) {
