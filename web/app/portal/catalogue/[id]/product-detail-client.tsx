@@ -41,7 +41,13 @@ type Product = {
   brand?: string | null; description?: string | null;
   categoryId?: string | null;
   category?: { id: string; name: string } | null;
-  imageUrls: string[]; featuredImageUrl?: string | null;
+  /**
+   * Null for a product that has never had an image: the column is Json? and the
+   * API returns it raw. Declared honestly so every use has to handle it -- it
+   * was string[] before, which typechecked while crashing the page on the six
+   * of seven products that have no images.
+   */
+  imageUrls?: string[] | null; featuredImageUrl?: string | null;
   isActive: boolean; variants: Variant[];
 };
 
@@ -418,6 +424,17 @@ export default function ProductDetailClient({ productId }: { productId: string }
     );
   }
 
+  /**
+   * The gallery, always an array.
+   *
+   * imageUrls is null for a product that has never had an image -- which is
+   * most of them -- and the six places below that read it would each need their
+   * own guard otherwise. Array.isArray rather than `?? []` because the column
+   * is Json: a value that is neither null nor an array is malformed data, and
+   * an empty gallery is a better answer than a crash.
+   */
+  const images = Array.isArray(product.imageUrls) ? product.imageUrls : [];
+
   const canUpdate = hasPermission(profile, 'product.update');
   const canDelete = hasPermission(profile, 'product.delete');
   const canCreateOffer = hasPermission(profile, 'offer.create');
@@ -758,13 +775,13 @@ export default function ProductDetailClient({ productId }: { productId: string }
                 ) : null}
               </div>
 
-              {product.imageUrls.length === 0 ? (
+              {images.length === 0 ? (
                 <div className="portal-empty-state">
                   No images yet. A product without a photo rarely sells online.
                 </div>
               ) : (
                 <div className="portal-image-grid">
-                  {product.imageUrls.map((url) => (
+                  {images.map((url) => (
                     <figure key={url} className="portal-image-tile">
                       <img src={url} alt="" />
                       <figcaption>
@@ -780,7 +797,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
                         ) : null}
                         {canUpdate ? (
                           <button type="button" className="portal-linkish"
-                            onClick={() => void setImages(product.imageUrls.filter((item) => item !== url))}>
+                            onClick={() => void setImages(images.filter((item) => item !== url))}>
                             Remove
                           </button>
                         ) : null}
@@ -795,15 +812,15 @@ export default function ProductDetailClient({ productId }: { productId: string }
               open={pickerOpen}
               token={token}
               multiple
-              usedUrls={product.imageUrls}
+              usedUrls={images}
               title={`Images for ${product.name}`}
               onClose={() => setPickerOpen(false)}
               // onSelect already hands over URLs; onSelectItems is for callers
               // that need the object key too, which this one does not.
               onSelect={(urls) =>
                 void setImages([
-                  ...product.imageUrls,
-                  ...urls.filter((url) => !product.imageUrls.includes(url)),
+                  ...images,
+                  ...urls.filter((url) => !images.includes(url)),
                 ])
               }
             />
