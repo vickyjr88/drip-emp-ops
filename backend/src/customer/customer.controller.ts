@@ -3,7 +3,7 @@ import { CustomerService } from './customer.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { SetCustomerPortalAccessDto } from '../customer-portal/dto/customer-portal.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { CustomerQueryDto } from './dto/customer-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -22,8 +22,8 @@ export class CustomerController {
 
   @Get()
   @Permissions(buildPermissionKey('Customer', 'read'))
-  findAll(@Query() pagination: PaginationDto) {
-    return this.service.findAll(pagination);
+  findAll(@Query() query: CustomerQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

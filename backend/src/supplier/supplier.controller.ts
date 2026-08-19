@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, Patch, Delete, Query } from '@nestj
 import { SupplierService } from './supplier.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { SupplierQueryDto } from './dto/supplier-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -21,8 +21,8 @@ export class SupplierController {
 
   @Get()
   @Permissions(buildPermissionKey('Supplier', 'read'))
-  findAll(@Query() pagination: PaginationDto) {
-    return this.service.findAll(pagination);
+  findAll(@Query() query: SupplierQueryDto) {
+    return this.service.findAll(query);
   }
 
   // Declared before :id so these literal paths are not read as supplier ids.

@@ -125,7 +125,9 @@ export default function AccountsPayablePage() {
       const nextProfile = await loadProfile(authToken);
       const [nextSuppliers, nextBalances, nextInvoices, nextPayments, nextTaxRates, nextBanks, nextStores, nextAccounts] = await Promise.all([
         hasPermission(nextProfile, 'supplier.read')
-          ? apiRequest<Supplier[]>('/suppliers?take=500', { method: 'GET' }, authToken)
+          ? apiRequest<{ items: Supplier[] }>('/suppliers?take=500', { method: 'GET' }, authToken).then(
+              (page) => page.items,
+            )
           : Promise.resolve([]),
         hasPermission(nextProfile, 'supplier.read')
           ? apiRequest<any[]>('/suppliers/balances', { method: 'GET' }, authToken)

@@ -4,7 +4,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { CustomerQueryDto } from './dto/customer-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 /**
  * Never select the portal password hash. Staff need to know *whether* a customer
@@ -29,9 +30,27 @@ export class CustomerService {
     return this.prisma.customer.create({ data: dto, select: CUSTOMER_SELECT });
   }
 
-  findAll(pagination: PaginationDto) {
-    const { skip, take } = pagination;
-    return this.prisma.customer.findMany({ skip, take, select: CUSTOMER_SELECT });
+  findAll(query: CustomerQueryDto) {
+    const { skip, take, search, priceTier, isActive, sortBy } = query;
+    const where: Prisma.CustomerWhereInput = {
+      ...(priceTier ? { priceTier } : {}),
+      ...(isActive !== undefined ? { isActive } : {}),
+      ...searchOr(search, (term) =>
+        containsAny(['firstName', 'lastName', 'email', 'phone', 'code', 'businessName'], term),
+      ),
+    };
+    const orderBy: Prisma.CustomerOrderByWithRelationInput[] =
+      sortBy === 'name-desc'
+        ? [{ firstName: 'desc' }, { lastName: 'desc' }, { id: 'asc' }]
+        : sortBy === 'email-asc'
+          ? [{ email: 'asc' }, { id: 'asc' }]
+          : [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }];
+    return paginate(
+      (args) => this.prisma.customer.findMany({ where, orderBy, select: CUSTOMER_SELECT, ...args }),
+      () => this.prisma.customer.count({ where }),
+      skip,
+      take,
+    );
   }
 
   findOne(id: string) {

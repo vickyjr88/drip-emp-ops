@@ -7057,6 +7057,88 @@ img {
     outline-offset: 2px;
   }
 
+  /* Server-paginated lists (server-pager.tsx): page-size select, numbered
+     page strip, and jump-to-page input alongside the Previous/Next buttons
+     above. Shares list-pager/list-pager-btn for layout and button styling. */
+  .list-pager-size {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #5a5c5c;
+  }
+
+  .list-pager-size select {
+    border: 1px solid var(--eef-border);
+    background: #fff;
+    color: #1a1c1c;
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    padding: 6px 8px;
+    min-height: 32px;
+  }
+
+  .list-pager-pages {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .list-pager-page-btn {
+    border: 1px solid var(--eef-border);
+    background: transparent;
+    color: #1a1c1c;
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px 8px;
+    cursor: pointer;
+  }
+
+  .list-pager-page-btn:hover {
+    border-color: var(--eef-primary);
+    color: var(--eef-primary);
+  }
+
+  .list-pager-page-btn.is-active {
+    background: var(--eef-primary);
+    border-color: var(--eef-primary);
+    color: #fff;
+    cursor: default;
+  }
+
+  .list-pager-page-btn:focus-visible {
+    outline: 2px solid var(--eef-primary);
+    outline-offset: 2px;
+  }
+
+  .list-pager-gap {
+    color: #8a8d8d;
+    font-size: 12px;
+    padding: 0 2px;
+  }
+
+  .list-pager-jump {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #5a5c5c;
+  }
+
+  .list-pager-jump input {
+    width: 56px;
+    border: 1px solid var(--eef-border);
+    background: #fff;
+    color: #1a1c1c;
+    font-family: 'Manrope', sans-serif;
+    font-size: 12px;
+    padding: 6px 8px;
+    min-height: 32px;
+  }
+
   /* Search sitting in a card header alongside existing filter controls. */
   .list-toolbar {
     display: flex;

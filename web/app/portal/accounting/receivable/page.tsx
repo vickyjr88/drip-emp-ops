@@ -153,7 +153,9 @@ export default function AccountsReceivablePage() {
       const nextProfile = await loadProfile(authToken);
       const [nextCustomers, nextInvoices, nextReceipts, nextAging, nextBanks, nextTaxRates, nextStores, nextRefunds] = await Promise.all([
         hasPermission(nextProfile, 'customer.read')
-          ? apiRequest<Customer[]>('/customers?take=500', { method: 'GET' }, authToken)
+          ? apiRequest<{ items: Customer[] }>('/customers?take=500', { method: 'GET' }, authToken).then(
+              (page) => page.items,
+            )
           : Promise.resolve([]),
         hasPermission(nextProfile, 'invoice.read')
           ? apiRequest<Invoice[]>('/invoices?take=200', { method: 'GET' }, authToken)

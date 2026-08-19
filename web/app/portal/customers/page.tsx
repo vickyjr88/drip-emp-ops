@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
-import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { useErrorState } from '../components/notifications';
 import {
@@ -41,8 +41,8 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [errorMessage, setErrorMessage] = useErrorState();
+  const [exportRows, setExportRows] = useState<Customer[]>([]);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -54,9 +54,6 @@ export default function CustomersPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      if (hasPermission(nextProfile, 'customer.read')) {
-        setCustomers(await apiRequest<Customer[]>('/customers', { method: 'GET' }, authToken));
-      }
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -75,9 +72,34 @@ export default function CustomersPage() {
     void load(token);
   }, [initialized, token, load]);
 
-  const controls = useListControls(customers, (row) => [
-    row.firstName, row.lastName, row.email, row.phone || '',
-  ]);
+  const fetchCustomersPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Customer>> => {
+      if (!token || !profile || !hasPermission(profile, 'customer.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Customer>>(`/customers?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const customersPager = useServerPager<Customer>({
+    fetchPage: (params) => fetchCustomersPage(params),
+    enabled: Boolean(token && profile),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'customer.read')) return;
+    const timer = setTimeout(() => {
+      void fetchCustomersPage({ skip: 0, take: 500, search: customersPager.search }).then((page) =>
+        setExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchCustomersPage, customersPager.search, token, profile]);
 
   function onLogout() {
     window.localStorage.removeItem(TOKEN_KEY);
@@ -145,9 +167,9 @@ export default function CustomersPage() {
               </div>
 
               <div className="list-toolbar">
-                <ListSearch controls={controls} placeholder="Search name, email, phone…" />
+                <ServerListSearch pager={customersPager} placeholder="Search name, email, phone…" />
                 <ListExport
-                  rows={controls.filtered}
+                  rows={exportRows}
                   config={{
                     fileName: 'customers',
                     columns: [
@@ -162,14 +184,14 @@ export default function CustomersPage() {
               </div>
 
               <div className="portal-list-stack">
-                {controls.visible.length === 0 ? (
+                {!customersPager.loading && customersPager.items.length === 0 ? (
                   <div className="portal-empty-state">
-                    {controls.search
+                    {customersPager.search
                       ? 'No customers match.'
                       : 'No customers yet. Walk-in sales do not create one — a record appears when someone checks out online or is added here.'}
                   </div>
                 ) : (
-                  controls.visible.map((customer) => (
+                  customersPager.items.map((customer) => (
                     <div key={customer.id} className="portal-list-row">
                       <div>
                         <strong>
@@ -198,7 +220,7 @@ export default function CustomersPage() {
                   ))
                 )}
               </div>
-              <ListPager controls={controls} noun="customers" />
+              <ServerListPager pager={customersPager} noun="customers" />
             </article>
           </PortalShell>
         </section>

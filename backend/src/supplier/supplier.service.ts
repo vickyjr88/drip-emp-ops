@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { SupplierQueryDto } from './dto/supplier-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -18,9 +20,18 @@ export class SupplierService {
     return this.prisma.supplier.create({ data: dto as any });
   }
 
-  findAll(pagination: PaginationDto) {
-    const { skip, take } = pagination;
-    return this.prisma.supplier.findMany({ skip, take, orderBy: { name: 'asc' } });
+  findAll(query: SupplierQueryDto) {
+    const { skip, take, search } = query;
+    const where: Prisma.SupplierWhereInput = {
+      ...searchOr(search, (term) => containsAny(['name', 'contactName', 'email', 'phone', 'kraPin'], term)),
+    };
+    const orderBy: Prisma.SupplierOrderByWithRelationInput[] = [{ name: 'asc' }, { id: 'asc' }];
+    return paginate(
+      (args) => this.prisma.supplier.findMany({ where, orderBy, ...args }),
+      () => this.prisma.supplier.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async findOne(id: string) {
