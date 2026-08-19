@@ -9355,6 +9355,81 @@ img {
   }
 }
 
+/* Sits directly beside WhatsApp, same row, same corner -- 54px button plus
+   its 20px inset plus a gap puts this one's right edge at 94px. */
+.lp-checkout-float {
+  position: fixed;
+  right: 94px;
+  bottom: 20px;
+  z-index: 60;
+  height: 54px;
+  padding: 0 18px 0 14px;
+  border-radius: 27px;
+  background: var(--de-royal, #1d2b6b);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  transition: transform 0.15s ease;
+}
+
+.lp-checkout-float svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.lp-checkout-float-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--de-royal, #1d2b6b);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.lp-checkout-float:hover,
+.lp-checkout-float:focus-visible {
+  transform: scale(1.04);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-checkout-float {
+    transition: none;
+  }
+
+  .lp-checkout-float:hover,
+  .lp-checkout-float:focus-visible {
+    transform: none;
+  }
+}
+
+/* Stacks above WhatsApp on narrow screens instead of squeezing beside it --
+   "Checkout" plus two floats side by side would not fit a phone width. */
+@media (max-width: 1060px) {
+  .lp-checkout-float {
+    right: 16px;
+    bottom: 72px;
+    height: 44px;
+    padding: 0 14px 0 12px;
+  }
+
+  .lp-checkout-float svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 /* --- Terms and privacy -------------------------------------------------- */
 .lp-legal-body {
   padding-block: 56px 84px;

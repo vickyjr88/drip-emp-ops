@@ -1,3 +1,4 @@
+import { CheckoutFloat } from './checkout-float';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 import { WhatsAppFloat } from './whatsapp-float';
@@ -22,6 +23,7 @@ export function EliteLayout({
 
       <SiteFooter />
 
+      <CheckoutFloat />
       <WhatsAppFloat />
 
     </div>
