@@ -85,7 +85,8 @@ export function ImagePicker({
   const [errorMessage, setErrorMessage] = useErrorState();
   const [chosen, setChosen] = useState<string[]>([]);
 
-  const used = new Set(usedUrls.filter(Boolean).map(objectKeyOf));
+  const safeUsedUrls = Array.isArray(usedUrls) ? usedUrls : [];
+  const used = new Set(safeUsedUrls.filter(Boolean).map(objectKeyOf));
 
   const loadPage = useCallback(
     async (nextCursor?: string) => {
@@ -95,9 +96,10 @@ export function ImagePicker({
       try {
         const query = nextCursor ? `?limit=60&cursor=${encodeURIComponent(nextCursor)}` : '?limit=60';
         const data = await apiRequest<LibraryResponse>(`/media/library${query}`, { method: 'GET' }, token);
-        setImages((prev) => (nextCursor ? [...prev, ...data.items] : data.items));
-        setCursor(data.nextCursor);
-        setTotal(data.total);
+        const nextItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? (data as unknown as LibraryImage[]) : [];
+        setImages((prev) => (nextCursor ? [...(Array.isArray(prev) ? prev : []), ...nextItems] : nextItems));
+        setCursor(data?.nextCursor || null);
+        setTotal(data?.total || 0);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Could not load the image library.');
       } finally {

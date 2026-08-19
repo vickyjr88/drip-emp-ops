@@ -54,14 +54,17 @@ export function useListControls<T>(
   searchable: (item: T) => Array<string | number | null | undefined>,
   pageSize: number = DEFAULT_PAGE_SIZE,
 ): ListControlsState<T> {
+  const safeItems = Array.isArray(items) ? items : [];
   const [search, setSearchRaw] = useState('');
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     const terms = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (terms.length === 0) return items;
-    return items.filter((item) => {
-      const haystack = searchable(item)
+    if (terms.length === 0) return safeItems;
+    return safeItems.filter((item) => {
+      const keys = searchable(item);
+      const safeKeys = Array.isArray(keys) ? keys : [];
+      const haystack = safeKeys
         .filter((value) => value !== null && value !== undefined)
         .join(' ')
         .toLowerCase();
@@ -70,7 +73,7 @@ export function useListControls<T>(
     // `searchable` is typically an inline arrow and would be a new reference
     // every render; depending on it would defeat the memo entirely.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, search]);
+  }, [safeItems, search]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
 
@@ -92,7 +95,7 @@ export function useListControls<T>(
     visible,
     filtered,
     filteredCount: filtered.length,
-    total: items.length,
+    total: safeItems.length,
     search,
     setSearch,
     page: safePage,
@@ -202,8 +205,9 @@ export function usePagination<T>(
   items: T[],
   pageSize: number = DEFAULT_PAGE_SIZE,
 ): ListControlsState<T> {
+  const safeItems = Array.isArray(items) ? items : [];
   const [page, setPage] = useState(1);
-  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+  const pageCount = Math.max(1, Math.ceil(safeItems.length / pageSize));
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
@@ -213,23 +217,23 @@ export function usePagination<T>(
   // on a page that no longer exists; reset whenever the set shrinks past it.
   useEffect(() => {
     setPage(1);
-  }, [items.length]);
+  }, [safeItems.length]);
 
   const safePage = Math.min(page, pageCount);
   const start = (safePage - 1) * pageSize;
 
   return {
-    visible: items.slice(start, start + pageSize),
-    filtered: items,
-    filteredCount: items.length,
-    total: items.length,
+    visible: safeItems.slice(start, start + pageSize),
+    filtered: safeItems,
+    filteredCount: safeItems.length,
+    total: safeItems.length,
     search: '',
     setSearch: () => {},
     page: safePage,
     setPage,
     pageCount,
     pageSize,
-    from: items.length === 0 ? 0 : start + 1,
-    to: Math.min(start + pageSize, items.length),
+    from: safeItems.length === 0 ? 0 : start + 1,
+    to: Math.min(start + pageSize, safeItems.length),
   };
 }

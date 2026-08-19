@@ -92,17 +92,22 @@ export function TourProvider({
   const pathname = usePathname();
 
   const userId = viewer?.userId || '';
-  const permissions = useMemo(() => viewer?.permissions || [], [viewer]);
+  const permissions = useMemo(
+    () => (Array.isArray(viewer?.permissions) ? viewer.permissions : []),
+    [viewer],
+  );
   const isAdmin = viewer?.isAdmin || false;
 
   const registerViewer = useCallback(
     (next: { userId: string; permissions: string[]; isAdmin: boolean }) => {
       setViewer((current) => {
+        const curPerms = Array.isArray(current?.permissions) ? current.permissions : [];
+        const nextPerms = Array.isArray(next?.permissions) ? next.permissions : [];
         if (
           current &&
           current.userId === next.userId &&
           current.isAdmin === next.isAdmin &&
-          current.permissions.length === next.permissions.length
+          curPerms.length === nextPerms.length
         ) {
           return current;
         }
@@ -162,7 +167,7 @@ export function TourProvider({
       TOURS.filter((tour) => {
         if (!tour.permission) return true;
         if (isAdmin) return true;
-        return permissions.includes(tour.permission);
+        return Array.isArray(permissions) && permissions.includes(tour.permission);
       }),
     [permissions, isAdmin],
   );

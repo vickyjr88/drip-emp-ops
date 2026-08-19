@@ -131,8 +131,9 @@ export function PortalShell({
   );
   const { checklistVisible, setChecklistVisible, hasViewer, availableTours, progress } = useTours();
 
-  const toursDone = availableTours.filter(
-    (tour) => progress[tour.id]?.status === 'COMPLETED',
+  const safeAvailableTours = Array.isArray(availableTours) ? availableTours : [];
+  const toursDone = safeAvailableTours.filter(
+    (tour) => progress && progress[tour.id]?.status === 'COMPLETED',
   ).length;
 
   useEffect(() => {
@@ -206,8 +207,6 @@ export function PortalShell({
               href={item.href}
               className={active === item.key ? 'is-active' : undefined}
               aria-current={active === item.key ? 'page' : undefined}
-              // Tour anchor. Derived from the nav key so the two cannot drift;
-              // see web/app/portal/tours/catalogue.ts.
               data-tour={`nav.${item.key}`}
               onClick={() => setNavOpen(false)}
             >
@@ -216,11 +215,7 @@ export function PortalShell({
           ))}
         </nav>
 
-        {/* Way back to the Getting Started panel. Hiding it used to be
-            one-way -- there was no control anywhere to bring it back. Lives in
-            the sidebar so it is reachable from every section, not just the
-            dashboard where the panel itself renders. */}
-        {hasViewer && availableTours.length > 0 ? (
+        {hasViewer && safeAvailableTours.length > 0 ? (
           <button
             type="button"
             className="portal-sidebar-tours"
@@ -229,7 +224,7 @@ export function PortalShell({
           >
             <span>{checklistVisible ? 'Hide getting started' : 'Getting started'}</span>
             <span className="portal-sidebar-tours-count">
-              {toursDone}/{availableTours.length}
+              {toursDone}/{safeAvailableTours.length}
             </span>
           </button>
         ) : null}

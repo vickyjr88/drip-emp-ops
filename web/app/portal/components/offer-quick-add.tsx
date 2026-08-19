@@ -60,12 +60,11 @@ export function OfferQuickAdd({
 
   const load = useCallback(async () => {
     try {
-      const rows = await apiRequest<{ items: OfferSummary[] }>('/offers?take=500', { method: 'GET' }, token).then(
-        (page) => page.items,
-      );
+      const page = await apiRequest<{ items: OfferSummary[] }>('/offers?take=500', { method: 'GET' }, token);
+      const rows = Array.isArray(page?.items) ? page.items : Array.isArray(page) ? (page as unknown as OfferSummary[]) : [];
       // Ended offers cannot take new items; adding to one would look like it
       // worked and change no price.
-      const open = rows.filter((row) => row.status !== 'ENDED');
+      const open = rows.filter((row) => row && row.status !== 'ENDED');
       setOffers(open);
       if (open.length) {
         setMode('existing');

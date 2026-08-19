@@ -22,7 +22,8 @@ type ListThumbProps = {
 };
 
 export function ListThumb({ sources, label }: ListThumbProps) {
-  const src = sources.find((candidate) => Boolean(candidate && candidate.trim()));
+  const safeSources = Array.isArray(sources) ? sources : [];
+  const src = safeSources.find((candidate) => Boolean(candidate && typeof candidate === 'string' && candidate.trim()));
 
   if (!src) {
     return (

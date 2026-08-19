@@ -26,17 +26,18 @@ export function TourChecklist() {
   } = useTours();
   const [expanded, setExpanded] = useState(false);
 
-  if (!hasViewer || !checklistVisible || availableTours.length === 0) return null;
+  const safeAvailableTours = Array.isArray(availableTours) ? availableTours : [];
+  if (!hasViewer || !checklistVisible || safeAvailableTours.length === 0) return null;
 
   // Stand down while a tour is running. The panel sits above the page content,
   // so leaving it there would both distract from the step being explained and
   // push every anchor below it down the page mid-tour.
   if (activeTour) return null;
 
-  const done = availableTours.filter(
+  const done = safeAvailableTours.filter(
     (tour) => progress[tour.id]?.status === 'COMPLETED',
   ).length;
-  const nextUp = availableTours.find(
+  const nextUp = safeAvailableTours.find(
     (tour) => (progress[tour.id]?.status || 'NOT_STARTED') !== 'COMPLETED',
   );
 
@@ -46,7 +47,7 @@ export function TourChecklist() {
         <div className="tour-checklist-headline">
           <p className="portal-kicker">Getting started</p>
           <h2 id="tour-checklist-title">
-            {done === availableTours.length
+            {done === safeAvailableTours.length
               ? 'You have been through everything'
               : nextUp
                 ? `Next: ${nextUp.title}`
@@ -59,7 +60,7 @@ export function TourChecklist() {
 
         <div className="tour-checklist-meta">
           <span className="tour-checklist-count">
-            {done} of {availableTours.length} done
+            {done} of {safeAvailableTours.length} done
           </span>
           {!expanded && nextUp ? (
             <button
@@ -76,7 +77,7 @@ export function TourChecklist() {
             onClick={() => setExpanded((open) => !open)}
             aria-expanded={expanded}
           >
-            {expanded ? 'Collapse' : `All ${availableTours.length}`}
+            {expanded ? 'Collapse' : `All ${safeAvailableTours.length}`}
           </button>
           <button
             type="button"
@@ -90,7 +91,7 @@ export function TourChecklist() {
 
       {expanded ? (
         <ul className="tour-checklist-list">
-          {availableTours.map((tour) => {
+          {safeAvailableTours.map((tour) => {
             const status = progress[tour.id]?.status || 'NOT_STARTED';
             const isDone = status === 'COMPLETED';
             const inProgress = status === 'IN_PROGRESS';

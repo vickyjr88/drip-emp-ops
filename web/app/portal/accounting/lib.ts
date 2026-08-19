@@ -75,8 +75,8 @@ export async function uploadMedia(file: File, token: string) {
 
 export function hasPermission(profile: AuthProfile | null | undefined, permission: string) {
   if (!profile) return false;
-  if (profile.role === 'ADMIN' || profile.roles?.some((role) => role.name === 'ADMIN')) return true;
-  return Boolean(profile.permissions?.includes(permission));
+  if (profile.role === 'ADMIN' || (Array.isArray(profile.roles) && profile.roles.some((role) => role?.name === 'ADMIN'))) return true;
+  return Boolean(Array.isArray(profile.permissions) && profile.permissions.includes(permission));
 }
 
 export function formatMoney(value: string | number, currency = 'KES') {
@@ -104,7 +104,7 @@ export async function loadProfile(token: string) {
 
 export function roleLabelFor(profile: AuthProfile | null) {
   if (!profile) return 'Unassigned';
-  if (profile.roles?.length) return profile.roles.map((role) => role.name).join(', ');
+  if (Array.isArray(profile.roles) && profile.roles.length) return profile.roles.map((role) => role.name).join(', ');
   return profile.role || 'Unassigned';
 }
 
