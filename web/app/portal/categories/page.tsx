@@ -217,7 +217,7 @@ export default function CategoriesPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {canCreate || canUpdate ? (
-              <article className="portal-card">
+              <article className="portal-card" data-tour="categories.add">
                 <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Category' : 'Add Category'}</h2>
                 <p className="portal-muted">
                   The URL segment is generated from the name, so &ldquo;Running Shoes&rdquo;
@@ -276,7 +276,7 @@ export default function CategoriesPage() {
               </article>
             ) : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="categories.list">
               <h2 style={{ marginTop: 0 }}>All Categories</h2>
               <div className="portal-list-stack">
                 {ordered.length === 0 ? (

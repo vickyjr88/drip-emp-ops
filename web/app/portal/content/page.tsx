@@ -571,7 +571,7 @@ export default function SiteContentPage() {
               </article>
             ) : null}
 
-            <div className="portal-action-row" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+            <div className="portal-action-row" style={{ marginBottom: 16, flexWrap: 'wrap' }} data-tour="content.pages">
               {PAGE_SCHEMAS.map((page) => (
                 <button
                   key={page.slug}
@@ -585,7 +585,7 @@ export default function SiteContentPage() {
               ))}
             </div>
 
-            <article className="portal-card" style={{ marginBottom: 16 }}>
+            <article className="portal-card" style={{ marginBottom: 16 }} data-tour="content.editor">
               <div className="portal-card-header-row">
                 <div>
                   <p className="portal-kicker">Editing</p>

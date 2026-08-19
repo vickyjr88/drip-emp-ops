@@ -193,7 +193,7 @@ export default function StoresPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {canCreate || canUpdate ? (
-              <article className="portal-card">
+              <article className="portal-card" data-tour="stores.add">
                 <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Store' : 'Add Store'}</h2>
                 <form className="portal-entity-form" onSubmit={onSubmit}>
                   <div className="portal-entity-grid-2">
@@ -242,7 +242,7 @@ export default function StoresPage() {
               </article>
             ) : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="stores.list">
               <h2 style={{ marginTop: 0 }}>All Stores</h2>
               <div className="portal-list-stack">
                 {stores.length === 0 ? (

@@ -244,7 +244,7 @@ export default function UsersManagementClient() {
                 You do not have permission to view users.
               </article>
             ) : (
-              <article className="portal-card">
+              <article className="portal-card" data-tour="users.list">
                 <div className="portal-card-header-row">
                   <div>
                     <h2 style={{ margin: 0 }}>Users</h2>
