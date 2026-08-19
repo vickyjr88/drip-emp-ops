@@ -397,7 +397,7 @@ export default function CataloguePage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {showForm && canCreate ? (
-              <article className="portal-card">
+              <article className="portal-card" data-tour="catalogue.add-product">
                 <h2 style={{ marginTop: 0 }}>Add Product</h2>
                 <p className="portal-muted">
                   Creates one variant per size at the same price. Adjust individual sizes afterwards.
@@ -539,7 +539,7 @@ export default function CataloguePage() {
               </article>
             ) : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="catalogue.products">
               <div className="portal-card-header-row">
                 <div>
                   <h2 style={{ margin: 0 }}>Products</h2>

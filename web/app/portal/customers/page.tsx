@@ -156,7 +156,7 @@ export default function CustomersPage() {
           >
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="customers.list">
               <div className="portal-card-head">
                 <h2 style={{ margin: 0 }}>All Customers</h2>
                 {canCreate ? (

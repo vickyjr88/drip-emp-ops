@@ -332,7 +332,7 @@ export default function ConsignmentsPage() {
             </div>
 
             {showIssue && canCreate ? (
-              <article className="portal-card">
+              <article className="portal-card" data-tour="consignments.issue">
                 <h2 style={{ marginTop: 0 }}>Issue Pickup</h2>
                 <p className="portal-muted">
                   Goods leave the shop floor but stay owned until sold or returned. Price is fixed now.
@@ -504,7 +504,7 @@ export default function ConsignmentsPage() {
               </article>
             ) : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="consignments.list">
               <div className="portal-card-header-row">
                 <div><h2 style={{ margin: 0 }}>Pickups</h2></div>
                 {canCreate && !showIssue ? (

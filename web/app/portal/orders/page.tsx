@@ -295,7 +295,7 @@ export default function OrdersPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {showTill && canCreate ? (
-              <article className="portal-card">
+              <article className="portal-card" data-tour="orders.new">
                 <h2 style={{ marginTop: 0 }}>New Order</h2>
                 <form className="portal-entity-form" onSubmit={onPlace}>
                   <div className="portal-entity-grid-2">
@@ -435,7 +435,7 @@ export default function OrdersPage() {
               </article>
             ) : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="orders.list">
               <div className="portal-card-header-row">
                 <div>
                   <h2 style={{ margin: 0 }}>Orders</h2>

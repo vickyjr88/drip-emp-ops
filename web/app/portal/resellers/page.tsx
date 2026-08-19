@@ -291,7 +291,7 @@ export default function ResellersPage() {
               </article>
             ) : null}
 
-            <article className="portal-card">
+            <article className="portal-card" data-tour="resellers.list">
               <div className="portal-card-header-row">
                 <div><h2 style={{ margin: 0 }}>All Resellers</h2></div>
                 {canCreate && !showForm ? (

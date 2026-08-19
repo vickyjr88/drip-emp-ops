@@ -272,7 +272,7 @@ export default function InventoryPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {canRecord ? (
-              <article className="portal-card">
+              <article className="portal-card" data-tour="inventory.record">
                 <h2 style={{ marginTop: 0 }}>Record Movement</h2>
                 <form className="portal-entity-form" onSubmit={onRecord}>
                   <div className="portal-entity-grid-2">

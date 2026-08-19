@@ -263,7 +263,7 @@ export default function OffersPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {/* ---- Running offers -------------------------------------- */}
-            <article className="portal-card" style={{ marginBottom: 20 }}>
+            <article className="portal-card" style={{ marginBottom: 20 }} data-tour="offers.list">
               <h2 style={{ marginTop: 0 }}>Offers</h2>
               <div className="list-toolbar">
                 <ServerListSearch pager={offersPager} placeholder="Search offers…" />
@@ -319,7 +319,7 @@ export default function OffersPage() {
             </article>
 
             {/* ---- Dead stock ------------------------------------------- */}
-            <article className="portal-card">
+            <article className="portal-card" data-tour="offers.dead-stock">
               <div className="portal-card-head">
                 <h2 style={{ margin: 0 }}>Not selling</h2>
                 <label className="portal-inline-filter">
