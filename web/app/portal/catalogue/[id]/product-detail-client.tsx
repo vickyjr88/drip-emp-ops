@@ -629,6 +629,40 @@ export default function ProductDetailClient({ productId }: { productId: string }
               {canUpdate ? (
                 <form className="portal-entity-form" style={{ marginTop: 18 }} onSubmit={addSize}>
                   <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>Add a size</h3>
+                  {product.variants.length ? (
+                    <label style={{ marginBottom: 12 }}>
+                      <span>Copy prices from</span>
+                      <select
+                        value=""
+                        onChange={(event) => {
+                          const source = product.variants.find((variant) => variant.id === event.target.value);
+                          if (!source) return;
+                          // Only the four prices. Size and SKU are what make a
+                          // variant distinct -- copying those would produce a
+                          // duplicate the API rejects on the unique SKU.
+                          setNewSize((prev) => ({
+                            ...prev,
+                            priceKes: String(source.priceKes ?? ''),
+                            resellerPriceKes: source.resellerPriceKes == null ? '' : String(source.resellerPriceKes),
+                            wholesalePriceKes: source.wholesalePriceKes == null ? '' : String(source.wholesalePriceKes),
+                            costKes: source.costKes == null ? '' : String(source.costKes),
+                          }));
+                          setFeedback(`Prices copied from ${source.name}. Set the size and add it.`);
+                        }}
+                      >
+                        <option value="">Choose a size to copy…</option>
+                        {product.variants.map((variant) => (
+                          <option key={variant.id} value={variant.id}>
+                            {variant.name} — {formatMoney(variant.priceKes)}
+                          </option>
+                        ))}
+                      </select>
+                      <small className="portal-muted">
+                        Fills the four prices below. A new size usually costs and sells
+                        for the same as the rest of the run.
+                      </small>
+                    </label>
+                  ) : null}
                   <div className="portal-entity-grid-3">
                     <label>
                       <span>Size</span>
