@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, CreateVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto, UpdateVariantDto } from './dto/update-product.dto';
 import { DuplicateProductDto } from './dto/duplicate-product.dto';
+import { ProductQueryDto } from './dto/product-query.dto';
+import { paginate } from '../common/pagination.util';
 
 const INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -83,42 +85,30 @@ export class ProductService {
    * Matching runs across name, SKU and brand together, because someone looking
    * for a shoe types whichever of the three they happen to remember.
    */
-  async findAll(query: {
-    search?: string;
-    categoryId?: string;
-    brand?: string;
-    isActive?: string;
-    skip?: number;
-    take?: number;
-  }) {
+  async findAll(query: ProductQueryDto) {
+    const { skip, take, search, categoryId, brand, isActive } = query;
     const where: Prisma.ProductWhereInput = {
-      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
-      ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
-      ...(query.isActive !== undefined ? { isActive: query.isActive !== 'false' } : {}),
-      ...(query.search
+      ...(categoryId ? { categoryId } : {}),
+      ...(brand ? { brand: { equals: brand, mode: 'insensitive' } } : {}),
+      ...(isActive !== undefined ? { isActive } : {}),
+      ...(search
         ? {
             OR: [
-              { name: { contains: query.search, mode: 'insensitive' } },
-              { sku: { contains: query.search, mode: 'insensitive' } },
-              { brand: { contains: query.search, mode: 'insensitive' } },
-              { variants: { some: { sku: { contains: query.search, mode: 'insensitive' } } } },
+              { name: { contains: search, mode: 'insensitive' } },
+              { sku: { contains: search, mode: 'insensitive' } },
+              { brand: { contains: search, mode: 'insensitive' } },
+              { variants: { some: { sku: { contains: search, mode: 'insensitive' } } } },
             ],
           }
         : {}),
     };
-
-    const take = query.take ? Math.min(Number(query.take), 200) : undefined;
-    const skip = query.skip ? Number(query.skip) : undefined;
-
-    if (take === undefined && skip === undefined) {
-      return this.prisma.product.findMany({ where, include: INCLUDE, orderBy: { name: 'asc' } });
-    }
-
-    const [items, total] = await Promise.all([
-      this.prisma.product.findMany({ where, include: INCLUDE, orderBy: { name: 'asc' }, skip, take }),
-      this.prisma.product.count({ where }),
-    ]);
-    return { items, total, skip: skip ?? 0, take: take ?? items.length };
+    const orderBy: Prisma.ProductOrderByWithRelationInput[] = [{ name: 'asc' }, { id: 'asc' }];
+    return paginate(
+      (args) => this.prisma.product.findMany({ where, include: INCLUDE, orderBy, ...args }),
+      () => this.prisma.product.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async findOne(id: string) {

@@ -6,6 +6,7 @@ import { ProductService } from './product.service';
 import { CreateProductDto, CreateVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto, UpdateVariantDto } from './dto/update-product.dto';
 import { DuplicateProductDto } from './dto/duplicate-product.dto';
+import { ProductQueryDto } from './dto/product-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('products')
@@ -21,15 +22,8 @@ export class ProductController {
 
   @Get()
   @Permissions(buildPermissionKey('Product', 'read'))
-  findAll(
-    @Query('search') search?: string,
-    @Query('categoryId') categoryId?: string,
-    @Query('brand') brand?: string,
-    @Query('isActive') isActive?: string,
-    @Query('skip') skip?: number,
-    @Query('take') take?: number,
-  ) {
-    return this.service.findAll({ search, categoryId, brand, isActive, skip, take });
+  findAll(@Query() query: ProductQueryDto) {
+    return this.service.findAll(query);
   }
 
   // Declared before ':id' so Nest does not read "variants" as a product id.

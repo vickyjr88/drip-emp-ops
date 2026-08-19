@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
-import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
@@ -52,7 +52,6 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -76,12 +75,10 @@ export default function OrdersPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [orderRows, levelRows, storeRows] = await Promise.all([
-        apiRequest<Order[]>('/orders', { method: 'GET' }, authToken),
+      const [levelRows, storeRows] = await Promise.all([
         apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
       ]);
-      setOrders(orderRows);
       setLevels(levelRows);
       setStores(storeRows);
       setHead((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
@@ -98,19 +95,64 @@ export default function OrdersPage() {
     void load(token);
   }, [initialized, token, load]);
 
+  const orderFilters = useMemo(() => ({ status: statusFilter || undefined }), [statusFilter]);
+
+  const fetchOrdersPage = useCallback(
+    async (params: {
+      skip: number;
+      take: number;
+      search: string;
+      status?: string;
+    }): Promise<ServerPage<Order>> => {
+      if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      if (params.status) query.set('status', params.status);
+      return apiRequest<ServerPage<Order>>(`/orders?${query}`, { method: 'GET' }, token);
+    },
+    [token],
+  );
+
+  const ordersPager = useServerPager<Order, typeof orderFilters>({
+    fetchPage: (params) => fetchOrdersPage(params),
+    filters: orderFilters,
+    enabled: Boolean(token),
+  });
+
+  const [exportRows, setExportRows] = useState<Order[]>([]);
+  useEffect(() => {
+    if (!token) return;
+    const timer = setTimeout(() => {
+      void fetchOrdersPage({ skip: 0, take: 500, search: ordersPager.search, ...orderFilters }).then((page) =>
+        setExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchOrdersPage, ordersPager.search, orderFilters, token]);
+
   const rows = useMemo(
-    () => orders
-      .filter((order) => !statusFilter || order.status === statusFilter)
-      .map((order) => ({
+    () =>
+      ordersPager.items.map((order) => ({
         ...order,
         who: order.customerName || 'Walk-in',
         storeName: order.store.name,
         balance: Number(order.total) - Number(order.amountPaid),
       })),
-    [orders, statusFilter],
+    [ordersPager.items],
   );
 
-  const controls = useListControls(rows, (row) => [row.orderNumber, row.who, row.customerPhone || '', row.storeName]);
+  const exportRowsShaped = useMemo(
+    () =>
+      exportRows.map((order) => ({
+        ...order,
+        who: order.customerName || 'Walk-in',
+        storeName: order.store.name,
+        balance: Number(order.total) - Number(order.amountPaid),
+      })),
+    [exportRows],
+  );
 
   const canCreate = hasPermission(profile, 'order.create');
   const canUpdate = hasPermission(profile, 'order.update');
@@ -161,6 +203,7 @@ export default function OrdersPage() {
       setHead((prev) => ({ ...prev, customerName: '', customerPhone: '' }));
       setShowTill(false);
       await load(token);
+      ordersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -174,6 +217,7 @@ export default function OrdersPage() {
       await apiRequest(`/orders/${order.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }, token);
       setFeedback(`${order.orderNumber} is now ${status}.`);
       await load(token);
+      ordersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -194,6 +238,7 @@ export default function OrdersPage() {
       setFeedback('Payment recorded.');
       setPayment({ orderId: '', amount: '', method: 'MPESA', reference: '' });
       await load(token);
+      ordersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -403,7 +448,7 @@ export default function OrdersPage() {
               </div>
 
               <div className="list-toolbar">
-                <ListSearch controls={controls} placeholder="Search order number, name or phone…" />
+                <ServerListSearch pager={ordersPager} placeholder="Search order number, name or phone…" />
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="">All statuses</option>
                   {['PENDING', 'PAID', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'].map((status) => (
@@ -411,7 +456,7 @@ export default function OrdersPage() {
                   ))}
                 </select>
                 <ListExport
-                  rows={controls.filtered}
+                  rows={exportRowsShaped}
                   config={{
                     fileName: 'orders',
                     columns: [
@@ -430,12 +475,12 @@ export default function OrdersPage() {
               </div>
 
               <div className="portal-list-stack">
-                {controls.visible.length === 0 ? (
+                {!ordersPager.loading && rows.length === 0 ? (
                   <div className="portal-empty-state">
-                    {controls.search || statusFilter ? 'No orders match.' : 'No orders yet.'}
+                    {ordersPager.search || statusFilter ? 'No orders match.' : 'No orders yet.'}
                   </div>
                 ) : (
-                  controls.visible.map((order) => (
+                  rows.map((order) => (
                     <div key={order.id} className="portal-record">
                       <div className="portal-list-row">
                         <div>
@@ -506,7 +551,7 @@ export default function OrdersPage() {
                   ))
                 )}
               </div>
-              <ListPager controls={controls} noun="orders" />
+              <ServerListPager pager={ordersPager} noun="orders" />
             </article>
           </PortalShell>
         </section>

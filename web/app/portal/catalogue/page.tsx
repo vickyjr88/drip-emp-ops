@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
-import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { ListThumb } from '../components/list-thumb';
 import { ImagePicker } from '../components/image-picker';
@@ -67,7 +67,6 @@ export default function CataloguePage() {
   const [saving, setSaving] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -110,11 +109,7 @@ export default function CataloguePage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [rows, cats] = await Promise.all([
-        apiRequest<Product[]>('/products', { method: 'GET' }, authToken),
-        apiRequest<Category[]>('/product-categories', { method: 'GET' }, authToken),
-      ]);
-      setProducts(rows);
+      const cats = await apiRequest<Category[]>('/product-categories', { method: 'GET' }, authToken);
       setCategories(cats);
     } catch (error) {
       setErrorMessage(error);
@@ -129,19 +124,45 @@ export default function CataloguePage() {
     void load(token);
   }, [initialized, token, load]);
 
-  const rows = useMemo(
-    () => products.map((product) => ({
-      ...product,
-      categoryName: product.category?.name || '',
-      brandName: product.brand || '',
-      priceFrom: product.variants.length
-        ? Math.min(...product.variants.map((variant) => Number(variant.priceKes)))
-        : 0,
-    })),
-    [products],
+  const fetchProductsPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Product>> => {
+      if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Product>>(`/products?${query}`, { method: 'GET' }, token);
+    },
+    [token],
   );
 
-  const controls = useListControls(rows, (row) => [row.name, row.sku, row.brandName, row.categoryName]);
+  const productsPager = useServerPager<Product>({
+    fetchPage: (params) => fetchProductsPage(params),
+    enabled: Boolean(token),
+  });
+
+  const [exportRows, setExportRows] = useState<Product[]>([]);
+  useEffect(() => {
+    if (!token) return;
+    const timer = setTimeout(() => {
+      void fetchProductsPage({ skip: 0, take: 500, search: productsPager.search }).then((page) =>
+        setExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchProductsPage, productsPager.search, token]);
+
+  const shapeRow = (product: Product) => ({
+    ...product,
+    categoryName: product.category?.name || '',
+    brandName: product.brand || '',
+    priceFrom: product.variants.length
+      ? Math.min(...product.variants.map((variant) => Number(variant.priceKes)))
+      : 0,
+  });
+
+  const rows = useMemo(() => productsPager.items.map(shapeRow), [productsPager.items]);
+  const exportRowsShaped = useMemo(() => exportRows.map(shapeRow), [exportRows]);
 
   const canCreate = hasPermission(profile, 'product.create');
   const canUpdate = hasPermission(profile, 'product.update');
@@ -172,6 +193,7 @@ export default function CataloguePage() {
       });
       setFeedback('Cost updated.');
       await load(token);
+      productsPager.reload();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -204,6 +226,7 @@ export default function CataloguePage() {
       setDuplicateOf(null);
       setDuplicateForm({ sku: '', name: '' });
       await load(token);
+      productsPager.reload();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -251,6 +274,7 @@ export default function CataloguePage() {
       setForm(BLANK); setPrice(''); setCost(''); setResellerPrice('');
       setWholesalePrice(''); setImages([]); setSizes(DEFAULT_SIZES); setShowForm(false);
       await load(token);
+      productsPager.reload();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -268,6 +292,7 @@ export default function CataloguePage() {
       }, token);
       setImageFor((prev) => (prev && prev.id === product.id ? { ...prev, imageUrls: urls } : prev));
       await load(token);
+      productsPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -301,6 +326,7 @@ export default function CataloguePage() {
       await apiRequest(`/products/${product.id}`, { method: 'DELETE' }, token);
       setFeedback(`${product.name} deleted.`);
       await load(token);
+      productsPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -314,6 +340,7 @@ export default function CataloguePage() {
       }, token);
       setFeedback(`${product.name} ${product.isActive ? 'deactivated' : 'reactivated'}.`);
       await load(token);
+      productsPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -517,8 +544,7 @@ export default function CataloguePage() {
                 <div>
                   <h2 style={{ margin: 0 }}>Products</h2>
                   <p className="portal-muted" style={{ margin: '4px 0 0' }}>
-                    {products.length} product(s),{' '}
-                    {products.reduce((sum, product) => sum + product.variants.length, 0)} variants.
+                    {productsPager.total} product(s).
                   </p>
                 </div>
                 {canCreate && !showForm ? (
@@ -529,9 +555,9 @@ export default function CataloguePage() {
               </div>
 
               <div className="list-toolbar">
-                <ListSearch controls={controls} placeholder="Search name, SKU or brand…" />
+                <ServerListSearch pager={productsPager} placeholder="Search name, SKU or brand…" />
                 <ListExport
-                  rows={controls.filtered}
+                  rows={exportRowsShaped}
                   config={{
                     fileName: 'catalogue',
                     columns: [
@@ -548,12 +574,12 @@ export default function CataloguePage() {
               </div>
 
               <div className="portal-list-stack">
-                {controls.visible.length === 0 ? (
+                {!productsPager.loading && rows.length === 0 ? (
                   <div className="portal-empty-state">
-                    {controls.search ? 'No products match that search.' : 'No products yet.'}
+                    {productsPager.search ? 'No products match that search.' : 'No products yet.'}
                   </div>
                 ) : (
-                  controls.visible.map((product) => (
+                  rows.map((product) => (
                     <div key={product.id} className="portal-record">
                       <div className="portal-list-row has-thumb">
                         <ListThumb sources={[product.featuredImageUrl, product.imageUrls?.[0]]} label={product.name} />
@@ -911,7 +937,7 @@ export default function CataloguePage() {
                   ))
                 )}
               </div>
-              <ListPager controls={controls} noun="products" />
+              <ServerListPager pager={productsPager} noun="products" />
             </article>
             {offerTarget && token ? (
               <OfferQuickAdd
@@ -921,6 +947,7 @@ export default function CataloguePage() {
                 onDone={(message) => {
                   setFeedback(message);
                   void load(token);
+                  productsPager.reload();
                 }}
               />
             ) : null}

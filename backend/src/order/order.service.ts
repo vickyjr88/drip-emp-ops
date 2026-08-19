@@ -4,7 +4,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateOrderDto, RecordOrderPaymentDto } from './dto/create-order.dto';
+import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
+import { paginate, searchOr, containsAny } from '../common/pagination.util';
 
 const INCLUDE = {
   store: { select: { id: true, code: true, name: true } },
@@ -160,44 +162,29 @@ export class OrderService {
     });
   }
 
-  async findAll(query: {
-    search?: string; storeId?: string; status?: OrderStatus; customerId?: string;
-    from?: string; to?: string; skip?: number; take?: number;
-  }) {
+  async findAll(query: OrderQueryDto) {
+    const { skip, take, search, storeId, status, customerId, from, to } = query;
     const where: Prisma.OrderWhereInput = {
-      ...(query.storeId ? { storeId: query.storeId } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.customerId ? { customerId: query.customerId } : {}),
-      ...(query.from || query.to
+      ...(storeId ? { storeId } : {}),
+      ...(status ? { status } : {}),
+      ...(customerId ? { customerId } : {}),
+      ...(from || to
         ? {
             placedAt: {
-              ...(query.from ? { gte: new Date(query.from) } : {}),
-              ...(query.to ? { lte: new Date(`${query.to}T23:59:59.999Z`) } : {}),
+              ...(from ? { gte: new Date(from) } : {}),
+              ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
             },
           }
         : {}),
-      ...(query.search
-        ? {
-            OR: [
-              { orderNumber: { contains: query.search, mode: 'insensitive' } },
-              { customerName: { contains: query.search, mode: 'insensitive' } },
-              { customerPhone: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...searchOr(search, (term) => containsAny(['orderNumber', 'customerName', 'customerPhone'], term)),
     };
-
-    const take = query.take ? Math.min(Number(query.take), 200) : undefined;
-    const skip = query.skip ? Number(query.skip) : undefined;
-
-    if (take === undefined && skip === undefined) {
-      return this.prisma.order.findMany({ where, include: INCLUDE, orderBy: { placedAt: 'desc' } });
-    }
-    const [items, total] = await Promise.all([
-      this.prisma.order.findMany({ where, include: INCLUDE, orderBy: { placedAt: 'desc' }, skip, take }),
-      this.prisma.order.count({ where }),
-    ]);
-    return { items, total, skip: skip ?? 0, take: take ?? items.length };
+    const orderBy: Prisma.OrderOrderByWithRelationInput[] = [{ placedAt: 'desc' }, { id: 'asc' }];
+    return paginate(
+      (args) => this.prisma.order.findMany({ where, include: INCLUDE, orderBy, ...args }),
+      () => this.prisma.order.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async findOne(id: string) {

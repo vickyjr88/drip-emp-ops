@@ -91,7 +91,9 @@ export default function InventoryPage() {
         apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Movement[]>('/inventory/movements?take=200', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
-        apiRequest<CatalogueProduct[]>('/products', { method: 'GET' }, authToken),
+        apiRequest<{ items: CatalogueProduct[] }>('/products?take=500', { method: 'GET' }, authToken).then(
+          (page) => page.items,
+        ),
       ]);
       setLevels(levelRows);
       setMovements(movementRows);

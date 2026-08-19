@@ -1,10 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { OrderStatus } from '@prisma/client';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { OrderService } from './order.service';
 import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderStatusDto } from './dto/create-order.dto';
+import { OrderQueryDto } from './dto/order-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('orders')
@@ -20,17 +20,8 @@ export class OrderController {
 
   @Get()
   @Permissions(buildPermissionKey('Order', 'read'))
-  findAll(
-    @Query('search') search?: string,
-    @Query('storeId') storeId?: string,
-    @Query('status') status?: OrderStatus,
-    @Query('customerId') customerId?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('skip') skip?: number,
-    @Query('take') take?: number,
-  ) {
-    return this.service.findAll({ search, storeId, status, customerId, from, to, skip, take });
+  findAll(@Query() query: OrderQueryDto) {
+    return this.service.findAll(query);
   }
 
   // Before ':id', or "summary" is read as an order id.
