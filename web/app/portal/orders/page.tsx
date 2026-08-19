@@ -14,6 +14,7 @@ import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
+import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, asList, canReadRbacFor, formatDate,
@@ -21,6 +22,7 @@ import {
 } from '../accounting/lib';
 
 type Store = { id: string; code: string; name: string };
+type Customer = { id: string; firstName: string; lastName: string; email: string; phone: string };
 
 type Level = {
   quantity: number; sellable: number;
@@ -64,6 +66,7 @@ type Draft = {
 };
 
 export default function OrdersPage() {
+  const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -72,17 +75,21 @@ export default function OrdersPage() {
   const [levels, setLevels] = useState<Level[]>([]);
   const [catalogue, setCatalogue] = useState<CatalogueProduct[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [showTill, setShowTill] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [awaitingSupplierOnly, setAwaitingSupplierOnly] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
-  const [head, setHead] = useState({ storeId: '', channel: 'IN_STORE', customerName: '', customerPhone: '' });
+  const [head, setHead] = useState({ storeId: '', channel: 'IN_STORE', customerId: '', customerName: '', customerPhone: '' });
   const [draft, setDraft] = useState<Draft[]>([]);
   const [pick, setPick] = useState({ variantId: '', quantity: '1' });
   /** Item search across the whole catalogue, not just what is on the shelf here. */
   const [itemQuery, setItemQuery] = useState('');
+  /** Search text for the customer autocomplete. Blank once a customer is
+   *  picked, same pattern as the item and reseller pickers elsewhere. */
+  const [customerQuery, setCustomerQuery] = useState('');
   const [payment, setPayment] = useState({ orderId: '', amount: '', method: 'MPESA', reference: '' });
 
   useEffect(() => {
@@ -95,14 +102,18 @@ export default function OrdersPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [levelRows, storeRows, productRows] = await Promise.all([
+      const [levelRows, storeRows, productRows, customerRows] = await Promise.all([
         apiRequest<unknown>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
         apiRequest<unknown>('/products?take=500', { method: 'GET' }, authToken),
+        // Only needed to fill the customer picker -- a role without
+        // customer.read simply gets the free-text fallback instead.
+        apiRequest<unknown>('/customers?take=500', { method: 'GET' }, authToken).catch(() => []),
       ]);
       setLevels(asList<Level>(levelRows));
       setStores(storeRows);
       setCatalogue(asList<CatalogueProduct>(productRows));
+      setCustomers(asList<Customer>(customerRows));
       setHead((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
     } catch (error) {
       setErrorMessage(error);
@@ -184,6 +195,18 @@ export default function OrdersPage() {
   const canCreate = hasPermission(profile, 'order.create');
   const canUpdate = hasPermission(profile, 'order.update');
   const canPay = hasPermission(profile, 'order-payment.create');
+  const canAddCustomer = hasPermission(profile, 'customer.create');
+
+  const customerMatches = useMemo(() => {
+    const query = customerQuery.trim().toLowerCase();
+    const scored = !query
+      ? customers
+      : customers.filter((customer) => {
+          const name = `${customer.firstName} ${customer.lastName}`.trim().toLowerCase();
+          return name.includes(query) || customer.phone?.toLowerCase().includes(query) || customer.email?.toLowerCase().includes(query);
+        });
+    return scored.slice(0, 25);
+  }, [customers, customerQuery]);
 
   // Sellable quantity here, per variant -- the picker uses this to decide
   // whether a line rings up as STOCK or has to become a SUPPLIER_ORDER.
@@ -264,6 +287,44 @@ export default function OrdersPage() {
     setItemQuery('');
   }
 
+  async function onAddCustomer() {
+    if (!token) return;
+    const result = await dialog.prompt({
+      title: 'New Customer',
+      message: 'Adds a customer record, then picks it for this order.',
+      fields: [
+        { name: 'firstName', label: 'First name', required: true },
+        { name: 'lastName', label: 'Last name', required: true },
+        { name: 'phone', label: 'Phone', required: true, placeholder: '+254…' },
+        { name: 'email', label: 'Email', placeholder: 'Leave blank if unknown' },
+      ],
+      confirmLabel: 'Add Customer',
+    });
+    if (!result) return;
+    try {
+      const created = await apiRequest<Customer>('/customers', {
+        method: 'POST',
+        body: JSON.stringify({
+          firstName: result.firstName,
+          lastName: result.lastName,
+          phone: result.phone,
+          email: result.email || undefined,
+        }),
+      }, token);
+      setCustomers((prev) => [...prev, created]);
+      setHead((prev) => ({
+        ...prev,
+        customerId: created.id,
+        customerName: `${created.firstName} ${created.lastName}`.trim(),
+        customerPhone: created.phone,
+      }));
+      setCustomerQuery('');
+      setFeedback(`${created.firstName} ${created.lastName} added.`);
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  }
+
   async function onPlace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || draft.length === 0) return;
@@ -274,6 +335,7 @@ export default function OrdersPage() {
         body: JSON.stringify({
           storeId: head.storeId,
           channel: head.channel,
+          customerId: head.customerId || undefined,
           customerName: head.customerName || undefined,
           customerPhone: head.customerPhone || undefined,
           lines: draft.map((line) => ({
@@ -285,7 +347,8 @@ export default function OrdersPage() {
       }, token);
       setFeedback(`${order.orderNumber} placed — ${formatMoney(order.total)}.`);
       setDraft([]);
-      setHead((prev) => ({ ...prev, customerName: '', customerPhone: '' }));
+      setHead((prev) => ({ ...prev, customerId: '', customerName: '', customerPhone: '' }));
+      setCustomerQuery('');
       setShowTill(false);
       await load(token);
       ordersPager.reload();
@@ -406,8 +469,63 @@ export default function OrdersPage() {
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>Customer name</span>
-                      <input value={head.customerName} placeholder="Walk-in"
-                        onChange={(event) => setHead((prev) => ({ ...prev, customerName: event.target.value }))} />
+                      <input
+                        value={head.customerId ? head.customerName : customerQuery}
+                        placeholder="Walk-in — search an existing customer, or type a name"
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setCustomerQuery(value);
+                          // Typing after a customer is picked starts a walk-in
+                          // name instead: the field never locks once chosen.
+                          setHead((prev) => ({ ...prev, customerId: '', customerName: value }));
+                        }}
+                      />
+                      {head.customerId ? (
+                        <div className="portal-picked-row">
+                          <span>
+                            <strong>{head.customerName}</strong>{' '}
+                            <span className="portal-muted">{head.customerPhone}</span>
+                          </span>
+                          <button
+                            type="button"
+                            className="portal-inline-btn"
+                            onClick={() => setHead((prev) => ({ ...prev, customerId: '', customerName: '', customerPhone: '' }))}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : customerQuery.trim() ? (
+                        <div className="portal-picker-results">
+                          {customerMatches.length === 0 ? (
+                            <p className="portal-muted" style={{ margin: 8 }}>No customer matches that.</p>
+                          ) : (
+                            customerMatches.map((customer) => (
+                              <button
+                                key={customer.id}
+                                type="button"
+                                className="portal-picker-option"
+                                onClick={() => {
+                                  setHead((prev) => ({
+                                    ...prev,
+                                    customerId: customer.id,
+                                    customerName: `${customer.firstName} ${customer.lastName}`.trim(),
+                                    customerPhone: customer.phone,
+                                  }));
+                                  setCustomerQuery('');
+                                }}
+                              >
+                                <span>{customer.firstName} {customer.lastName}</span>
+                                <span className="portal-muted">{customer.phone || customer.email}</span>
+                              </button>
+                            ))
+                          )}
+                          {canAddCustomer ? (
+                            <button type="button" className="portal-picker-option is-action" onClick={() => void onAddCustomer()}>
+                              <span>+ Add new customer</span>
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </label>
                     <label>
                       <span>Phone</span>

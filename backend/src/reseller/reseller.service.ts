@@ -20,9 +20,9 @@ const TRADE_TIERS: Prisma.EnumPriceTierFilter = { in: ['RESELLER', 'WHOLESALE'] 
 export class ResellerService {
   constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateResellerDto) {
+  async create(dto: CreateResellerDto) {
     const { name, creditLimit, priceTier, contactName, email, ...rest } = dto;
-    return this.prisma.customer.create({
+    const customer = await this.prisma.customer.create({
       data: {
         ...rest,
         // A trade account is a shop: the name given is its trading name, and
@@ -41,6 +41,10 @@ export class ResellerService {
         creditLimit: new Prisma.Decimal(creditLimit ?? 0),
       },
     });
+    // findAll/findOne both supply this; a caller that picks the just-created
+    // reseller straight out of the create response (rather than reloading the
+    // list) needs the same field to show a name instead of a blank.
+    return { ...customer, name: customerDisplayName(customer) };
   }
 
   /**

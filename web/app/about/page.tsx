@@ -30,6 +30,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const dynamic = 'force-dynamic';
 
 type ValueItem = { title: string; description: string };
+type GalleryPhoto = { image: string; caption?: string };
 
 export default async function AboutPage() {
   const content = await fetchPageContent('about');
@@ -42,6 +43,10 @@ export default async function AboutPage() {
   const storyKicker = contentValue(content, 'story.kicker', 'Our Story');
   const storyHeading = contentValue(content, 'story.heading', 'Built on the Right Pair');
   const storyParagraphs = contentValue<string[]>(content, 'story.paragraphs', []);
+  const storyImage = contentValue(content, 'story.image', '');
+
+  const galleryHeading = contentValue(content, 'gallery.heading', 'Inside the Shop');
+  const galleryItems = contentValue<GalleryPhoto[]>(content, 'gallery.items', []).filter((item) => item.image);
 
   const valuesKicker = contentValue(content, 'values.kicker', 'What We Stand For');
   const valuesHeading = contentValue(content, 'values.heading', 'How We Trade');
@@ -72,13 +77,34 @@ export default async function AboutPage() {
         </section>
 
         {storyParagraphs.length ? (
-          <section className="lp-container de-about-story">
-            <p className="lp-about-eyebrow">{storyKicker}</p>
-            <h2>{storyHeading}</h2>
-            <span className="lp-divider" aria-hidden="true" />
-            {storyParagraphs.map((paragraph, index) => (
-              <p key={index}>{paragraph}</p>
-            ))}
+          <section className={`lp-container de-about-story${storyImage ? ' has-image' : ''}`}>
+            <div className="de-about-story-copy">
+              <p className="lp-about-eyebrow">{storyKicker}</p>
+              <h2>{storyHeading}</h2>
+              <span className="lp-divider" aria-hidden="true" />
+              {storyParagraphs.map((paragraph, index) => (
+                <p key={index}>{paragraph}</p>
+              ))}
+            </div>
+            {storyImage ? (
+              <div className="de-about-story-media">
+                <img src={storyImage} alt="" />
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {galleryItems.length ? (
+          <section className="lp-container de-about-gallery">
+            {galleryHeading ? <h2>{galleryHeading}</h2> : null}
+            <div className="de-gallery-strip">
+              {galleryItems.map((photo, index) => (
+                <figure key={`${photo.image}-${index}`}>
+                  <img src={photo.image} alt={photo.caption || ''} loading="lazy" />
+                  {photo.caption ? <figcaption>{photo.caption}</figcaption> : null}
+                </figure>
+              ))}
+            </div>
           </section>
         ) : null}
 

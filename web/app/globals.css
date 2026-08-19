@@ -4087,6 +4087,129 @@ img {
     border-radius: 0;
   }
 
+  /* --- Dashboard quick-jump cards ------------------------------------------
+     Orders / Consignments / Resellers / Customers, at the very top: a count
+     and a click-through, not a chart -- so this is stat tiles wearing a link,
+     not a fifth thing to learn. */
+  .portal-nav-card-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .portal-nav-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--eef-white);
+    border: 1px solid var(--eef-border);
+    border-left: 3px solid var(--eef-primary);
+    padding: 18px 20px;
+    text-decoration: none;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .portal-nav-card:hover,
+  .portal-nav-card:focus-visible {
+    border-color: var(--eef-primary);
+    transform: translateY(-1px);
+  }
+
+  .portal-nav-card-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--eef-surface);
+    color: var(--eef-primary);
+  }
+
+  .portal-nav-card-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .portal-nav-card-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .portal-nav-card-body strong {
+    font-family: 'Libre Caslon Text', serif;
+    font-size: 1.6rem;
+    line-height: 1.1;
+    color: var(--eef-black);
+  }
+
+  .portal-nav-card-body span {
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #5a5c5c;
+  }
+
+  /* --- Sales-summary stat row: revenue, collected, outstanding ----------- */
+  .portal-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+  }
+
+  .portal-stat-card {
+    background: var(--eef-white);
+    border: 1px solid var(--eef-border);
+    padding: 18px 20px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .portal-stat-card p {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #5a5c5c;
+    overflow-wrap: anywhere;
+  }
+
+  .portal-stat-card h3 {
+    margin: 8px 0 0;
+    font-family: 'Libre Caslon Text', serif;
+    font-size: clamp(20px, 2.1vw, 28px);
+    line-height: 1.15;
+    color: var(--eef-black);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .portal-stat-note {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #767878;
+  }
+
+  @media (max-width: 900px) {
+    .portal-nav-card-grid,
+    .portal-stat-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 560px) {
+    .portal-nav-card-grid,
+    .portal-stat-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .portal-loading {
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -5109,6 +5232,20 @@ img {
 
   .portal-picker-option:hover {
     background: #f4f5f5;
+  }
+
+  /* Trailing row in a picker's result list: not a match, an escape hatch --
+     "what you searched for is not in the list, create it". Set apart with a
+     heavier top border and the brand colour so it reads as a different kind
+     of row, not one more result to scan past. */
+  .portal-picker-option.is-action {
+    border-top: 2px solid var(--eef-border);
+    color: var(--eef-primary, #06166e);
+    font-weight: 700;
+  }
+
+  .portal-picker-option.is-action:hover {
+    background: var(--eef-surface, #f9f9f9);
   }
 
   /* What is currently selected, shown instead of the result list so the choice
@@ -10433,9 +10570,156 @@ img {
   color: #5b6480;
 }
 
+/* --- Trust badges, right under the hero --------------------------------- */
+.de-home-trust {
+  padding-block: 48px 0;
+}
+
+.de-trust-grid {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.de-trust-badge {
+  border: 1px solid #dfe2f0;
+  background: #fff;
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.de-trust-badge svg {
+  width: 34px;
+  height: 34px;
+  fill: var(--de-royal, #06166e);
+  margin-bottom: 12px;
+}
+
+.de-trust-badge h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: #020721;
+}
+
+.de-trust-badge p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #5b6480;
+}
+
+/* --- Brand strip --------------------------------------------------------- */
+.de-home-brands {
+  padding-block: 40px 0;
+}
+
+.de-brands-heading {
+  margin: 0 0 20px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8188a3;
+}
+
+.de-brands-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 36px 48px;
+}
+
+.de-brand-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+}
+
+.de-brand-item img {
+  max-height: 32px;
+  max-width: 120px;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: 0.55;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.de-brand-item img:hover {
+  filter: none;
+  opacity: 1;
+}
+
+.de-brand-item span {
+  font-family: 'Libre Caslon Text', serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #8188a3;
+  white-space: nowrap;
+}
+
+/* --- Mid-page conversion banner ------------------------------------------ */
+.de-mid-cta {
+  margin-top: 56px;
+  background: var(--de-royal, #06166e);
+  color: #fff;
+  padding: 40px 0;
+}
+
+.de-mid-cta-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.de-mid-cta-inner h2 {
+  margin: 0;
+  font-family: 'Libre Caslon Text', serif;
+  font-size: clamp(1.3rem, 2.6vw, 1.7rem);
+  color: #fff;
+}
+
+.de-mid-cta-inner p {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.de-mid-cta-inner .lp-button-primary {
+  flex-shrink: 0;
+  background: #fff;
+  color: var(--de-royal, #06166e);
+  border-color: #fff;
+}
+
+.de-mid-cta-inner .lp-button-primary:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+@media (max-width: 640px) {
+  .de-mid-cta-inner {
+    text-align: center;
+    justify-content: center;
+  }
+}
+
 .de-about-story {
   padding-block: 56px 0;
   max-width: 760px;
+}
+
+/* With an image, the section runs full width and splits into two columns
+   instead of capping at the text-only measure above. */
+.de-about-story.has-image {
+  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 48px;
+  align-items: center;
 }
 
 .de-about-story h2,
@@ -10450,6 +10734,63 @@ img {
   font-size: 1rem;
   line-height: 1.75;
   color: #454e68;
+}
+
+.de-about-story-media img {
+  width: 100%;
+  height: 100%;
+  max-height: 480px;
+  object-fit: cover;
+  display: block;
+}
+
+@media (max-width: 860px) {
+  .de-about-story.has-image {
+    grid-template-columns: 1fr;
+  }
+
+  .de-about-story-media {
+    order: -1;
+  }
+
+  .de-about-story-media img {
+    max-height: 320px;
+  }
+}
+
+/* --- Shop photo strip ---------------------------------------------------- */
+.de-about-gallery {
+  padding-block: 48px 0;
+}
+
+.de-about-gallery h2 {
+  font-family: 'Libre Caslon Text', serif;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  margin: 0 0 24px;
+  color: #020721;
+}
+
+.de-gallery-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.de-gallery-strip figure {
+  margin: 0;
+}
+
+.de-gallery-strip img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+
+.de-gallery-strip figcaption {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #5b6480;
 }
 
 .de-about-values {

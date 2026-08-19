@@ -22,6 +22,23 @@ import { PageContentDocument, contentValue, fetchPageContent } from './lib/page-
 import { ShopCategory, ShopProduct, fetchCategories, fetchProducts } from './lib/shop';
 import { useEnquiryContact } from './lib/use-enquiry-contact';
 
+type TrustBadge = { title: string; description: string };
+type BrandItem = { name: string; logo?: string };
+
+/** One icon per badge, resolved by position. A fifth custom badge falls back
+ *  to a plain checkmark rather than breaking the row. */
+const TRUST_ICONS = [
+  // Shield / authentic
+  <path key="shield" d="M12 2 4 5v6c0 5 3.4 8.6 8 9 4.6-.4 8-4 8-9V5l-8-3Zm-1.2 12.4L7 10.6l1.4-1.4 2.4 2.4L15.6 7l1.4 1.4-6.2 6Z" />,
+  // Trending / spark
+  <path key="trend" d="m3 17 6-6 4 4 8-8v3h2V4h-6v2h3l-7 7-4-4-7 7Z" />,
+  // Bag / easy shopping
+  <path key="bag" d="M7 7V6a5 5 0 0 1 10 0v1h3l-1 14H5L4 7Zm2 0h6V6a3 3 0 0 0-6 0Z" />,
+  // Truck / delivery
+  <path key="truck" d="M3 6h11v9H3Zm11 3h4l3 3v3h-7Zm-8.5 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm11 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z" />,
+];
+const FALLBACK_TRUST_ICON = <path key="check" d="m9 16.2-3.5-3.6L4 14.1l5 5 11-11-1.5-1.5Z" />;
+
 export default function HomeClient() {
   const router = useRouter();
   const enquiry = useEnquiryContact();
@@ -62,6 +79,22 @@ export default function HomeClient() {
     'featured.subheading',
     'Fresh pairs on the shelf at Ronald Ngala Street. Sizes move fast.',
   );
+
+  const trustHeading = contentValue(content, 'trust.heading', 'Why Shop With Us');
+  const trustSub = contentValue(content, 'trust.subheading', '');
+  const trustItems = contentValue<TrustBadge[]>(content, 'trust.items', []);
+
+  const brandsHeading = contentValue(content, 'brands.heading', 'Brands We Carry');
+  const brandItems = contentValue<BrandItem[]>(content, 'brands.items', []);
+
+  const midCtaEnabled = contentValue(content, 'midCta.enabled', true);
+  const midCtaHeading = contentValue(content, 'midCta.heading', 'Free Delivery on Orders Over KES 15,000');
+  const midCtaBody = contentValue(
+    content,
+    'midCta.body',
+    'Nationwide, on us. Shop the full range and check out in minutes.',
+  );
+  const midCtaLabel = contentValue(content, 'midCta.ctaLabel', 'Shop Now');
 
   const aboutHeading = contentValue(content, 'about.heading', '');
   const aboutBody = contentValue(content, 'about.body', '');
@@ -131,6 +164,28 @@ export default function HomeClient() {
           </div>
         </section>
 
+        {trustItems.length ? (
+          <section className="lp-container de-home-trust">
+            {trustHeading || trustSub ? (
+              <div className="lp-heading-center">
+                {trustHeading ? <h2>{trustHeading}</h2> : null}
+                {trustSub ? <p>{trustSub}</p> : null}
+              </div>
+            ) : null}
+            <div className="de-trust-grid">
+              {trustItems.map((item, index) => (
+                <article key={`${item.title}-${index}`} className="de-trust-badge">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    {TRUST_ICONS[index] || FALLBACK_TRUST_ICON}
+                  </svg>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {categories.length ? (
           <section className="lp-container de-home-cats">
             <div className="lp-heading-center">
@@ -144,6 +199,23 @@ export default function HomeClient() {
                   <span>{category.name}</span>
                   <em>{category.productCount} style{category.productCount === 1 ? '' : 's'}</em>
                 </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {brandItems.length ? (
+          <section className="lp-container de-home-brands">
+            {brandsHeading ? <p className="de-brands-heading">{brandsHeading}</p> : null}
+            <div className="de-brands-row">
+              {brandItems.map((brand, index) => (
+                <div key={`${brand.name}-${index}`} className="de-brand-item">
+                  {brand.logo ? (
+                    <img src={brand.logo} alt={brand.name} loading="lazy" />
+                  ) : (
+                    <span>{brand.name}</span>
+                  )}
+                </div>
               ))}
             </div>
           </section>
@@ -163,6 +235,18 @@ export default function HomeClient() {
               {newest.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
+            </div>
+          </section>
+        ) : null}
+
+        {midCtaEnabled && midCtaHeading ? (
+          <section className="de-mid-cta">
+            <div className="lp-container de-mid-cta-inner">
+              <div>
+                <h2>{midCtaHeading}</h2>
+                {midCtaBody ? <p>{midCtaBody}</p> : null}
+              </div>
+              <Link className="lp-button lp-button-primary" href="/shop">{midCtaLabel}</Link>
             </div>
           </section>
         ) : null}

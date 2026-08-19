@@ -27,7 +27,19 @@ export class CustomerService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(dto: CreateCustomerDto) {
-    return this.prisma.customer.create({ data: dto, select: CUSTOMER_SELECT });
+    const email = dto.email?.trim().toLowerCase();
+    return this.prisma.customer.create({
+      data: {
+        ...dto,
+        // Email is the unique key and the portal login; a walk-in rung up
+        // without one gets a placeholder derived from their phone instead, in
+        // the same shape the reseller flow already uses for a trade account
+        // opened with no address on hand. It cannot receive mail, so the
+        // account stays inert until a real email is entered.
+        email: email || `${dto.phone.replace(/[^0-9]/g, '')}@customer.invalid`,
+      },
+      select: CUSTOMER_SELECT,
+    });
   }
 
   findAll(query: CustomerQueryDto) {

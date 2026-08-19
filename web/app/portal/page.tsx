@@ -55,6 +55,26 @@ type OrderRow = {
   store: { name: string };
 };
 
+/** One quick-jump card at the top of the dashboard: where it goes, and how
+ *  many rows live there. Null while the count has not loaded (or the role
+ *  cannot see it), so the card still links out without claiming a number. */
+type NavCard = { key: string; label: string; href: string; count: number | null; icon: JSX.Element };
+
+const NAV_ICONS: Record<string, JSX.Element> = {
+  orders: (
+    <path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V8h4.5M8 12h8M8 16h5" />
+  ),
+  consignments: (
+    <path d="M3 7h18M3 7l1.5 12a2 2 0 0 0 2 1.8h11a2 2 0 0 0 2-1.8L21 7M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  ),
+  resellers: (
+    <path d="M17 20v-2a4 4 0 0 0-3-3.87M13 3.13a4 4 0 0 1 0 7.75M9 20v-2a4 4 0 0 0-4-4H4M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+  ),
+  customers: (
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+  ),
+};
+
 export default function PortalPage() {
   const notifications = useNotifications();
   const [initialized, setInitialized] = useState(false);
@@ -68,6 +88,9 @@ export default function PortalPage() {
   const [summary, setSummary] = useState<SalesSummary | null>(null);
   const [lowStock, setLowStock] = useState<StockRow[]>([]);
   const [recentOrders, setRecentOrders] = useState<OrderRow[]>([]);
+  const [consignmentCount, setConsignmentCount] = useState<number | null>(null);
+  const [resellerCount, setResellerCount] = useState<number | null>(null);
+  const [customerCount, setCustomerCount] = useState<number | null>(null);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -93,6 +116,22 @@ export default function PortalPage() {
       if (hasPermission(nextProfile, 'stock-level.read')) {
         const levels = await apiRequest<StockRow[] | { items: StockRow[] }>('/inventory/levels?lowOnly=true', { method: 'GET' }, authToken);
         setLowStock(Array.isArray(levels) ? levels : Array.isArray(levels?.items) ? levels.items : []);
+      }
+
+      // Just the count from each list's paginated envelope -- take=1 fetches
+      // one row (if any) at the cost of one row, and .total is the number the
+      // nav card actually wants.
+      if (hasPermission(nextProfile, 'consignment.read')) {
+        const page = await apiRequest<{ total: number }>('/consignments?take=1', { method: 'GET' }, authToken);
+        setConsignmentCount(typeof page?.total === 'number' ? page.total : null);
+      }
+      if (hasPermission(nextProfile, 'customer.read')) {
+        const [customerPage, resellerPage] = await Promise.all([
+          apiRequest<{ total: number }>('/customers?take=1', { method: 'GET' }, authToken),
+          apiRequest<{ total: number }>('/resellers?take=1', { method: 'GET' }, authToken),
+        ]);
+        setCustomerCount(typeof customerPage?.total === 'number' ? customerPage.total : null);
+        setResellerCount(typeof resellerPage?.total === 'number' ? resellerPage.total : null);
       }
     } catch (error) {
       setErrorMessage(error);
@@ -185,6 +224,23 @@ export default function PortalPage() {
     );
   }
 
+  // Only a card whose permission the signed-in role actually has: a link to a
+  // page that would 403 on arrival is worse than no card at all.
+  const navCards: NavCard[] = [
+    hasPermission(profile, 'order.read')
+      ? { key: 'orders', label: 'Orders', href: '/portal/orders', count: summary?.orderCount ?? null, icon: NAV_ICONS.orders }
+      : null,
+    hasPermission(profile, 'consignment.read')
+      ? { key: 'consignments', label: 'Consignments', href: '/portal/consignments', count: consignmentCount, icon: NAV_ICONS.consignments }
+      : null,
+    hasPermission(profile, 'customer.read')
+      ? { key: 'resellers', label: 'Resellers', href: '/portal/resellers', count: resellerCount, icon: NAV_ICONS.resellers }
+      : null,
+    hasPermission(profile, 'customer.read')
+      ? { key: 'customers', label: 'Customers', href: '/portal/customers', count: customerCount, icon: NAV_ICONS.customers }
+      : null,
+  ].filter((card): card is NavCard => card !== null);
+
   return (
     <EliteLayout active="portal">
       <main className="lp-main-content portal-main is-authenticated">
@@ -204,6 +260,24 @@ export default function PortalPage() {
             onLogout={onLogout}
             onRefresh={() => token && void load(token)}
           >
+            {navCards.length > 0 ? (
+              <div className="portal-nav-card-grid">
+                {navCards.map((card) => (
+                  <Link key={card.key} href={card.href} className="portal-nav-card">
+                    <span className="portal-nav-card-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        {card.icon}
+                      </svg>
+                    </span>
+                    <span className="portal-nav-card-body">
+                      <strong>{card.count === null ? '—' : card.count.toLocaleString('en-KE')}</strong>
+                      <span>{card.label}</span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+
             {summary ? (
               <div className="portal-stat-grid">
                 <article className="portal-stat-card">

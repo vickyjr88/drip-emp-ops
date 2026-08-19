@@ -67,6 +67,10 @@ export default function ConsignmentsPage() {
   const [head, setHead] = useState({ customerId: '', storeId: '', notes: '' });
   const [draft, setDraft] = useState<Draft[]>([]);
   const [pick, setPick] = useState({ variantId: '', quantity: '1' });
+  /** Search text for the reseller and item autocompletes -- cleared once
+   *  something is picked, same pattern as the till's item picker. */
+  const [resellerQuery, setResellerQuery] = useState('');
+  const [itemQuery, setItemQuery] = useState('');
   // Settlement is per line: sold and returned reported together.
   const [settle, setSettle] = useState<{ id: string; entries: Record<string, { sold: string; returned: string }>; amount: string; method: string; reference: string } | null>(null);
 
@@ -153,9 +157,34 @@ export default function ConsignmentsPage() {
 
   const canCreate = hasPermission(profile, 'consignment.create');
   const canUpdate = hasPermission(profile, 'consignment.update');
+  const canAddReseller = hasPermission(profile, 'customer.create');
 
   // Only stock on the shop floor at the chosen store can go out.
   const availableHere = levels.filter((row) => row.store.id === head.storeId && row.quantity > 0);
+
+  const resellerMatches = useMemo(() => {
+    const query = resellerQuery.trim().toLowerCase();
+    const scored = !query
+      ? resellers
+      : resellers.filter(
+          (reseller) =>
+            reseller.name.toLowerCase().includes(query) || reseller.code.toLowerCase().includes(query),
+        );
+    return scored.slice(0, 25);
+  }, [resellers, resellerQuery]);
+
+  const itemMatches = useMemo(() => {
+    const query = itemQuery.trim().toLowerCase();
+    const scored = !query
+      ? availableHere
+      : availableHere.filter(
+          (row) =>
+            row.variant.product.name.toLowerCase().includes(query) ||
+            row.variant.name.toLowerCase().includes(query) ||
+            row.variant.sku.toLowerCase().includes(query),
+        );
+    return scored.slice(0, 25);
+  }, [availableHere, itemQuery]);
 
   function addLine() {
     const level = availableHere.find((row) => row.variant.id === pick.variantId);
@@ -173,6 +202,40 @@ export default function ConsignmentsPage() {
       }];
     });
     setPick({ variantId: '', quantity: '1' });
+    setItemQuery('');
+  }
+
+  async function onAddReseller() {
+    if (!token) return;
+    const result = await dialog.prompt({
+      title: 'New Reseller',
+      message: 'Adds a trade account, then picks it for this pickup.',
+      fields: [
+        { name: 'code', label: 'Code', required: true, placeholder: 'e.g. MNJ' },
+        { name: 'name', label: 'Name', required: true, placeholder: 'e.g. Mama Njeri Shoes' },
+        { name: 'phone', label: 'Phone' },
+        { name: 'location', label: 'Location' },
+      ],
+      confirmLabel: 'Add Reseller',
+    });
+    if (!result) return;
+    try {
+      const created = await apiRequest<Reseller>('/resellers', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: result.code,
+          name: result.name,
+          phone: result.phone || undefined,
+          location: result.location || undefined,
+        }),
+      }, token);
+      setResellers((prev) => [...prev, created]);
+      setHead((prev) => ({ ...prev, customerId: created.id }));
+      setResellerQuery('');
+      setFeedback(`${created.name} added.`);
+    } catch (error) {
+      setErrorMessage(error);
+    }
   }
 
   async function onIssue(event: FormEvent<HTMLFormElement>) {
@@ -341,19 +404,63 @@ export default function ConsignmentsPage() {
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>Reseller</span>
-                      <select value={head.customerId} required
-                        onChange={(event) => setHead((prev) => ({ ...prev, customerId: event.target.value }))}>
-                        {resellers.map((reseller) => (
-                          <option key={reseller.id} value={reseller.id}>
-                            {reseller.name} ({reseller.priceTier.toLowerCase()})
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        value={resellerQuery}
+                        placeholder="Search reseller by name or code…"
+                        onChange={(event) => { setResellerQuery(event.target.value); setHead((prev) => ({ ...prev, customerId: '' })); }}
+                      />
+                      {head.customerId ? (
+                        <div className="portal-picked-row">
+                          <span>
+                            <strong>
+                              {resellers.find((reseller) => reseller.id === head.customerId)?.name}
+                            </strong>
+                            {' '}
+                            <span className="portal-muted">
+                              ({resellers.find((reseller) => reseller.id === head.customerId)?.priceTier.toLowerCase()})
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            className="portal-inline-btn"
+                            onClick={() => setHead((prev) => ({ ...prev, customerId: '' }))}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="portal-picker-results">
+                          {resellerMatches.length === 0 ? (
+                            <p className="portal-muted" style={{ margin: 8 }}>
+                              {resellerQuery.trim() ? 'No reseller matches that.' : 'Start typing, or pick from the list.'}
+                            </p>
+                          ) : (
+                            resellerMatches.map((reseller) => (
+                              <button
+                                key={reseller.id}
+                                type="button"
+                                className="portal-picker-option"
+                                onClick={() => { setHead((prev) => ({ ...prev, customerId: reseller.id })); setResellerQuery(''); }}
+                              >
+                                <span>{reseller.name}</span>
+                                <span className="portal-muted">
+                                  {reseller.code} · {reseller.priceTier.toLowerCase()}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                          {canAddReseller ? (
+                            <button type="button" className="portal-picker-option is-action" onClick={() => void onAddReseller()}>
+                              <span>+ Add new reseller</span>
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
                     </label>
                     <label>
                       <span>From store</span>
                       <select value={head.storeId}
-                        onChange={(event) => { setHead((prev) => ({ ...prev, storeId: event.target.value })); setDraft([]); }}>
+                        onChange={(event) => { setHead((prev) => ({ ...prev, storeId: event.target.value })); setDraft([]); setItemQuery(''); setPick({ variantId: '', quantity: '1' }); }}>
                         {stores.map((store) => (
                           <option key={store.id} value={store.id}>{store.name}</option>
                         ))}
@@ -364,15 +471,51 @@ export default function ConsignmentsPage() {
                   <div className="portal-entity-grid-3">
                     <label>
                       <span>Item</span>
-                      <select value={pick.variantId}
-                        onChange={(event) => setPick((prev) => ({ ...prev, variantId: event.target.value }))}>
-                        <option value="">Choose…</option>
-                        {availableHere.map((row) => (
-                          <option key={row.variant.id} value={row.variant.id}>
-                            {row.variant.product.name} — {row.variant.name} ({row.quantity} on floor)
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        value={itemQuery}
+                        placeholder="Search product, size or SKU…"
+                        onChange={(event) => { setItemQuery(event.target.value); setPick((prev) => ({ ...prev, variantId: '' })); }}
+                      />
+                      {pick.variantId ? (
+                        <div className="portal-picked-row">
+                          <span>
+                            <strong>
+                              {availableHere.find((row) => row.variant.id === pick.variantId)?.variant.product.name}
+                              {' — '}
+                              {availableHere.find((row) => row.variant.id === pick.variantId)?.variant.name}
+                            </strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="portal-inline-btn"
+                            onClick={() => { setPick((prev) => ({ ...prev, variantId: '' })); setItemQuery(''); }}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="portal-picker-results">
+                          {itemMatches.length === 0 ? (
+                            <p className="portal-muted" style={{ margin: 8 }}>
+                              {itemQuery.trim() ? 'Nothing on the floor matches that.' : 'Start typing, or pick from the list.'}
+                            </p>
+                          ) : (
+                            itemMatches.map((row) => (
+                              <button
+                                key={row.variant.id}
+                                type="button"
+                                className="portal-picker-option"
+                                onClick={() => { setPick((prev) => ({ ...prev, variantId: row.variant.id })); setItemQuery(''); }}
+                              >
+                                <span>{row.variant.product.name} — {row.variant.name}</span>
+                                <span className="portal-muted">
+                                  {row.variant.sku} · {row.quantity} on floor
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
                     </label>
                     <label>
                       <span>Quantity</span>

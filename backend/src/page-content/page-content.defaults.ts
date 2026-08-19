@@ -43,7 +43,7 @@ export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
       label: 'About section image',
       recommendedWidth: 1200,
       recommendedHeight: 900,
-      note: 'Sits beside the "Real Estate Done Right" copy.',
+      note: 'Sits beside the "About the shop" copy.',
     },
     {
       key: 'hero.backgroundImage',
@@ -51,6 +51,13 @@ export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
       recommendedWidth: 1920,
       recommendedHeight: 1080,
       note: 'Full-bleed banner behind the search bar. Landscape works best.',
+    },
+    {
+      key: 'brands.items[].logo',
+      label: 'Brand logo',
+      recommendedWidth: 400,
+      recommendedHeight: 160,
+      note: 'Wide transparent PNG works best. The brand name shows as text until a logo is uploaded.',
     },
   ],
   about: [
@@ -61,31 +68,18 @@ export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
       recommendedHeight: 1080,
     },
     {
-      key: 'leadership.image',
-      label: 'Leadership portrait',
-      recommendedWidth: 800,
-      recommendedHeight: 1000,
-      note: 'Portrait orientation; the frame is taller than it is wide.',
+      key: 'story.image',
+      label: 'Story image',
+      recommendedWidth: 1000,
+      recommendedHeight: 1200,
+      note: 'Sits beside "Our Story". Portrait or square works better than wide here.',
     },
     {
-      key: 'heritage.items[].image',
-      label: 'Heritage entry',
-      recommendedWidth: 800,
-      recommendedHeight: 600,
-    },
-    {
-      key: 'team.items[].image',
-      label: 'Team member',
-      recommendedWidth: 600,
-      recommendedHeight: 600,
-      note: 'Square crop; faces sit best centred.',
-    },
-    {
-      key: 'recognition.partners[].logo',
-      label: 'Partner logo',
-      recommendedWidth: 400,
-      recommendedHeight: 160,
-      note: 'Wide transparent PNG. The partner name shows as text until a logo is uploaded.',
+      key: 'gallery.items[].image',
+      label: 'Gallery photo',
+      recommendedWidth: 900,
+      recommendedHeight: 900,
+      note: 'Square crop. Shown in a row between the story and the values.',
     },
   ],
   terms: [],
@@ -136,72 +130,50 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       ],
     },
     featured: {
-      heading: 'Featured Residences',
-      subheading: 'A curated selection of our most prestigious available properties.',
+      heading: 'In Stock Now',
+      subheading: 'Fresh pairs on the shelf at Ronald Ngala Street. Sizes move fast.',
     },
-    // Follows the old site: a featured property carries the hero rather than an
-    // empty search form, so a visitor sees real stock before being asked to
-    // describe what they want. The search bar stays underneath it.
-    heroFeature: {
-      enabled: true,
-      eyebrow: 'Featured residence',
-      ctaLabel: 'View this home',
-      browseLabel: 'Browse Properties',
-      talkLabel: 'Talk to an Agent',
-    },
-    // The credibility block the old site carries and this page lacked: who
-    // stands behind the firm, before any ask.
-    about: {
-      heading: 'Quality Affordable Sneakers & Streetwear in Kenya',
-      body:
-        'Drip Emporium curates the finest sneakers and premium streetwear from Nike, Adidas, Jordan, Puma, Calvin Klein, Tommy Hilfiger and BOSS. Find us at Dubai Merchants Mall shop F53 and Palms Mall shop BF75 on Ronald Ngala Street, Nairobi, or order online. Free nationwide delivery on orders over KES 15,000.',
-      image: '',
-      linkLabel: 'More About Us',
-      linkHref: '/about',
-    },
-    // Deliberately not auto-counted. The portal has one sold unit and no
-    // completed project, so a live count would read "1 property sold" and do
-    // more harm than the section is worth. These are typed in, and the whole
-    // band hides while they are blank rather than rendering the old site's
-    // "0+ Happy Clients".
-    stats: {
-      enabled: false,
+    // Trust badges, directly under the hero: what a first-time visitor checks
+    // before they trust a shop enough to add something to a cart. Four reads
+    // best in the grid; more will still lay out but crowd a phone screen.
+    trust: {
+      heading: 'Why Shop With Us',
+      subheading: '',
       items: [
-        { value: '', label: 'Happy Clients' },
-        { value: '', label: 'Properties Sold' },
-        { value: '', label: 'Years of Excellence' },
-        { value: '', label: 'Star Service' },
+        { title: '100% Authentic', description: 'Genuine stock only, from Nike, Adidas, Jordan and Puma. No fakes, no stories.' },
+        { title: 'Trending Styles', description: 'New drops and the pairs everyone is asking for, kept in stock.' },
+        { title: 'Easy Shopping', description: 'Buy online with card or M-Pesa, or walk in and try the pair on first.' },
+        { title: 'Fast & Reliable Delivery', description: 'Nationwide delivery, free on orders over KES 15,000.' },
       ],
     },
-    // Completed work. Hidden until at least one project is marked delivered,
-    // for the same reason as the stats.
-    portfolio: {
-      enabled: false,
-      eyebrow: 'Delivered portfolio',
-      heading: 'Completed projects — proof of how we build and hand over.',
-      subheading:
-        'Use this as your reference track record. When you are ready to deploy capital, the ongoing section above is where current allocation opens.',
-      items: [],
+    // A single fixed list rather than pulled from the live catalogue, so a
+    // brand the shop is about to bring in can be shown before the first pair
+    // lands, and a brand that sells out is not silently dropped from the row.
+    brands: {
+      heading: 'Brands We Carry',
+      items: [
+        { name: 'Nike', logo: '' },
+        { name: 'Adidas', logo: '' },
+        { name: 'Puma', logo: '' },
+        { name: 'Vans', logo: '' },
+        { name: 'Converse', logo: '' },
+        { name: 'New Balance', logo: '' },
+      ],
     },
-    // Needs an actual document; the section stays hidden until one is attached
-    // rather than advertising a download that 404s.
-    report: {
-      enabled: false,
-      eyebrow: 'Market intelligence',
-      heading: 'The East Africa Property Report',
-      body:
-        "Access our quarterly insights on Nairobi's highest performing real estate sectors. Make your next move with total clarity.",
-      releaseLabel: 'Latest release',
-      releaseTitle: '',
-      fileUrl: '',
-      ctaLabel: 'Download Report',
+    // A second, sharper ask partway down the page -- the closing CTA at the
+    // very bottom only reaches whoever scrolls that far. Free delivery is the
+    // single strongest reason to buy now rather than "think about it".
+    midCta: {
+      enabled: true,
+      heading: 'Free Delivery on Orders Over KES 15,000',
+      body: 'Nationwide, on us. Shop the full range and check out in minutes.',
+      ctaLabel: 'Shop Now',
     },
     cta: {
-      heading: 'Ready to Find Your Elite Residence?',
-      body: 'Our dedicated professionals are standing by to guide you through every step of your real estate journey.',
-      primaryLabel: 'Contact Our Experts',
-      secondaryLabel: 'Book a Consultation',
-      // The secondary button pointed at "#" and did nothing when clicked.
+      heading: 'Cannot find your size?',
+      body: 'Message us — stock moves between our two shops and we will tell you straight away what we have.',
+      primaryLabel: 'WhatsApp Us',
+      secondaryLabel: 'Visit a Shop',
       secondaryHref: '/contact',
     },
   },
@@ -222,6 +194,14 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
         'We stock sneakers, boots, casuals, sandals and officials from Nike, Adidas, Jordan, Puma, Calvin Klein, Tommy Hilfiger and BOSS. Everything on the shelf is what it says it is, priced so you do not have to negotiate to feel fairly treated.',
         'Two shops, EUR 36 to 46, and a WhatsApp line that gets answered. If we do not have your size in one shop, we will tell you whether the other one does.',
       ],
+      image: '',
+    },
+    // A handful of shop photos -- the shelf, the storefront, a fitting in
+    // progress. Hidden entirely until at least one is uploaded, same as every
+    // other optional band on this site.
+    gallery: {
+      heading: 'Inside the Shop',
+      items: [],
     },
     values: {
       kicker: 'What We Stand For',
