@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { PettyCashReconciliationService } from './petty-cash-reconciliation.service';
 import { CreatePettyCashReconciliationDto } from './dto/create-petty-cash-reconciliation.dto';
+import { PettyCashReconciliationQueryDto } from './dto/petty-cash-reconciliation-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -19,8 +20,8 @@ export class PettyCashReconciliationController {
 
   @Get()
   @Permissions(buildPermissionKey('PettyCashReconciliation', 'read'))
-  findAll(@Query('boxId') boxId?: string) {
-    return this.service.findAll(boxId);
+  findAll(@Query() query: PettyCashReconciliationQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

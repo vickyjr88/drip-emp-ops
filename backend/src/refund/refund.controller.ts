@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { RefundService } from './refund.service';
 import { ApproveRefundDto, CreateRefundDto, RejectRefundDto } from './dto/create-refund.dto';
+import { RefundQueryDto } from './dto/refund-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -19,8 +20,8 @@ export class RefundController {
 
   @Get()
   @Permissions(buildPermissionKey('Refund', 'read'))
-  findAll(@Query('receiptId') receiptId?: string, @Query('status') status?: string) {
-    return this.service.findAll({ receiptId, status });
+  findAll(@Query() query: RefundQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

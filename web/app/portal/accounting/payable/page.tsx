@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import { ListExport } from '../../components/list-export';
 import { ListPager, ListSearch, useListControls } from '../../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { TourLauncher } from '../../tours/tour-launcher';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
@@ -86,10 +87,12 @@ export default function AccountsPayablePage() {
   >([]);
   const [recatInvoiceId, setRecatInvoiceId] = useState<string | null>(null);
   const [recatForm, setRecatForm] = useState({ storeId: '', glExpenseAccountId: '' });
-  const [supplierInvoices, setSupplierInvoices] = useState<SupplierInvoice[]>([]);
-  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([]);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [supplierExportRows, setSupplierExportRows] = useState<Supplier[]>([]);
+  const [invoiceExportRows, setInvoiceExportRows] = useState<SupplierInvoice[]>([]);
+  const [paymentExportRows, setPaymentExportRows] = useState<SupplierPayment[]>([]);
+  const [approvedInvoicesForSupplier, setApprovedInvoicesForSupplier] = useState<SupplierInvoice[]>([]);
 
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [supplierName, setSupplierName] = useState('');
@@ -123,7 +126,7 @@ export default function AccountsPayablePage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextSuppliers, nextBalances, nextInvoices, nextPayments, nextTaxRates, nextBanks, nextStores, nextAccounts] = await Promise.all([
+      const [nextSuppliers, nextBalances, nextTaxRates, nextBanks, nextStores, nextAccounts] = await Promise.all([
         hasPermission(nextProfile, 'supplier.read')
           ? apiRequest<{ items: Supplier[] }>('/suppliers?take=500', { method: 'GET' }, authToken).then(
               (page) => page.items,
@@ -131,12 +134,6 @@ export default function AccountsPayablePage() {
           : Promise.resolve([]),
         hasPermission(nextProfile, 'supplier.read')
           ? apiRequest<any[]>('/suppliers/balances', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'supplier-invoice.read')
-          ? apiRequest<SupplierInvoice[]>('/supplier-invoices?take=200', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'supplier-payment.read')
-          ? apiRequest<SupplierPayment[]>('/supplier-payments?take=200', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'tax-rate.read')
           ? apiRequest<TaxRate[]>('/tax-rates?activeOnly=true', { method: 'GET' }, authToken)
@@ -160,8 +157,6 @@ export default function AccountsPayablePage() {
       setExpenseAccounts(
         nextAccounts.filter((account: any) => account.type === 'EXPENSE' && account.parentId),
       );
-      setSupplierInvoices(nextInvoices);
-      setSupplierPayments(nextPayments);
       setTaxRates(nextTaxRates);
       setBankAccounts(nextBanks);
     } catch (error) {
@@ -186,10 +181,109 @@ export default function AccountsPayablePage() {
     return map;
   }, [suppliers]);
 
-  const approvedInvoicesForSupplier = useMemo(
-    () => supplierInvoices.filter((invoice) => invoice.supplierId === paymentSupplierId && invoice.status === 'APPROVED'),
-    [supplierInvoices, paymentSupplierId],
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'supplier-invoice.read') || !paymentSupplierId) {
+      setApprovedInvoicesForSupplier([]);
+      return;
+    }
+    let cancelled = false;
+    const query = new URLSearchParams({ supplierId: paymentSupplierId, status: 'APPROVED', take: '500' });
+    void apiRequest<ServerPage<SupplierInvoice>>(`/supplier-invoices?${query}`, { method: 'GET' }, token).then(
+      (page) => {
+        if (!cancelled) setApprovedInvoicesForSupplier(page.items);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [token, profile, paymentSupplierId]);
+
+  const fetchSuppliersPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Supplier>> => {
+      if (!token || !profile || !hasPermission(profile, 'supplier.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Supplier>>(`/suppliers?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
   );
+
+  const suppliersPager = useServerPager<Supplier>({
+    fetchPage: (params) => fetchSuppliersPage(params),
+    enabled: Boolean(token && profile && tab === 'suppliers'),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'supplier.read')) return;
+    const timer = setTimeout(() => {
+      void fetchSuppliersPage({ skip: 0, take: 500, search: suppliersPager.search }).then((page) =>
+        setSupplierExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchSuppliersPage, suppliersPager.search, token, profile]);
+
+  const fetchInvoicesPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<SupplierInvoice>> => {
+      if (!token || !profile || !hasPermission(profile, 'supplier-invoice.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<SupplierInvoice>>(`/supplier-invoices?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const invoicesPager = useServerPager<SupplierInvoice>({
+    fetchPage: (params) => fetchInvoicesPage(params),
+    enabled: Boolean(token && profile && tab === 'invoices'),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'supplier-invoice.read')) return;
+    const timer = setTimeout(() => {
+      void fetchInvoicesPage({ skip: 0, take: 500, search: invoicesPager.search }).then((page) =>
+        setInvoiceExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchInvoicesPage, invoicesPager.search, token, profile]);
+
+  const fetchPaymentsPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<SupplierPayment>> => {
+      if (!token || !profile || !hasPermission(profile, 'supplier-payment.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<SupplierPayment>>(`/supplier-payments?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const paymentsPager = useServerPager<SupplierPayment>({
+    fetchPage: (params) => fetchPaymentsPage(params),
+    enabled: Boolean(token && profile && tab === 'payments'),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'supplier-payment.read')) return;
+    const timer = setTimeout(() => {
+      void fetchPaymentsPage({ skip: 0, take: 500, search: paymentsPager.search }).then((page) =>
+        setPaymentExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchPaymentsPage, paymentsPager.search, token, profile]);
 
   const canCreateSupplier = hasPermission(profile, 'supplier.create');
   const canCreateInvoice = hasPermission(profile, 'supplier-invoice.create');
@@ -229,6 +323,9 @@ export default function AccountsPayablePage() {
       await action();
       setFeedback(successMessage);
       await load(token);
+      suppliersPager.reload();
+      invoicesPager.reload();
+      paymentsPager.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Operation failed.');
     } finally {
@@ -325,6 +422,7 @@ export default function AccountsPayablePage() {
       );
       setFeedback('Attachment uploaded.');
       await load(token);
+      invoicesPager.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Could not upload attachment.');
     } finally {
@@ -386,26 +484,6 @@ export default function AccountsPayablePage() {
       await apiRequest(`/supplier-payments/${id}/cancel`, { method: 'POST' }, token);
     }, 'Payment cancelled.');
   }
-
-  const supplierControls = useListControls(suppliers, (row) => [
-    row.name,
-    row.email,
-    row.phone,
-  ]);
-
-  const invoiceControls = useListControls(supplierInvoices, (row) => [
-    row.invoiceNumber,
-    row.status,
-    row.currency,
-    supplierLabel(supplierMap.get(row.supplierId)),
-  ]);
-
-  const paymentControls = useListControls(supplierPayments, (row) => [
-    row.paymentNumber,
-    row.status,
-    row.currency,
-    supplierLabel(supplierMap.get(row.supplierId)),
-  ]);
 
   if (!initialized || loading) {
     return (
@@ -519,9 +597,9 @@ export default function AccountsPayablePage() {
                 ) : null}
 
                 <div className="list-toolbar">
-                  <ListSearch controls={supplierControls} placeholder="Search suppliers…" />
+                  <ServerListSearch pager={suppliersPager} placeholder="Search suppliers…" />
                     <ListExport
-                      rows={supplierControls.filtered}
+                      rows={supplierExportRows}
                       config={{
                         fileName: 'suppliers',
                         columns: [
@@ -535,10 +613,12 @@ export default function AccountsPayablePage() {
                     />
                 </div>
                 <div className="portal-list-stack">
-                  {suppliers.length === 0 ? (
-                    <div className="portal-empty-state">No suppliers yet.</div>
+                  {!suppliersPager.loading && suppliersPager.items.length === 0 ? (
+                    <div className="portal-empty-state">
+                      {suppliersPager.search ? 'No suppliers match.' : 'No suppliers yet.'}
+                    </div>
                   ) : (
-                    supplierControls.visible.map((supplier) => {
+                    suppliersPager.items.map((supplier) => {
                       const balance = supplierBalances.find((row) => row.id === supplier.id);
                       return (
                         <div key={supplier.id} className="portal-record">
@@ -577,7 +657,7 @@ export default function AccountsPayablePage() {
                     })
                   )}
                 </div>
-                <ListPager controls={supplierControls} noun="suppliers" />
+                <ServerListPager pager={suppliersPager} noun="suppliers" />
               </article>
             ) : null}
 
@@ -645,9 +725,9 @@ export default function AccountsPayablePage() {
                 ) : null}
 
                 <div className="list-toolbar">
-                  <ListSearch controls={invoiceControls} placeholder="Search invoices or suppliers…" />
+                  <ServerListSearch pager={invoicesPager} placeholder="Search invoices or suppliers…" />
                   <ListExport
-                    rows={invoiceControls.filtered}
+                    rows={invoiceExportRows}
                     config={{
                       fileName: 'supplier-invoices',
                       dateOf: (row) => row.invoiceDate,
@@ -667,12 +747,12 @@ export default function AccountsPayablePage() {
                 </div>
 
                 <div className="portal-list-stack">
-                  {invoiceControls.visible.length === 0 ? (
+                  {!invoicesPager.loading && invoicesPager.items.length === 0 ? (
                     <div className="portal-empty-state">
-                      {invoiceControls.search ? 'No invoices match that search.' : 'No supplier invoices yet.'}
+                      {invoicesPager.search ? 'No invoices match that search.' : 'No supplier invoices yet.'}
                     </div>
                   ) : (
-                    invoiceControls.visible.map((invoice) => (
+                    invoicesPager.items.map((invoice) => (
                       <div key={invoice.id} className="portal-record">
                         <div className="portal-list-row">
                           <div>
@@ -813,7 +893,7 @@ export default function AccountsPayablePage() {
                     ))
                   )}
                 </div>
-                <ListPager controls={invoiceControls} noun="invoices" />
+                <ServerListPager pager={invoicesPager} noun="invoices" />
 
                 <input
                   ref={attachmentInputRef}
@@ -909,9 +989,9 @@ export default function AccountsPayablePage() {
                 ) : null}
 
                 <div className="list-toolbar">
-                  <ListSearch controls={paymentControls} placeholder="Search payments or suppliers…" />
+                  <ServerListSearch pager={paymentsPager} placeholder="Search payments or suppliers…" />
                   <ListExport
-                    rows={paymentControls.filtered}
+                    rows={paymentExportRows}
                     config={{
                       fileName: 'supplier-payments',
                       dateOf: (row) => row.stagedAt,
@@ -930,12 +1010,12 @@ export default function AccountsPayablePage() {
                 </div>
 
                 <div className="portal-list-stack">
-                  {paymentControls.visible.length === 0 ? (
+                  {!paymentsPager.loading && paymentsPager.items.length === 0 ? (
                     <div className="portal-empty-state">
-                      {paymentControls.search ? 'No payments match that search.' : 'No payments staged yet.'}
+                      {paymentsPager.search ? 'No payments match that search.' : 'No payments staged yet.'}
                     </div>
                   ) : (
-                    paymentControls.visible.map((payment) => (
+                    paymentsPager.items.map((payment) => (
                       <div key={payment.id} className="portal-record">
                         <div className="portal-list-row">
                           <div>
@@ -967,7 +1047,7 @@ export default function AccountsPayablePage() {
                     ))
                   )}
                 </div>
-                <ListPager controls={paymentControls} noun="payments" />
+                <ServerListPager pager={paymentsPager} noun="payments" />
               </article>
             ) : null}
           </PortalShell>

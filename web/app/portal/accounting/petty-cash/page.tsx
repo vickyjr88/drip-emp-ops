@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import { ListExport } from '../../components/list-export';
-import { ListPager, ListSearch, useListControls } from '../../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
@@ -63,8 +63,8 @@ export default function PettyCashPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
 
   const [boxes, setBoxes] = useState<PettyCashBox[]>([]);
-  const [vouchers, setVouchers] = useState<PettyCashVoucher[]>([]);
-  const [reconciliations, setReconciliations] = useState<PettyCashReconciliation[]>([]);
+  const [voucherExportRows, setVoucherExportRows] = useState<PettyCashVoucher[]>([]);
+  const [reconExportRows, setReconExportRows] = useState<PettyCashReconciliation[]>([]);
   const [balances, setBalances] = useState<Record<string, BoxBalance>>({});
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
   const [downloadingVoucherId, setDownloadingVoucherId] = useState<string | null>(null);
@@ -95,21 +95,11 @@ export default function PettyCashPage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextBoxes, nextVouchers, nextRecon] = await Promise.all([
-        hasPermission(nextProfile, 'petty-cash-box.read')
-          ? apiRequest<PettyCashBox[]>('/petty-cash-boxes', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'petty-cash-voucher.read')
-          ? apiRequest<PettyCashVoucher[]>('/petty-cash-vouchers', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'petty-cash-reconciliation.read')
-          ? apiRequest<PettyCashReconciliation[]>('/petty-cash-reconciliations', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-      ]);
+      const nextBoxes = hasPermission(nextProfile, 'petty-cash-box.read')
+        ? await apiRequest<PettyCashBox[]>('/petty-cash-boxes', { method: 'GET' }, authToken)
+        : [];
       setProfile(nextProfile);
       setBoxes(nextBoxes);
-      setVouchers(nextVouchers);
-      setReconciliations(nextRecon);
       setActiveBoxId((prev) => prev || nextBoxes[0]?.id || null);
 
       if (hasPermission(nextProfile, 'petty-cash-box.read')) {
@@ -139,11 +129,72 @@ export default function PettyCashPage() {
   }, [initialized, token, load]);
 
   const activeBox = useMemo(() => boxes.find((box) => box.id === activeBoxId) || null, [boxes, activeBoxId]);
-  const activeVouchers = useMemo(() => vouchers.filter((voucher) => voucher.boxId === activeBoxId), [vouchers, activeBoxId]);
-  const activeReconciliations = useMemo(
-    () => reconciliations.filter((recon) => recon.boxId === activeBoxId),
-    [reconciliations, activeBoxId],
+
+  const fetchVouchersPage = useCallback(
+    async (params: { skip: number; take: number; search: string; boxId: string }): Promise<ServerPage<PettyCashVoucher>> => {
+      if (!token || !profile || !hasPermission(profile, 'petty-cash-voucher.read') || !params.boxId) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      query.set('boxId', params.boxId);
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<PettyCashVoucher>>(`/petty-cash-vouchers?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
   );
+
+  const vouchersPager = useServerPager<PettyCashVoucher, { boxId: string }>({
+    fetchPage: (params) => fetchVouchersPage(params),
+    filters: { boxId: activeBoxId || '' },
+    enabled: Boolean(token && profile && activeBoxId),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'petty-cash-voucher.read') || !activeBoxId) return;
+    const timer = setTimeout(() => {
+      void fetchVouchersPage({ skip: 0, take: 500, search: vouchersPager.search, boxId: activeBoxId }).then((page) =>
+        setVoucherExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchVouchersPage, vouchersPager.search, activeBoxId, token, profile]);
+
+  const fetchReconciliationsPage = useCallback(
+    async (params: {
+      skip: number;
+      take: number;
+      search: string;
+      boxId: string;
+    }): Promise<ServerPage<PettyCashReconciliation>> => {
+      if (!token || !profile || !hasPermission(profile, 'petty-cash-reconciliation.read') || !params.boxId) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      query.set('boxId', params.boxId);
+      return apiRequest<ServerPage<PettyCashReconciliation>>(`/petty-cash-reconciliations?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const reconciliationsPager = useServerPager<PettyCashReconciliation, { boxId: string }>({
+    fetchPage: (params) => fetchReconciliationsPage(params),
+    filters: { boxId: activeBoxId || '' },
+    enabled: Boolean(token && profile && activeBoxId),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'petty-cash-reconciliation.read') || !activeBoxId) return;
+    const timer = setTimeout(() => {
+      void fetchReconciliationsPage({ skip: 0, take: 500, search: '', boxId: activeBoxId }).then((page) =>
+        setReconExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchReconciliationsPage, activeBoxId, token, profile]);
 
   const canCreateBox = hasPermission(profile, 'petty-cash-box.create');
   const canCreateVoucher = hasPermission(profile, 'petty-cash-voucher.create');
@@ -164,6 +215,8 @@ export default function PettyCashPage() {
       await action();
       setFeedback(successMessage);
       await load(token);
+      vouchersPager.reload();
+      reconciliationsPager.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Operation failed.');
     } finally {
@@ -240,6 +293,7 @@ export default function PettyCashPage() {
       }
       await downloadFile(`/petty-cash-vouchers/${voucher.id}/pdf`, token, `voucher-${voucher.voucherNumber}.pdf`);
       await load(token);
+      vouchersPager.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to print voucher.');
     } finally {
@@ -284,20 +338,6 @@ export default function PettyCashPage() {
       setReconNotes('');
     }, 'Reconciliation recorded.');
   }
-
-  const voucherControls = useListControls(activeVouchers, (row) => [
-    row.voucherNumber,
-    row.payee,
-    row.purpose,
-    row.status,
-    row.type,
-  ]);
-
-  const reconControls = useListControls(activeReconciliations, (row) => [
-    row.periodEnd,
-    row.expectedBalance,
-    row.countedBalance,
-  ]);
 
   if (!initialized || loading) {
     return (
@@ -479,9 +519,9 @@ export default function PettyCashPage() {
                   ) : null}
 
                   <div className="list-toolbar">
-                    <ListSearch controls={voucherControls} placeholder="Search vouchers…" />
+                    <ServerListSearch pager={vouchersPager} placeholder="Search vouchers…" />
                       <ListExport
-                        rows={voucherControls.filtered}
+                        rows={voucherExportRows}
                         config={{
                           fileName: 'petty-cash-vouchers',
                           dateOf: (row) => row.createdAt,
@@ -499,10 +539,12 @@ export default function PettyCashPage() {
                       />
                   </div>
                   <div className="portal-list-stack">
-                    {activeVouchers.length === 0 ? (
-                      <div className="portal-empty-state">No vouchers for this box yet.</div>
+                    {!vouchersPager.loading && vouchersPager.items.length === 0 ? (
+                      <div className="portal-empty-state">
+                        {vouchersPager.search ? 'No vouchers match.' : 'No vouchers for this box yet.'}
+                      </div>
                     ) : (
-                      voucherControls.visible.map((voucher) => (
+                      vouchersPager.items.map((voucher) => (
                         <div key={voucher.id} className="portal-record">
                           <div className="portal-list-row">
                             <div>
@@ -542,7 +584,7 @@ export default function PettyCashPage() {
                       ))
                     )}
                   </div>
-                  <ListPager controls={voucherControls} noun="vouchers" />
+                  <ServerListPager pager={vouchersPager} noun="vouchers" />
                 </article>
 
                 <article className="portal-card" data-tour="petty-cash.reconciliations">
@@ -575,9 +617,8 @@ export default function PettyCashPage() {
                   ) : null}
 
                   <div className="list-toolbar">
-                    <ListSearch controls={reconControls} placeholder="Search reconciliations…" />
                     <ListExport
-                      rows={reconControls.filtered}
+                      rows={reconExportRows}
                       config={{
                         fileName: 'petty-cash-reconciliations',
                         dateOf: (row) => row.periodEnd,
@@ -592,10 +633,10 @@ export default function PettyCashPage() {
                     />
                   </div>
                   <div className="portal-list-stack">
-                    {activeReconciliations.length === 0 ? (
+                    {!reconciliationsPager.loading && reconciliationsPager.items.length === 0 ? (
                       <div className="portal-empty-state">No reconciliations recorded yet.</div>
                     ) : (
-                      reconControls.visible.map((recon) => (
+                      reconciliationsPager.items.map((recon) => (
                         <div key={recon.id} className="portal-record">
                           <div className="portal-list-row">
                             <div>
@@ -612,7 +653,7 @@ export default function PettyCashPage() {
                       ))
                     )}
                   </div>
-                  <ListPager controls={reconControls} noun="reconciliations" />
+                  <ServerListPager pager={reconciliationsPager} noun="reconciliations" />
                 </article>
               </div>
             ) : null}

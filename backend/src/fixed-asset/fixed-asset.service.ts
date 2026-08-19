@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { JournalSource } from '@prisma/client';
+import { JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { CreateFixedAssetDto } from './dto/create-fixed-asset.dto';
 import { DisposeFixedAssetDto } from './dto/dispose-fixed-asset.dto';
+import { FixedAssetQueryDto } from './dto/fixed-asset-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class FixedAssetService {
@@ -29,17 +31,19 @@ export class FixedAssetService {
     });
   }
 
-  findAll(params: { skip?: number; take?: number; storeId?: string; status?: string }) {
-    const { skip, take, storeId, status } = params;
-    return this.prisma.fixedAsset.findMany({
-      where: {
-        ...(storeId ? { storeId } : {}),
-        ...(status ? { status: status as any } : {}),
-      },
-      orderBy: { acquisitionDate: 'desc' },
+  findAll(query: FixedAssetQueryDto) {
+    const { skip, take, search, storeId, status } = query;
+    const where: Prisma.FixedAssetWhereInput = {
+      ...(storeId ? { storeId } : {}),
+      ...(status ? { status: status as any } : {}),
+      ...searchOr(search, (term) => containsAny(['assetCode', 'description', 'category'], term)),
+    };
+    return paginate(
+      (args) => this.prisma.fixedAsset.findMany({ where, orderBy: [{ acquisitionDate: 'desc' }, { id: 'asc' }], ...args }),
+      () => this.prisma.fixedAsset.count({ where }),
       skip,
       take,
-    });
+    );
   }
 
   async findOne(id: string) {

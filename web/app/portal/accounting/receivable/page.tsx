@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import { ListExport } from '../../components/list-export';
 import { ListPager, ListSearch, useListControls } from '../../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { TourLauncher } from '../../tours/tour-launcher';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
@@ -88,6 +89,7 @@ type Refund = {
   processedAt?: string | null;
   rejectedReason?: string | null;
   createdAt: string;
+  receipt?: { receiptNumber: string; currency: string } | null;
 };
 
 type ArTab = 'invoices' | 'receipts' | 'refunds' | 'aging';
@@ -115,14 +117,14 @@ export default function AccountsReceivablePage() {
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [aging, setAging] = useState<AgingReport | null>(null);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
   const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
-  const [refunds, setRefunds] = useState<Refund[]>([]);
+  const [receiptExportRows, setReceiptExportRows] = useState<Receipt[]>([]);
+  const [pendingRefundCount, setPendingRefundCount] = useState(0);
 
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceCustomerId, setInvoiceCustomerId] = useState('');
@@ -151,7 +153,7 @@ export default function AccountsReceivablePage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextCustomers, nextInvoices, nextReceipts, nextAging, nextBanks, nextTaxRates, nextStores, nextRefunds] = await Promise.all([
+      const [nextCustomers, nextInvoices, nextAging, nextBanks, nextTaxRates, nextStores] = await Promise.all([
         hasPermission(nextProfile, 'customer.read')
           ? apiRequest<{ items: Customer[] }>('/customers?take=500', { method: 'GET' }, authToken).then(
               (page) => page.items,
@@ -159,9 +161,6 @@ export default function AccountsReceivablePage() {
           : Promise.resolve([]),
         hasPermission(nextProfile, 'invoice.read')
           ? apiRequest<Invoice[]>('/invoices?take=200', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'receipt.read')
-          ? apiRequest<Receipt[]>('/receipts?take=200', { method: 'GET' }, authToken)
           : Promise.resolve([]),
         hasPermission(nextProfile, 'invoice.read')
           ? apiRequest<AgingReport>('/invoices/reports/aging', { method: 'GET' }, authToken)
@@ -175,19 +174,14 @@ export default function AccountsReceivablePage() {
         hasPermission(nextProfile, 'store.read')
           ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'refund.read')
-          ? apiRequest<Refund[]>('/refunds', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
       ]);
       setProfile(nextProfile);
       setCustomers(nextCustomers);
       setInvoices(nextInvoices);
-      setReceipts(nextReceipts);
       setAging(nextAging);
       setBankAccounts(nextBanks);
       setTaxRates(nextTaxRates);
       setStores(nextStores);
-      setRefunds(nextRefunds);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load accounts receivable.');
     } finally {
@@ -215,6 +209,68 @@ export default function AccountsReceivablePage() {
     [invoices],
   );
 
+  const fetchReceiptsPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Receipt>> => {
+      if (!token || !profile || !hasPermission(profile, 'receipt.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Receipt>>(`/receipts?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const receiptsPager = useServerPager<Receipt>({
+    fetchPage: (params) => fetchReceiptsPage(params),
+    enabled: Boolean(token && profile && tab === 'receipts'),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'receipt.read')) return;
+    const timer = setTimeout(() => {
+      void fetchReceiptsPage({ skip: 0, take: 500, search: receiptsPager.search }).then((page) =>
+        setReceiptExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchReceiptsPage, receiptsPager.search, token, profile]);
+
+  const fetchRefundsPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Refund>> => {
+      if (!token || !profile || !hasPermission(profile, 'refund.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Refund>>(`/refunds?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const refundsPager = useServerPager<Refund>({
+    fetchPage: (params) => fetchRefundsPage(params),
+    enabled: Boolean(token && profile && tab === 'refunds'),
+  });
+
+  const refreshPendingRefundCount = useCallback(async () => {
+    if (!token || !profile || !hasPermission(profile, 'refund.read')) return;
+    const page = await apiRequest<ServerPage<Refund>>(
+      '/refunds?status=PENDING&take=1',
+      { method: 'GET' },
+      token,
+    );
+    setPendingRefundCount(page.total);
+  }, [token, profile]);
+
+  useEffect(() => {
+    void refreshPendingRefundCount();
+  }, [refreshPendingRefundCount]);
+
   const canCreateInvoice = hasPermission(profile, 'invoice.create');
   const canUpdateInvoice = hasPermission(profile, 'invoice.update');
   const canCreateReceipt = hasPermission(profile, 'receipt.create');
@@ -236,6 +292,9 @@ export default function AccountsReceivablePage() {
       await action();
       setFeedback(successMessage);
       await load(token);
+      receiptsPager.reload();
+      refundsPager.reload();
+      void refreshPendingRefundCount();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Operation failed.');
     } finally {
@@ -459,13 +518,6 @@ export default function AccountsReceivablePage() {
     customerLabel(customers.find((entry) => entry.id === row.customerId)),
   ]);
 
-  const receiptControls = useListControls(receipts, (row) => [
-    row.receiptNumber,
-    row.paymentMethod,
-    row.status,
-    row.currency,
-  ]);
-
   if (!initialized || loading) {
     return (
       <EliteLayout active="portal">
@@ -527,7 +579,7 @@ export default function AccountsReceivablePage() {
                 Receipts
               </button>
               <button type="button" className={`portal-inline-btn${tab === 'refunds' ? ' is-active' : ''}`} onClick={() => setTab('refunds')}>
-                Refunds{refunds.filter((refund) => refund.status === 'PENDING').length > 0 ? ` (${refunds.filter((refund) => refund.status === 'PENDING').length})` : ''}
+                Refunds{pendingRefundCount > 0 ? ` (${pendingRefundCount})` : ''}
               </button>
               <button type="button" className={`portal-inline-btn${tab === 'aging' ? ' is-active' : ''}`} onClick={() => setTab('aging')}>
                 Aging
@@ -842,9 +894,9 @@ export default function AccountsReceivablePage() {
                   ) : null}
 
                   <div className="list-toolbar">
-                    <ListSearch controls={receiptControls} placeholder="Search receipts…" />
+                    <ServerListSearch pager={receiptsPager} placeholder="Search receipts…" />
                     <ListExport
-                      rows={receiptControls.filtered}
+                      rows={receiptExportRows}
                       config={{
                         fileName: 'receipts',
                         dateOf: (row) => row.receivedAt,
@@ -862,10 +914,12 @@ export default function AccountsReceivablePage() {
                     />
                   </div>
                   <div className="portal-list-stack">
-                    {receipts.length === 0 ? (
-                      <div className="portal-empty-state">No receipts yet.</div>
+                    {!receiptsPager.loading && receiptsPager.items.length === 0 ? (
+                      <div className="portal-empty-state">
+                        {receiptsPager.search ? 'No receipts match.' : 'No receipts yet.'}
+                      </div>
                     ) : (
-                      receiptControls.visible.map((receipt) => (
+                      receiptsPager.items.map((receipt) => (
                         <div key={receipt.id} className="portal-record">
                           <div className="portal-list-row">
                             <div>
@@ -908,7 +962,7 @@ export default function AccountsReceivablePage() {
                       ))
                     )}
                   </div>
-                  <ListPager controls={receiptControls} noun="receipts" />
+                  <ServerListPager pager={receiptsPager} noun="receipts" />
                 </article>
               </div>
             ) : null}
@@ -920,12 +974,17 @@ export default function AccountsReceivablePage() {
                   <p className="portal-muted" style={{ margin: '0 0 12px' }}>
                     Refund requests wait here for approval before anything is paid out or posted to the ledger.
                   </p>
+                  <div className="list-toolbar">
+                    <ServerListSearch pager={refundsPager} placeholder="Search refunds…" />
+                  </div>
                   <div className="portal-list-stack">
-                    {refunds.length === 0 ? (
-                      <div className="portal-empty-state">No refunds requested yet.</div>
+                    {!refundsPager.loading && refundsPager.items.length === 0 ? (
+                      <div className="portal-empty-state">
+                        {refundsPager.search ? 'No refunds match.' : 'No refunds requested yet.'}
+                      </div>
                     ) : (
-                      refunds.map((refund) => {
-                        const receipt = receipts.find((item) => item.id === refund.receiptId);
+                      refundsPager.items.map((refund) => {
+                        const receipt = refund.receipt;
                         return (
                           <div key={refund.id} className="portal-record">
                             <div className="portal-list-row">
@@ -956,6 +1015,7 @@ export default function AccountsReceivablePage() {
                       })
                     )}
                   </div>
+                  <ServerListPager pager={refundsPager} noun="refunds" />
                 </article>
               </div>
             ) : null}

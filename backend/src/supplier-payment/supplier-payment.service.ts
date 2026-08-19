@@ -1,11 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccountPurpose, JournalSource } from '@prisma/client';
+import { AccountPurpose, JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountResolverService } from '../ledger/account-resolver.service';
 import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { CreateSupplierPaymentDto } from './dto/create-supplier-payment.dto';
+import { SupplierPaymentQueryDto } from './dto/supplier-payment-query.dto';
 import { nextReference } from '../common/next-reference';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -86,18 +88,25 @@ export class SupplierPaymentService {
     });
   }
 
-  findAll(params: { skip?: number; take?: number; supplierId?: string; status?: string }) {
-    const { skip, take, supplierId, status } = params;
-    return this.prisma.supplierPayment.findMany({
-      where: {
-        ...(supplierId ? { supplierId } : {}),
-        ...(status ? { status: status as any } : {}),
-      },
-      include: { allocations: { include: { supplierInvoice: true } } },
-      orderBy: { stagedAt: 'desc' },
+  findAll(query: SupplierPaymentQueryDto) {
+    const { skip, take, search, supplierId, status } = query;
+    const where: Prisma.SupplierPaymentWhereInput = {
+      ...(supplierId ? { supplierId } : {}),
+      ...(status ? { status: status as any } : {}),
+      ...searchOr(search, (term) => containsAny(['paymentNumber', 'supplier.name'], term)),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.supplierPayment.findMany({
+          where,
+          include: { allocations: { include: { supplierInvoice: true } } },
+          orderBy: [{ stagedAt: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.supplierPayment.count({ where }),
       skip,
       take,
-    });
+    );
   }
 
   async findOne(id: string) {

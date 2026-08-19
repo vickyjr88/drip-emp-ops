@@ -1,11 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { JournalSource } from '@prisma/client';
+import { JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { EmailLogService } from '../email-log/email-log.service';
 import { CreateSupplierInvoiceDto } from './dto/create-supplier-invoice.dto';
 import { CreateSupplierInvoiceAttachmentDto } from './dto/create-supplier-invoice-attachment.dto';
+import { SupplierInvoiceQueryDto } from './dto/supplier-invoice-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class SupplierInvoiceService {
@@ -41,19 +43,26 @@ export class SupplierInvoiceService {
     });
   }
 
-  findAll(params: { skip?: number; take?: number; supplierId?: string; status?: string; storeId?: string }) {
-    const { skip, take, supplierId, status, storeId } = params;
-    return this.prisma.supplierInvoice.findMany({
-      where: {
-        ...(supplierId ? { supplierId } : {}),
-        ...(status ? { status: status as any } : {}),
-        ...(storeId ? { storeId } : {}),
-      },
-      include: { attachments: true },
-      orderBy: { invoiceDate: 'desc' },
+  findAll(query: SupplierInvoiceQueryDto) {
+    const { skip, take, search, supplierId, status, storeId } = query;
+    const where: Prisma.SupplierInvoiceWhereInput = {
+      ...(supplierId ? { supplierId } : {}),
+      ...(status ? { status: status as any } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...searchOr(search, (term) => containsAny(['invoiceNumber', 'supplier.name'], term)),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.supplierInvoice.findMany({
+          where,
+          include: { attachments: true },
+          orderBy: [{ invoiceDate: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.supplierInvoice.count({ where }),
       skip,
       take,
-    });
+    );
   }
 
   async findOne(id: string) {

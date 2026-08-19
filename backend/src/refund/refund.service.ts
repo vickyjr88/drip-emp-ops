@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccountPurpose, JournalSource } from '@prisma/client';
+import { AccountPurpose, JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountResolverService } from '../ledger/account-resolver.service';
 import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { ApproveRefundDto, CreateRefundDto, RejectRefundDto } from './dto/create-refund.dto';
+import { RefundQueryDto } from './dto/refund-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 const ROUNDING_TOLERANCE = 0.01;
 
@@ -118,14 +120,25 @@ export class RefundService {
     });
   }
 
-  findAll(params: { receiptId?: string; status?: string }) {
-    return this.prisma.refund.findMany({
-      where: {
-        ...(params.receiptId ? { receiptId: params.receiptId } : {}),
-        ...(params.status ? { status: params.status as any } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  findAll(query: RefundQueryDto) {
+    const { skip, take, search, receiptId, status } = query;
+    const where: Prisma.RefundWhereInput = {
+      ...(receiptId ? { receiptId } : {}),
+      ...(status ? { status: status as any } : {}),
+      ...searchOr(search, (term) => containsAny(['reason', 'requestedBy'], term)),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.refund.findMany({
+          where,
+          include: { receipt: true },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.refund.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async findOne(id: string) {

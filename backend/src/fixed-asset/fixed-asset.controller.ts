@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { FixedAssetService } from './fixed-asset.service';
 import { CreateFixedAssetDto } from './dto/create-fixed-asset.dto';
 import { DisposeFixedAssetDto } from './dto/dispose-fixed-asset.dto';
+import { FixedAssetQueryDto } from './dto/fixed-asset-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -20,18 +21,8 @@ export class FixedAssetController {
 
   @Get()
   @Permissions(buildPermissionKey('FixedAsset', 'read'))
-  findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('storeId') storeId?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.service.findAll({
-      skip: skip ? Number(skip) : undefined,
-      take: take ? Number(take) : undefined,
-      storeId,
-      status,
-    });
+  findAll(@Query() query: FixedAssetQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Post('run-depreciation')

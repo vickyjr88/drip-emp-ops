@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import { ListExport } from '../../components/list-export';
 import { ListPager, ListSearch, useListControls } from '../../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { TourLauncher } from '../../tours/tour-launcher';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
@@ -75,7 +76,6 @@ export default function TaxPage() {
   const [glAccounts, setGlAccounts] = useState<ChartOfAccount[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [remittances, setRemittances] = useState<TaxRemittance[]>([]);
 
   const [showRateForm, setShowRateForm] = useState(false);
   const [rateForm, setRateForm] = useState({ name: '', code: '', rate: '', appliesTo: 'OUTPUT' as TaxApplication, glAccountId: '' });
@@ -110,7 +110,7 @@ export default function TaxPage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextRates, nextAccounts, nextStores, nextBanks, nextRemittances] = await Promise.all([
+      const [nextRates, nextAccounts, nextStores, nextBanks] = await Promise.all([
         hasPermission(nextProfile, 'tax-rate.read')
           ? apiRequest<TaxRate[]>('/tax-rates', { method: 'GET' }, authToken)
           : Promise.resolve([]),
@@ -123,16 +123,12 @@ export default function TaxPage() {
         hasPermission(nextProfile, 'bank-account.read')
           ? apiRequest<BankAccount[]>('/bank-accounts', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'tax-remittance.read')
-          ? apiRequest<TaxRemittance[]>('/tax-remittances?take=500', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
       ]);
       setProfile(nextProfile);
       setTaxRates(nextRates);
       setGlAccounts(nextAccounts);
       setStores(nextStores);
       setBankAccounts(nextBanks);
-      setRemittances(nextRemittances);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load tax configuration.');
     } finally {
@@ -154,6 +150,25 @@ export default function TaxPage() {
     for (const rate of taxRates) map.set(rate.id, rate);
     return map;
   }, [taxRates]);
+
+  const fetchRemittancesPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<TaxRemittance>> => {
+      if (!token || !profile || !hasPermission(profile, 'tax-remittance.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<TaxRemittance>>(`/tax-remittances?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const remittancesPager = useServerPager<TaxRemittance>({
+    fetchPage: (params) => fetchRemittancesPage(params),
+    enabled: Boolean(token && profile && tab === 'remittances'),
+  });
 
   const canCreateRate = hasPermission(profile, 'tax-rate.create');
   const canUpdateRate = hasPermission(profile, 'tax-rate.update');
@@ -191,6 +206,7 @@ export default function TaxPage() {
       await action();
       setFeedback(successMessage);
       await load(token);
+      remittancesPager.reload();
     } catch (error) {
       setErrorMessage(readApiError(error, 'Operation failed.'));
     } finally {
@@ -738,11 +754,17 @@ export default function TaxPage() {
                   </form>
                 ) : null}
 
+                <div className="list-toolbar">
+                  <ServerListSearch pager={remittancesPager} placeholder="Search remittances…" />
+                </div>
+
                 <div className="portal-list-stack">
-                  {remittances.length === 0 ? (
-                    <div className="portal-empty-state">No remittances recorded yet.</div>
+                  {!remittancesPager.loading && remittancesPager.items.length === 0 ? (
+                    <div className="portal-empty-state">
+                      {remittancesPager.search ? 'No remittances match.' : 'No remittances recorded yet.'}
+                    </div>
                   ) : (
-                    remittances.map((remittance) => (
+                    remittancesPager.items.map((remittance) => (
                       <div key={remittance.id} className="portal-list-row">
                         <div>
                           <strong>{remittance.remittanceNumber}</strong>
@@ -760,6 +782,7 @@ export default function TaxPage() {
                     ))
                   )}
                 </div>
+                <ServerListPager pager={remittancesPager} noun="remittances" />
               </article>
             ) : null}
           </PortalShell>

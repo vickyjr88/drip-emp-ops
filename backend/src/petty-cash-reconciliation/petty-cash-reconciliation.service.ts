@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PettyCashBoxService } from '../petty-cash-box/petty-cash-box.service';
 import { CreatePettyCashReconciliationDto } from './dto/create-petty-cash-reconciliation.dto';
+import { PettyCashReconciliationQueryDto } from './dto/petty-cash-reconciliation-query.dto';
+import { paginate } from '../common/pagination.util';
 
 @Injectable()
 export class PettyCashReconciliationService {
@@ -27,11 +30,16 @@ export class PettyCashReconciliationService {
     });
   }
 
-  findAll(boxId?: string) {
-    return this.prisma.pettyCashReconciliation.findMany({
-      where: boxId ? { boxId } : {},
-      orderBy: { periodEnd: 'desc' },
-    });
+  findAll(query: PettyCashReconciliationQueryDto) {
+    const { skip, take, boxId } = query;
+    const where: Prisma.PettyCashReconciliationWhereInput = boxId ? { boxId } : {};
+    return paginate(
+      (args) =>
+        this.prisma.pettyCashReconciliation.findMany({ where, orderBy: [{ periodEnd: 'desc' }, { id: 'asc' }], ...args }),
+      () => this.prisma.pettyCashReconciliation.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async findOne(id: string) {

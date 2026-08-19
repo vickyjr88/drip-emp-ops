@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { SupplierPaymentService } from './supplier-payment.service';
 import { CreateSupplierPaymentDto } from './dto/create-supplier-payment.dto';
+import { SupplierPaymentQueryDto } from './dto/supplier-payment-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -19,18 +20,8 @@ export class SupplierPaymentController {
 
   @Get()
   @Permissions(buildPermissionKey('SupplierPayment', 'read'))
-  findAll(
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
-    @Query('supplierId') supplierId?: string,
-    @Query('status') status?: string,
-  ) {
-    return this.service.findAll({
-      skip: skip ? Number(skip) : undefined,
-      take: take ? Number(take) : undefined,
-      supplierId,
-      status,
-    });
+  findAll(@Query() query: SupplierPaymentQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query, StreamableFile } from '@nestjs/common';
 import { PettyCashVoucherService } from './petty-cash-voucher.service';
 import { CreatePettyCashVoucherDto } from './dto/create-petty-cash-voucher.dto';
+import { PettyCashVoucherQueryDto } from './dto/petty-cash-voucher-query.dto';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -19,8 +20,8 @@ export class PettyCashVoucherController {
 
   @Get()
   @Permissions(buildPermissionKey('PettyCashVoucher', 'read'))
-  findAll(@Query('boxId') boxId?: string, @Query('type') type?: string) {
-    return this.service.findAll({ boxId, type });
+  findAll(@Query() query: PettyCashVoucherQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

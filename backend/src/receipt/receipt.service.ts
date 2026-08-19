@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccountPurpose, InvoiceSourceType, JournalSource } from '@prisma/client';
+import { AccountPurpose, InvoiceSourceType, JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountResolverService } from '../ledger/account-resolver.service';
@@ -7,7 +7,9 @@ import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { PdfService } from '../pdf/pdf.service';
 import { receiptPdfTemplate } from '../pdf/pdf.templates';
 import { AllocateReceiptDto, CancelReceiptDto, CreateReceiptDto } from './dto/create-receipt.dto';
+import { ReceiptQueryDto } from './dto/receipt-query.dto';
 import { nextReference } from '../common/next-reference';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 const PURPOSE_BY_SOURCE_TYPE: Record<InvoiceSourceType, AccountPurpose> = {
   ORDER: AccountPurpose.SALES,
@@ -122,18 +124,27 @@ export class ReceiptService {
     });
   }
 
-  findAll(params: { skip?: number; take?: number; customerId?: string; status?: string }) {
-    const { skip, take, customerId, status } = params;
-    return this.prisma.receipt.findMany({
-      where: {
-        ...(customerId ? { customerId } : {}),
-        ...(status ? { status: status as any } : {}),
-      },
-      include: { allocations: true },
-      orderBy: { receivedAt: 'desc' },
+  findAll(query: ReceiptQueryDto) {
+    const { skip, take, search, customerId, status } = query;
+    const where: Prisma.ReceiptWhereInput = {
+      ...(customerId ? { customerId } : {}),
+      ...(status ? { status: status as any } : {}),
+      ...searchOr(search, (term) =>
+        containsAny(['receiptNumber', 'transactionReference', 'customer.firstName', 'customer.lastName'], term),
+      ),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.receipt.findMany({
+          where,
+          include: { allocations: true },
+          orderBy: [{ receivedAt: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.receipt.count({ where }),
       skip,
       take,
-    });
+    );
   }
 
   async findOne(id: string) {

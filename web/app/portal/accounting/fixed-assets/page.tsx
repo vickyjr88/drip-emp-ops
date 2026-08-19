@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import { ListExport } from '../../components/list-export';
-import { ListPager, ListSearch, useListControls } from '../../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
@@ -45,8 +45,8 @@ export default function FixedAssetsPage() {
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
 
-  const [assets, setAssets] = useState<FixedAsset[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
+  const [exportRows, setExportRows] = useState<FixedAsset[]>([]);
 
   const [showAssetForm, setShowAssetForm] = useState(false);
   const [assetCode, setAssetCode] = useState('');
@@ -71,16 +71,10 @@ export default function FixedAssetsPage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextAssets, nextStores] = await Promise.all([
-        hasPermission(nextProfile, 'fixed-asset.read')
-          ? apiRequest<FixedAsset[]>('/fixed-assets?take=200', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'store.read')
-          ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-      ]);
+      const nextStores = hasPermission(nextProfile, 'store.read')
+        ? await apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
+        : [];
       setProfile(nextProfile);
-      setAssets(nextAssets);
       setStores(nextStores);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load fixed assets.');
@@ -97,6 +91,33 @@ export default function FixedAssetsPage() {
     }
     void load(token);
   }, [initialized, token, load]);
+
+  const fetchAssetsPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<FixedAsset>> => {
+      if (!token || !profile || !hasPermission(profile, 'fixed-asset.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<FixedAsset>>(`/fixed-assets?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const assetsPager = useServerPager<FixedAsset>({
+    fetchPage: (params) => fetchAssetsPage(params),
+    enabled: Boolean(token && profile),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'fixed-asset.read')) return;
+    const timer = setTimeout(() => {
+      void fetchAssetsPage({ skip: 0, take: 500, search: assetsPager.search }).then((page) => setExportRows(page.items));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchAssetsPage, assetsPager.search, token, profile]);
 
   const storeMap = useMemo(() => {
     const map = new Map<string, Store>();
@@ -121,7 +142,7 @@ export default function FixedAssetsPage() {
     try {
       await action();
       setFeedback(successMessage);
-      await load(token);
+      assetsPager.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Operation failed.');
     } finally {
@@ -204,12 +225,6 @@ export default function FixedAssetsPage() {
       );
     }, 'Asset transferred.');
   }
-
-  const assetControls = useListControls(assets, (row) => [
-    row.description,
-    row.assetCode,
-    row.category,
-  ]);
 
   if (!initialized || loading) {
     return (
@@ -351,9 +366,9 @@ export default function FixedAssetsPage() {
               ) : null}
 
               <div className="list-toolbar">
-                <ListSearch controls={assetControls} placeholder="Search assets…" />
+                <ServerListSearch pager={assetsPager} placeholder="Search assets…" />
                   <ListExport
-                    rows={assetControls.filtered}
+                    rows={exportRows}
                     config={{
                       fileName: 'fixed-assets',
                       dateOf: (row) => row.acquisitionDate,
@@ -372,10 +387,12 @@ export default function FixedAssetsPage() {
                   />
               </div>
               <div className="portal-list-stack">
-                {assets.length === 0 ? (
-                  <div className="portal-empty-state">No fixed assets registered yet.</div>
+                {!assetsPager.loading && assetsPager.items.length === 0 ? (
+                  <div className="portal-empty-state">
+                    {assetsPager.search ? 'No assets match.' : 'No fixed assets registered yet.'}
+                  </div>
                 ) : (
-                  assetControls.visible.map((asset) => (
+                  assetsPager.items.map((asset) => (
                     <div key={asset.id} className="portal-record">
                       <div className="portal-list-row">
                         <div>
@@ -431,7 +448,7 @@ export default function FixedAssetsPage() {
                   ))
                 )}
               </div>
-              <ListPager controls={assetControls} noun="assets" />
+              <ServerListPager pager={assetsPager} noun="assets" />
             </article>
           </PortalShell>
         </section>

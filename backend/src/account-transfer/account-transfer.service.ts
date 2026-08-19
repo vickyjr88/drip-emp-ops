@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { JournalSource } from '@prisma/client';
+import { JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { CreateAccountTransferDto } from './dto/create-account-transfer.dto';
+import { AccountTransferQueryDto } from './dto/account-transfer-query.dto';
 import { nextReference } from '../common/next-reference';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class AccountTransferService {
@@ -67,15 +69,27 @@ export class AccountTransferService {
     });
   }
 
-  findAll(params: { skip?: number; take?: number; accountId?: string }) {
-    const { skip, take, accountId } = params;
-    return this.prisma.accountTransfer.findMany({
-      where: accountId ? { OR: [{ fromAccountId: accountId }, { toAccountId: accountId }] } : undefined,
-      include: { fromAccount: true, toAccount: true },
-      orderBy: { transferDate: 'desc' },
+  findAll(query: AccountTransferQueryDto) {
+    const { skip, take, search, accountId } = query;
+    const searchClause = searchOr(search, (term) =>
+      containsAny(['transferNumber', 'memo'], term),
+    );
+    const where: Prisma.AccountTransferWhereInput = {
+      ...(accountId ? { OR: [{ fromAccountId: accountId }, { toAccountId: accountId }] } : {}),
+      ...(searchClause ? { AND: [searchClause] } : {}),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.accountTransfer.findMany({
+          where,
+          include: { fromAccount: true, toAccount: true },
+          orderBy: [{ transferDate: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.accountTransfer.count({ where }),
       skip,
       take,
-    });
+    );
   }
 
   async findOne(id: string) {

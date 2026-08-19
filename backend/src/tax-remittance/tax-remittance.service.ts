@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AccountPurpose, JournalSource, TaxApplication } from '@prisma/client';
+import { AccountPurpose, JournalSource, Prisma, TaxApplication } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { AccountResolverService } from '../ledger/account-resolver.service';
 import { CreateTaxRemittanceDto } from './dto/create-tax-remittance.dto';
+import { TaxRemittanceQueryDto } from './dto/tax-remittance-query.dto';
 import { nextReference } from '../common/next-reference';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class TaxRemittanceService {
@@ -71,18 +73,25 @@ export class TaxRemittanceService {
     });
   }
 
-  findAll(params: { skip?: number; take?: number; taxRateId?: string; storeId?: string }) {
-    const { skip, take, taxRateId, storeId } = params;
-    return this.prisma.taxRemittance.findMany({
-      where: {
-        ...(taxRateId ? { taxRateId } : {}),
-        ...(storeId ? { storeId } : {}),
-      },
-      include: { taxRate: true, bankAccount: true, store: true },
-      orderBy: { remittedAt: 'desc' },
+  findAll(query: TaxRemittanceQueryDto) {
+    const { skip, take, search, taxRateId, storeId } = query;
+    const where: Prisma.TaxRemittanceWhereInput = {
+      ...(taxRateId ? { taxRateId } : {}),
+      ...(storeId ? { storeId } : {}),
+      ...searchOr(search, (term) => containsAny(['remittanceNumber', 'reference'], term)),
+    };
+    return paginate(
+      (args) =>
+        this.prisma.taxRemittance.findMany({
+          where,
+          include: { taxRate: true, bankAccount: true, store: true },
+          orderBy: [{ remittedAt: 'desc' }, { id: 'asc' }],
+          ...args,
+        }),
+      () => this.prisma.taxRemittance.count({ where }),
       skip,
       take,
-    });
+    );
   }
 
   async findOne(id: string) {

@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { JournalSource } from '@prisma/client';
+import { JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LedgerService } from '../ledger/ledger.service';
 import { DEFAULT_ACCOUNT_CODES } from '../ledger/default-accounts';
 import { PdfService } from '../pdf/pdf.service';
 import { pettyCashVoucherPdfTemplate } from '../pdf/pdf.templates';
 import { CreatePettyCashVoucherDto } from './dto/create-petty-cash-voucher.dto';
+import { PettyCashVoucherQueryDto } from './dto/petty-cash-voucher-query.dto';
 import { nextReference } from '../common/next-reference';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 @Injectable()
 export class PettyCashVoucherService {
@@ -73,14 +75,19 @@ export class PettyCashVoucherService {
     });
   }
 
-  findAll(params: { boxId?: string; type?: string }) {
-    return this.prisma.pettyCashVoucher.findMany({
-      where: {
-        ...(params.boxId ? { boxId: params.boxId } : {}),
-        ...(params.type ? { type: params.type as any } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  findAll(query: PettyCashVoucherQueryDto) {
+    const { skip, take, search, boxId, type } = query;
+    const where: Prisma.PettyCashVoucherWhereInput = {
+      ...(boxId ? { boxId } : {}),
+      ...(type ? { type: type as any } : {}),
+      ...searchOr(search, (term) => containsAny(['voucherNumber', 'payee', 'purpose'], term)),
+    };
+    return paginate(
+      (args) => this.prisma.pettyCashVoucher.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], ...args }),
+      () => this.prisma.pettyCashVoucher.count({ where }),
+      skip,
+      take,
+    );
   }
 
   async findOne(id: string) {

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import { TourLauncher } from '../../tours/tour-launcher';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
@@ -184,7 +185,6 @@ export default function GeneralLedgerPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [bankBalances, setBankBalances] = useState<Record<string, number>>({});
   const [stores, setStores] = useState<Store[]>([]);
-  const [transfers, setTransfers] = useState<AccountTransfer[]>([]);
   const [assignmentsByStore, setAssignmentsByStore] = useState<Record<string, StoreAccountAssignment[]>>({});
   const [assignmentStoreId, setAssignmentStoreId] = useState('');
 
@@ -249,7 +249,7 @@ export default function GeneralLedgerPage() {
     setErrorMessage(null);
     try {
       const nextProfile = await loadProfile(authToken);
-      const [nextAccounts, nextJournals, nextBanks, nextStores, nextTransfers] = await Promise.all([
+      const [nextAccounts, nextJournals, nextBanks, nextStores] = await Promise.all([
         hasPermission(nextProfile, 'chart-of-account.read')
           ? apiRequest<ChartOfAccount[]>('/chart-of-accounts', { method: 'GET' }, authToken)
           : Promise.resolve([]),
@@ -262,9 +262,6 @@ export default function GeneralLedgerPage() {
         hasPermission(nextProfile, 'store.read')
           ? apiRequest<Store[]>('/stores', { method: 'GET' }, authToken)
           : Promise.resolve([]),
-        hasPermission(nextProfile, 'account-transfer.read')
-          ? apiRequest<AccountTransfer[]>('/account-transfers?take=500', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
       ]);
       setProfile(nextProfile);
       setAccounts(nextAccounts);
@@ -272,7 +269,6 @@ export default function GeneralLedgerPage() {
       setJournalTotal(nextJournals.total);
       setBankAccounts(nextBanks);
       setStores(nextStores);
-      setTransfers(nextTransfers);
 
       if (hasPermission(nextProfile, 'bank-account.read')) {
         const balanceEntries = await Promise.all(
@@ -299,6 +295,25 @@ export default function GeneralLedgerPage() {
     }
     void load(token);
   }, [initialized, token, load]);
+
+  const fetchTransfersPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<AccountTransfer>> => {
+      if (!token || !profile || !hasPermission(profile, 'account-transfer.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<AccountTransfer>>(`/account-transfers?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const transfersPager = useServerPager<AccountTransfer>({
+    fetchPage: (params) => fetchTransfersPage(params),
+    enabled: Boolean(token && profile && tab === 'transfers'),
+  });
 
   const loadAssignments = useCallback(
     async (storeId: string) => {
@@ -408,6 +423,7 @@ export default function GeneralLedgerPage() {
       await action();
       setFeedback(successMessage);
       await load(token);
+      transfersPager.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Operation failed.');
     } finally {
@@ -1507,11 +1523,17 @@ export default function GeneralLedgerPage() {
                   </form>
                 ) : null}
 
+                <div className="list-toolbar">
+                  <ServerListSearch pager={transfersPager} placeholder="Search transfers…" />
+                </div>
+
                 <div className="portal-list-stack">
-                  {transfers.length === 0 ? (
-                    <div className="portal-empty-state">No transfers yet.</div>
+                  {!transfersPager.loading && transfersPager.items.length === 0 ? (
+                    <div className="portal-empty-state">
+                      {transfersPager.search ? 'No transfers match.' : 'No transfers yet.'}
+                    </div>
                   ) : (
-                    transfers.map((transfer) => (
+                    transfersPager.items.map((transfer) => (
                       <div key={transfer.id} className="portal-list-row">
                         <div>
                           <strong>{transfer.transferNumber}</strong>
@@ -1526,6 +1548,7 @@ export default function GeneralLedgerPage() {
                     ))
                   )}
                 </div>
+                <ServerListPager pager={transfersPager} noun="transfers" />
               </article>
             ) : null}
 
