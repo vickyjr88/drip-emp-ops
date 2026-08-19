@@ -101,7 +101,9 @@ export default function UserFormClient({
     try {
       const nextProfile = await apiRequest<AuthProfile>('/auth/profile', { method: 'GET' }, authToken);
       const nextRoles = hasPermission(nextProfile, 'role.read')
-        ? await apiRequest<RoleRecord[]>('/roles', { method: 'GET' }, authToken)
+        ? await apiRequest<{ items: RoleRecord[] }>('/roles?take=500', { method: 'GET' }, authToken).then(
+            (page) => page.items,
+          )
         : [];
 
       setProfile(nextProfile);

@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useErrorState, useFeedbackState } from '../components/notifications';
-import { ListPager, usePagination } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { usePortalDialog } from '../components/portal-dialog';
@@ -74,10 +74,9 @@ export default function UsersManagementClient() {
   const [feedback, setFeedback] = useFeedbackState();
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [users, setUsers] = useState<AuthProfile[]>([]);
   const [roles, setRoles] = useState<RoleRecord[]>([]);
-  const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const [exportRows, setExportRows] = useState<AuthProfile[]>([]);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -89,16 +88,12 @@ export default function UsersManagementClient() {
     setErrorMessage(null);
     try {
       const nextProfile = await apiRequest<AuthProfile>('/auth/profile', { method: 'GET' }, authToken);
-      const [nextUsers, nextRoles] = await Promise.all([
-        hasPermission(nextProfile, 'user.read')
-          ? apiRequest<AuthProfile[]>('/users', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-        hasPermission(nextProfile, 'role.read')
-          ? apiRequest<RoleRecord[]>('/roles', { method: 'GET' }, authToken)
-          : Promise.resolve([]),
-      ]);
+      const nextRoles = hasPermission(nextProfile, 'role.read')
+        ? await apiRequest<RoleRecord[]>('/roles?take=500', { method: 'GET' }, authToken).then(
+            (page: unknown) => (Array.isArray(page) ? page : (page as ServerPage<RoleRecord>).items),
+          )
+        : [];
       setProfile(nextProfile);
-      setUsers(nextUsers);
       setRoles(nextRoles);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load users.');
@@ -121,22 +116,36 @@ export default function UsersManagementClient() {
   const canDelete = hasPermission(profile, 'user.delete');
   const canRead = hasPermission(profile, 'user.read');
 
-  const filteredUsers = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return users
-      .filter((user) => {
-        if (roleFilter !== 'all' && !user.roles.some((role) => role.id === roleFilter || role.name === roleFilter)) {
-          return false;
-        }
-        if (!query) return true;
-        const haystack = `${user.name || ''} ${user.email} ${user.roles.map((role) => role.name).join(' ')}`.toLowerCase();
-        return haystack.includes(query);
-      })
-      .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
-  }, [users, search, roleFilter]);
+  const fetchUsersPage = useCallback(
+    async (params: { skip: number; take: number; search: string; roleId: string }): Promise<ServerPage<AuthProfile>> => {
+      if (!token || !profile || !hasPermission(profile, 'user.read')) {
+        return { items: [], total: 0, skip: params.skip, take: params.take };
+      }
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      if (params.search) query.set('search', params.search);
+      if (params.roleId !== 'all') query.set('roleId', params.roleId);
+      return apiRequest<ServerPage<AuthProfile>>(`/users?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
 
-  // Search already exists above; this adds the paging it lacked.
-  const userPager = usePagination(filteredUsers);
+  const userPager = useServerPager<AuthProfile, { roleId: string }>({
+    fetchPage: (params) => fetchUsersPage(params),
+    filters: { roleId: roleFilter },
+    enabled: Boolean(token && profile),
+  });
+
+  useEffect(() => {
+    if (!token || !profile || !hasPermission(profile, 'user.read')) return;
+    const timer = setTimeout(() => {
+      void fetchUsersPage({ skip: 0, take: 500, search: userPager.search, roleId: roleFilter }).then((page) =>
+        setExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchUsersPage, userPager.search, roleFilter, token, profile]);
 
   const roleLabel = useMemo(() => {
     if (!profile) return 'Unassigned';
@@ -169,7 +178,7 @@ export default function UsersManagementClient() {
     try {
       await apiRequest(`/users/${id}`, { method: 'DELETE' }, token);
       setFeedback('User deleted.');
-      await load(token);
+      userPager.reload();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to delete user.');
     } finally {
@@ -240,7 +249,7 @@ export default function UsersManagementClient() {
                   <div>
                     <h2 style={{ margin: 0 }}>Users</h2>
                     <p className="portal-muted">
-                      Showing {filteredUsers.length} of {users.length} user{users.length === 1 ? '' : 's'}.
+                      Showing {userPager.total} user{userPager.total === 1 ? '' : 's'}.
                     </p>
                   </div>
                   {canCreate ? (
@@ -251,15 +260,7 @@ export default function UsersManagementClient() {
                 </div>
 
                 <div className="portal-filter-bar">
-                  <label className="portal-filter-search">
-                    <span>Search</span>
-                    <input
-                      type="search"
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Name, email, or role"
-                    />
-                  </label>
+                  <ServerListSearch pager={userPager} placeholder="Name, email, or role" />
                   <label>
                     <span>Role</span>
                     <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
@@ -271,12 +272,12 @@ export default function UsersManagementClient() {
                       ))}
                     </select>
                   </label>
-                  {search || roleFilter !== 'all' ? (
+                  {userPager.search || roleFilter !== 'all' ? (
                     <button
                       type="button"
                       className="portal-inline-btn"
                       onClick={() => {
-                        setSearch('');
+                        userPager.setSearch('');
                         setRoleFilter('all');
                       }}
                     >
@@ -286,10 +287,10 @@ export default function UsersManagementClient() {
                 </div>
 
                 <div className="portal-list-stack" style={{ marginTop: 16 }}>
-                  {filteredUsers.length === 0 ? (
+                  {!userPager.loading && userPager.items.length === 0 ? (
                     <div className="portal-empty-state">No users match your filters.</div>
                   ) : (
-                    userPager.visible.map((user) => (
+                    userPager.items.map((user) => (
                       <div key={user.id} className="portal-record">
                         <div className="portal-list-row portal-rbac-row">
                           <div>
@@ -343,9 +344,9 @@ export default function UsersManagementClient() {
                   )}
                 </div>
                 <div className="list-export-row">
-                  <ListPager controls={userPager} noun="users" />
+                  <ServerListPager pager={userPager} noun="users" />
                   <ListExport
-                    rows={filteredUsers}
+                    rows={exportRows}
                     config={{
                       fileName: 'users',
                       columns: [

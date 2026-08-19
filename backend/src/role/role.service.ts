@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AssignRolePermissionsDto } from './dto/assign-role-permissions.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { RoleQueryDto } from './dto/role-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 const ROLE_INCLUDE = Prisma.validator<Prisma.RoleInclude>()({
   permissions: {
@@ -40,13 +42,19 @@ export class RoleService {
     return this.toRoleView(role);
   }
 
-  async findAll() {
-    const roles = await this.prisma.role.findMany({
-      include: ROLE_INCLUDE,
-      orderBy: { name: 'asc' },
-    });
-
-    return roles.map((role) => this.toRoleView(role));
+  async findAll(query: RoleQueryDto) {
+    const { skip, take, search } = query;
+    const where: Prisma.RoleWhereInput = {
+      ...searchOr(search, (term) => containsAny(['name', 'description'], term)),
+    };
+    const orderBy: Prisma.RoleOrderByWithRelationInput[] = [{ name: 'asc' }, { id: 'asc' }];
+    const page = await paginate(
+      (args) => this.prisma.role.findMany({ where, include: ROLE_INCLUDE, orderBy, ...args }),
+      () => this.prisma.role.count({ where }),
+      skip,
+      take,
+    );
+    return { ...page, items: page.items.map((role) => this.toRoleView(role)) };
   }
 
   async findOne(id: string) {

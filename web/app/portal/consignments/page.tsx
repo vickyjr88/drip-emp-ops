@@ -84,7 +84,7 @@ export default function ConsignmentsPage() {
         apiRequest<Consignment[]>('/consignments', { method: 'GET' }, authToken),
         apiRequest<Level[]>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
-        apiRequest<Reseller[]>('/resellers', { method: 'GET' }, authToken),
+        apiRequest<{ items: Reseller[] }>('/resellers?take=500', { method: 'GET' }, authToken).then((page) => page.items),
       ]);
       setConsignments(rows);
       setLevels(levelRows);

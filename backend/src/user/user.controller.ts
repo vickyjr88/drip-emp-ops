@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
@@ -6,6 +6,7 @@ import { AssignUserRolesDto } from './dto/assign-user-roles.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserQueryDto } from './dto/user-query.dto';
 import { UserService } from './user.service';
 
 @ApiBearerAuth()
@@ -16,8 +17,8 @@ export class UserController {
 
   @Get()
   @Permissions(buildPermissionKey('User', 'read'))
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query() query: UserQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Post()

@@ -13,10 +13,10 @@
  */
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
-import { ListPager, ListSearch, useListControls } from '../components/list-controls';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
@@ -42,7 +42,7 @@ export default function ResellersPage() {
   const [saving, setSaving] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [resellers, setResellers] = useState<Reseller[]>([]);
+  const [exportRows, setExportRows] = useState<Reseller[]>([]);
   const [form, setForm] = useState(BLANK);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -59,7 +59,6 @@ export default function ResellersPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      setResellers(await apiRequest<Reseller[]>('/resellers?includeInactive=true', { method: 'GET' }, authToken));
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -73,8 +72,33 @@ export default function ResellersPage() {
     void load(token);
   }, [initialized, token, load]);
 
-  const rows = useMemo(() => resellers, [resellers]);
-  const controls = useListControls(rows, (row) => [row.name, row.code, row.phone || '', row.location || '']);
+  const fetchResellersPage = useCallback(
+    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Reseller>> => {
+      if (!token || !profile) return { items: [], total: 0, skip: params.skip, take: params.take };
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      query.set('includeInactive', 'true');
+      if (params.search) query.set('search', params.search);
+      return apiRequest<ServerPage<Reseller>>(`/resellers?${query}`, { method: 'GET' }, token);
+    },
+    [token, profile],
+  );
+
+  const resellersPager = useServerPager<Reseller>({
+    fetchPage: (params) => fetchResellersPage(params),
+    enabled: Boolean(token && profile),
+  });
+
+  useEffect(() => {
+    if (!token || !profile) return;
+    const timer = setTimeout(() => {
+      void fetchResellersPage({ skip: 0, take: 500, search: resellersPager.search }).then((page) =>
+        setExportRows(page.items),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [fetchResellersPage, resellersPager.search, token, profile]);
 
   const canCreate = hasPermission(profile, 'customer.create');
   const canUpdate = hasPermission(profile, 'customer.update');
@@ -94,7 +118,7 @@ export default function ResellersPage() {
         setFeedback(`${form.name} added.`);
       }
       setForm(BLANK); setEditingId(null); setShowForm(false);
-      await load(token);
+      resellersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -110,7 +134,7 @@ export default function ResellersPage() {
         body: JSON.stringify({ code: reseller.code, name: reseller.name, isActive: !reseller.isActive }),
       }, token);
       setFeedback(`${reseller.name} ${reseller.isActive ? 'deactivated' : 'reactivated'}.`);
-      await load(token);
+      resellersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -128,7 +152,7 @@ export default function ResellersPage() {
     try {
       await apiRequest(`/resellers/${reseller.id}`, { method: 'DELETE' }, token);
       setFeedback(`${reseller.name} deleted.`);
-      await load(token);
+      resellersPager.reload();
     } catch (error) {
       setErrorMessage(error);
     }
@@ -163,9 +187,9 @@ export default function ResellersPage() {
     );
   }
 
-  const totalOwed = resellers.reduce((sum, row) => sum + row.owed, 0);
-  const totalHeld = resellers.reduce((sum, row) => sum + row.unitsHeld, 0);
-  const totalOverdue = resellers.reduce((sum, row) => sum + row.overdue, 0);
+  const totalOwed = exportRows.reduce((sum, row) => sum + row.owed, 0);
+  const totalHeld = exportRows.reduce((sum, row) => sum + row.unitsHeld, 0);
+  const totalOverdue = exportRows.reduce((sum, row) => sum + row.overdue, 0);
 
   return (
     <EliteLayout active="portal">
@@ -278,9 +302,9 @@ export default function ResellersPage() {
               </div>
 
               <div className="list-toolbar">
-                <ListSearch controls={controls} placeholder="Search name, code, phone…" />
+                <ServerListSearch pager={resellersPager} placeholder="Search name, code, phone…" />
                 <ListExport
-                  rows={controls.filtered}
+                  rows={exportRows}
                   config={{
                     fileName: 'resellers',
                     columns: [
@@ -297,12 +321,12 @@ export default function ResellersPage() {
               </div>
 
               <div className="portal-list-stack">
-                {controls.visible.length === 0 ? (
+                {!resellersPager.loading && resellersPager.items.length === 0 ? (
                   <div className="portal-empty-state">
-                    {controls.search ? 'No resellers match.' : 'No resellers yet.'}
+                    {resellersPager.search ? 'No resellers match.' : 'No resellers yet.'}
                   </div>
                 ) : (
-                  controls.visible.map((reseller) => (
+                  resellersPager.items.map((reseller) => (
                     <div key={reseller.id} className="portal-record">
                       <div className="portal-list-row">
                         <div>
@@ -355,7 +379,7 @@ export default function ResellersPage() {
                   ))
                 )}
               </div>
-              <ListPager controls={controls} noun="resellers" />
+              <ServerListPager pager={resellersPager} noun="resellers" />
             </article>
           </PortalShell>
         </section>

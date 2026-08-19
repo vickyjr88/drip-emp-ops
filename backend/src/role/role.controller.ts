@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { AssignRolePermissionsDto } from './dto/assign-role-permissions.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { RoleQueryDto } from './dto/role-query.dto';
 import { RoleService } from './role.service';
 
 @ApiBearerAuth()
@@ -21,8 +22,8 @@ export class RoleController {
 
   @Get()
   @Permissions(buildPermissionKey('Role', 'read'))
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query() query: RoleQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

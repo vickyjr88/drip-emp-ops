@@ -2,7 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateResellerDto, UpdateResellerDto } from './dto/reseller.dto';
+import { ResellerQueryDto } from './dto/reseller-query.dto';
 import { customerDisplayName } from '../customer/customer-name';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 /**
  * Trade accounts: the shops that take our stock and pay for what they sell.
@@ -47,15 +49,30 @@ export class ResellerService {
    * Both figures come from the open consignments rather than a stored balance,
    * so they cannot drift from the pickups they are derived from.
    */
-  async findAll(includeInactive = false) {
-    const rows = await this.prisma.customer.findMany({
-      where: { priceTier: TRADE_TIERS, ...(includeInactive ? {} : { isActive: true }) },
-      include: { consignments: { where: { status: 'OPEN' }, include: { lines: true } } },
-      orderBy: { firstName: 'asc' },
-    });
+  async findAll(query: ResellerQueryDto) {
+    const { skip, take, search, includeInactive } = query;
+    const where: Prisma.CustomerWhereInput = {
+      priceTier: TRADE_TIERS,
+      ...(includeInactive ? {} : { isActive: true }),
+      ...searchOr(search, (term) => containsAny(['firstName', 'lastName', 'businessName', 'code', 'phone'], term)),
+    };
+    const orderBy: Prisma.CustomerOrderByWithRelationInput[] = [{ firstName: 'asc' }, { id: 'asc' }];
+
+    const page = await paginate(
+      (args) =>
+        this.prisma.customer.findMany({
+          where,
+          include: { consignments: { where: { status: 'OPEN' }, include: { lines: true } } },
+          orderBy,
+          ...args,
+        }),
+      () => this.prisma.customer.count({ where }),
+      skip,
+      take,
+    );
 
     const now = Date.now();
-    return rows.map((customer) => {
+    const items = page.items.map((customer) => {
       const unitsHeld = customer.consignments.reduce(
         (sum, consignment) =>
           sum +
@@ -85,6 +102,8 @@ export class ResellerService {
         overdue,
       };
     });
+
+    return { ...page, items };
   }
 
   async findOne(id: string) {

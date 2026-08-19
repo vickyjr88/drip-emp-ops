@@ -4,6 +4,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { ResellerService } from './reseller.service';
 import { CreateResellerDto, UpdateResellerDto } from './dto/reseller.dto';
+import { ResellerQueryDto } from './dto/reseller-query.dto';
 
 @ApiBearerAuth()
 @ApiTags('resellers')
@@ -17,8 +18,8 @@ export class ResellerController {
 
   @Get()
   @Permissions(buildPermissionKey('Customer', 'read'))
-  findAll(@Query('includeInactive') includeInactive?: string) {
-    return this.service.findAll(includeInactive === 'true');
+  findAll(@Query() query: ResellerQueryDto) {
+    return this.service.findAll(query);
   }
 
   @Get(':id')

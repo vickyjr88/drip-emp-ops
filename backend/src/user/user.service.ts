@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserQueryDto } from './dto/user-query.dto';
+import { containsAny, paginate, searchOr } from '../common/pagination.util';
 
 export const AUTH_USER_INCLUDE = Prisma.validator<Prisma.UserInclude>()({
   roles: {
@@ -47,13 +49,20 @@ export class UserService {
     });
   }
 
-  async findAll() {
-    const users = await this.prisma.user.findMany({
-      include: AUTH_USER_INCLUDE,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return users.map((user) => this.toAuthUser(user));
+  async findAll(query: UserQueryDto) {
+    const { skip, take, search, roleId } = query;
+    const where: Prisma.UserWhereInput = {
+      ...(roleId ? { roles: { some: { roleId } } } : {}),
+      ...searchOr(search, (term) => containsAny(['name', 'email'], term)),
+    };
+    const orderBy: Prisma.UserOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'asc' }];
+    const page = await paginate(
+      (args) => this.prisma.user.findMany({ where, include: AUTH_USER_INCLUDE, orderBy, ...args }),
+      () => this.prisma.user.count({ where }),
+      skip,
+      take,
+    );
+    return { ...page, items: page.items.map((user) => this.toAuthUser(user)) };
   }
 
   async findById(id: string) {
