@@ -605,6 +605,9 @@ model SupplierInvoice {
   /// Which store this belongs to. Optional: head-office costs belong to no single store.
   store              Store?                      @relation(fields: [storeId], references: [id])
   storeId            String?
+  /// Order lines this bill actually fulfilled, when it was raised to source a
+  /// customer's SUPPLIER_ORDER line rather than to restock the floor.
+  fulfilledLines     OrderLine[]
 
   @@unique([supplierId, invoiceNumber])
 }
@@ -1391,6 +1394,12 @@ model ProductVariant {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  /// Listed for sale but never held on the shop floor -- sourced from the
+  /// supplier per order instead. Lets the order form default a line's
+  /// fulfillment to SUPPLIER_ORDER without inferring it from an absent
+  /// StockLevel row, which would misfire the moment real stock arrives.
+  isDropShip       Boolean  @default(false)
+
   stock            StockLevel[]
   orderLines       OrderLine[]
   movements        StockMovement[]
@@ -1596,7 +1605,39 @@ model OrderLine {
   discount    Decimal        @default(0)
   lineTotal   Decimal
 
+  /// STOCK reserves against StockLevel at order time, same as always.
+  /// SUPPLIER_ORDER charges the customer in full up front but is sourced from
+  /// the supplier afterwards -- it never touches StockLevel and its cost of
+  /// goods is deferred until the supplier bill is actually recorded, so
+  /// margin is not booked against inventory that was never held.
+  fulfillmentType   OrderLineFulfillmentType   @default(STOCK)
+  /// Null for STOCK lines. Tracks a SUPPLIER_ORDER line from placement
+  /// through to the customer actually having it in hand.
+  fulfillmentStatus OrderLineFulfillmentStatus?
+  /// The supplier invoice that eventually fulfilled this line, once bought
+  /// in. This is what lets postOrderCost find the real cost instead of
+  /// guessing from the variant's costKes.
+  supplierInvoice   SupplierInvoice?            @relation(fields: [supplierInvoiceId], references: [id])
+  supplierInvoiceId String?
+
   @@index([orderId])
+  @@index([fulfillmentStatus])
+}
+
+enum OrderLineFulfillmentType {
+  STOCK
+  SUPPLIER_ORDER
+}
+
+/// Only meaningful on a SUPPLIER_ORDER line. Ordered from a supplier and
+/// handed to the customer are kept distinct: an item that has arrived is not
+/// automatically an item the customer has collected, and both states are
+/// worth chasing separately from an operations worklist.
+enum OrderLineFulfillmentStatus {
+  AWAITING_SUPPLIER
+  ORDERED_FROM_SUPPLIER
+  RECEIVED
+  HANDED_TO_CUSTOMER
 }
 
 /// Money against an order. Several are allowed: a deposit now, the balance on

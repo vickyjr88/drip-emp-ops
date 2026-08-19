@@ -53,6 +53,14 @@ export class CreateVariantDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Listed for sale but never held on the shop floor -- every order against it is sourced from the supplier.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isDropShip?: boolean;
 }
 
 export class CreateProductDto {

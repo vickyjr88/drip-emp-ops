@@ -4,7 +4,7 @@ import {
   ArrayMinSize, IsArray, IsEmail, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional,
   IsString, Min, ValidateNested,
 } from 'class-validator';
-import { OrderStatus, PriceTier } from '@prisma/client';
+import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier } from '@prisma/client';
 
 export class CreateOrderLineDto {
   @ApiProperty()
@@ -28,6 +28,15 @@ export class CreateOrderLineDto {
   @IsNumber()
   @Min(0)
   discount?: number;
+
+  @ApiPropertyOptional({
+    enum: OrderLineFulfillmentType,
+    default: 'STOCK',
+    description: 'STOCK reserves from the shop floor. SUPPLIER_ORDER is charged the same but sourced from the supplier afterwards, so it does not touch stock.',
+  })
+  @IsOptional()
+  @IsEnum(OrderLineFulfillmentType)
+  fulfillmentType?: OrderLineFulfillmentType;
 }
 
 export class CreateOrderDto {
@@ -108,6 +117,19 @@ export class UpdateOrderStatusDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class UpdateOrderLineFulfillmentDto {
+  @ApiProperty({ enum: OrderLineFulfillmentStatus })
+  @IsEnum(OrderLineFulfillmentStatus)
+  status!: OrderLineFulfillmentStatus;
+
+  @ApiPropertyOptional({
+    description: 'The supplier invoice this line was actually bought in against, once ORDERED_FROM_SUPPLIER or later. Drives cost-of-goods for this line instead of the variant\'s default cost.',
+  })
+  @IsOptional()
+  @IsString()
+  supplierInvoiceId?: string;
 }
 
 export class RecordOrderPaymentDto {

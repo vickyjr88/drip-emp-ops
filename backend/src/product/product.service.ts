@@ -58,6 +58,7 @@ export class ProductService {
       ...(dto.costKes !== undefined ? { costKes: new Prisma.Decimal(dto.costKes) } : {}),
       barcode: dto.barcode,
       isActive: dto.isActive ?? true,
+      isDropShip: dto.isDropShip ?? false,
     };
   }
 
@@ -269,6 +270,7 @@ export class ProductService {
         ...(dto.costKes !== undefined ? { costKes: toNullableDecimal(dto.costKes) } : {}),
         ...(dto.barcode !== undefined ? { barcode: dto.barcode } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.isDropShip !== undefined ? { isDropShip: dto.isDropShip } : {}),
       },
     });
   }

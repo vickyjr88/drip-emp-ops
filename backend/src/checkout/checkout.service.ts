@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { OrderStatus, Prisma } from '@prisma/client';
+import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
@@ -164,6 +164,9 @@ export class CheckoutService {
         if (!variant) throw new NotFoundException(`That item is no longer available.`);
         const listPrice = Number(variant.priceKes);
         const unitPrice = offerByVariant.get(variant.id) ?? listPrice;
+        // A drop-ship listing is never held on the shelf, so every order
+        // against it is sourced from the supplier -- same rule as the till.
+        const fulfillmentType: OrderLineFulfillmentType = variant.isDropShip ? 'SUPPLIER_ORDER' : 'STOCK';
         return {
           variantId: variant.id,
           description: `${variant.product.name} — ${variant.name}`,
@@ -174,6 +177,8 @@ export class CheckoutService {
           listPrice: new Prisma.Decimal(listPrice),
           discount: new Prisma.Decimal((listPrice - unitPrice) * line.quantity),
           lineTotal: new Prisma.Decimal(unitPrice * line.quantity),
+          fulfillmentType,
+          fulfillmentStatus: fulfillmentType === 'SUPPLIER_ORDER' ? OrderLineFulfillmentStatus.AWAITING_SUPPLIER : null,
         };
       });
 
@@ -204,7 +209,11 @@ export class CheckoutService {
         include: { lines: true },
       });
 
-      for (const line of dto.lines) {
+      for (const line of lines) {
+        // A SUPPLIER_ORDER line was never on the shelf, so there is nothing
+        // to draw down here -- its cost is booked separately once the
+        // supplier bill that fulfils it is approved.
+        if (line.fulfillmentType !== 'STOCK') continue;
         await this.inventory.record(
           {
             variantId: line.variantId,

@@ -27,6 +27,8 @@ import {
 type Variant = {
   id: string; sku: string; name: string; priceKes: string | number;
   costKes?: string | number | null; isActive: boolean;
+  /** Listed for sale but never held on the shop floor -- sourced from the supplier per order. */
+  isDropShip: boolean;
   resellerPriceKes?: string | number | null;
   wholesalePriceKes?: string | number | null;
   attributes?: Record<string, unknown> | null;
@@ -79,6 +81,8 @@ export default function CataloguePage() {
   const [wholesalePrice, setWholesalePrice] = useState('');
   /** Sizes ticked for the product being created, as numbers from SIZE_RANGE. */
   const [sizes, setSizes] = useState<number[]>(DEFAULT_SIZES);
+  /** For a supplier's line we do not stock ourselves -- every size sources per order. */
+  const [dropShip, setDropShip] = useState(false);
   /** The product being duplicated, or null when the panel is closed. */
   const [duplicateOf, setDuplicateOf] = useState<Product | null>(null);
   const [duplicateForm, setDuplicateForm] = useState({ sku: '', name: '' });
@@ -206,6 +210,30 @@ export default function CataloguePage() {
   }
 
   /**
+   * Flips whether a size is sourced from the supplier per order instead of
+   * held on the shelf. Doing this here, rather than only at creation, is
+   * what lets an existing variant that never sells enough to justify
+   * stocking be switched to drop-ship without recreating it.
+   */
+  async function onToggleDropShip(variant: Variant) {
+    if (!token || savingVariant) return;
+    setSavingVariant(variant.id);
+    try {
+      await apiRequest(`/products/variants/${variant.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isDropShip: !variant.isDropShip }),
+      }, token);
+      setFeedback(variant.isDropShip ? `${variant.name} now needs shelf stock to sell.` : `${variant.name} now sources from the supplier per order.`);
+      await load(token);
+      productsPager.reload();
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setSavingVariant(null);
+    }
+  }
+
+  /**
    * Creates a copy of a product with its whole size run and price tiers.
    *
    * The copy is inactive and unstocked, so it lands in the list needing a
@@ -271,12 +299,13 @@ export default function CataloguePage() {
             costKes: optionalNumber(cost),
             resellerPriceKes: optionalNumber(resellerPrice),
             wholesalePriceKes: optionalNumber(wholesalePrice),
+            isDropShip: dropShip,
           })),
         }),
       }, token);
       setFeedback(`${form.name} added with ${sizes.length} size${sizes.length === 1 ? '' : 's'}.`);
       setForm(BLANK); setPrice(''); setCost(''); setResellerPrice('');
-      setWholesalePrice(''); setImages([]); setSizes(DEFAULT_SIZES); setShowForm(false);
+      setWholesalePrice(''); setImages([]); setSizes(DEFAULT_SIZES); setDropShip(false); setShowForm(false);
       await load(token);
       productsPager.reload();
     } catch (error) {
@@ -508,6 +537,11 @@ export default function CataloguePage() {
                         ? `${sizes.length} size${sizes.length === 1 ? '' : 's'}, all at the price above. Adjust individually afterwards.`
                         : 'Pick at least one size.'}
                     </small>
+                  </label>
+
+                  <label className="portal-check">
+                    <input type="checkbox" checked={dropShip} onChange={(event) => setDropShip(event.target.checked)} />
+                    <span>Source from supplier per order (never held on the shelf)</span>
                   </label>
 
                   <label>
@@ -814,7 +848,7 @@ export default function CataloguePage() {
                                 <th className="portal-num">Wholesale</th>
                                 <th className="portal-num">Cost</th>
                                 <th className="portal-num">Margin</th>
-                                <th>Status</th><th />
+                                <th>Status</th><th>Sourcing</th><th />
                               </tr>
                             </thead>
                             <tbody>
@@ -905,6 +939,20 @@ export default function CataloguePage() {
                                   </td>
                                   <td className="portal-num">{margin === null ? '—' : `${margin.toFixed(1)}%`}</td>
                                   <td>{variant.isActive ? 'Active' : 'Inactive'}</td>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="portal-linkish"
+                                      disabled={savingVariant === variant.id}
+                                      onClick={() => void onToggleDropShip(variant)}
+                                    >
+                                      {variant.isDropShip ? (
+                                        <span className="portal-chip is-danger">From supplier</span>
+                                      ) : (
+                                        <span className="portal-chip is-muted">On shelf</span>
+                                      )}
+                                    </button>
+                                  </td>
                                   <td>
                                     {/* Straight from the row: someone looking
                                         at a size that is not moving should not

@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, PriceTier, Prisma } from '@prisma/client';
+import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
-import { CreateOrderDto, RecordOrderPaymentDto } from './dto/create-order.dto';
+import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderLineFulfillmentDto } from './dto/create-order.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
 import { paginate, searchOr, containsAny } from '../common/pagination.util';
@@ -15,6 +15,14 @@ const INCLUDE = {
     include: {
       variant: {
         select: { id: true, sku: true, name: true, product: { select: { id: true, name: true, brand: true } } },
+      },
+      // Who is actually sourcing a SUPPLIER_ORDER line, once bought in --
+      // the detail page names the bill and the supplier, not just a status.
+      supplierInvoice: {
+        select: {
+          id: true, invoiceNumber: true, status: true,
+          supplier: { select: { id: true, name: true, phone: true, email: true } },
+        },
       },
     },
   },
@@ -99,6 +107,12 @@ export class OrderService {
         if (lineTotal < 0) {
           throw new BadRequestException(`Discount on ${variant.sku} is more than the line is worth.`);
         }
+        // A drop-ship variant is never on the shop floor, so a line against
+        // it can only ever be sourced from the supplier -- the caller's
+        // choice is honoured for everything else, defaulting to STOCK.
+        const fulfillmentType: OrderLineFulfillmentType = variant.isDropShip
+          ? 'SUPPLIER_ORDER'
+          : line.fulfillmentType ?? 'STOCK';
         return {
           variantId: variant.id,
           description: `${variant.name} (${variant.sku})`,
@@ -107,6 +121,10 @@ export class OrderService {
           listPrice: new Prisma.Decimal(listPrice),
           discount: new Prisma.Decimal(discount),
           lineTotal: new Prisma.Decimal(lineTotal),
+          fulfillmentType,
+          // Charged the same as any line, but there is nothing to hand over
+          // yet -- this is what the operations worklist chases.
+          fulfillmentStatus: fulfillmentType === 'SUPPLIER_ORDER' ? OrderLineFulfillmentStatus.AWAITING_SUPPLIER : null,
         };
       });
 
@@ -144,7 +162,12 @@ export class OrderService {
         include: INCLUDE,
       });
 
-      for (const line of dto.lines) {
+      // Only a STOCK line takes anything off the shop floor. A SUPPLIER_ORDER
+      // line is charged the same but has nothing to reserve -- it is not
+      // physically ours yet, so StockLevel is left untouched and the
+      // operations worklist is what tracks getting it in.
+      for (const line of lines) {
+        if (line.fulfillmentType !== 'STOCK') continue;
         await this.inventory.record(
           {
             variantId: line.variantId,
@@ -163,7 +186,7 @@ export class OrderService {
   }
 
   async findAll(query: OrderQueryDto) {
-    const { skip, take, search, storeId, status, customerId, from, to } = query;
+    const { skip, take, search, storeId, status, customerId, from, to, awaitingSupplier } = query;
     const where: Prisma.OrderWhereInput = {
       ...(storeId ? { storeId } : {}),
       ...(status ? { status } : {}),
@@ -173,6 +196,18 @@ export class OrderService {
             placedAt: {
               ...(from ? { gte: new Date(from) } : {}),
               ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+            },
+          }
+        : {}),
+      // The operations worklist: any order still holding a supplier line
+      // that has not reached the customer yet.
+      ...(awaitingSupplier
+        ? {
+            lines: {
+              some: {
+                fulfillmentType: 'SUPPLIER_ORDER',
+                fulfillmentStatus: { not: OrderLineFulfillmentStatus.HANDED_TO_CUSTOMER },
+              },
             },
           }
         : {}),
@@ -207,9 +242,13 @@ export class OrderService {
     }
 
     // Cancelling or refunding puts the goods back; they never left the shop.
+    // A SUPPLIER_ORDER line never took stock in the first place -- there is
+    // nothing to return -- so it is simply left as-is; per-line cancellation
+    // for a supplier line not yet fulfilled is handled separately.
     if (status === 'CANCELLED' || status === 'REFUNDED') {
       await this.prisma.$transaction(async (tx) => {
         for (const line of order.lines) {
+          if (line.fulfillmentType !== 'STOCK') continue;
           await this.inventory.record(
             {
               variantId: line.variantId,
@@ -240,6 +279,52 @@ export class OrderService {
         ...(status === 'CANCELLED' ? { cancelledAt: new Date() } : {}),
       },
       include: INCLUDE,
+    });
+  }
+
+  /**
+   * Sequence a SUPPLIER_ORDER line moves through, same idea as order status:
+   * chasing the supplier, then the customer, are different jobs and neither
+   * should be skippable by accident.
+   */
+  private static readonly NEXT_LINE_STATUS: Record<OrderLineFulfillmentStatus, OrderLineFulfillmentStatus[]> = {
+    AWAITING_SUPPLIER: ['ORDERED_FROM_SUPPLIER'],
+    ORDERED_FROM_SUPPLIER: ['RECEIVED'],
+    RECEIVED: ['HANDED_TO_CUSTOMER'],
+    HANDED_TO_CUSTOMER: [],
+  };
+
+  /**
+   * Advances one SUPPLIER_ORDER line -- ordered from the supplier, received,
+   * then handed over. This is the operations worklist's counterpart to
+   * setStatus: it tracks a promise to source an item rather than a stock
+   * movement, so it never touches StockLevel.
+   */
+  async updateLineFulfillment(orderId: string, lineId: string, dto: UpdateOrderLineFulfillmentDto) {
+    const line = await this.prisma.orderLine.findUnique({ where: { id: lineId } });
+    if (!line || line.orderId !== orderId) throw new NotFoundException(`Line ${lineId} not found on order ${orderId}`);
+    if (line.fulfillmentType !== 'SUPPLIER_ORDER') {
+      throw new BadRequestException('Only a SUPPLIER_ORDER line has a fulfillment sequence to advance.');
+    }
+    const current = line.fulfillmentStatus ?? OrderLineFulfillmentStatus.AWAITING_SUPPLIER;
+    if (current === dto.status) return line;
+    if (!OrderService.NEXT_LINE_STATUS[current].includes(dto.status)) {
+      throw new BadRequestException(
+        `A line that is ${current} cannot become ${dto.status}. Allowed: ${
+          OrderService.NEXT_LINE_STATUS[current].join(', ') || 'nothing — already handed over'
+        }.`,
+      );
+    }
+    if (dto.status === 'ORDERED_FROM_SUPPLIER' && !dto.supplierInvoiceId && !line.supplierInvoiceId) {
+      throw new BadRequestException('Link the supplier invoice this was bought in against before marking it ordered.');
+    }
+
+    return this.prisma.orderLine.update({
+      where: { id: lineId },
+      data: {
+        fulfillmentStatus: dto.status,
+        ...(dto.supplierInvoiceId ? { supplierInvoiceId: dto.supplierInvoiceId } : {}),
+      },
     });
   }
 

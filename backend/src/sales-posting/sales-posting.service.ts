@@ -40,14 +40,19 @@ export class SalesPostingService {
   /**
    * What the goods on an order cost us.
    *
-   * Uses the variant's recorded cost. A variant with no cost contributes
-   * nothing rather than blocking the sale: the money side must still post, and
-   * a missing cost is a catalogue gap to fix, not a reason to lose the sale
-   * from the books.
+   * Uses the variant's recorded cost, STOCK lines only: a SUPPLIER_ORDER line
+   * was never drawn from Inventory, so crediting that account for it would
+   * write down stock that was never held. Its cost is booked separately,
+   * against Accounts Payable, once the supplier bill that actually fulfilled
+   * it is approved -- see the note on postSupplierOrderLineCost below.
+   *
+   * A STOCK variant with no cost contributes nothing rather than blocking the
+   * sale: the money side must still post, and a missing cost is a catalogue
+   * gap to fix, not a reason to lose the sale from the books.
    */
   private async costOfOrder(orderId: string, tx: Prisma.TransactionClient) {
     const lines = await tx.orderLine.findMany({
-      where: { orderId },
+      where: { orderId, fulfillmentType: 'STOCK' },
       include: { variant: { select: { costKes: true, sku: true } } },
     });
 

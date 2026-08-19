@@ -28,9 +28,23 @@ type Level = {
   variant: { id: string; sku: string; name: string; priceKes: string | number; product: { name: string } };
 };
 
+/**
+ * The full catalogue, for picking something to order in even when nothing is
+ * on the shelf -- either a normal variant that happens to be at zero right
+ * now, or one that is never stocked at all (isDropShip).
+ */
+type CatalogueProduct = {
+  id: string; name: string; brand?: string | null;
+  variants: { id: string; sku: string; name: string; priceKes: string | number; isActive: boolean; isDropShip: boolean }[];
+};
+
+type FulfillmentType = 'STOCK' | 'SUPPLIER_ORDER';
+type FulfillmentStatus = 'AWAITING_SUPPLIER' | 'ORDERED_FROM_SUPPLIER' | 'RECEIVED' | 'HANDED_TO_CUSTOMER';
+
 type OrderLine = {
   id: string; description: string; quantity: number;
   unitPrice: string | number; lineTotal: string | number;
+  fulfillmentType: FulfillmentType; fulfillmentStatus: FulfillmentStatus | null;
 };
 
 type Order = {
@@ -44,7 +58,10 @@ type Order = {
 const CHANNELS = ['IN_STORE', 'WHATSAPP', 'INSTAGRAM', 'WEBSITE'];
 const METHODS = ['MPESA', 'CASH', 'CARD', 'BANK_TRANSFER'];
 
-type Draft = { variantId: string; quantity: number; label: string; price: number };
+type Draft = {
+  variantId: string; quantity: number; label: string; price: number;
+  fulfillmentType: FulfillmentType;
+};
 
 export default function OrdersPage() {
   const [initialized, setInitialized] = useState(false);
@@ -53,16 +70,19 @@ export default function OrdersPage() {
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [levels, setLevels] = useState<Level[]>([]);
+  const [catalogue, setCatalogue] = useState<CatalogueProduct[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [showTill, setShowTill] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [awaitingSupplierOnly, setAwaitingSupplierOnly] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
   const [head, setHead] = useState({ storeId: '', channel: 'IN_STORE', customerName: '', customerPhone: '' });
   const [draft, setDraft] = useState<Draft[]>([]);
   const [pick, setPick] = useState({ variantId: '', quantity: '1' });
+  /** Item search across the whole catalogue, not just what is on the shelf here. */
+  const [itemQuery, setItemQuery] = useState('');
   const [payment, setPayment] = useState({ orderId: '', amount: '', method: 'MPESA', reference: '' });
 
   useEffect(() => {
@@ -75,12 +95,14 @@ export default function OrdersPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [levelRows, storeRows] = await Promise.all([
+      const [levelRows, storeRows, productRows] = await Promise.all([
         apiRequest<unknown>('/inventory/levels', { method: 'GET' }, authToken),
         apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
+        apiRequest<unknown>('/products?take=500', { method: 'GET' }, authToken),
       ]);
       setLevels(asList<Level>(levelRows));
       setStores(storeRows);
+      setCatalogue(asList<CatalogueProduct>(productRows));
       setHead((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
     } catch (error) {
       setErrorMessage(error);
@@ -95,7 +117,10 @@ export default function OrdersPage() {
     void load(token);
   }, [initialized, token, load]);
 
-  const orderFilters = useMemo(() => ({ status: statusFilter || undefined }), [statusFilter]);
+  const orderFilters = useMemo(
+    () => ({ status: statusFilter || undefined, awaitingSupplier: awaitingSupplierOnly || undefined }),
+    [statusFilter, awaitingSupplierOnly],
+  );
 
   const fetchOrdersPage = useCallback(
     async (params: {
@@ -103,6 +128,7 @@ export default function OrdersPage() {
       take: number;
       search: string;
       status?: string;
+      awaitingSupplier?: boolean;
     }): Promise<ServerPage<Order>> => {
       if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
       const query = new URLSearchParams();
@@ -110,6 +136,7 @@ export default function OrdersPage() {
       query.set('take', String(params.take));
       if (params.search) query.set('search', params.search);
       if (params.status) query.set('status', params.status);
+      if (params.awaitingSupplier) query.set('awaitingSupplier', 'true');
       return apiRequest<ServerPage<Order>>(`/orders?${query}`, { method: 'GET' }, token);
     },
     [token],
@@ -158,29 +185,83 @@ export default function OrdersPage() {
   const canUpdate = hasPermission(profile, 'order.update');
   const canPay = hasPermission(profile, 'order-payment.create');
 
-  // Only what the chosen store actually has, so a sale cannot be rung up
-  // against stock sitting in the other shop.
-  const availableHere = levels.filter((row) => row.store.id === head.storeId && row.sellable > 0);
+  // Sellable quantity here, per variant -- the picker uses this to decide
+  // whether a line rings up as STOCK or has to become a SUPPLIER_ORDER.
+  const sellableHere = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of levels) {
+      if (row.store.id !== head.storeId) continue;
+      map.set(row.variant.id, row.sellable);
+    }
+    return map;
+  }, [levels, head.storeId]);
+
+  /**
+   * Every active variant in the catalogue, whether or not it is on the
+   * shelf here. A variant with nothing sellable at this store -- including
+   * one that is never stocked at all -- is offered too, just flagged as a
+   * supplier order rather than left out. That is the whole point: "we don't
+   * have it, but the supplier does" should not mean it cannot be sold.
+   */
+  const itemOptions = useMemo(() => {
+    const options: Array<{
+      variantId: string; sku: string; label: string; price: number;
+      sellable: number; mustOrder: boolean;
+    }> = [];
+    for (const product of catalogue) {
+      for (const variant of product.variants) {
+        if (!variant.isActive) continue;
+        const sellable = sellableHere.get(variant.id) ?? 0;
+        options.push({
+          variantId: variant.id,
+          sku: variant.sku,
+          label: `${product.name} — ${variant.name}`,
+          price: Number(variant.priceKes),
+          sellable,
+          // A drop-ship variant is never on the shelf, so it always has to
+          // be ordered in, even if some stray StockLevel row said otherwise.
+          mustOrder: variant.isDropShip || sellable <= 0,
+        });
+      }
+    }
+    return options;
+  }, [catalogue, sellableHere]);
+
+  const itemMatches = useMemo(() => {
+    const query = itemQuery.trim().toLowerCase();
+    const scored = !query
+      ? itemOptions
+      : itemOptions.filter(
+          (option) => option.label.toLowerCase().includes(query) || option.sku.toLowerCase().includes(query),
+        );
+    // Capped, same reasoning as elsewhere: a few hundred rendered rows is a
+    // slow first paint for a list nobody scrolls to the end of.
+    return scored.slice(0, 25);
+  }, [itemOptions, itemQuery]);
+
   const draftTotal = draft.reduce((sum, line) => sum + line.price * line.quantity, 0);
 
   function addLine() {
-    const level = availableHere.find((row) => row.variant.id === pick.variantId);
-    if (!level) return;
+    const option = itemOptions.find((row) => row.variantId === pick.variantId);
+    if (!option) return;
     const quantity = Number(pick.quantity) || 1;
+    const fulfillmentType: FulfillmentType = option.mustOrder ? 'SUPPLIER_ORDER' : 'STOCK';
     setDraft((prev) => {
-      const existing = prev.find((line) => line.variantId === level.variant.id);
+      const existing = prev.find((line) => line.variantId === option.variantId);
       if (existing) {
         return prev.map((line) =>
-          line.variantId === level.variant.id ? { ...line, quantity: line.quantity + quantity } : line);
+          line.variantId === option.variantId ? { ...line, quantity: line.quantity + quantity } : line);
       }
       return [...prev, {
-        variantId: level.variant.id,
+        variantId: option.variantId,
         quantity,
-        label: `${level.variant.product.name} — ${level.variant.name}`,
-        price: Number(level.variant.priceKes),
+        label: option.label,
+        price: option.price,
+        fulfillmentType,
       }];
     });
     setPick({ variantId: '', quantity: '1' });
+    setItemQuery('');
   }
 
   async function onPlace(event: FormEvent<HTMLFormElement>) {
@@ -195,7 +276,11 @@ export default function OrdersPage() {
           channel: head.channel,
           customerName: head.customerName || undefined,
           customerPhone: head.customerPhone || undefined,
-          lines: draft.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
+          lines: draft.map((line) => ({
+            variantId: line.variantId,
+            quantity: line.quantity,
+            fulfillmentType: line.fulfillmentType,
+          })),
         }),
       }, token);
       setFeedback(`${order.orderNumber} placed — ${formatMoney(order.total)}.`);
@@ -334,15 +419,54 @@ export default function OrdersPage() {
                   <div className="portal-entity-grid-3">
                     <label>
                       <span>Item</span>
-                      <select value={pick.variantId}
-                        onChange={(event) => setPick((prev) => ({ ...prev, variantId: event.target.value }))}>
-                        <option value="">Choose…</option>
-                        {availableHere.map((row) => (
-                          <option key={row.variant.id} value={row.variant.id}>
-                            {row.variant.product.name} — {row.variant.name} ({row.sellable} left)
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        value={itemQuery}
+                        placeholder="Search product, size or SKU…"
+                        onChange={(event) => { setItemQuery(event.target.value); setPick((prev) => ({ ...prev, variantId: '' })); }}
+                      />
+                      {pick.variantId ? (
+                        <div className="portal-picked-row">
+                          <span>
+                            <strong>{itemOptions.find((option) => option.variantId === pick.variantId)?.label}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            className="portal-inline-btn"
+                            onClick={() => { setPick((prev) => ({ ...prev, variantId: '' })); setItemQuery(''); }}
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="portal-picker-results">
+                          {itemMatches.length === 0 ? (
+                            <p className="portal-muted" style={{ margin: 8 }}>
+                              {itemQuery.trim() ? 'Nothing matches that.' : 'Start typing, or pick from the list.'}
+                            </p>
+                          ) : (
+                            itemMatches.map((option) => (
+                              <button
+                                key={option.variantId}
+                                type="button"
+                                className="portal-picker-option"
+                                onClick={() => { setPick((prev) => ({ ...prev, variantId: option.variantId })); setItemQuery(''); }}
+                              >
+                                <span>{option.label}</span>
+                                <span className="portal-muted">
+                                  {option.sku}
+                                  {option.mustOrder ? ' · order from supplier' : ` · ${option.sellable} on shelf`}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                      {!pick.variantId ? (
+                        <small className="portal-muted">
+                          Anything in the catalogue can be added, even with nothing on the shelf — it rings up as
+                          an order from the supplier instead.
+                        </small>
+                      ) : null}
                     </label>
                     <label>
                       <span>Quantity</span>
@@ -360,11 +484,18 @@ export default function OrdersPage() {
                   {draft.length > 0 ? (
                     <div className="portal-table-wrap">
                       <table className="portal-data-table is-doc">
-                        <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th><th /></tr></thead>
+                        <thead><tr><th>Item</th><th>Fulfillment</th><th>Qty</th><th>Price</th><th>Total</th><th /></tr></thead>
                         <tbody>
                           {draft.map((line) => (
                             <tr key={line.variantId}>
                               <td>{line.label}</td>
+                              <td>
+                                {line.fulfillmentType === 'SUPPLIER_ORDER' ? (
+                                  <span className="portal-chip is-danger">From supplier</span>
+                                ) : (
+                                  <span className="portal-chip is-muted">On shelf</span>
+                                )}
+                              </td>
                               <td>{line.quantity}</td>
                               <td>{formatMoney(line.price)}</td>
                               <td>{formatMoney(line.price * line.quantity)}</td>
@@ -377,7 +508,7 @@ export default function OrdersPage() {
                             </tr>
                           ))}
                           <tr>
-                            <td colSpan={3}><strong>Total</strong></td>
+                            <td colSpan={4}><strong>Total</strong></td>
                             <td colSpan={2}><strong>{formatMoney(draftTotal)}</strong></td>
                           </tr>
                         </tbody>
@@ -386,6 +517,13 @@ export default function OrdersPage() {
                   ) : (
                     <div className="portal-empty-state">Nothing added yet.</div>
                   )}
+                  {draft.some((line) => line.fulfillmentType === 'SUPPLIER_ORDER') ? (
+                    <p className="portal-muted">
+                      Item(s) marked &ldquo;From supplier&rdquo; are charged in full now, same as anything on the
+                      shelf. Let the customer know it is being sourced and roughly when to expect it — the order
+                      will sit in Awaiting Supplier until it is bought in and handed over.
+                    </p>
+                  ) : null}
 
                   <div className="portal-inline-actions">
                     <button type="submit" className="portal-primary-btn" disabled={saving || draft.length === 0}>
@@ -455,6 +593,14 @@ export default function OrdersPage() {
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
+                <label className="portal-check">
+                  <input
+                    type="checkbox"
+                    checked={awaitingSupplierOnly}
+                    onChange={(event) => setAwaitingSupplierOnly(event.target.checked)}
+                  />
+                  <span>Awaiting supplier only</span>
+                </label>
                 <ListExport
                   rows={exportRowsShaped}
                   config={{
@@ -477,7 +623,7 @@ export default function OrdersPage() {
               <div className="portal-list-stack">
                 {!ordersPager.loading && rows.length === 0 ? (
                   <div className="portal-empty-state">
-                    {ordersPager.search || statusFilter ? 'No orders match.' : 'No orders yet.'}
+                    {ordersPager.search || statusFilter || awaitingSupplierOnly ? 'No orders match.' : 'No orders yet.'}
                   </div>
                 ) : (
                   rows.map((order) => (
@@ -485,6 +631,11 @@ export default function OrdersPage() {
                       <div className="portal-list-row">
                         <div>
                           <strong>{order.orderNumber}</strong>
+                          {order.lines.some(
+                            (line) => line.fulfillmentType === 'SUPPLIER_ORDER' && line.fulfillmentStatus !== 'HANDED_TO_CUSTOMER',
+                          ) ? (
+                            <span className="portal-chip is-danger" style={{ marginLeft: 8 }}>Sourcing</span>
+                          ) : null}
                           <p className="portal-muted">
                             {order.who} · {order.storeName} · {order.channel.replace('_', ' ')} ·{' '}
                             {formatDate(order.placedAt)}
@@ -496,10 +647,9 @@ export default function OrdersPage() {
                         </div>
                         <span>{order.status}</span>
                         <div className="portal-action-row">
-                          <button type="button" className="portal-inline-btn"
-                            onClick={() => setExpanded(expanded === order.id ? null : order.id)}>
-                            {expanded === order.id ? 'Hide' : 'Details'}
-                          </button>
+                          <Link href={`/portal/orders/${order.id}`} className="portal-inline-btn">
+                            View
+                          </Link>
                           {canPay && order.balance > 0 ? (
                             <button type="button" className="portal-inline-btn"
                               onClick={() => setPayment({ orderId: order.id, amount: String(order.balance), method: 'MPESA', reference: '' })}>
@@ -523,30 +673,6 @@ export default function OrdersPage() {
                           ) : null}
                         </div>
                       </div>
-
-                      {expanded === order.id ? (
-                        <div className="portal-table-wrap">
-                          <table className="portal-data-table is-doc">
-                            <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
-                            <tbody>
-                              {order.lines.map((line) => (
-                                <tr key={line.id}>
-                                  <td>{line.description}</td>
-                                  <td>{line.quantity}</td>
-                                  <td>{formatMoney(line.unitPrice)}</td>
-                                  <td>{formatMoney(line.lineTotal)}</td>
-                                </tr>
-                              ))}
-                              {order.payments.map((paid) => (
-                                <tr key={paid.id}>
-                                  <td colSpan={3}>Paid — {paid.method}{paid.reference ? ` (${paid.reference})` : ''}</td>
-                                  <td>{formatMoney(paid.amount)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : null}
                     </div>
                   ))
                 )}

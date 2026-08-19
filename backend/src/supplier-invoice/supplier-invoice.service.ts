@@ -55,7 +55,7 @@ export class SupplierInvoiceService {
       (args) =>
         this.prisma.supplierInvoice.findMany({
           where,
-          include: { attachments: true },
+          include: { attachments: true, supplier: { select: { id: true, name: true } } },
           orderBy: [{ invoiceDate: 'desc' }, { id: 'asc' }],
           ...args,
         }),

@@ -3,7 +3,12 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { OrderService } from './order.service';
-import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderStatusDto } from './dto/create-order.dto';
+import {
+  CreateOrderDto,
+  RecordOrderPaymentDto,
+  UpdateOrderLineFulfillmentDto,
+  UpdateOrderStatusDto,
+} from './dto/create-order.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 
 @ApiBearerAuth()
@@ -45,6 +50,16 @@ export class OrderController {
   @Permissions(buildPermissionKey('Order', 'update'))
   setStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
     return this.service.setStatus(id, dto.status, dto.notes);
+  }
+
+  @Patch(':id/lines/:lineId/fulfillment')
+  @Permissions(buildPermissionKey('Order', 'update'))
+  updateLineFulfillment(
+    @Param('id') id: string,
+    @Param('lineId') lineId: string,
+    @Body() dto: UpdateOrderLineFulfillmentDto,
+  ) {
+    return this.service.updateLineFulfillment(id, lineId, dto);
   }
 
   @Post(':id/payments')
