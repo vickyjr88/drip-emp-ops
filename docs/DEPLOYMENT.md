@@ -205,6 +205,7 @@ editing `.env` and redeploying is enough.
 |---|---|
 | `NEXT_PUBLIC_API_BASE_URL` | Public API URL the browser calls, e.g. `https://api.example.com`. |
 | `NEXT_PUBLIC_SITE_URL` | As above. Also build-time. |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 Measurement ID (`G-XXXXXXXXXX`, from Admin → Data Streams → the web stream — not the numeric Property ID GA shows elsewhere). Left blank, no analytics script loads. Storefront only: the staff portal is excluded in code regardless of this value. |
 
 ### Runtime — changing these needs only a restart
 

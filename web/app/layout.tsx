@@ -5,6 +5,7 @@ import { NotificationsProvider } from './portal/components/notifications';
 import { CartProvider } from './lib/cart';
 import { CustomerAuthProvider } from './lib/customer-auth';
 import { JsonLd, SITE_DESCRIPTION, SITE_NAME, SITE_URL, organizationSchema } from './lib/site';
+import { StorefrontAnalytics } from './components/storefront-analytics';
 
 export const metadata: Metadata = {
   // Makes every relative canonical/OG URL below resolve against the real
@@ -76,6 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </NotificationsProvider>
         </CartProvider>
         </CustomerAuthProvider>
+        <StorefrontAnalytics />
       </body>
     </html>
   );

@@ -25,6 +25,11 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ARG NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 
+# GA4 Measurement ID, inlined like the other NEXT_PUBLIC_* values. Blank means
+# the analytics script never loads at all -- see StorefrontAnalytics.
+ARG NEXT_PUBLIC_GA_MEASUREMENT_ID
+ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
+
 RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 FROM node:18-alpine AS runtime
