@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { storefrontOrigin } from '../common/storefront-origin';
+import { csvField } from '../common/csv.util';
 
 /**
  * The public catalogue.
@@ -226,6 +228,107 @@ export class StorefrontService {
     shaped.sort((a, b) => Number(b.anyInStock) - Number(a.anyInStock) || comparator(a, b));
 
     return shaped;
+  }
+
+  /**
+   * The catalogue as Meta's Commerce Manager expects to fetch it: one CSV
+   * row per size, not per product, since a shopper buys a specific size and
+   * that is what Facebook/Instagram Shops needs to check out.
+   *
+   * Field choices, and why:
+   *  - `id` is the variant SKU, not the variant's UUID -- Meta's catalog ID
+   *    also has to line up with whatever content ID a Pixel/Conversions API
+   *    integration fires, and the SKU is the identifier this shop already
+   *    prints on receipts and uses everywhere else a human reads it.
+   *  - `item_group_id` is the product ID, shared by every size of one shoe,
+   *    so Shops groups them into a single listing with a size picker instead
+   *    of showing eleven near-identical cards for one style.
+   *  - `availability` is only ever "in stock" or "out of stock". Meta's own
+   *    docs disagree with several third-party feed tools about whether
+   *    "preorder" is also accepted, so rather than risk the whole feed being
+   *    rejected on an unrecognised value, every orderable size (including a
+   *    drop-ship or backordered one -- this shop already sells those, see
+   *    canOrder in shape() above) is reported in stock, matching what a
+   *    shopper is actually allowed to buy on the storefront itself.
+   *  - `condition` is fixed to "new": every listing here is new retail stock,
+   *    never a used or refurbished resale.
+   *  - `gender`/`age_group` have no source data to draw from (this shop does
+   *    not model either), so both are fixed to the least restrictive value
+   *    Meta accepts ("unisex", "adult") rather than guessing per product.
+   */
+  async catalogCsv(): Promise<string> {
+    const products = await this.prisma.product.findMany({
+      where: { isActive: true },
+      include: {
+        category: { select: { name: true, slug: true } },
+        variants: { orderBy: { name: 'asc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const variantIds = products.flatMap((product) => product.variants.map((variant) => variant.id));
+    const [stock, offers] = await Promise.all([this.stockMap(variantIds), this.offerMap(variantIds)]);
+    const shaped = products.map((product) => this.shape(product, stock, offers));
+
+    const origin = storefrontOrigin();
+    const columns = [
+      'id',
+      'item_group_id',
+      'title',
+      'description',
+      'availability',
+      'condition',
+      'price',
+      'sale_price',
+      'link',
+      'image_link',
+      'additional_image_link',
+      'brand',
+      'google_product_category',
+      'size',
+      'gender',
+      'age_group',
+    ];
+
+    const rows: string[][] = [columns];
+    for (const product of shaped) {
+      const link = `${origin}/shop/${product.slug}`;
+      const [imageLink, ...additional] = product.imageUrls;
+      // image_link is required -- Meta rejects a row without one, and a
+      // listing with no photo would not be worth showing in Shops anyway.
+      if (!imageLink) continue;
+      for (const variant of product.variants) {
+        // shape() already flips these: priceKes is what the shopper pays
+        // (the offer price, when one is active) and wasPriceKes is the
+        // original. Meta wants it the other way round -- `price` is always
+        // the list price and `sale_price` is the discount, so a markdown
+        // is not lost on the way into the feed.
+        const listPrice = variant.wasPriceKes ?? variant.priceKes;
+        rows.push([
+          variant.sku,
+          product.id,
+          `${product.name} - ${variant.size}`,
+          product.description || product.name,
+          // Every listing here is orderable (canOrder is always true, see
+          // shape()); a size only drops out of the feed row set entirely if
+          // it is inactive, which shape() already filters out above.
+          'in stock',
+          'new',
+          `${listPrice.toFixed(2)} KES`,
+          variant.wasPriceKes ? `${variant.priceKes.toFixed(2)} KES` : '',
+          link,
+          imageLink || '',
+          additional.join(','),
+          product.brand || '',
+          'Apparel & Accessories > Shoes',
+          variant.size,
+          'unisex',
+          'adult',
+        ]);
+      }
+    }
+
+    return rows.map((row) => row.map(csvField).join(',')).join('\r\n') + '\r\n';
   }
 
   async bySlug(slug: string) {
