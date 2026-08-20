@@ -116,4 +116,39 @@ export class CustomerService {
       select: CUSTOMER_SELECT,
     });
   }
+
+  /**
+   * The customer base by trade tier -- retail shoppers versus the resellers
+   * and wholesale accounts, which is the split the rest of the reports do not
+   * show: consignment exposure covers what is out with resellers, but not how
+   * many trade accounts there are or whether the base is growing.
+   */
+  async stats() {
+    const since = new Date();
+    since.setDate(since.getDate() - 29);
+    since.setHours(0, 0, 0, 0);
+
+    const [byTier, active, inactive, newLast30Days, total, portalEnabled] = await Promise.all([
+      this.prisma.customer.groupBy({ by: ['priceTier'], _count: true }),
+      this.prisma.customer.count({ where: { isActive: true } }),
+      this.prisma.customer.count({ where: { isActive: false } }),
+      this.prisma.customer.count({ where: { createdAt: { gte: since } } }),
+      this.prisma.customer.count(),
+      this.prisma.customer.count({ where: { portalEnabled: true } }),
+    ]);
+
+    return {
+      total,
+      active,
+      inactive,
+      newLast30Days,
+      portalEnabled,
+      byTier: byTier.map((row) => ({ tier: row.priceTier, count: row._count })),
+      // Same rows, framed for the resellers screen: retail is the shop's own
+      // customers and everything else is a trade account.
+      resellers: byTier
+        .filter((row) => row.priceTier !== 'RETAIL')
+        .reduce((sum, row) => sum + row._count, 0),
+    };
+  }
 }

@@ -148,4 +148,36 @@ export class CartLeadService {
     });
     return created;
   }
+
+  /**
+   * How many leads are sitting outstanding, and how many of all the leads
+   * ever recorded actually turned into an order -- the number that answers
+   * "is chasing these worth the time", which the raw list does not.
+   */
+  async stats() {
+    const [bySource, byStatus, outstandingValue, converted, total] = await Promise.all([
+      this.prisma.cartLead.groupBy({ by: ['source'], _count: true }),
+      this.prisma.cartLead.groupBy({ by: ['status'], _count: true }),
+      this.prisma.cartLead.aggregate({
+        where: { status: { in: ['NEW', 'CONTACTED'] } },
+        _sum: { total: true },
+        _count: true,
+      }),
+      this.prisma.cartLead.count({ where: { status: 'CONVERTED' } }),
+      this.prisma.cartLead.count(),
+    ]);
+
+    return {
+      total,
+      bySource: bySource.map((row) => ({ source: row.source, count: row._count })),
+      byStatus: byStatus.map((row) => ({ status: row.status, count: row._count })),
+      outstanding: { count: outstandingValue._count, value: Number(outstandingValue._sum.total ?? 0) },
+      converted,
+      // Against every lead ever recorded, including ones still open or that
+      // expired without converting -- so this reads as "how many of all the
+      // leads we've had actually became a sale", not a rate inflated by
+      // excluding the ones that didn't.
+      conversionRate: total ? Math.round((converted / total) * 1000) / 10 : null,
+    };
+  }
 }

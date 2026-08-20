@@ -26,6 +26,13 @@ export class CustomerController {
     return this.service.findAll(query);
   }
 
+  // Before ':id', or "stats" would be read as a customer id.
+  @Get('stats')
+  @Permissions(buildPermissionKey('Customer', 'read'))
+  stats() {
+    return this.service.stats();
+  }
+
   @Get(':id')
   @Permissions(buildPermissionKey('Customer', 'read'))
   findOne(@Param('id') id: string) {

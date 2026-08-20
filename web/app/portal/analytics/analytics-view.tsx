@@ -3,15 +3,18 @@
 /**
  * The analytics workspace.
  *
- * Built from the reporting endpoints rather than a dedicated analytics API:
- * store performance, product margin and consignment exposure already answer
- * the questions a shop owner asks, and sourcing the figures from the same
- * place as the accounting reports means the two can never disagree.
+ * Sales, margin and consignment figures come from the same reporting
+ * endpoints the accounting reports use, so the two can never disagree.
+ * Leads, inquiries and the customer base each get their own lightweight
+ * stats() endpoint instead -- there is no ledger entry for a WhatsApp lead
+ * or a contact-form message, so there is nothing for a shared report to
+ * source them from.
  *
  * What replaced what: this screen used to chart a property portfolio --
  * blocks, units, absorption and floor area. None of that survives; the
  * questions here are which shop is making money, which shoes carry the
- * margin, and what is sitting with resellers.
+ * margin, what is sitting with resellers, and whether leads, inquiries and
+ * the customer base are growing.
  */
 
 import Link from 'next/link';
@@ -30,7 +33,7 @@ import {
   loadProfile,
   roleLabelFor,
 } from '../accounting/lib';
-import { BarChart, ChartFrame, RankedBars, RateMeter, formatCompact } from './charts';
+import { BarChart, ChartFrame, RankedBars, RateMeter, StackedBar, TrendChart, CHART_CATEGORICAL, formatCompact } from './charts';
 
 type StoreRow = {
   storeId: string;
@@ -76,6 +79,34 @@ type SalesSummary = {
   collected: number;
   outstanding: number;
   averageOrderValue: number;
+  byStatus: Array<{ status: string; count: number; value: number }>;
+  byChannel: Array<{ channel: string; count: number; value: number }>;
+};
+
+type LeadStats = {
+  total: number;
+  bySource: Array<{ source: string; count: number }>;
+  byStatus: Array<{ status: string; count: number }>;
+  outstanding: { count: number; value: number };
+  converted: number;
+  conversionRate: number | null;
+};
+
+type InquiryStats = {
+  total: number;
+  byStatus: Array<{ status: string; count: number }>;
+  open: number;
+  trend: Array<{ date: string; count: number }>;
+};
+
+type CustomerStats = {
+  total: number;
+  active: number;
+  inactive: number;
+  newLast30Days: number;
+  portalEnabled: number;
+  byTier: Array<{ tier: string; count: number }>;
+  resellers: number;
 };
 
 type ConsignmentActivity = {
@@ -90,6 +121,13 @@ function percentLabel(value: number | null | undefined) {
 
 function round1(value: number) {
   return Math.round(value * 10) / 10;
+}
+
+/** "20 Aug", short enough to sit under a trend point without crowding its neighbours. */
+function shortDayLabel(isoDate: string) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 }
 
 type Period = 'today' | 'week' | 'month';
@@ -131,6 +169,9 @@ export function AnalyticsView() {
   const [products, setProducts] = useState<{ rows: ProductRow[]; totals: any; costIncomplete: boolean } | null>(null);
   const [consignment, setConsignment] = useState<{ rows: ConsignmentRow[]; totals: any } | null>(null);
   const [summary, setSummary] = useState<SalesSummary | null>(null);
+  const [leads, setLeads] = useState<LeadStats | null>(null);
+  const [inquiries, setInquiries] = useState<InquiryStats | null>(null);
+  const [customers, setCustomers] = useState<CustomerStats | null>(null);
 
   // The day/week/month cut, kept apart from the all-time panels above: this
   // reloads on its own when the period changes, rather than re-running the
@@ -164,17 +205,24 @@ export function AnalyticsView() {
         }
       };
 
-      const [nextStores, nextProducts, nextConsignment, nextSummary] = await Promise.all([
-        load<any>('/reports/store-performance', 'journal-entry.read'),
-        load<any>('/reports/product-profitability', 'journal-entry.read'),
-        load<any>('/reports/consignment-exposure', 'journal-entry.read'),
-        load<SalesSummary>('/orders/summary', 'order.read'),
-      ]);
+      const [nextStores, nextProducts, nextConsignment, nextSummary, nextLeads, nextInquiries, nextCustomers] =
+        await Promise.all([
+          load<any>('/reports/store-performance', 'journal-entry.read'),
+          load<any>('/reports/product-profitability', 'journal-entry.read'),
+          load<any>('/reports/consignment-exposure', 'journal-entry.read'),
+          load<SalesSummary>('/orders/summary', 'order.read'),
+          load<LeadStats>('/cart-leads/stats', 'cart-lead.read'),
+          load<InquiryStats>('/inquiries/stats', 'inquiry.read'),
+          load<CustomerStats>('/customers/stats', 'customer.read'),
+        ]);
 
       setStores(nextStores);
       setProducts(nextProducts);
       setConsignment(nextConsignment);
       setSummary(nextSummary);
+      setLeads(nextLeads);
+      setInquiries(nextInquiries);
+      setCustomers(nextCustomers);
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -254,7 +302,13 @@ export function AnalyticsView() {
   const productTotals = products?.totals || {};
   const consignmentTotals = consignment?.totals || {};
 
-  const nothingYet = !storeRows.length && !productRows.length && !consignmentRows.length;
+  const nothingYet =
+    !storeRows.length &&
+    !productRows.length &&
+    !consignmentRows.length &&
+    !leads?.total &&
+    !inquiries?.total &&
+    !customers?.total;
 
   return (
     <EliteLayout active="portal">
@@ -266,7 +320,7 @@ export function AnalyticsView() {
             tourIsAdmin={profile.role === 'ADMIN' || (profile.roles || []).some((r: { name: string }) => r.name === 'ADMIN')}
             active="analytics"
             pageTitle="Analytics"
-            pageSubtitle="Which shop is making money, which shoes carry the margin, and what is out with resellers."
+            pageSubtitle="Which shop is making money, which shoes carry the margin, and how sales, leads, inquiries and the customer base are moving."
             email={profile.email}
             roleLabel={roleLabelFor(profile)}
             permissionCount={profile.permissions?.length || 0}
@@ -395,6 +449,51 @@ export function AnalyticsView() {
                       real ones. Set a cost on those variants in the catalogue for a true figure.
                     </p>
                   </article>
+                ) : null}
+
+                {/* ---- Order channel mix ------------------------------------ */}
+                {summary?.byChannel?.length ? (
+                  <div className="portal-detail-grid" style={{ marginBottom: 20 }}>
+                    <ChartFrame
+                      title="Orders by channel"
+                      subtitle="Where the order actually came from: card checkout, WhatsApp, or in store."
+                      table={{
+                        headers: ['Channel', 'Orders', 'Value'],
+                        rows: summary.byChannel.map((row) => [
+                          row.channel.replace('_', ' '),
+                          row.count,
+                          formatMoney(row.value),
+                        ]),
+                      }}
+                    >
+                      <StackedBar
+                        segments={summary.byChannel.map((row, index) => ({
+                          label: row.channel.replace('_', ' '),
+                          value: row.value,
+                          color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
+                        }))}
+                        valueFormat={formatCompact}
+                      />
+                    </ChartFrame>
+
+                    <ChartFrame
+                      title="Orders by status"
+                      subtitle="Every order ever placed, all-time."
+                      table={{
+                        headers: ['Status', 'Orders', 'Value'],
+                        rows: summary.byStatus.map((row) => [row.status, row.count, formatMoney(row.value)]),
+                      }}
+                    >
+                      <StackedBar
+                        segments={summary.byStatus.map((row, index) => ({
+                          label: row.status,
+                          value: row.count,
+                          color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
+                        }))}
+                        valueFormat={(value) => `${value} order${value === 1 ? '' : 's'}`}
+                      />
+                    </ChartFrame>
+                  </div>
                 ) : null}
 
                 {/* ---- Stores ---------------------------------------------- */}
@@ -551,6 +650,163 @@ export function AnalyticsView() {
                         </tbody>
                       </table>
                     </div>
+                  </article>
+                ) : null}
+
+                {/* ---- Leads (WhatsApp orders and abandoned carts) ---------- */}
+                {leads && leads.total > 0 ? (
+                  <article className="portal-card" style={{ marginTop: 20 }}>
+                    <h2 style={{ marginTop: 0 }}>Leads</h2>
+                    <p className="portal-muted" style={{ marginTop: 0 }}>
+                      Carts a shopper chose to send on WhatsApp, or left behind with contact details on
+                      file. All-time.
+                    </p>
+                    <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+                      <div className="portal-stat">
+                        <span>Outstanding</span>
+                        <h3>{leads.outstanding.count}</h3>
+                        <span className="portal-stat-note">{formatMoney(leads.outstanding.value)} in carts</span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>Converted to an order</span>
+                        <h3>{leads.converted}</h3>
+                        <span className="portal-stat-note">
+                          {leads.conversionRate === null ? '—' : `${leads.conversionRate}%`} of all leads
+                        </span>
+                      </div>
+                    </div>
+                    <div className="portal-detail-grid">
+                      <ChartFrame
+                        title="By source"
+                        table={{
+                          headers: ['Source', 'Count'],
+                          rows: leads.bySource.map((row) => [row.source.replace('_', ' '), row.count]),
+                        }}
+                      >
+                        <StackedBar
+                          segments={leads.bySource.map((row, index) => ({
+                            label: row.source.replace('_', ' '),
+                            value: row.count,
+                            color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
+                          }))}
+                          valueFormat={(value) => `${value} lead${value === 1 ? '' : 's'}`}
+                        />
+                      </ChartFrame>
+                      <ChartFrame
+                        title="By status"
+                        table={{
+                          headers: ['Status', 'Count'],
+                          rows: leads.byStatus.map((row) => [row.status, row.count]),
+                        }}
+                      >
+                        <StackedBar
+                          segments={leads.byStatus.map((row, index) => ({
+                            label: row.status,
+                            value: row.count,
+                            color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
+                          }))}
+                          valueFormat={(value) => `${value} lead${value === 1 ? '' : 's'}`}
+                        />
+                      </ChartFrame>
+                    </div>
+                    <Link href="/portal/orders" className="portal-inline-btn" style={{ marginTop: 12 }}>
+                      Go to Cart Leads
+                    </Link>
+                  </article>
+                ) : null}
+
+                {/* ---- Inquiries ---------------------------------------------- */}
+                {inquiries && inquiries.total > 0 ? (
+                  <article className="portal-card" style={{ marginTop: 20 }}>
+                    <h2 style={{ marginTop: 0 }}>Inquiries</h2>
+                    <p className="portal-muted" style={{ marginTop: 0 }}>
+                      Contact-form submissions from the storefront.
+                    </p>
+                    <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+                      <div className="portal-stat">
+                        <span>Open</span>
+                        <h3>{inquiries.open}</h3>
+                        <span className="portal-stat-note">{inquiries.total} received all-time</span>
+                      </div>
+                    </div>
+                    <div className="portal-detail-grid">
+                      <ChartFrame
+                        title="By status"
+                        table={{
+                          headers: ['Status', 'Count'],
+                          rows: inquiries.byStatus.map((row) => [row.status, row.count]),
+                        }}
+                      >
+                        <StackedBar
+                          segments={inquiries.byStatus.map((row, index) => ({
+                            label: row.status,
+                            value: row.count,
+                            color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
+                          }))}
+                          valueFormat={(value) => `${value}`}
+                        />
+                      </ChartFrame>
+                      <ChartFrame title="Last 14 days" subtitle="Submissions per day.">
+                        <TrendChart
+                          data={inquiries.trend.map((point) => ({
+                            label: shortDayLabel(point.date),
+                            value: point.count,
+                          }))}
+                          valueFormat={(value) => `${value}`}
+                        />
+                      </ChartFrame>
+                    </div>
+                    <Link href="/portal/inquiries" className="portal-inline-btn" style={{ marginTop: 12 }}>
+                      Go to Inquiries
+                    </Link>
+                  </article>
+                ) : null}
+
+                {/* ---- Customers & resellers ----------------------------------- */}
+                {customers && customers.total > 0 ? (
+                  <article className="portal-card" style={{ marginTop: 20 }}>
+                    <h2 style={{ marginTop: 0 }}>Customers</h2>
+                    <p className="portal-muted" style={{ marginTop: 0 }}>
+                      The full customer base, retail and trade.
+                    </p>
+                    <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+                      <div className="portal-stat">
+                        <span>Total customers</span>
+                        <h3>{customers.total}</h3>
+                        <span className="portal-stat-note">
+                          {customers.active} active · {customers.inactive} inactive
+                        </span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>New in 30 days</span>
+                        <h3>{customers.newLast30Days}</h3>
+                        <span className="portal-stat-note">{customers.portalEnabled} with portal access</span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>Resellers &amp; wholesale</span>
+                        <h3>{customers.resellers}</h3>
+                        <span className="portal-stat-note">Trade accounts, not retail</span>
+                      </div>
+                    </div>
+                    <ChartFrame
+                      title="By price tier"
+                      table={{
+                        headers: ['Tier', 'Count'],
+                        rows: customers.byTier.map((row) => [row.tier, row.count]),
+                      }}
+                    >
+                      <StackedBar
+                        segments={customers.byTier.map((row, index) => ({
+                          label: row.tier,
+                          value: row.count,
+                          color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
+                        }))}
+                        valueFormat={(value) => `${value} customer${value === 1 ? '' : 's'}`}
+                      />
+                    </ChartFrame>
+                    <Link href="/portal/resellers" className="portal-inline-btn" style={{ marginTop: 12 }}>
+                      Go to Resellers
+                    </Link>
                   </article>
                 ) : null}
               </>

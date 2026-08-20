@@ -34,6 +34,15 @@ export class CartLeadController {
     return this.service.findAll(query);
   }
 
+  // Before ':id'-shaped routes, if any are ever added, or "stats" would be
+  // read as an id.
+  @ApiBearerAuth()
+  @Get('stats')
+  @Permissions(buildPermissionKey('CartLead', 'read'))
+  stats() {
+    return this.service.stats();
+  }
+
   @ApiBearerAuth()
   @Patch(':id/status')
   @Permissions(buildPermissionKey('CartLead', 'update'))

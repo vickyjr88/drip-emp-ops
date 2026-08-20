@@ -27,6 +27,14 @@ export class InquiryController {
     return this.service.findAll(query);
   }
 
+  // Before any ':id'-shaped route, or "stats" would be read as an id.
+  @ApiBearerAuth()
+  @Get('inquiries/stats')
+  @Permissions(buildPermissionKey('Inquiry', 'read'))
+  stats() {
+    return this.service.stats();
+  }
+
   @ApiBearerAuth()
   @Patch('inquiries/:id/status')
   @Permissions(buildPermissionKey('Inquiry', 'update'))

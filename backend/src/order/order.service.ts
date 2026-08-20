@@ -410,9 +410,10 @@ export class OrderService {
         : {}),
     };
 
-    const [totals, byStatus] = await Promise.all([
+    const [totals, byStatus, byChannel] = await Promise.all([
       this.prisma.order.aggregate({ where, _count: true, _sum: { total: true, amountPaid: true } }),
       this.prisma.order.groupBy({ by: ['status'], where, _count: true, _sum: { total: true } }),
+      this.prisma.order.groupBy({ by: ['channel'], where, _count: true, _sum: { total: true } }),
     ]);
 
     const revenue = Number(totals._sum.total ?? 0);
@@ -426,6 +427,14 @@ export class OrderService {
       averageOrderValue: totals._count ? revenue / totals._count : 0,
       byStatus: byStatus.map((row) => ({
         status: row.status,
+        count: row._count,
+        value: Number(row._sum.total ?? 0),
+      })),
+      // Which route the sale actually came through -- card checkout, a
+      // WhatsApp order rung up at the till, or a walk-in -- since the same
+      // revenue figure says nothing about where the demand is coming from.
+      byChannel: byChannel.map((row) => ({
+        channel: row.channel,
         count: row._count,
         value: Number(row._sum.total ?? 0),
       })),
