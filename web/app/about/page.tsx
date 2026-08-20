@@ -16,6 +16,7 @@ import { contentValue, fetchPageContent } from '../lib/page-content';
  */
 
 export async function generateMetadata(): Promise<Metadata> {
+  const content = await fetchPageContent('about');
   return seoMetadata({
     key: 'about',
     path: '/about',
@@ -23,6 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description:
       'Drip Emporium stocks genuine sneakers and streetwear from Nike, Adidas, Jordan and Puma at two shops on Ronald Ngala Street, Nairobi.',
     shareTitle: 'About Drip Emporium',
+    image: contentValue(content, 'hero.image', ''),
   });
 }
 
@@ -60,13 +62,16 @@ export default async function AboutPage() {
   return (
     <EliteLayout active="profile">
       <main className="lp-main-content lp-services-page">
-        <section className="lp-services-hero">
+        <section className={`lp-services-hero${heroImage ? ' has-image' : ''}`}>
           {heroImage ? (
-            <div
-              className="lp-hero-image"
-              aria-hidden="true"
-              style={{ backgroundImage: `url(${heroImage})` }}
-            />
+            <>
+              <div
+                className="lp-hero-image"
+                aria-hidden="true"
+                style={{ backgroundImage: `url(${heroImage})` }}
+              />
+              <div className="lp-hero-overlay" aria-hidden="true" />
+            </>
           ) : null}
           <div className="lp-container lp-services-hero-inner">
             <p>{heroKicker}</p>

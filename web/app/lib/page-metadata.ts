@@ -33,6 +33,11 @@ export type SeoDefaults = {
   shareTitle?: string;
   /** Share-card description when it should differ from the meta description. */
   shareDescription?: string;
+  /**
+   * The page's own share image (e.g. a hero background), when it has one.
+   * Takes priority over the borrowed-from-portfolio fallback in previewFor.
+   */
+  image?: string | null;
 };
 
 /**
@@ -44,7 +49,7 @@ export type SeoDefaults = {
 export async function seoMetadata(defaults: SeoDefaults): Promise<Metadata> {
   const [content, preview] = await Promise.all([
     fetchPageContent('seo'),
-    previewFor(defaults.path),
+    previewFor(defaults.path, defaults.image),
   ]);
 
   const base = `${defaults.key}.`;

@@ -302,11 +302,37 @@ img {
 .lp-services-hero {
   background: #fff;
   padding: 80px 0 48px;
+  /* Needed as soon as .lp-hero-image is rendered inside: that div is
+     position: absolute, and without a positioned ancestor here it sizes
+     itself against the page's initial containing block instead of this
+     section -- covering the header and everything below the hero rather
+     than sitting behind this section's own text. Set unconditionally
+     rather than only in .has-image so the section's box never shifts
+     the moment a CMS editor adds a photo. */
+  position: relative;
+  overflow: hidden;
+}
+
+.lp-services-hero.has-image {
+  padding: 140px 0;
 }
 
 .lp-services-hero-inner {
+  position: relative;
   text-align: center;
   max-width: 980px;
+}
+
+.lp-services-hero.has-image .lp-services-hero-inner {
+  color: #fff;
+}
+
+.lp-services-hero.has-image .lp-services-hero-inner > p:first-child {
+  color: #fff;
+}
+
+.lp-services-hero.has-image .lp-services-intro {
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .lp-services-hero-inner > p:first-child {

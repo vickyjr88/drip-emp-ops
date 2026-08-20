@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { JsonLd, SITE_DESCRIPTION, SITE_NAME, SITE_URL, absoluteUrl } from './lib/site';
 import { seoMetadata } from './lib/page-metadata';
+import { contentValue, fetchPageContent } from './lib/page-content';
 import HomeClient from './home-client';
 
 /**
@@ -10,6 +11,7 @@ import HomeClient from './home-client';
  */
 
 export async function generateMetadata(): Promise<Metadata> {
+  const content = await fetchPageContent('home');
   // No title: home uses the layout's default rather than the "%s | Brand"
   // template, so it reads as the site rather than a section of it.
   return seoMetadata({
@@ -17,6 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/',
     description: SITE_DESCRIPTION,
     shareTitle: `${SITE_NAME} | Property Sales, Rentals and Management in Nairobi`,
+    image: contentValue(content, 'hero.backgroundImage', ''),
   });
 }
 
