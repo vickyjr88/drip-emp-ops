@@ -66,6 +66,48 @@ export function CartClient() {
   const total = cart.subtotal + shipping;
 
   /**
+   * Marks this basket as a possible abandoned-cart lead once there is a way to
+   * reach whoever is filling it in. Debounced so every keystroke in the form
+   * does not fire a request, and skipped entirely while an order is actually
+   * being placed -- a cart that is about to become a real sale is not an
+   * abandoned one.
+   */
+  useEffect(() => {
+    if (!cart.ready || submitting) return;
+    if (cart.lines.length === 0) return;
+    const hasContact = Boolean(form.phone.trim() || form.email.trim());
+    if (!hasContact) return;
+
+    const timer = window.setTimeout(() => {
+      void fetch(`${API}/cart-leads/abandoned-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'ABANDONED_CART',
+          lines: cart.lines.map((line) => ({
+            variantId: line.variantId,
+            sku: line.sku,
+            name: line.name,
+            size: line.size,
+            quantity: line.quantity,
+            priceKes: line.priceKes,
+          })),
+          customerName: `${form.firstName} ${form.lastName}`.trim() || undefined,
+          customerPhone: form.phone.trim() || undefined,
+          customerEmail: form.email.trim() || undefined,
+          shippingAddress: deliver ? form.shippingAddress.trim() || undefined : undefined,
+          shipping,
+        }),
+      }).catch(() => {
+        // Best-effort: a shopper's checkout must never depend on this.
+      });
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.ready, cart.lines, form.firstName, form.lastName, form.email, form.phone, form.shippingAddress, deliver, submitting]);
+
+  /**
    * The order as a message someone can read on a phone.
    *
    * Carries everything the form collected -- who, how to reach them, and where
@@ -94,6 +136,44 @@ export function CartClient() {
     if (wantAccount) lines.push('Please set up my account for order tracking.');
 
     return lines.join('\n');
+  }
+
+  /** The cart's lines in the shape the backend keeps a lead snapshot in. */
+  function leadLines() {
+    return cart.lines.map((line) => ({
+      variantId: line.variantId,
+      sku: line.sku,
+      name: line.name,
+      size: line.size,
+      quantity: line.quantity,
+      priceKes: line.priceKes,
+    }));
+  }
+
+  /**
+   * Persists the cart the moment a shopper chooses WhatsApp, so the order is
+   * on record even if they never actually send the message that follows.
+   * Fire-and-forget: a shopper's WhatsApp app opening must never wait on, or
+   * be blocked by, this request.
+   */
+  function recordWhatsappLead() {
+    void fetch(`${API}/cart-leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source: 'WHATSAPP_ORDER',
+        lines: leadLines(),
+        customerName: `${form.firstName} ${form.lastName}`.trim() || undefined,
+        customerPhone: form.phone.trim() || undefined,
+        customerEmail: form.email.trim() || undefined,
+        shippingAddress: deliver ? form.shippingAddress.trim() || undefined : undefined,
+        shipping,
+        message: buildWhatsappMessage(),
+      }),
+    }).catch(() => {
+      // Best-effort: the shopper's own WhatsApp order still goes out even if
+      // recording it here fails.
+    });
   }
 
   /**
@@ -133,6 +213,7 @@ export function CartClient() {
           setError(`${data?.message || 'Could not create your account.'} Your order details have still been sent.`);
         }
       }
+      recordWhatsappLead();
       window.open(enquiry.whatsappHref(buildWhatsappMessage()), '_blank', 'noopener');
     } finally {
       setSubmitting(false);

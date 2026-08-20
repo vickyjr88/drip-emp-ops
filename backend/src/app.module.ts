@@ -11,6 +11,7 @@ import { StorefrontModule } from './storefront/storefront.module';
 import { OfferModule } from './offer/offer.module';
 import { PaystackModule } from './paystack/paystack.module';
 import { CheckoutModule } from './checkout/checkout.module';
+import { CartLeadModule } from './cart-lead/cart-lead.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 
@@ -70,6 +71,7 @@ import { PdfModule } from './pdf/pdf.module';
     OfferModule,
     PaystackModule,
     CheckoutModule,
+    CartLeadModule,
     PrismaModule,
     CustomerModule,
     CustomerPortalModule,

@@ -60,6 +60,14 @@ type Order = {
 const CHANNELS = ['IN_STORE', 'WHATSAPP', 'INSTAGRAM', 'WEBSITE'];
 const METHODS = ['MPESA', 'CASH', 'CARD', 'BANK_TRANSFER'];
 
+type CartLeadLine = { variantId: string; sku: string; name: string; size: string; quantity: number; priceKes: number };
+type CartLead = {
+  id: string; source: 'WHATSAPP_ORDER' | 'ABANDONED_CART'; status: 'NEW' | 'CONTACTED' | 'CONVERTED' | 'EXPIRED';
+  customerName?: string | null; customerPhone?: string | null; customerEmail?: string | null;
+  lines: CartLeadLine[]; total: string | number; message?: string | null;
+  lastActivityAt: string; createdAt: string;
+};
+
 type Draft = {
   variantId: string; quantity: number; label: string; price: number;
   fulfillmentType: FulfillmentType;
@@ -91,6 +99,8 @@ export default function OrdersPage() {
    *  picked, same pattern as the item and reseller pickers elsewhere. */
   const [customerQuery, setCustomerQuery] = useState('');
   const [payment, setPayment] = useState({ orderId: '', amount: '', method: 'MPESA', reference: '' });
+  /** Set while the till is being used to ring up a specific lead, so placing the order can mark that lead converted afterwards. */
+  const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -158,6 +168,69 @@ export default function OrdersPage() {
     filters: orderFilters,
     enabled: Boolean(token),
   });
+
+  const [leadSourceFilter, setLeadSourceFilter] = useState('');
+  const leadFilters = useMemo(() => ({ source: leadSourceFilter || undefined }), [leadSourceFilter]);
+
+  const fetchLeadsPage = useCallback(
+    async (params: { skip: number; take: number; search: string; source?: string }): Promise<ServerPage<CartLead>> => {
+      if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
+      const query = new URLSearchParams();
+      query.set('skip', String(params.skip));
+      query.set('take', String(params.take));
+      // A lead already turned into an order, or expired, has nothing left for
+      // staff to act on -- the default view is only the outstanding ones.
+      query.set('status', 'NEW');
+      if (params.search) query.set('search', params.search);
+      if (params.source) query.set('source', params.source);
+      return apiRequest<ServerPage<CartLead>>(`/cart-leads?${query}`, { method: 'GET' }, token);
+    },
+    [token],
+  );
+
+  const leadsPager = useServerPager<CartLead, typeof leadFilters>({
+    fetchPage: (params) => fetchLeadsPage(params),
+    filters: leadFilters,
+    enabled: Boolean(token),
+  });
+
+  async function onDismissLead(lead: CartLead) {
+    if (!token) return;
+    try {
+      await apiRequest(`/cart-leads/${lead.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'EXPIRED' }) }, token);
+      leadsPager.reload();
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  }
+
+  /** Pre-fills the till with this lead's items and contact so staff ring it up as a real order instead of retyping it. */
+  function onStartOrderFromLead(lead: CartLead) {
+    setHead((prev) => ({
+      ...prev,
+      channel: lead.source === 'WHATSAPP_ORDER' ? 'WHATSAPP' : prev.channel,
+      customerId: '',
+      customerName: lead.customerName || '',
+      customerPhone: lead.customerPhone || '',
+    }));
+    // The name field reads from customerQuery until a customer is picked from
+    // the autocomplete (see its value binding below) -- without also setting
+    // this, the prefill would be invisible even though head.customerName is
+    // correctly set underneath it.
+    setCustomerQuery(lead.customerName || '');
+    setDraft(
+      lead.lines.map((line) => ({
+        variantId: line.variantId,
+        quantity: line.quantity,
+        label: `${line.name} (${line.size})`,
+        price: line.priceKes,
+        fulfillmentType: 'STOCK' as FulfillmentType,
+      })),
+    );
+    setConvertingLeadId(lead.id);
+    setShowTill(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   const [exportRows, setExportRows] = useState<Order[]>([]);
   useEffect(() => {
@@ -346,6 +419,15 @@ export default function OrdersPage() {
         }),
       }, token);
       setFeedback(`${order.orderNumber} placed — ${formatMoney(order.total)}.`);
+      if (convertingLeadId) {
+        await apiRequest(`/cart-leads/${convertingLeadId}/convert`, { method: 'PATCH', body: JSON.stringify({ orderId: order.id }) }, token)
+          .catch(() => {
+            // The order is real either way; the lead just stays listed as
+            // outstanding if this follow-up call fails.
+          });
+        setConvertingLeadId(null);
+        leadsPager.reload();
+      }
       setDraft([]);
       setHead((prev) => ({ ...prev, customerId: '', customerName: '', customerPhone: '' }));
       setCustomerQuery('');
@@ -647,7 +729,7 @@ export default function OrdersPage() {
                     <button type="submit" className="portal-primary-btn" disabled={saving || draft.length === 0}>
                       {saving ? 'Placing...' : `Place Order — ${formatMoney(draftTotal)}`}
                     </button>
-                    <button type="button" className="portal-ghost-btn" onClick={() => { setShowTill(false); setDraft([]); }}>
+                    <button type="button" className="portal-ghost-btn" onClick={() => { setShowTill(false); setDraft([]); setConvertingLeadId(null); }}>
                       Cancel
                     </button>
                   </div>
@@ -690,6 +772,63 @@ export default function OrdersPage() {
                 </form>
               </article>
             ) : null}
+
+            <article className="portal-card" data-tour="orders.leads">
+              <div className="portal-card-header-row">
+                <div>
+                  <h2 style={{ margin: 0 }}>Cart Leads</h2>
+                  <p className="portal-muted" style={{ margin: '4px 0 0' }}>
+                    Shoppers who chose WhatsApp instead of checking out, or left a cart with contact details filled in.
+                  </p>
+                </div>
+              </div>
+
+              <div className="list-toolbar">
+                <ServerListSearch pager={leadsPager} placeholder="Search name, phone or email…" />
+                <select value={leadSourceFilter} onChange={(event) => setLeadSourceFilter(event.target.value)}>
+                  <option value="">All sources</option>
+                  <option value="WHATSAPP_ORDER">WhatsApp order</option>
+                  <option value="ABANDONED_CART">Abandoned cart</option>
+                </select>
+              </div>
+
+              <div className="portal-list-stack">
+                {!leadsPager.loading && leadsPager.items.length === 0 ? (
+                  <div className="portal-empty-state">
+                    {leadsPager.search || leadSourceFilter ? 'No leads match.' : 'No outstanding leads.'}
+                  </div>
+                ) : (
+                  leadsPager.items.map((lead) => (
+                    <div key={lead.id} className="portal-record">
+                      <div className="portal-list-row">
+                        <div>
+                          <strong>{lead.customerName || lead.customerPhone || lead.customerEmail}</strong>
+                          <span className="portal-chip" style={{ marginLeft: 8 }}>
+                            {lead.source === 'WHATSAPP_ORDER' ? 'WhatsApp' : 'Abandoned cart'}
+                          </span>
+                          <p className="portal-muted">
+                            {lead.customerPhone || lead.customerEmail || 'No contact on file'} ·{' '}
+                            {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDate(lead.lastActivityAt)}
+                          </p>
+                          <p>{formatMoney(lead.total)}</p>
+                        </div>
+                        <div className="portal-action-row">
+                          {canCreate ? (
+                            <button type="button" className="portal-inline-btn" onClick={() => onStartOrderFromLead(lead)}>
+                              Start Order
+                            </button>
+                          ) : null}
+                          <button type="button" className="portal-inline-btn" onClick={() => void onDismissLead(lead)}>
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <ServerListPager pager={leadsPager} noun="leads" />
+            </article>
 
             <article className="portal-card" data-tour="orders.list">
               <div className="portal-card-header-row">

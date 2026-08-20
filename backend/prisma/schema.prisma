@@ -96,6 +96,7 @@ model Customer {
   receipts     Receipt[]
   orders       Order[]
   consignments Consignment[]
+  cartLeads    CartLead[]
 }
 
 model CustomerDocument {
@@ -1568,6 +1569,7 @@ model Order {
 
   lines    OrderLine[]
   payments OrderPayment[]
+  cartLead CartLead?
 
   @@index([customerId])
   @@index([storeId])
@@ -1665,6 +1667,60 @@ enum PriceTier {
   RETAIL
   RESELLER
   WHOLESALE
+}
+
+/// A storefront cart that has not (yet) become an Order -- either the shopper
+/// chose the WhatsApp route instead of paying online, or they filled in
+/// contact details and left before checking out either way. Both are the same
+/// shape (a cart snapshot plus a way to reach the shopper), so one table
+/// serves both rather than duplicating it.
+///
+/// Anonymous browsing is not recorded here at all: without a name, phone or
+/// email there is no lead to act on, only a cart nobody can be reached about.
+model CartLead {
+  id            String         @id @default(uuid())
+  source        CartLeadSource
+  status        CartLeadStatus @default(NEW)
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  customerId    String?
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+  shippingAddress String?
+  /// Snapshot of CartLine[] from the storefront cart at the moment this was
+  /// recorded: variantId, sku, name, size, quantity, priceKes. Copied rather
+  /// than referenced because the cart it came from is client-side and gone by
+  /// the time anyone looks at this.
+  lines    Json
+  subtotal Decimal
+  shipping Decimal @default(0)
+  total    Decimal
+  /// The exact WhatsApp message sent, when source is WHATSAPP_ORDER. Null for
+  /// an abandoned cart, which was never sent anywhere.
+  message String?
+  /// Set once staff turn this into a real Order, so the lead stops showing as
+  /// outstanding without deleting the trail that produced the sale.
+  order   Order?  @relation(fields: [orderId], references: [id])
+  orderId String? @unique
+
+  lastActivityAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([customerId])
+  @@index([source])
+  @@index([status])
+}
+
+enum CartLeadSource {
+  WHATSAPP_ORDER
+  ABANDONED_CART
+}
+
+enum CartLeadStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  EXPIRED
 }
 
 /// A shop that takes goods from us, sells them, and pays for what sold.
