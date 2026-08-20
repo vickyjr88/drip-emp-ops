@@ -3,6 +3,7 @@ import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, Pric
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
+import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderLineFulfillmentDto } from './dto/create-order.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
@@ -66,6 +67,7 @@ export class OrderService {
     private readonly prisma: PrismaService,
     private readonly inventory: InventoryService,
     private readonly posting: SalesPostingService,
+    private readonly ownerNotification: OwnerNotificationService,
   ) {}
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
@@ -347,7 +349,7 @@ export class OrderService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.orderPayment.create({
         data: {
           orderId: id,
@@ -376,6 +378,21 @@ export class OrderService {
         include: INCLUDE,
       });
     });
+
+    // WhatsApp orders specifically, per the notification scope -- an in-store
+    // walk-in settling at the till is not one of the events worth an email.
+    if (updated.status === 'PAID' && order.status !== 'PAID' && updated.channel === 'WHATSAPP') {
+      void this.ownerNotification.notifyOrderPaid({
+        orderNumber: updated.orderNumber,
+        channel: updated.channel,
+        customerName: updated.customerName,
+        customerPhone: updated.customerPhone,
+        customerEmail: updated.customerEmail,
+        total: Number(updated.total),
+      });
+    }
+
+    return updated;
   }
 
   /** What sold, over a period. */

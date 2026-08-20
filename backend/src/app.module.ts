@@ -12,6 +12,7 @@ import { OfferModule } from './offer/offer.module';
 import { PaystackModule } from './paystack/paystack.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { CartLeadModule } from './cart-lead/cart-lead.module';
+import { InquiryModule } from './inquiry/inquiry.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 
@@ -72,6 +73,7 @@ import { PdfModule } from './pdf/pdf.module';
     PaystackModule,
     CheckoutModule,
     CartLeadModule,
+    InquiryModule,
     PrismaModule,
     CustomerModule,
     CustomerPortalModule,

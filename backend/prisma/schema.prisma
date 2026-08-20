@@ -1723,6 +1723,28 @@ enum CartLeadStatus {
   EXPIRED
 }
 
+/// A message through the contact form, not attached to any product or order --
+/// someone asking about a size, a general question, or anything else that
+/// does not fit the storefront's other flows.
+model Inquiry {
+  id      String        @id @default(uuid())
+  name    String
+  email   String
+  phone   String?
+  message String
+  status  InquiryStatus @default(NEW)
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  RESOLVED
+}
+
 /// A shop that takes goods from us, sells them, and pays for what sold.
 ///
 

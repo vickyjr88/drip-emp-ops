@@ -4,9 +4,10 @@ import { OrderService } from './order.service';
 import { OrderController } from './order.controller';
 import { InventoryModule } from '../inventory/inventory.module';
 import { SalesPostingModule } from '../sales-posting/sales-posting.module';
+import { EmailLogModule } from '../email-log/email-log.module';
 
 @Module({
-  imports: [PrismaModule, InventoryModule, SalesPostingModule],
+  imports: [PrismaModule, InventoryModule, SalesPostingModule, EmailLogModule],
   controllers: [OrderController],
   providers: [OrderService],
   exports: [OrderService],

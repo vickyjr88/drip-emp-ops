@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EmailLogModule } from '../email-log/email-log.module';
-import { CartLeadService } from './cart-lead.service';
-import { CartLeadController } from './cart-lead.controller';
+import { InquiryService } from './inquiry.service';
+import { InquiryController } from './inquiry.controller';
 
 @Module({
   imports: [PrismaModule, EmailLogModule],
-  controllers: [CartLeadController],
-  providers: [CartLeadService],
+  controllers: [InquiryController],
+  providers: [InquiryService],
 })
-export class CartLeadModule {}
+export class InquiryModule {}

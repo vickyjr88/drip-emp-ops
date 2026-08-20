@@ -2,12 +2,16 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CartLeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/pagination.util';
+import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { RecordCartLeadDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
 
 @Injectable()
 export class CartLeadService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ownerNotification: OwnerNotificationService,
+  ) {}
 
   /**
    * A cart with nobody to reach is not a lead, only browsing -- the caller
@@ -131,6 +135,17 @@ export class CartLeadService {
     if (existing) {
       return this.prisma.cartLead.update({ where: { id: existing.id }, data });
     }
-    return this.prisma.cartLead.create({ data: { ...data, source: 'ABANDONED_CART' } });
+
+    const created = await this.prisma.cartLead.create({ data: { ...data, source: 'ABANDONED_CART' } });
+    // Only on the first sync for this cart -- later syncs are the same
+    // shopper still typing, not a new abandonment to report each time.
+    void this.ownerNotification.notifyAbandonedCart({
+      customerName: created.customerName,
+      customerPhone: created.customerPhone,
+      customerEmail: created.customerEmail,
+      lines: dto.lines,
+      total: Number(created.total),
+    });
+    return created;
   }
 }

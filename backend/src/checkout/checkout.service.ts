@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { PaystackService } from '../paystack/paystack.service';
+import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 
@@ -33,6 +34,7 @@ export class CheckoutService {
     private readonly inventory: InventoryService,
     private readonly posting: SalesPostingService,
     private readonly paystack: PaystackService,
+    private readonly ownerNotification: OwnerNotificationService,
   ) {}
 
   /**
@@ -53,7 +55,7 @@ export class CheckoutService {
     if (existing) {
       const setPassword = details.password && !existing.portalPassword;
       if (setPassword) {
-        return tx.customer.update({
+        const updated = await tx.customer.update({
           where: { id: existing.id },
           data: {
             portalPassword: await bcrypt.hash(details.password!, 10),
@@ -61,11 +63,15 @@ export class CheckoutService {
             phone: details.phone || existing.phone,
           },
         });
+        // A password being set is the actual "signed up" moment -- a bare
+        // customer record from an earlier guest checkout was never that.
+        void this.ownerNotification.notifySignup(updated);
+        return updated;
       }
       return existing;
     }
 
-    return tx.customer.create({
+    const created = await tx.customer.create({
       data: {
         firstName: details.firstName.trim(),
         lastName: details.lastName.trim(),
@@ -76,6 +82,10 @@ export class CheckoutService {
           : {}),
       },
     });
+    // Same distinction as above: only a password makes this a real signup,
+    // not just a new guest-checkout customer row.
+    if (details.password) void this.ownerNotification.notifySignup(created);
+    return created;
   }
 
   /** Signup on its own, for someone creating an account before buying. */
@@ -334,6 +344,19 @@ export class CheckoutService {
         },
       });
     });
+
+    // Only on the transition into PAID, not every settle() call this order
+    // will ever see -- a part-payment or a webhook replay must not re-notify.
+    if (updated.status === OrderStatus.PAID && order.status !== OrderStatus.PAID) {
+      void this.ownerNotification.notifyOrderPaid({
+        orderNumber: updated.orderNumber,
+        channel: updated.channel,
+        customerName: updated.customerName,
+        customerPhone: updated.customerPhone,
+        customerEmail: updated.customerEmail,
+        total: Number(updated.total),
+      });
+    }
 
     return { orderNumber: updated.orderNumber, status: updated.status, paid: true };
   }
