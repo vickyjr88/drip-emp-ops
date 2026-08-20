@@ -19,7 +19,7 @@ import { useRouter } from 'next/navigation';
 import { EliteLayout } from './components/elite-layout';
 import { ProductCard } from './components/product-card';
 import { PageContentDocument, contentValue, fetchPageContent } from './lib/page-content';
-import { ShopCategory, ShopProduct, fetchCategories, fetchProducts } from './lib/shop';
+import { ShopCategory, ShopProduct, fetchCategories, fetchFeaturedProducts } from './lib/shop';
 import { useEnquiryContact } from './lib/use-enquiry-contact';
 
 type TrustBadge = { title: string; description: string };
@@ -44,16 +44,14 @@ export default function HomeClient() {
   const enquiry = useEnquiryContact();
 
   const [content, setContent] = useState<PageContentDocument | null>(null);
-  const [newest, setNewest] = useState<ShopProduct[]>([]);
+  const [featured, setFeatured] = useState<ShopProduct[]>([]);
   const [categories, setCategories] = useState<ShopCategory[]>([]);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     void fetchPageContent('home').then((doc) => { if (!cancelled) setContent(doc); });
-    void fetchProducts({ inStockOnly: 'true' }).then((rows) => {
-      if (!cancelled) setNewest(rows.slice(0, 10));
-    });
+    void fetchFeaturedProducts(10).then((rows) => { if (!cancelled) setFeatured(rows); });
     void fetchCategories().then((rows) => { if (!cancelled) setCategories(rows); });
     return () => { cancelled = true; };
   }, []);
@@ -73,11 +71,11 @@ export default function HomeClient() {
     'Sneakers, boots, casuals, sandals, officials and cleaning agents — all in one place.',
   );
 
-  const newestHeading = contentValue(content, 'featured.heading', 'In Stock Now');
-  const newestSub = contentValue(
+  const featuredHeading = contentValue(content, 'featured.heading', 'Featured Products');
+  const featuredSub = contentValue(
     content,
     'featured.subheading',
-    'Fresh pairs on the shelf at Ronald Ngala Street. Sizes move fast.',
+    'The pairs we would point you to first. Sizes move fast.',
   );
 
   const trustHeading = contentValue(content, 'trust.heading', 'Why Shop With Us');
@@ -221,18 +219,18 @@ export default function HomeClient() {
           </section>
         ) : null}
 
-        {newest.length ? (
+        {featured.length ? (
           <section className="lp-container de-home-new">
             <div className="de-home-new-head">
               <div>
-                <h2>{newestHeading}</h2>
-                <p>{newestSub}</p>
+                <h2>{featuredHeading}</h2>
+                <p>{featuredSub}</p>
               </div>
               <Link className="lp-button lp-button-ghost" href="/shop">View All</Link>
             </div>
 
             <div className="de-grid">
-              {newest.map((product) => (
+              {featured.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>

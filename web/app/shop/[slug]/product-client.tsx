@@ -142,7 +142,10 @@ export function ProductClient({ product }: { product: ShopProduct }) {
 
           <div className="de-product-info">
             <div className="de-product-title-row">
-              {product.brand ? <p className="de-product-brand">{product.brand}</p> : null}
+              <div className="de-product-title-row-left">
+                {product.brand ? <p className="de-product-brand">{product.brand}</p> : null}
+                {product.isFeatured ? <span className="de-product-featured-flag">Featured</span> : null}
+              </div>
               <ShareButton
                 url={absoluteUrl(`/shop/${product.slug}`)}
                 title={product.name}

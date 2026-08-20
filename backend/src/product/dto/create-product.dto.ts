@@ -110,6 +110,14 @@ export class CreateProductDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Shown in the "Featured" rail on the home, shop and product pages.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
   /**
    * Created with the product rather than in a second call: a product with no
    * variant cannot be sold, so allowing one to be saved alone only invites

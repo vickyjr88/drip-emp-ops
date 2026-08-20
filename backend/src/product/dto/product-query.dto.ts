@@ -24,4 +24,9 @@ export class ProductQueryDto extends PagedQueryDto {
   @IsOptional()
   @Transform(toBoolean)
   isActive?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(toBoolean)
+  isFeatured?: boolean;
 }

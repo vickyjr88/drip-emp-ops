@@ -68,6 +68,9 @@ export function ProductCard({ product }: { product: ShopProduct }) {
             {product.name.charAt(0)}
           </span>
         )}
+        {product.isFeatured ? (
+          <span className="de-card-flag is-featured">Featured</span>
+        ) : null}
         {!product.anyInStock && orderableVariants.length ? (
           <span className="de-card-flag is-preorder">Ships from supplier</span>
         ) : null}

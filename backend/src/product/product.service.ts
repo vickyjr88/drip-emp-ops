@@ -87,11 +87,12 @@ export class ProductService {
    * for a shoe types whichever of the three they happen to remember.
    */
   async findAll(query: ProductQueryDto) {
-    const { skip, take, search, categoryId, brand, isActive } = query;
+    const { skip, take, search, categoryId, brand, isActive, isFeatured } = query;
     const where: Prisma.ProductWhereInput = {
       ...(categoryId ? { categoryId } : {}),
       ...(brand ? { brand: { equals: brand, mode: 'insensitive' } } : {}),
       ...(isActive !== undefined ? { isActive } : {}),
+      ...(isFeatured !== undefined ? { isFeatured } : {}),
       ...(search
         ? {
             OR: [

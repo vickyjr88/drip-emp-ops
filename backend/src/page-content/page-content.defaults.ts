@@ -128,8 +128,8 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       ],
     },
     featured: {
-      heading: 'In Stock Now',
-      subheading: 'Fresh pairs on the shelf at Ronald Ngala Street. Sizes move fast.',
+      heading: 'Featured Products',
+      subheading: 'The pairs we would point you to first. Sizes move fast.',
     },
     // Trust badges, directly under the hero: what a first-time visitor checks
     // before they trust a shop enough to add something to a cart. Four reads

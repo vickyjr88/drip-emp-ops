@@ -35,6 +35,8 @@ export type ShopProduct = {
   description?: string | null;
   imageUrls: string[];
   category?: { name: string; slug: string } | null;
+  /** Merchant-picked for the "Featured" rail, not the per-product hero image. */
+  isFeatured?: boolean;
   variants: ShopVariant[];
   priceFrom: number;
   priceTo: number;
@@ -69,6 +71,11 @@ export function fetchProducts(query: Record<string, string | undefined> = {}) {
 
 export function fetchProduct(slug: string) {
   return get<ShopProduct | null>(`/shop/products/${slug}`, null);
+}
+
+/** The "Featured" rail for the home, shop and product pages. */
+export function fetchFeaturedProducts(limit = 10) {
+  return get<ShopProduct[]>(`/shop/products/featured?limit=${limit}`, []);
 }
 
 export const fetchCategories = () => get<ShopCategory[]>('/shop/categories', []);

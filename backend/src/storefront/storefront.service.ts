@@ -70,6 +70,7 @@ export class StorefrontService {
           : all;
       })(),
       category: product.category ? { name: product.category.name, slug: product.category.slug } : null,
+      isFeatured: Boolean(product.isFeatured),
       variants,
       priceFrom: prices.length ? Math.min(...prices) : 0,
       priceTo: prices.length ? Math.max(...prices) : 0,
@@ -228,6 +229,62 @@ export class StorefrontService {
     shaped.sort((a, b) => Number(b.anyInStock) - Number(a.anyInStock) || comparator(a, b));
 
     return shaped;
+  }
+
+  /**
+   * The home page's and shop's "Featured" rail.
+   *
+   * Merchant-picked products lead, in the order they were marked featured
+   * (oldest pick first, so a long-running favourite does not keep jumping
+   * around the rail every time something new is added). If that is not
+   * enough to fill the rail, or nobody has picked anything yet, random
+   * in-stock products top it up -- picked fresh each call rather than by
+   * recency, so the fallback does not just become a second "newest" rail.
+   * Curated picks are never displaced by the filler, and a sold-out product
+   * is never used as filler since showing something nobody can buy in the
+   * shop's best position defeats the point of featuring it.
+   */
+  async featured(limit = 10) {
+    const featuredProducts = await this.prisma.product.findMany({
+      where: { isActive: true, isFeatured: true },
+      include: {
+        category: { select: { name: true, slug: true } },
+        variants: { orderBy: { name: 'asc' } },
+      },
+      orderBy: { updatedAt: 'asc' },
+      take: limit,
+    });
+
+    const remaining = limit - featuredProducts.length;
+    let fillerProducts: (typeof featuredProducts)[number][] = [];
+    if (remaining > 0) {
+      const candidates = await this.prisma.product.findMany({
+        where: { isActive: true, isFeatured: false },
+        include: {
+          category: { select: { name: true, slug: true } },
+          variants: { orderBy: { name: 'asc' } },
+        },
+      });
+      // Shuffled so the filler looks freshly picked on every visit rather than
+      // always being the same handful of products in id/creation order.
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      fillerProducts = candidates;
+    }
+
+    const all = [...featuredProducts, ...fillerProducts];
+    const variantIds = all.flatMap((product) => product.variants.map((variant) => variant.id));
+    const [stock, offers] = await Promise.all([this.stockMap(variantIds), this.offerMap(variantIds)]);
+
+    const shapedFeatured = featuredProducts.map((product) => this.shape(product, stock, offers));
+    const shapedFiller = fillerProducts
+      .map((product) => this.shape(product, stock, offers))
+      // Sold-out filler is worse than showing fewer products in this slot.
+      .filter((product) => product.anyInStock);
+
+    return [...shapedFeatured, ...shapedFiller].slice(0, limit);
   }
 
   /**

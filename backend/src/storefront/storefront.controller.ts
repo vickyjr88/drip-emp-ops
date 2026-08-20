@@ -39,6 +39,15 @@ export class StorefrontController {
     return this.service.list({ category, brand, size, search, minPrice, maxPrice, inStockOnly, sort });
   }
 
+  // Declared before 'products/:slug' below, or "featured" would be read as a
+  // product slug.
+  @Public()
+  @Get('products/featured')
+  featured(@Query('limit') limit?: string) {
+    const parsed = limit ? Number(limit) : undefined;
+    return this.service.featured(parsed && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined);
+  }
+
   // After the literal routes above, or "categories" is read as a slug.
   @Public()
   @Get('products/:slug')
