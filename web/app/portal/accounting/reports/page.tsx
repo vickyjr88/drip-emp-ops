@@ -83,6 +83,34 @@ const PDF_REPORTS: ReportKey[] = [
 type ChartOfAccount = { id: string; code: string; name: string; type?: string };
 type StoreOption = { id: string; code: string; name: string };
 
+/**
+ * Quick date-range presets, alongside the manual From/To pickers rather than
+ * replacing them -- picking a custom range is still the point of those
+ * inputs; these just save the trip for the ranges asked for every day.
+ *
+ * `days` is how far back from today the range starts; 0 means today only.
+ * Every preset still ends today, since a report about the past that stops
+ * short of now is rarely what "last 7 days" means.
+ */
+const DATE_PRESETS: Array<{ key: string; label: string; days: number }> = [
+  { key: 'today', label: 'Today', days: 0 },
+  { key: 'last7', label: 'Last 7 Days', days: 6 },
+  { key: 'last14', label: 'Last 14 Days', days: 13 },
+  { key: 'last30', label: 'Last 30 Days', days: 29 },
+];
+
+/** YYYY-MM-DD, the shape every date input and report endpoint already uses. */
+function toISODate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function presetRange(days: number): { from: string; to: string } {
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(today.getDate() - days);
+  return { from: toISODate(start), to: toISODate(today) };
+}
+
 export default function FinancialReportsPage() {
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -96,6 +124,10 @@ export default function FinancialReportsPage() {
   const [activeReport, setActiveReport] = useState<ReportKey>('store-performance');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  // Which preset (if any) produced the current from/to, so the matching
+  // button can stay highlighted. Cleared on any manual edit so a stale
+  // preset never looks selected once the dates no longer match it.
+  const [activePreset, setActivePreset] = useState<string | null>(null);
   const [glAccountId, setGlAccountId] = useState('');
   const [storeId, setStoreId] = useState('');
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -145,6 +177,17 @@ export default function FinancialReportsPage() {
     void init(token);
   }, [initialized, token, init]);
 
+  function applyPreset(preset: { key: string; days: number }) {
+    const { from: nextFrom, to: nextTo } = presetRange(preset.days);
+    setFrom(nextFrom);
+    setTo(nextTo);
+    setActivePreset(preset.key);
+    // A preset is meant to be one click, not "set the dates, then remember to
+    // also press Run Report" -- unlike typing a custom range by hand, where
+    // a separate confirm makes sense while both fields are mid-edit.
+    void runReport({ from: nextFrom, to: nextTo });
+  }
+
   /**
    * Downloads the current report as a PDF using the same filters on screen, so
    * the file matches what the user is looking at rather than a default period.
@@ -180,9 +223,14 @@ export default function FinancialReportsPage() {
     }
   }
 
-  const runReport = useCallback(async () => {
+  const runReport = useCallback(async (overrides?: { from?: string; to?: string }) => {
     if (!token) return;
     const reportKeyAtRequestTime = activeReport;
+    // A preset calls this in the same tick as setFrom/setTo, before the state
+    // update has landed -- reading from/to here would still see the old
+    // values. Every other caller omits overrides and gets current state.
+    const effectiveFrom = overrides?.from ?? from;
+    const effectiveTo = overrides?.to ?? to;
     setReportLoading(true);
     setErrorMessage(null);
     try {
@@ -195,13 +243,13 @@ export default function FinancialReportsPage() {
       const scopedStoreId = REPORTS_WITHOUT_STORE_SCOPE.includes(activeReport) ? '' : storeId;
 
       const params = new URLSearchParams();
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
+      if (effectiveFrom) params.set('from', effectiveFrom);
+      if (effectiveTo) params.set('to', effectiveTo);
       if (scopedStoreId) params.set('storeId', scopedStoreId);
 
       // For as-of reports the date lives in `asOf` rather than `to`.
       const asOfParams = new URLSearchParams();
-      if (to) asOfParams.set('asOf', to);
+      if (effectiveTo) asOfParams.set('asOf', effectiveTo);
       if (scopedStoreId) asOfParams.set('storeId', scopedStoreId);
       const asOfQuery = asOfParams.toString() ? `?${asOfParams.toString()}` : '';
 
@@ -346,16 +394,38 @@ export default function FinancialReportsPage() {
 
             <article className="portal-card">
               <div className="portal-entity-form" style={{ marginBottom: 16 }}>
+                {/* Quick presets beside the manual pickers below, not instead of
+                    them -- a custom range is still typed into From/To directly. */}
+                <div className="portal-action-row" style={{ marginBottom: 12 }}>
+                  {DATE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      className={`portal-inline-btn${activePreset === preset.key ? ' is-active' : ''}`}
+                      onClick={() => applyPreset(preset)}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="portal-entity-grid-3">
                   {activeReport !== 'trial-balance' && activeReport !== 'balance-sheet' && activeReport !== 'ar-aging' && activeReport !== 'ap-aging' ? (
                     <label>
                       <span>From</span>
-                      <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+                      <input
+                        type="date"
+                        value={from}
+                        onChange={(event) => { setFrom(event.target.value); setActivePreset(null); }}
+                      />
                     </label>
                   ) : null}
                   <label>
                     <span>{activeReport === 'balance-sheet' || activeReport === 'trial-balance' || activeReport === 'ar-aging' || activeReport === 'ap-aging' ? 'As Of' : 'To'}</span>
-                    <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+                    <input
+                      type="date"
+                      value={to}
+                      onChange={(event) => { setTo(event.target.value); setActivePreset(null); }}
+                    />
                   </label>
                   {activeReport === 'general-ledger' ? (
                     <label>

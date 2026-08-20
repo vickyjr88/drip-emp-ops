@@ -10,6 +10,17 @@ function round2(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * A bare date string as "to" means the caller wants that whole day included.
+ * `new Date("2026-08-20")` parses as midnight UTC, so an unadjusted `lte`
+ * would cut off everything posted that day -- a report for "today" would
+ * come back empty until the next one starts. Pushed to the last instant of
+ * the day instead, the same way order.service.ts's own summary already does.
+ */
+function endOfDay(to: string) {
+  return new Date(`${to}T23:59:59.999Z`);
+}
+
 @Injectable()
 export class FinancialReportsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -33,7 +44,7 @@ export class FinancialReportsService {
             ? {
                 entryDate: {
                   ...(params.from ? { gte: new Date(params.from) } : {}),
-                  ...(params.to ? { lte: new Date(params.to) } : {}),
+                  ...(params.to ? { lte: endOfDay(params.to) } : {}),
                 },
               }
             : {}),
@@ -158,7 +169,7 @@ export class FinancialReportsService {
         entry: {
           status: 'POSTED',
           ...(from || to
-            ? { entryDate: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } }
+            ? { entryDate: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: endOfDay(to) } : {}) } }
             : {}),
         },
         account: { code: { in: ['1000', '1010'] } },
@@ -240,7 +251,7 @@ export class FinancialReportsService {
         entry: {
           status: 'POSTED',
           ...(from || to
-            ? { entryDate: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } }
+            ? { entryDate: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: endOfDay(to) } : {}) } }
             : {}),
         },
       },
@@ -291,7 +302,7 @@ export class FinancialReportsService {
         ? {
             placedAt: {
               ...(from ? { gte: new Date(from) } : {}),
-              ...(to ? { lte: new Date(to) } : {}),
+              ...(to ? { lte: endOfDay(to) } : {}),
             },
           }
         : {}),
