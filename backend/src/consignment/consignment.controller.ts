@@ -31,6 +31,16 @@ export class ConsignmentController {
     return this.service.stats();
   }
 
+  @Get('activity')
+  @Permissions(buildPermissionKey('Consignment', 'read'))
+  activity(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    return this.service.activity(from, to, storeId);
+  }
+
   @Get(':id')
   @Permissions(buildPermissionKey('Consignment', 'read'))
   findOne(@Param('id') id: string) { return this.service.findOne(id); }

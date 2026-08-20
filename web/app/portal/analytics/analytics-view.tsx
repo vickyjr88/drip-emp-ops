@@ -15,7 +15,7 @@
  */
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { useErrorState } from '../components/notifications';
@@ -24,6 +24,7 @@ import {
   TOKEN_KEY,
   apiRequest,
   canReadRbacFor,
+  formatDate,
   formatMoney,
   hasPermission,
   loadProfile,
@@ -77,8 +78,46 @@ type SalesSummary = {
   averageOrderValue: number;
 };
 
+type ConsignmentActivity = {
+  pickupsIssued: number;
+  valueIssued: number;
+  collected: number;
+};
+
 function percentLabel(value: number | null | undefined) {
   return value === null || value === undefined ? '—' : `${value.toFixed(1)}%`;
+}
+
+function round1(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+type Period = 'today' | 'week' | 'month';
+
+const PERIOD_LABEL: Record<Period, string> = { today: 'Today', week: 'This Week', month: 'This Month' };
+
+/** ISO date-only strings (YYYY-MM-DD), the shape every report endpoint's
+ *  from/to already expects. Week starts Monday, matching how the shop
+ *  actually counts a trading week rather than the locale default of Sunday. */
+function periodRange(period: Period): { from: string; to: string } {
+  const now = new Date();
+  const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+  const to = toISODate(now);
+
+  if (period === 'today') return { from: to, to };
+
+  if (period === 'week') {
+    const day = now.getDay();
+    // getDay(): 0 = Sunday. Distance back to Monday is 6 when today is
+    // Sunday, otherwise day - 1.
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - diffToMonday);
+    return { from: toISODate(monday), to };
+  }
+
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: toISODate(firstOfMonth), to };
 }
 
 export function AnalyticsView() {
@@ -92,6 +131,15 @@ export function AnalyticsView() {
   const [products, setProducts] = useState<{ rows: ProductRow[]; totals: any; costIncomplete: boolean } | null>(null);
   const [consignment, setConsignment] = useState<{ rows: ConsignmentRow[]; totals: any } | null>(null);
   const [summary, setSummary] = useState<SalesSummary | null>(null);
+
+  // The day/week/month cut, kept apart from the all-time panels above: this
+  // reloads on its own when the period changes, rather than re-running the
+  // whole page's init() just to move a date window.
+  const [period, setPeriod] = useState<Period>('today');
+  const [periodLoading, setPeriodLoading] = useState(false);
+  const [periodSales, setPeriodSales] = useState<{ totals: any } | null>(null);
+  const [periodConsignments, setPeriodConsignments] = useState<ConsignmentActivity | null>(null);
+  const range = useMemo(() => periodRange(period), [period]);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -141,6 +189,29 @@ export function AnalyticsView() {
     }
     void init(token);
   }, [initialized, token, init]);
+
+  useEffect(() => {
+    if (!initialized || !token || !profile) return;
+    const { from, to } = range;
+    let cancelled = false;
+    setPeriodLoading(true);
+    void Promise.all([
+      hasPermission(profile, 'journal-entry.read')
+        ? apiRequest<{ totals: any }>(`/reports/store-performance?from=${from}&to=${to}`, { method: 'GET' }, token).catch(() => null)
+        : Promise.resolve(null),
+      hasPermission(profile, 'consignment.read')
+        ? apiRequest<ConsignmentActivity>(`/consignments/activity?from=${from}&to=${to}`, { method: 'GET' }, token).catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([sales, consignments]) => {
+      if (cancelled) return;
+      setPeriodSales(sales);
+      setPeriodConsignments(consignments);
+      setPeriodLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialized, token, profile, range]);
 
   function onLogout() {
     window.localStorage.removeItem(TOKEN_KEY);
@@ -249,6 +320,71 @@ export function AnalyticsView() {
                     </span>
                   </div>
                 </div>
+
+                {/* ---- Day / week / month ---------------------------------- */}
+                <article className="portal-card" style={{ marginBottom: 20 }}>
+                  <div className="portal-card-header-row">
+                    <div>
+                      <h2 style={{ margin: 0 }}>Sales &amp; Consignments</h2>
+                      <p className="portal-muted" style={{ margin: '4px 0 0' }}>
+                        {PERIOD_LABEL[period]}, {range.from === range.to
+                          ? formatDate(range.from)
+                          : `${formatDate(range.from)} – ${formatDate(range.to)}`}
+                      </p>
+                    </div>
+                    <div className="portal-tabs">
+                      {(['today', 'week', 'month'] as Period[]).map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={period === option ? 'is-active' : ''}
+                          onClick={() => setPeriod(option)}
+                        >
+                          {PERIOD_LABEL[option]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {periodLoading ? (
+                    <p className="portal-muted">Loading…</p>
+                  ) : (
+                    <div className="portal-stat-grid" style={{ marginTop: 16 }}>
+                      <div className="portal-stat">
+                        <span>Sales</span>
+                        <h3>{formatMoney(periodSales?.totals?.revenue ?? 0)}</h3>
+                        <span className="portal-stat-note">
+                          {periodSales?.totals?.orderCount ?? 0} order
+                          {periodSales?.totals?.orderCount === 1 ? '' : 's'}
+                        </span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>Gross profit</span>
+                        <h3>{formatMoney(periodSales?.totals?.grossProfit ?? 0)}</h3>
+                        <span className="portal-stat-note">
+                          {periodSales?.totals?.revenue
+                            ? percentLabel(
+                                round1((periodSales.totals.grossProfit / periodSales.totals.revenue) * 100),
+                              )
+                            : '—'}{' '}
+                          margin
+                        </span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>Pickups issued</span>
+                        <h3>{periodConsignments?.pickupsIssued ?? 0}</h3>
+                        <span className="portal-stat-note">
+                          {formatMoney(periodConsignments?.valueIssued ?? 0)} value
+                        </span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>Collected from resellers</span>
+                        <h3>{formatMoney(periodConsignments?.collected ?? 0)}</h3>
+                        <span className="portal-stat-note">In {PERIOD_LABEL[period].toLowerCase()}</span>
+                      </div>
+                    </div>
+                  )}
+                </article>
 
                 {/* Shown when any variant sold has no cost on file, because
                     every margin on this page then reads higher than it is. */}

@@ -397,6 +397,55 @@ export class ConsignmentService {
     return { unitsHeld, owed, overdue: overdueCount };
   }
 
+  /**
+   * What happened with resellers in a window, as opposed to stats() above,
+   * which is always "what is out right now" regardless of period. A day/week/
+   * month view wants activity -- pickups issued and cash actually collected in
+   * that window -- not the live exposure a period filter cannot sensibly
+   * apply to.
+   */
+  async activity(from?: string, to?: string, storeId?: string) {
+    const issuedWhere: Prisma.ConsignmentWhereInput = {
+      ...(storeId ? { storeId } : {}),
+      ...(from || to
+        ? {
+            issuedAt: {
+              ...(from ? { gte: new Date(from) } : {}),
+              ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [issued, collected] = await Promise.all([
+      this.prisma.consignment.aggregate({
+        where: issuedWhere,
+        _count: { _all: true },
+        _sum: { totalValue: true },
+      }),
+      this.prisma.consignmentPayment.aggregate({
+        where: {
+          ...(storeId ? { consignment: { storeId } } : {}),
+          ...(from || to
+            ? {
+                receivedAt: {
+                  ...(from ? { gte: new Date(from) } : {}),
+                  ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+                },
+              }
+            : {}),
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    return {
+      pickupsIssued: issued._count._all,
+      valueIssued: Number(issued._sum.totalValue ?? 0),
+      collected: Number(collected._sum.amount ?? 0),
+    };
+  }
+
   /** Adds the figures every caller wants: what is still out, and the balance. */
   private decorate<T extends { status: string; dueDate: Date | null; soldValue: Prisma.Decimal; amountPaid: Prisma.Decimal; lines: Array<{ quantityOut: number; quantitySold: number; quantityReturned: number }> }>(row: T) {
     const stillOut = row.lines.reduce(
