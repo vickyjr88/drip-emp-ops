@@ -10008,6 +10008,46 @@ img {
   font-size: 0.95rem;
 }
 
+/* The button is .lp-button-black, sized site-wide for a roomy standalone CTA
+   (28px horizontal padding). Inside this narrow two-item row that padding is
+   what pushed the row past a ~360px viewport -- the button has no flex-shrink
+   and nothing else in the row could give back enough space. Narrowed here
+   only, rather than on the shared class, since every other use of
+   .lp-button-black is a full-width or standalone button with room to spare. */
+.de-search-submit {
+  flex-shrink: 0;
+  gap: 6px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* Below this, "SEARCH" in the shared button's wide uppercase tracking is what
+   a phone actually runs out of room for -- the icon alone says the same
+   thing in a third of the width, and the button keeps its aria-label for
+   anyone using a screen reader. */
+@media (max-width: 480px) {
+  /* Same declarations as .lp-visually-hidden -- applied directly here rather
+     than by toggling that class, since there is no clean way to add a class
+     only below a breakpoint without JS. */
+  .de-search-submit-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .de-search-submit {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}
+
 .de-filter-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

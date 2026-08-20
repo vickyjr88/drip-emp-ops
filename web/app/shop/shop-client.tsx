@@ -21,6 +21,20 @@ import {
   ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts,
 } from '../lib/shop';
 
+/** The label beside this shrinks to icon-only below ~400px -- see .de-search
+ *  button in globals.css -- so the button still reads as "search" once its
+ *  text is hidden rather than becoming a plain black square. */
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        d="M10.5 3a7.5 7.5 0 0 1 5.807 12.246l4.473 4.474a1 1 0 0 1-1.32 1.497l-.094-.083-4.474-4.473A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 export function ShopClient() {
   const router = useRouter();
   const params = useSearchParams();
@@ -101,7 +115,10 @@ export function ShopClient() {
                 aria-label="Search products"
                 onChange={(event) => setSearchDraft(event.target.value)}
               />
-              <button type="submit" className="lp-button lp-button-black">Search</button>
+              <button type="submit" className="lp-button lp-button-black de-search-submit" aria-label="Search">
+                <SearchIcon />
+                <span className="de-search-submit-label">Search</span>
+              </button>
             </form>
 
             <div className="de-filter-row">
