@@ -7,10 +7,12 @@ import { previewFor } from './lib/preview-image';
  * Custom 404.
  *
  * A 404 is usually reached by someone who wanted something specific -- a
- * listing that has since sold, a mistyped URL, a stale link from elsewhere.
- * So this is a set of routes onward rather than an apology: the destinations
- * are ordered by what a lost visitor most likely wanted, with listings first
- * because that is what the site is for.
+ * size that sold out and was delisted, a mistyped URL, a stale link from
+ * elsewhere (this site used to run on a different platform, so old bookmarks
+ * and search results for it still turn up occasionally). So this is a set of
+ * routes onward rather than an apology: the destinations are ordered by what
+ * a lost visitor most likely wanted, with the shop first because that is
+ * what the site is for.
  *
  * Next returns HTTP 404 for this route automatically, which matters -- a soft
  * 404 (a "not found" page served as 200) gets the URL indexed as real content.
@@ -21,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: 'Page not found',
     description:
-      'That page could not be found. Browse available listings, explore our services, or get in touch with the Drip Emporium team.',
+      'That page could not be found. Shop sneakers and streetwear, or get in touch with the Drip Emporium team.',
     // Keep dead URLs out of the index while still serving a useful page.
     robots: { index: false, follow: true },
     // noindex does not stop a chat client or messaging app unfurling the link
@@ -32,29 +34,29 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const DESTINATIONS = [
   {
-    href: '/listings',
-    title: 'Browse listings',
-    body: 'Apartments, townhouses and plots currently available, with prices, floor plans and photos.',
+    href: '/shop',
+    title: 'Shop All',
+    body: 'Sneakers and streetwear from Nike, Adidas, Jordan and Puma, EUR 36-46.',
   },
   {
-    href: '/services',
-    title: 'What we do',
-    body: 'Sales, lettings, portfolio management and construction oversight.',
+    href: '/cart',
+    title: 'Your cart',
+    body: 'Pick up where you left off if you were mid checkout.',
   },
   {
     href: '/about',
     title: 'About Drip Emporium',
-    body: 'Who we are, how we work, and the developments we have delivered.',
+    body: 'Who we are, and where to find our two shops on Ronald Ngala Street.',
   },
   {
     href: '/contact',
     title: 'Talk to us',
-    body: 'Ask about a specific property or arrange a viewing.',
+    body: 'Ask about a size, an order, or anything else.',
   },
   {
-    href: '/portal',
-    title: 'Client portal',
-    body: 'Owners and tenants: statements, payments and documents.',
+    href: '/account',
+    title: 'Your account',
+    body: 'Sign in to track an order or see what is on its way.',
   },
 ];
 
@@ -66,8 +68,8 @@ export default function NotFound() {
           <p className="lp-about-eyebrow">Error 404</p>
           <h1>We couldn&rsquo;t find that page</h1>
           <p className="notfound-lede">
-            The link may be out of date, or a property that has since been sold or let. Here is
-            where most people go next.
+            The link may be out of date, or a pair that has since sold out. Here is where most
+            people go next.
           </p>
         </section>
 

@@ -121,6 +121,26 @@ Keep the forwarding headers the UI generates — `Host`, `X-Forwarded-For` and
 especially `X-Forwarded-Proto`, without which the app builds `http://` links
 behind an `https://` proxy.
 
+**A site that used to run something else (e.g. `dripemporium.store` previously
+ran OpenCart) can carry a leftover PHP handler.** aaPanel provisions a "PHP
+site" with a `location ~ \.php$` block pointing at a PHP-FPM pool by default,
+and switching that same site to reverse-proxy mode does not always remove it.
+If the old PHP-FPM pool is gone (the app it served no longer exists), any
+request nginx still matches to that block — `/administrator/index.php`,
+`/index.php?route=...`, or anything else ending in `.php` from old bookmarks
+or bots probing for the old admin panel — hits a dead upstream and nginx
+answers with its own 502/500, **before the request ever reaches this app's
+`web` container**. That is a different failure from a normal 404: the app's
+own `not-found.tsx` only runs for requests nginx actually forwards to it.
+
+Fix in aaPanel → Website → the site → **Config File**: remove any
+`location ~ \.php$` (or similar `.php`/`fastcgi_pass` handling) block so every
+request falls through to the reverse-proxy location and reaches the `web`
+container, which then serves its own 404 for anything that is not a real
+route. Re-check after any site-settings change made through the UI, since
+aaPanel can regenerate the PHP block on some actions even after it has been
+removed once.
+
 ### Serving uploaded media
 
 `MEDIA_PUBLIC_BASE_URL` must be publicly reachable: link-preview scrapers fetch
