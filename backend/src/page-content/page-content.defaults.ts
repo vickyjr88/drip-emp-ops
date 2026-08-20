@@ -109,8 +109,6 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     services: {
       heading: 'Shop By Category',
       subheading: 'Sneakers, boots, casuals, sandals, officials and cleaning agents — all in one place.',
-      // A teaser of the full list on /services, kept in the same order so the
-      // icons (resolved by position) line up across both pages.
       items: [
         {
           title: 'Sneakers',
@@ -245,31 +243,14 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
         'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall and Palms Mall, Ronald Ngala Street.',
       shareTitle: 'Drip Emporium | Quality Affordable Sneakers & Streetwear',
     },
+    // Key is "properties" rather than "shop" -- a naming leftover from before
+    // this was a shoe shop -- but it is what /shop/page.tsx actually reads,
+    // so it stays rather than risk losing content already edited under it.
     properties: {
       title: 'Shop All Sneakers & Streetwear',
       description:
         'Browse sneakers, boots, casuals, sandals and officials from Nike, Adidas, Jordan and Puma. Free delivery on orders over KES 15,000.',
       shareTitle: 'Shop Sneakers & Streetwear | Drip Emporium',
-    },
-    listings: {
-      title: 'Sneakers and Streetwear in Nairobi',
-      description:
-        'Every pair in stock at Drip Emporium, with sizes and prices in KES.',
-      shareTitle: 'Sneakers in Nairobi | Drip Emporium',
-    },
-    areas: {
-      title: "Nairobi's Best Neighbourhoods",
-      description:
-        'Westlands, Kilimani, Lavington, Parklands and Kileleshwa — what makes each Nairobi neighbourhood distinct, with indicative sale and rental ranges.',
-      shareTitle: "Nairobi's Best Neighbourhoods | Drip Emporium",
-      shareDescription:
-        "What makes each of Nairobi's most sought-after residential areas distinct, with indicative prices.",
-    },
-    services: {
-      title: 'Services',
-      description:
-        'Property sales, lettings, portfolio management and construction oversight for owners and investors in Nairobi.',
-      shareTitle: 'Services | Drip Emporium',
     },
     about: {
       title: 'About Us',
@@ -334,8 +315,8 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       label: 'Contact A Team',
       href: '/contact',
     },
-    // Used by the enquiry buttons on listings and the properties index, which
-    // each carried their own copy of the number before this existed.
+    // Used by the enquiry buttons on product pages, the cart and checkout,
+    // which each carried their own copy of the number before this existed.
     enquiries: {
       whatsapp: '254113206481',
       phone: '+254 113 206 481',
@@ -346,7 +327,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     brand: {
       heading: 'Drip Emporium',
       description:
-        'Your professional partner in Nairobi real estate, providing verified listings, transparent process, and long-term value.',
+        'Genuine sneakers and streetwear from Nike, Adidas, Jordan and Puma. Two shops on Ronald Ngala Street, Nairobi.',
     },
     quickLinks: {
       heading: 'Quick Links',
@@ -407,18 +388,18 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     form: {
       heading: 'Send an Inquiry',
       intro:
-        'Tell us what you are looking for and we will come back to you within one working day. Whether you are buying, letting or looking for someone to manage a property you already own, it helps to know your budget, preferred areas and timing.',
+        'Tell us what you are after and we will come back to you the same day. Naming the shoe, your size and which shop is nearest saves a round of messages.',
     },
     // The card beside the form. Was hardcoded in the page, including the
     // photograph, so none of it could be changed without a deploy.
     agent: {
-      name: 'Mohamed Drip Emporium',
-      role: 'Principal Broker',
+      name: 'Drip Emporium',
+      role: 'Customer Care',
       image: '',
     },
     details: {
       phone: '+254 113 206 481',
-      email: 'direct@dripemporium.store',
+      email: 'info@dripemporium.store',
       officeName: 'Dubai Merchants Mall, Shop F53',
       officeAddress: 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi',
     },

@@ -52,13 +52,11 @@ export default function ContactClient() {
     'form.intro',
     'Tell us what you are after and we will come back to you the same day. Naming the shoe, your size and which shop is nearest saves a round of messages.',
   );
-  const agentName = contentValue(content, 'agent.name', 'Mohamed Drip Emporium');
-  const agentRole = contentValue(content, 'agent.role', 'Principal Broker');
-  // Falls back to the file that was hardcoded here, so the card keeps its
-  // photograph until someone uploads a replacement.
-  const agentImage = contentValue(content, 'agent.image', '/images/agent-shared.jpg');
-  const phone = contentValue(content, 'details.phone', '+12345678900');
-  const email = contentValue(content, 'details.email', 'direct@dripemporium.store');
+  const agentName = contentValue(content, 'agent.name', 'Drip Emporium');
+  const agentRole = contentValue(content, 'agent.role', 'Customer Care');
+  const agentImage = contentValue(content, 'agent.image', '');
+  const phone = contentValue(content, 'details.phone', '+254 113 206 481');
+  const email = contentValue(content, 'details.email', 'info@dripemporium.store');
   const officeName = contentValue(content, 'details.officeName', 'Drip Emporium HQ');
   const officeAddress = contentValue(content, 'details.officeAddress', 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi');
   const highlights = contentValue<Array<{ title: string; description: string }>>(content, 'highlights.items', [
@@ -124,19 +122,18 @@ export default function ContactClient() {
       <main className="lp-main-content lp-contact-main">
         <section className="lp-container lp-contact-header">
           <p>Connect with our team</p>
-          <h1>Contact Agent</h1>
+          <h1>Get In Touch</h1>
         </section>
 
-        <section className="lp-container lp-contact-mobile-intro">
-          <div>
-            <img
-              src="/images/agent-shared.jpg"
-              alt="Mohamed Drip Emporium"
-            />
-          </div>
-          <h2>Mohamed Drip Emporium</h2>
-          <p>Principal Consultant</p>
-        </section>
+        {agentImage ? (
+          <section className="lp-container lp-contact-mobile-intro">
+            <div>
+              <img src={agentImage} alt={agentName} />
+            </div>
+            <h2>{agentName}</h2>
+            <p>{agentRole}</p>
+          </section>
+        ) : null}
 
         <section className="lp-container lp-contact-grid">
           <article className="lp-contact-form-card">
@@ -195,14 +192,14 @@ export default function ContactClient() {
             </form>
 
             <div className="lp-contact-quick-actions">
-              <a href={`tel:${phone}`}>Call Agent</a>
+              <a href={`tel:${phone}`}>Call Us</a>
               <a href={`mailto:${email}`}>Email Direct</a>
             </div>
           </article>
 
           <aside className="lp-contact-aside">
             <article className="lp-contact-agent-card">
-              <img src={agentImage} alt={agentName} />
+              {agentImage ? <img src={agentImage} alt={agentName} /> : null}
               <h3>{agentName}</h3>
               <p>{agentRole}</p>
               <div className="lp-contact-agent-lines">

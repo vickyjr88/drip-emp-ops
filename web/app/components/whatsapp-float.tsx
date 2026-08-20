@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * Floating WhatsApp button, as the old site carries bottom-right.
+ * Floating WhatsApp button, bottom-right on every page.
  *
- * Reads the number from the same CMS field the enquiry buttons on listings
- * use, so there is still one place to change it. Renders nothing when that
- * field is cleared, which is how the button is turned off.
+ * Reads the number from the same CMS field the enquiry buttons on product
+ * pages use, so there is still one place to change it. Renders nothing when
+ * that field is cleared, which is how the button is turned off.
  */
 
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
@@ -18,7 +18,7 @@ export function WhatsAppFloat() {
   return (
     <a
       className="lp-whatsapp-float"
-      href={whatsappHref('Hello, I would like to enquire about a property.')}
+      href={whatsappHref('Hello, I would like to enquire about a pair of shoes.')}
       target="_blank"
       rel="noreferrer"
       aria-label="Chat with us on WhatsApp"

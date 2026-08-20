@@ -537,15 +537,6 @@ export default function ImportersPage() {
                         Open
                       </Link>
                     </div>
-                    <div className="portal-list-row">
-                      <div>
-                        <strong>Units</strong>
-                        <p>Units are uploaded per block from the unit screen.</p>
-                      </div>
-                      <Link href="/portal/units/new" className="portal-inline-btn">
-                        Open
-                      </Link>
-                    </div>
                   </div>
                 </article>
               </>

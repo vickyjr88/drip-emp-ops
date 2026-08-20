@@ -8,7 +8,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/contact',
     title: 'Contact Us',
     description:
-      'Get in touch with Drip Emporium about a property, a viewing, or managing your portfolio. Phone, email and office details.',
+      'Get in touch with Drip Emporium about stock, sizing, orders or anything else. Phone, WhatsApp, email and shop details.',
     shareTitle: 'Contact Drip Emporium',
   });
 }

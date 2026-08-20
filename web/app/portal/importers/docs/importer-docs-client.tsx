@@ -10,9 +10,9 @@
  * stale the first time a field is added, and a column reference that disagrees
  * with the validator is worse than none.
  *
- * The two importers that are not definition-driven -- units and project
- * expenses -- are described here explicitly, because their rules live in their
- * own screens and there is nowhere else to read them.
+ * Project expenses are not definition-driven, so it is described here
+ * explicitly, because its rules live in its own screen and there is nowhere
+ * else to read them.
  */
 
 import Link from 'next/link';
@@ -61,41 +61,6 @@ const TYPE_NOTES: Record<string, string> = {
 function typeLabel(type: string) {
   return TYPE_NOTES[type] || type;
 }
-
-/**
- * The unit importer, which is not definition-driven.
- *
- * Its columns live in the uploader component on the unit screen, so they are
- * mirrored here. Kept in the order the generated template writes them, so this
- * table and a downloaded file read the same way.
- */
-const UNIT_COLUMNS: Array<{ name: string; required?: boolean; note: string }> = [
-  { name: 'blockName', note: 'Block within the project. Falls back to the default block chosen on the upload screen.' },
-  { name: 'unitNumber', required: true, note: 'Unit identifier, e.g. 101.' },
-  { name: 'floorNumber', required: true, note: 'Whole number.' },
-  {
-    name: 'floorPlanName',
-    note: 'Names a floor plan in the same project. Size, price, bedrooms and bathrooms are copied from it, so those columns can be left blank.',
-  },
-  {
-    name: 'sizeSqft',
-    required: true,
-    note: 'Square feet. Required unless a floor plan supplies it. A file still headed sizeSqm is read as square metres, so older files import at their true size.',
-  },
-  { name: 'priceKes', required: true, note: 'Required unless a floor plan supplies it.' },
-  { name: 'priceUsd', note: 'Defaults to 0.' },
-  { name: 'bedrooms', note: 'From the floor plan when blank.' },
-  { name: 'bathrooms', note: 'From the floor plan when blank.' },
-  { name: 'parkingSlots', note: 'Whole number.' },
-  { name: 'hasBalcony', note: 'true or false.' },
-  { name: 'hasStore', note: 'true or false.' },
-  { name: 'status', note: 'AVAILABLE, RESERVED, SOLD, RENTED or BLOCKED. Defaults to AVAILABLE.' },
-  { name: 'propertyType', note: 'e.g. Apartment.' },
-  { name: 'listingType', note: 'SALE or RENT.' },
-  { name: 'referenceCode', note: 'Your own reference for the listing.' },
-  { name: 'furnishing', note: 'e.g. Furnished, Unfurnished.' },
-  { name: 'availableFrom', note: 'yyyy-mm-dd. Blank means available now.' },
-];
 
 const EXPENSE_COLUMNS: Array<{ name: string; required?: boolean; note: string }> = [
   { name: 'date', required: true, note: 'd/m/yyyy or yyyy-mm-dd. Slash dates are read day-first: 3/4/2024 is 3 April.' },
@@ -295,48 +260,6 @@ export function ImporterDocsClient() {
                 </div>
               </article>
             ))}
-
-            <article className="portal-card">
-              <div className="portal-card-header-row">
-                <div>
-                  <h2 style={{ margin: 0 }}>Units</h2>
-                  <p className="portal-muted" style={{ margin: '4px 0 0' }}>
-                    Uploaded per project from the unit screen, rather than from the importers page.
-                  </p>
-                </div>
-                <Link href="/portal/units/new" className="portal-inline-btn">
-                  Open
-                </Link>
-              </div>
-              <p className="portal-muted">
-                Naming a floor plan in <code>floorPlanName</code> fills in size, price, bedrooms and
-                bathrooms, so those columns only need a value where a unit differs from its layout.
-                The figures are copied once, at import: editing the plan afterwards never changes
-                units already created from it.
-              </p>
-              <div className="portal-table-wrap">
-                <table className="portal-data-table is-doc">
-                  <thead>
-                    <tr>
-                      <th>Column</th>
-                      <th>Required</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {UNIT_COLUMNS.map((column) => (
-                      <tr key={column.name}>
-                        <td>
-                          <code>{column.name}</code>
-                        </td>
-                        <td>{column.required ? 'Yes' : 'No'}</td>
-                        <td>{column.note}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
 
             <article className="portal-card">
               <div className="portal-card-header-row">

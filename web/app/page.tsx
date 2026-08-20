@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     key: 'home',
     path: '/',
     description: SITE_DESCRIPTION,
-    shareTitle: `${SITE_NAME} | Property Sales, Rentals and Management in Nairobi`,
+    shareTitle: `${SITE_NAME} | Quality Affordable Sneakers & Streetwear in Nairobi`,
     image: contentValue(content, 'hero.backgroundImage', ''),
   });
 }
@@ -26,8 +26,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function HomePage() {
   return (
     <>
-      {/* The questions a person actually asks before calling an agent. This is
-          the content an assistant can quote directly, and it is what earns a
+      {/* The questions a shopper actually asks before buying. This is the
+          content an assistant can quote directly, and it is what earns a
           place in an answer rather than only a blue link. */}
       <JsonLd
         data={{
@@ -36,42 +36,42 @@ export default function HomePage() {
           mainEntity: [
             {
               '@type': 'Question',
-              name: `What does ${SITE_NAME} do?`,
+              name: `What does ${SITE_NAME} sell?`,
               acceptedAnswer: {
                 '@type': 'Answer',
-                text: `${SITE_NAME} sells and lets residential property in Nairobi, and manages portfolios on behalf of owners. That covers finding a buyer or tenant, collecting rent, handling statements and payments, and overseeing construction on developments still being built.`,
+                text: `${SITE_NAME} stocks genuine sneakers and streetwear from Nike, Adidas, Jordan and Puma, in sizes EUR 36-46, at two shops in Nairobi.`,
               },
             },
             {
               '@type': 'Question',
-              name: 'Where are your properties?',
+              name: 'Where are your shops?',
               acceptedAnswer: {
                 '@type': 'Answer',
-                text: 'Our developments are in Nairobi and the surrounding area. Each listing shows its project, location and floor, along with the price in Kenyan shillings.',
+                text: 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, both on Ronald Ngala Street, Nairobi. Open 08:00 to 20:00 daily.',
               },
             },
             {
               '@type': 'Question',
-              name: 'How do I arrange a viewing?',
+              name: 'How do I order?',
               acceptedAnswer: {
                 '@type': 'Answer',
-                text: 'Every listing has an inquiry form that reaches our team directly, or you can use the contact page. Tell us which unit you are interested in and we will arrange a time.',
+                text: 'Buy online with card through the shop, or message us on WhatsApp with the shoe and your size and we will confirm availability and arrange payment and delivery or collection.',
               },
             },
             {
               '@type': 'Question',
-              name: 'Can I pay for a unit in instalments?',
+              name: 'What if my size is not shown as in stock?',
               acceptedAnswer: {
                 '@type': 'Answer',
-                text: 'Yes. Sales contracts can carry a payment schedule rather than a single payment, and you can see what has been paid and what is outstanding at any time through the client portal.',
+                text: 'You can still order it. Sizes not on the shelf are sourced from our supplier, and the order is tracked the same way as any other until it reaches the shop.',
               },
             },
             {
               '@type': 'Question',
-              name: 'I already own or rent through you. Where do I see my statement?',
+              name: 'Where do I see my order?',
               acceptedAnswer: {
                 '@type': 'Answer',
-                text: `Sign in to the client portal at ${absoluteUrl('/portal')}. Owners and tenants can see payments, statements and documents there.`,
+                text: `Sign in to your account at ${absoluteUrl('/account')} to track an order, or message us on WhatsApp with your order number.`,
               },
             },
           ],

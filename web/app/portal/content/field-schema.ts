@@ -59,7 +59,7 @@ const LINK_FIELDS: Field[] = [
     path: 'href',
     label: 'Link',
     type: 'text',
-    help: 'A path such as /listings, or /services#property-sales to jump to a section.',
+    help: 'A path such as /shop, or /about#our-story to jump to a section.',
   },
 ];
 
@@ -517,10 +517,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
           'The home page keeps the site-wide title, so its page title field is not used. Its description is what search engines show.',
         fields: seoFields('home'),
       },
-      { key: 'seo-properties', title: 'Properties', fields: seoFields('properties') },
-      { key: 'seo-listings', title: 'Listings', fields: seoFields('listings') },
-      { key: 'seo-areas', title: 'Areas', fields: seoFields('areas') },
-      { key: 'seo-services', title: 'Services', fields: seoFields('services') },
+      { key: 'seo-properties', title: 'Shop', fields: seoFields('properties') },
       { key: 'seo-about', title: 'About', fields: seoFields('about') },
       { key: 'seo-contact', title: 'Contact', fields: seoFields('contact') },
       { key: 'seo-terms', title: 'Terms', fields: seoFields('terms') },
@@ -566,7 +563,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
         key: 'header-enquiries',
         title: 'Enquiry contact',
         description:
-          'Used by the WhatsApp and call buttons on listings and the properties page. The WhatsApp number is digits only, with the country code and no plus sign.',
+          'Used by the WhatsApp and call buttons on product pages, the cart and checkout. Set these separately if calls should ring a different line than WhatsApp. The WhatsApp number is digits only, with the country code and no plus sign.',
         fields: [
           { path: 'enquiries.whatsapp', label: 'WhatsApp number', type: 'text' },
           { path: 'enquiries.phone', label: 'Phone (as displayed)', type: 'text' },
@@ -614,7 +611,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       {
         key: 'footer-services',
         title: 'Services links',
-        description: 'Anchor links such as /services#property-sales jump straight to that section.',
+        description: 'Anchor links such as /shop#sneakers jump straight to that section.',
         repeatable: {
           path: 'services.items',
           label: 'Link',
@@ -698,7 +695,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       },
       {
         key: 'agent',
-        title: 'Agent card',
+        title: 'Contact card',
         description: 'The card beside the form, with the photo, name and role.',
         fields: [
           { path: 'agent.name', label: 'Name', type: 'text' },
@@ -709,7 +706,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
             type: 'image',
             recommendedWidth: 800,
             recommendedHeight: 800,
-            help: 'Square. Leave blank to keep the built-in photo.',
+            help: 'Square. Leave blank to show no photo.',
           },
         ],
       },
@@ -726,7 +723,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       },
       {
         key: 'highlights',
-        title: 'Why work with us',
+        title: 'Why shop with us',
         repeatable: {
           path: 'highlights.items',
           label: 'Highlight',
