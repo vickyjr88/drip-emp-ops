@@ -13,9 +13,9 @@
  * treat "uploaded" and "picked" as the same event and needs no second code path.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useErrorState } from '../components/notifications';
-import { apiRequest } from '../accounting/lib';
+import { apiRequest, uploadMedia } from '../accounting/lib';
 
 type LibraryImage = {
   objectKey: string;
@@ -84,6 +84,8 @@ export function ImagePicker({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [chosen, setChosen] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const safeUsedUrls = Array.isArray(usedUrls) ? usedUrls : [];
   const used = new Set(safeUsedUrls.filter(Boolean).map(objectKeyOf));
@@ -150,10 +152,72 @@ export function ImagePicker({
     onClose();
   }
 
+  /**
+   * Uploads straight from the picker, for the image nobody uploaded yet.
+   *
+   * A single file selects and closes immediately, same as clicking an
+   * existing image in single mode -- the whole point of uploading from here
+   * is to finish picking in one motion rather than cancel, go find an upload
+   * button elsewhere, then reopen this dialog. In multiple mode each upload
+   * is added to the library grid and marked chosen, so it can be reviewed
+   * alongside anything else selected before confirming.
+   */
+  async function onUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length || !token) return;
+
+    setUploading(true);
+    setErrorMessage(null);
+    try {
+      const uploaded: LibraryImage[] = [];
+      for (const file of files) {
+        const result = await uploadMedia(file, token);
+        uploaded.push({
+          objectKey: result.objectKey,
+          url: result.url,
+          sizeBytes: file.size,
+          uploadedAt: new Date().toISOString(),
+        });
+      }
+      setImages((prev) => [...uploaded, ...prev]);
+      setTotal((prev) => prev + uploaded.length);
+
+      if (!multiple) {
+        emit([uploaded[0].url]);
+        onClose();
+        return;
+      }
+      setChosen((prev) => [...prev, ...uploaded.map((image) => image.url)]);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not upload the image.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div className="portal-dialog-overlay" role="dialog" aria-modal="true" aria-label={title}>
       <div className="portal-dialog portal-image-picker">
-        <p className="portal-dialog-title">{title}</p>
+        <div className="portal-dialog-title-row">
+          <p className="portal-dialog-title">{title}</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple={multiple}
+            hidden
+            onChange={(event) => void onUpload(event)}
+          />
+          <button
+            type="button"
+            className="portal-inline-btn"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? 'Uploading...' : "Can't find it? Upload New"}
+          </button>
+        </div>
         <p className="portal-dialog-message">
           {multiple
             ? 'Select one or more images already uploaded, then add them.'

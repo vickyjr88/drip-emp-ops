@@ -3334,6 +3334,22 @@ img {
     color: var(--eef-black);
   }
 
+  .portal-dialog-title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .portal-dialog-title-row .portal-dialog-title {
+    margin-bottom: 0;
+  }
+
+  .portal-dialog-title-row .portal-inline-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
   .portal-dialog-message {
     font-size: 14px;
     line-height: 1.5;

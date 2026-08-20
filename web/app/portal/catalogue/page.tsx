@@ -100,6 +100,7 @@ export default function CataloguePage() {
   const [editPickerOpen, setEditPickerOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const createFileInputRef = useRef<HTMLInputElement | null>(null);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
@@ -346,6 +347,21 @@ export default function CataloguePage() {
     }
   }
 
+  /** Uploads straight into the not-yet-created product's local image list -- there is no product to PATCH yet, so this just extends `images` the same way picking an existing one does. */
+  async function onUploadNewImages(files: FileList | null) {
+    if (!token || !files?.length) return;
+    setUploading(true);
+    try {
+      const uploaded = await Promise.all(Array.from(files).map((file) => uploadMedia(file, token)));
+      const urls = uploaded.map((item) => item.url).filter(Boolean);
+      setImages((prev) => [...prev, ...urls]);
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function onDelete(product: Product) {
     if (!token) return;
     const confirmed = await dialog.confirm({
@@ -547,14 +563,55 @@ export default function CataloguePage() {
                   <label>
                     <span>Images</span>
                     <div className="portal-inline-actions">
+                      <button
+                        type="button"
+                        className="portal-inline-btn"
+                        disabled={uploading}
+                        onClick={() => createFileInputRef.current?.click()}
+                      >
+                        {uploading ? 'Uploading...' : 'Upload'}
+                      </button>
                       <button type="button" className="portal-inline-btn" onClick={() => setPickerOpen(true)}>
                         Choose Existing
                       </button>
                     </div>
-                    {images.length ? (
-                      <p className="portal-muted">{images.length} image(s) selected</p>
-                    ) : null}
                   </label>
+                  {images.length ? (
+                    <div className="portal-project-gallery-grid">
+                      {images.map((url, index) => (
+                        <div key={`${url}-${index}`} className={`portal-project-gallery-item${index === 0 ? ' is-featured' : ''}`}>
+                          <img src={url} alt="" className="portal-project-gallery-thumb" />
+                          <div className="portal-gallery-item-actions">
+                            {index === 0 ? (
+                              <span className="portal-featured-badge">Featured</span>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="portal-inline-btn is-danger"
+                              onClick={() => setImages((prev) => prev.filter((item) => item !== url))}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="portal-empty-state">
+                      No images yet. A product without a photo is the one shoppers scroll past.
+                    </div>
+                  )}
+                  <input
+                    ref={createFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    hidden
+                    onChange={(event) => {
+                      void onUploadNewImages(event.target.files);
+                      event.target.value = '';
+                    }}
+                  />
                   <ImagePicker
                     open={pickerOpen}
                     token={token}
