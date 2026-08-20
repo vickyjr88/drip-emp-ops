@@ -28,6 +28,7 @@ export class StorefrontService {
       .map((variant: any) => {
         const offer = offerByVariant.get(variant.id);
         const retail = Number(variant.priceKes);
+        const inStock = (stockByVariant.get(variant.id) ?? 0) > 0;
         return {
           id: variant.id,
           sku: variant.sku,
@@ -39,7 +40,12 @@ export class StorefrontService {
           wasPriceKes: offer ? offer.was : null,
           offerLabel: offer ? offer.label : null,
           // Availability, not quantity.
-          inStock: (stockByVariant.get(variant.id) ?? 0) > 0,
+          inStock,
+          // Every active listing can be ordered, in stock or not -- an
+          // out-of-shelf line is simply sourced from the supplier instead of
+          // the shelf, the same rule the checkout and the till use to route
+          // it rather than blocking the sale.
+          canOrder: true,
         };
       });
 

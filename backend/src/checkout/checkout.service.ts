@@ -136,6 +136,16 @@ export class CheckoutService {
       });
       const byId = new Map(variants.map((variant) => [variant.id, variant]));
 
+      // What is actually on the shelf at this store, for the variants in this
+      // basket -- the storefront shows "order from supplier" for anything
+      // with nothing sellable, but the basket is client-side and cannot be
+      // trusted to have got that right, so it is re-checked here the same
+      // way the till re-checks isDropShip rather than trusting the request.
+      const stockLevels = await tx.stockLevel.findMany({
+        where: { storeId: store.id, variantId: { in: dto.lines.map((line) => line.variantId) } },
+      });
+      const sellableByVariant = new Map(stockLevels.map((row) => [row.variantId, row.quantity - row.reserved]));
+
       // A live offer is the price the shopper was shown, so it is the price
       // they are charged. Read here rather than taken from the request: the
       // basket is client-side and cannot be trusted to name its own discount.
@@ -166,7 +176,16 @@ export class CheckoutService {
         const unitPrice = offerByVariant.get(variant.id) ?? listPrice;
         // A drop-ship listing is never held on the shelf, so every order
         // against it is sourced from the supplier -- same rule as the till.
-        const fulfillmentType: OrderLineFulfillmentType = variant.isDropShip ? 'SUPPLIER_ORDER' : 'STOCK';
+        // A normal listing that has run out gets the same treatment: there is
+        // nothing on the shelf to reserve, so it is sourced from the supplier
+        // instead of failing the order outright. Each line's quantity is
+        // drawn down from the running sellable total so a basket with two
+        // lines against the same low-stock variant doesn't let both claim
+        // the same last unit.
+        const remaining = sellableByVariant.get(variant.id) ?? 0;
+        const fulfillmentType: OrderLineFulfillmentType =
+          variant.isDropShip || remaining < line.quantity ? 'SUPPLIER_ORDER' : 'STOCK';
+        sellableByVariant.set(variant.id, remaining - line.quantity);
         return {
           variantId: variant.id,
           description: `${variant.product.name} — ${variant.name}`,

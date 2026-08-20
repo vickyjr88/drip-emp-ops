@@ -10114,8 +10114,13 @@ img {
   padding: 5px 8px;
 }
 
-.de-card.is-out .de-card-media img {
-  opacity: 0.5;
+.de-card-flag.is-preorder {
+  background: var(--de-royal);
+}
+
+.de-card-sizes.is-preorder {
+  color: var(--de-royal);
+  font-weight: 600;
 }
 
 .de-card-body {
@@ -10439,13 +10444,16 @@ img {
   color: #fff;
 }
 
-/* Struck through and dimmed: a sold-out size is legible as sold out before
-   anyone clicks it. */
-.de-size.is-out {
-  color: #6c7493;
-  background: var(--de-100);
-  cursor: not-allowed;
-  text-decoration: line-through;
+/* Dashed border rather than struck-through: this size is still orderable,
+   just sourced from the supplier instead of the shelf, so it should not read
+   as unavailable. */
+.de-size.is-preorder {
+  border-style: dashed;
+  color: var(--de-muted);
+}
+
+.de-size.is-preorder.is-on {
+  color: #fff;
 }
 
 .de-size-note {

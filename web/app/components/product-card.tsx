@@ -56,10 +56,10 @@ export function ProductCard({ product }: { product: ShopProduct }) {
     window.setTimeout(() => setAdded(false), 2000);
   }
 
-  const inStockVariants = product.variants.filter((variant) => variant.inStock);
+  const orderableVariants = product.variants.filter((variant) => variant.canOrder);
 
   return (
-    <article className={`de-card${product.anyInStock ? '' : ' is-out'}`}>
+    <article className={`de-card${product.anyInStock ? '' : ' is-preorder'}`}>
       <Link href={`/shop/${product.slug}`} className="de-card-media">
         {product.imageUrls[0] ? (
           <img src={product.imageUrls[0]} alt={product.name} loading="lazy" />
@@ -68,7 +68,9 @@ export function ProductCard({ product }: { product: ShopProduct }) {
             {product.name.charAt(0)}
           </span>
         )}
-        {!product.anyInStock ? <span className="de-card-flag">Sold out</span> : null}
+        {!product.anyInStock && orderableVariants.length ? (
+          <span className="de-card-flag is-preorder">Ships from supplier</span>
+        ) : null}
       </Link>
 
       <div className="de-card-overlay-actions">
@@ -103,11 +105,13 @@ export function ProductCard({ product }: { product: ShopProduct }) {
               <small>{product.sizesInStock.length} sizes</small>
             ) : null}
           </p>
+        ) : orderableVariants.length ? (
+          <p className="de-card-sizes is-preorder">Ordered in from supplier</p>
         ) : (
           <p className="de-card-sizes is-none">Out of stock — ask us</p>
         )}
 
-        {product.anyInStock ? (
+        {orderableVariants.length ? (
           <div className="de-card-quickadd">
             {pickingSize ? (
               <div className="de-card-size-picker">
@@ -116,7 +120,7 @@ export function ProductCard({ product }: { product: ShopProduct }) {
                   <button type="button" onClick={() => setPickingSize(false)} aria-label="Cancel">×</button>
                 </div>
                 <div className="de-card-size-picker-grid">
-                  {inStockVariants.map((variant) => (
+                  {orderableVariants.map((variant) => (
                     <button
                       key={variant.id}
                       type="button"

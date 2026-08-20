@@ -20,6 +20,8 @@ export type ShopVariant = {
   offerLabel?: string | null;
   /** Availability, not a count. */
   inStock: boolean;
+  /** Always true today: out-of-shelf sizes are still orderable, sourced from the supplier. */
+  canOrder: boolean;
 };
 
 export type ShopProduct = {

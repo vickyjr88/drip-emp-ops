@@ -39,6 +39,10 @@ export function ProductClient({ product }: { product: ShopProduct }) {
     () =>
       product.variants.find((variant) => variant.inStock && variant.wasPriceKes)?.id ??
       product.variants.find((variant) => variant.inStock)?.id ??
+      // Nothing on the shelf: fall back to any orderable size rather than
+      // leaving the page with nothing picked, since it can still be sourced
+      // from the supplier.
+      product.variants.find((variant) => variant.canOrder)?.id ??
       null,
   );
   const [image, setImage] = useState(0);
@@ -65,8 +69,8 @@ export function ProductClient({ product }: { product: ShopProduct }) {
       lines.push(`SKU:   ${chosen.sku}`);
       lines.push(`Price: ${formatKes(chosen.priceKes)}`);
       // Saying it is out of stock up front stops the shop replying "yes" to
-      // something they cannot sell.
-      if (!chosen.inStock) lines.push('(Shown as out of stock — can it be ordered in?)');
+      // something that needs a supplier order first.
+      if (!chosen.inStock) lines.push('(Currently ordered in from our supplier — usual lead time applies)');
     } else {
       lines.push(`Hello Drip Emporium, I am interested in the ${product.name}.`);
       lines.push('');
@@ -161,19 +165,19 @@ export function ProductClient({ product }: { product: ShopProduct }) {
             <div className="de-sizes">
               <div className="de-sizes-head">
                 <span>Select size (EUR)</span>
-                {!product.anyInStock ? <em>All sizes sold out</em> : null}
+                {!product.anyInStock ? <em>Ordered in from supplier</em> : null}
               </div>
               <div className="de-size-buttons">
                 {product.variants.map((variant) => (
                   <button
                     key={variant.id}
                     type="button"
-                    disabled={!variant.inStock}
-                    className={`de-size${sizeId === variant.id ? ' is-on' : ''}${variant.inStock ? '' : ' is-out'}`}
+                    disabled={!variant.canOrder}
+                    className={`de-size${sizeId === variant.id ? ' is-on' : ''}${variant.inStock ? '' : ' is-preorder'}`}
                     onClick={() => setSizeId(variant.id)}
-                    // Said out loud, because the strikethrough alone is not
-                    // available to a screen reader.
-                    aria-label={`${variant.size}${variant.inStock ? '' : ' — sold out'}`}
+                    // Said out loud, because the note in the button styling
+                    // is not available to a screen reader.
+                    aria-label={`${variant.size}${variant.inStock ? '' : ' — ordered in from supplier'}`}
                   >
                     {variant.size.replace('EUR ', '')}
                   </button>
@@ -181,7 +185,7 @@ export function ProductClient({ product }: { product: ShopProduct }) {
               </div>
               {chosen ? (
                 <p className="de-size-note">
-                  {chosen.size} · {chosen.sku} · in stock
+                  {chosen.size} · {chosen.sku} · {chosen.inStock ? 'in stock' : 'ordered in from supplier'}
                 </p>
               ) : (
                 <p className="de-size-note">
