@@ -46,12 +46,18 @@ const UNIQUE_VIOLATION = 'P2002';
  *
  * Retries are the honest answer here: any read-then-write scheme has a gap,
  * and the unique index is the only thing that can actually adjudicate. Three
- * attempts is plenty for a shop -- a fourth collision would mean something
- * other than concurrency is wrong.
+ * attempts with no delay between them is plenty when only two requests ever
+ * collide -- but several arriving at once (a burst of approvals, a bulk
+ * action) all read the same "next" number, all lose to the one that writes
+ * first, and then all retry at the same instant and collide with each other
+ * again, exhausting attempts before the herd thins out. A short, randomised
+ * delay before each retry -- growing attempt over attempt -- spreads them
+ * out so each pass has a real chance of finding a gap instead of re-colliding
+ * in lockstep.
  */
 export async function retryOnDuplicateReference<T>(
   run: () => Promise<T>,
-  attempts = 3,
+  attempts = 6,
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt++) {
@@ -60,6 +66,10 @@ export async function retryOnDuplicateReference<T>(
     } catch (error: any) {
       if (error?.code !== UNIQUE_VIOLATION) throw error;
       lastError = error;
+      if (attempt < attempts - 1) {
+        const backoffMs = 10 * (attempt + 1) + Math.random() * 25;
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
     }
   }
   throw lastError;

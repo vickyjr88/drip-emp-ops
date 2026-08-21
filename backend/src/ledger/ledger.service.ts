@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { JournalSource, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJournalEntryDto, JournalLineInputDto } from './dto/create-journal-entry.dto';
-import { nextReference } from '../common/next-reference';
+import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 
 export type PostJournalLine = {
   accountId: string;
@@ -81,41 +81,50 @@ export class LedgerService {
    * Posts a balanced double-entry journal. Callers from AR/AP/petty-cash/fixed-assets
    * services pass an explicit `source` + `sourceId` so postings are traceable back to
    * the sub-ledger transaction that created them.
+   *
+   * Two approvals (or any other journal-posting action) submitted at the same
+   * moment can both read the same "next" entry number before either has
+   * written it -- the same read-then-write gap `nextReference`'s own doc
+   * comment describes for order numbers. Unlike checkout, nothing here was
+   * retrying on that collision, so it surfaced as a raw, unhandled 500
+   * instead of the second request simply trying again with a fresh number.
    */
   async postJournal(options: PostJournalOptions, tx?: any) {
     this.validateBalance(options.lines);
     const runner = tx || this.prisma;
 
-    const entryNumber = await this.nextEntryNumber(runner);
+    return retryOnDuplicateReference(async () => {
+      const entryNumber = await this.nextEntryNumber(runner);
 
-    return runner.journalEntry.create({
-      data: {
-        entryNumber,
-        entryDate: options.entryDate || new Date(),
-        memo: options.memo,
-        source: options.source,
-        sourceId: options.sourceId,
-        postedBy: options.postedBy || 'system',
-        lines: {
-          create: options.lines.map((line) => {
-            const fxRate = Number(line.fxRate ?? 1);
-            const debit = Number(line.debit || 0);
-            const credit = Number(line.credit || 0);
-            return {
-              accountId: line.accountId,
-              debit,
-              credit,
-              currencyCode: line.currencyCode || 'KES',
-              fxRate,
-              baseDebit: debit * fxRate,
-              baseCredit: credit * fxRate,
-              storeId: line.storeId || undefined,
-              memo: line.memo,
-            };
-          }),
+      return runner.journalEntry.create({
+        data: {
+          entryNumber,
+          entryDate: options.entryDate || new Date(),
+          memo: options.memo,
+          source: options.source,
+          sourceId: options.sourceId,
+          postedBy: options.postedBy || 'system',
+          lines: {
+            create: options.lines.map((line) => {
+              const fxRate = Number(line.fxRate ?? 1);
+              const debit = Number(line.debit || 0);
+              const credit = Number(line.credit || 0);
+              return {
+                accountId: line.accountId,
+                debit,
+                credit,
+                currencyCode: line.currencyCode || 'KES',
+                fxRate,
+                baseDebit: debit * fxRate,
+                baseCredit: credit * fxRate,
+                storeId: line.storeId || undefined,
+                memo: line.memo,
+              };
+            }),
+          },
         },
-      },
-      include: { lines: true },
+        include: { lines: true },
+      });
     });
   }
 

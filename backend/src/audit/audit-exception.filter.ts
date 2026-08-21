@@ -38,6 +38,20 @@ export class AuditExceptionFilter implements ExceptionFilter {
         ? exception.getResponse()
         : { statusCode: 500, message: 'Internal server error' };
 
+    // An HttpException is a deliberate, already-messaged rejection (bad
+    // input, not found, etc.) -- nothing to log. Anything else reaching here
+    // is a bug, and without this the client only ever sees the opaque 500
+    // above while the actual cause (a Prisma error, a null-pointer, whatever)
+    // vanished with no trace of what broke or where.
+    if (!(exception instanceof HttpException)) {
+      this.logger.error(
+        `Unhandled exception on ${request?.method} ${request?.originalUrl || request?.url}: ${
+          (exception as Error)?.message
+        }`,
+        (exception as Error)?.stack,
+      );
+    }
+
     const method: string = request?.method || '';
     if ((status === 401 || status === 403) && AUDITED_METHODS.has(method.toUpperCase())) {
       const path: string = request.originalUrl || request.url || '';
