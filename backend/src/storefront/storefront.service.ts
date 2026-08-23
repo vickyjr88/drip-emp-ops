@@ -176,21 +176,89 @@ export class StorefrontService {
     };
   }
 
+  /**
+   * Products whose name or brand is a near-miss for a search word.
+   *
+   * Prisma has no trigram operator, so this is raw SQL returning ids the caller
+   * folds into its where clause. Each word is scored against each *word* of the
+   * name rather than the whole string: "smaba" against "Adidas Samba White"
+   * scores 0.09 as a whole and 0.8 against the word "samba", so comparing
+   * whole strings would reject almost every real typo.
+   *
+   * A transposition in a short word ("nkie") still scores too low to match --
+   * trigrams have little to work with in four letters. That is a known limit,
+   * not something a lower threshold fixes: dropping it far enough to catch
+   * those starts matching unrelated products.
+   */
+  private async fuzzyProductIds(words: string[]): Promise<string[]> {
+    if (words.length === 0) return [];
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT DISTINCT p.id
+      FROM "Product" p
+      CROSS JOIN LATERAL unnest(${words}::text[]) AS q(word)
+      CROSS JOIN LATERAL unnest(
+        string_to_array(lower(p.name) || ' ' || lower(coalesce(p.brand, '')), ' ')
+      ) AS t(part)
+      WHERE p."isActive" = true AND similarity(t.part, q.word) > 0.3
+    `;
+    return rows.map((row) => row.id);
+  }
+
   async list(query: {
     category?: string; brand?: string; size?: string; search?: string;
     minPrice?: string; maxPrice?: string; inStockOnly?: string; sort?: string;
   }) {
+    // Split on whitespace and require every word to match something, in any
+    // order. A single contains on the whole phrase meant "white air force"
+    // found nothing -- the product is called "Air Force 1 White", which does
+    // not contain that string -- and a shopper describing a shoe the way they
+    // would say it out loud got an empty page.
+    const words = (query.search || '').trim().split(/\s+/).filter(Boolean);
+
+    // Exact-ish matching first; the trigram pass only has to rescue what this
+    // misses, which keeps the raw query off the common path.
+    const wordClauses: Prisma.ProductWhereInput[] = words.map((word) => ({
+      OR: [
+        { name: { contains: word, mode: 'insensitive' } },
+        { brand: { contains: word, mode: 'insensitive' } },
+        // Searching the description and the category is what makes a query
+        // like "sneakers" work at all: it is a category, named on no product.
+        { description: { contains: word, mode: 'insensitive' } },
+        { category: { name: { contains: word, mode: 'insensitive' } } },
+        // The SKU is what a shopper reads off a tag or a receipt.
+        { variants: { some: { sku: { contains: word, mode: 'insensitive' }, isActive: true } } },
+      ],
+    }));
+
+    // The fuzzy pass is a fallback, not an extra OR branch. Run alongside the
+    // literal clauses it widens every query: "white air force" matched Adidas
+    // Samba, because "white" is close enough to something in that name. It is
+    // therefore consulted only when the literal pass finds nothing at all --
+    // which is also the only time a shopper needs it.
+    const literalCount = words.length
+      ? await this.prisma.product.count({
+          where: {
+            isActive: true,
+            ...(query.category ? { category: { slug: query.category } } : {}),
+            ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
+            AND: wordClauses,
+          },
+        })
+      : 0;
+    const fuzzyIds = words.length && literalCount === 0
+      ? await this.fuzzyProductIds(words)
+      : [];
+
     const where: Prisma.ProductWhereInput = {
       isActive: true,
       ...(query.category ? { category: { slug: query.category } } : {}),
       ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
-      ...(query.search
-        ? {
-            OR: [
-              { name: { contains: query.search, mode: 'insensitive' } },
-              { brand: { contains: query.search, mode: 'insensitive' } },
-            ],
-          }
+      // Either the literal match, or -- only when that found nothing -- the
+      // typo rescue. Never both, so a query that works is never widened.
+      ...(words.length
+        ? fuzzyIds.length
+          ? { id: { in: fuzzyIds } }
+          : { AND: wordClauses }
         : {}),
       // A size filter is really a question about variants, not products.
       ...(query.size ? { variants: { some: { name: query.size, isActive: true } } } : {}),
