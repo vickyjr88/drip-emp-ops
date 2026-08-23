@@ -121,6 +121,16 @@ export function CompleteClient() {
                   : `Collect at ${order.store?.name || 'our shop'}${order.store?.location ? `, ${order.store.location}` : ''}. Open 08:00 to 20:00.`}
               </p>
 
+              {/* What was paid covers the goods only. Saying so here, on the
+                  page shown the moment the payment lands, is the difference
+                  between an expected call and an unexpected charge. */}
+              {order.shippingAddress ? (
+                <p className="de-complete-where">
+                  Delivery is not included in this payment. We will contact you to arrange
+                  it and confirm the cost separately.
+                </p>
+              ) : null}
+
               <div className="de-complete-actions">
                 <Link className="lp-button lp-button-primary" href="/shop">Keep shopping</Link>
                 <a className="lp-button de-whatsapp"

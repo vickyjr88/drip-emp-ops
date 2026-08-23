@@ -86,11 +86,14 @@ export default function HomeClient() {
   const brandItems = contentValue<BrandItem[]>(content, 'brands.items', []);
 
   const midCtaEnabled = contentValue(content, 'midCta.enabled', true);
-  const midCtaHeading = contentValue(content, 'midCta.heading', 'Free Delivery on Orders Over KES 15,000');
+  // Defaults no longer promise free delivery: it is not charged at checkout but
+  // it is not free either -- it is arranged and invoiced separately afterwards,
+  // so advertising "on us" would be a claim the shop does not honour.
+  const midCtaHeading = contentValue(content, 'midCta.heading', 'Countrywide Delivery, Arranged For You');
   const midCtaBody = contentValue(
     content,
     'midCta.body',
-    'Nationwide, on us. Shop the full range and check out in minutes.',
+    'Order online and we will call to arrange delivery and confirm the cost. Shop the full range and check out in minutes.',
   );
   const midCtaLabel = contentValue(content, 'midCta.ctaLabel', 'Shop Now');
 

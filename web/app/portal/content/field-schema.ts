@@ -481,6 +481,15 @@ export const PAGE_SCHEMAS: PageSchema[] = [
           { path: 'enquiries.phone', label: 'Phone (as displayed)', type: 'text' },
         ],
       },
+      {
+        key: 'header-delivery',
+        title: 'Delivery message',
+        description:
+          'The delivery line shown on product pages and the home page. Delivery is not charged at checkout -- it is arranged and billed separately after an order -- so this is what the shop advertises, not a figure anything calculates from.',
+        fields: [
+          { path: 'delivery.note', label: 'Delivery note', type: 'text' },
+        ],
+      },
     ],
   },
 

@@ -247,7 +247,7 @@ export function ProductClient({ product }: { product: ShopProduct }) {
 
             {/* The three things a shopper checks before committing. */}
             <ul className="de-assurances">
-              <li>Free delivery on orders over KSh 15,000</li>
+              <li>{enquiry.deliveryNote}</li>
               <li>Try before you pay at either shop</li>
               <li>Open 08:00–20:00, Ronald Ngala Street</li>
             </ul>

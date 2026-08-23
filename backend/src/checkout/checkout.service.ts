@@ -9,9 +9,20 @@ import { OwnerNotificationService } from '../email-log/owner-notification.servic
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 
-/** Free delivery over this, as advertised on the storefront. */
-const FREE_DELIVERY_OVER = 15000;
-const DELIVERY_FEE = 500;
+/**
+ * Delivery is not charged at checkout.
+ *
+ * It is arranged and billed separately after the order is placed -- a distinct
+ * service, often subcontracted, at a price that depends on where the parcel is
+ * going. Charging a flat fee here also put it through the till: payment.amount
+ * is the order total, and sales posting credits that whole figure to revenue,
+ * so every delivered order booked income with no cost against it and reported a
+ * margin the shop never earned.
+ *
+ * The column stays on the order so historic figures are unchanged and a manual
+ * order can still carry one; the storefront simply never sets it.
+ */
+const STOREFRONT_DELIVERY_FEE = 0;
 
 /**
  * The order a payment reference belongs to.
@@ -212,12 +223,10 @@ export class CheckoutService {
       });
 
       const subtotal = lines.reduce((sum, line) => sum + Number(line.lineTotal), 0);
-      // Delivery only applies when there is somewhere to deliver to.
-      const shipping = dto.shippingAddress?.trim()
-        ? subtotal >= FREE_DELIVERY_OVER
-          ? 0
-          : DELIVERY_FEE
-        : 0;
+      // Always zero: see STOREFRONT_DELIVERY_FEE. An address still means the
+      // buyer wants delivery -- it is what the shop calls them about -- it just
+      // no longer adds anything to what they pay online.
+      const shipping = STOREFRONT_DELIVERY_FEE;
 
       const order = await tx.order.create({
         data: {

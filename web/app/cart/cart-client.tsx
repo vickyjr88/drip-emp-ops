@@ -22,8 +22,13 @@ import { formatKes } from '../lib/shop';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
-const FREE_DELIVERY_OVER = 15000;
-const DELIVERY_FEE = 500;
+/**
+ * Delivery is not charged here. It is arranged after the order is placed and
+ * billed separately, because the price depends on where the parcel is going.
+ * The backend fixes this at zero too -- it recomputes rather than trusting the
+ * browser, so this constant is only what the summary shows.
+ */
+const DELIVERY_FEE = 0;
 
 export function CartClient() {
   const cart = useCart();
@@ -62,7 +67,7 @@ export function CartClient() {
     return () => { cancelled = true; };
   }, []);
 
-  const shipping = deliver ? (cart.subtotal >= FREE_DELIVERY_OVER ? 0 : DELIVERY_FEE) : 0;
+  const shipping = DELIVERY_FEE;
   const total = cart.subtotal + shipping;
 
   /**
@@ -122,7 +127,7 @@ export function CartClient() {
     }
     lines.push('');
     lines.push(`Subtotal: ${formatKes(cart.subtotal)}`);
-    lines.push(`Delivery: ${deliver ? (shipping === 0 ? 'Free' : formatKes(shipping)) : 'Collection at shop'}`);
+    lines.push(`Delivery: ${deliver ? 'To arrange (billed separately)' : 'Collection at shop'}`);
     lines.push(`Total: ${formatKes(total)}`);
     lines.push('');
 
@@ -325,15 +330,15 @@ export function CartClient() {
               <div><dt>Subtotal</dt><dd>{formatKes(cart.subtotal)}</dd></div>
               <div>
                 <dt>Delivery</dt>
-                <dd>{deliver ? (shipping === 0 ? 'Free' : formatKes(shipping)) : 'Collection'}</dd>
+                <dd>{deliver ? 'Arranged after order' : 'Collection'}</dd>
               </div>
               <div className="is-total"><dt>Total</dt><dd>{formatKes(total)}</dd></div>
             </dl>
 
-            {deliver && shipping > 0 ? (
+            {deliver ? (
               <p className="de-summary-note">
-                Free delivery on orders over {formatKes(FREE_DELIVERY_OVER)} — add{' '}
-                {formatKes(FREE_DELIVERY_OVER - cart.subtotal)} more.
+                Delivery is not charged here. We will contact you after you order to
+                arrange it and confirm the cost separately.
               </p>
             ) : null}
 

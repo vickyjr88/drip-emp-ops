@@ -17,6 +17,14 @@ import { PageContentDocument, contentValue, fetchPageContent } from './page-cont
 
 const DEFAULT_WHATSAPP = '254113206481';
 const DEFAULT_PHONE = '+254 113 206 481';
+/**
+ * Advertising copy, not a calculation.
+ *
+ * Delivery is arranged and billed after the order, so nothing derives a charge
+ * from this -- it is only what the shop tells shoppers, and it lives in the CMS
+ * so it can be changed without a rebuild.
+ */
+const DEFAULT_DELIVERY_NOTE = 'Delivery arranged after you order — we will call to confirm';
 
 export function useEnquiryContact() {
   const [content, setContent] = useState<PageContentDocument | null>(null);
@@ -33,10 +41,12 @@ export function useEnquiryContact() {
 
   const whatsapp = contentValue(content, 'enquiries.whatsapp', DEFAULT_WHATSAPP);
   const phone = contentValue(content, 'enquiries.phone', DEFAULT_PHONE);
+  const deliveryNote = contentValue(content, 'delivery.note', DEFAULT_DELIVERY_NOTE);
 
   return {
     whatsapp,
     phone,
+    deliveryNote,
     /** tel: links need the punctuation stripped; the displayed text keeps it. */
     phoneHref: `tel:${phone.replace(/[^\d+]/g, '')}`,
     /** Builds a wa.me link with the message pre-filled. */
