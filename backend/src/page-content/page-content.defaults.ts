@@ -22,12 +22,13 @@ export type ImageSlot = {
 // "footer" is not a page, but it is site-wide editable copy and fits the same
 // slug-keyed document model, so it rides along rather than needing its own
 // table and endpoints.
-export const PAGE_SLUGS = ['home', 'about', 'contact', 'terms', 'privacy', 'header', 'footer', 'seo'] as const;
+export const PAGE_SLUGS = ['home', 'about', 'faq', 'contact', 'terms', 'privacy', 'header', 'footer', 'seo'] as const;
 export type PageSlug = (typeof PAGE_SLUGS)[number];
 
 export const PAGE_LABELS: Record<PageSlug, string> = {
   home: 'Home',
   about: 'About',
+  faq: 'FAQ',
   contact: 'Contact',
   terms: 'Terms',
   privacy: 'Privacy',
@@ -37,6 +38,8 @@ export const PAGE_LABELS: Record<PageSlug, string> = {
 };
 
 export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
+  // FAQ is all prose; there is nothing on it an image would improve.
+  faq: [],
   home: [
     {
       key: 'about.image',
@@ -99,6 +102,10 @@ export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
 };
 
 export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
+  // Empty on purpose. The FAQ page carries its own answers and falls back to
+  // them whenever no question has been saved, so seeding them here as well
+  // would be a second copy to keep in step with the first.
+  faq: {},
   home: {
     hero: {
       heading: 'Quality Affordable\nSneakers & Streetwear',

@@ -10073,6 +10073,60 @@ img {
   margin-top: 2px;
 }
 
+/* FAQ accordion. Native <details>, so it opens before any JS loads and the
+   browser's find-in-page can still reach collapsed answers. */
+.de-faq {
+  padding: 40px 0 64px;
+  max-width: 820px;
+}
+
+.de-faq-item {
+  border-bottom: 1px solid var(--de-line);
+}
+
+.de-faq-item > summary {
+  padding: 18px 34px 18px 0;
+  position: relative;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+/* The default triangle sits inconsistently across browsers, so it is replaced
+   with a marker positioned against the row. */
+.de-faq-item > summary::-webkit-details-marker {
+  display: none;
+}
+
+.de-faq-item > summary::after {
+  content: '+';
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.3rem;
+  font-weight: 400;
+  line-height: 1;
+  color: #6b6d6b;
+}
+
+.de-faq-item[open] > summary::after {
+  content: '\2013';
+}
+
+.de-faq-item > p {
+  margin: 0 0 16px;
+  padding-right: 34px;
+  color: #4a4c4a;
+  line-height: 1.65;
+}
+
+.de-faq-item > summary:focus-visible {
+  outline: 2px solid #1a1c1c;
+  outline-offset: 2px;
+}
+
 /* Instant search dropdown. The box is positioned so the panel can hang from it
    without the flex row above needing to make space. */
 .de-search-box {

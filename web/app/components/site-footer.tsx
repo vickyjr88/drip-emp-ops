@@ -20,6 +20,7 @@ const DEFAULT_QUICK_LINKS: FooterLink[] = [
   { label: 'Home', href: '/' },
   { label: 'Shop All', href: '/shop' },
   { label: 'About Us', href: '/about' },
+  { label: 'FAQ', href: '/faq' },
   { label: 'Contact', href: '/contact' },
   { label: 'Staff Portal', href: '/portal' },
 ];

@@ -336,6 +336,39 @@ export const PAGE_SCHEMAS: PageSchema[] = [
 
 
   {
+    slug: 'faq',
+    label: 'FAQ',
+    href: '/faq',
+    sections: [
+      {
+        key: 'faq-hero',
+        title: 'Hero',
+        fields: [
+          { path: 'hero.kicker', label: 'Kicker', type: 'text' },
+          { path: 'hero.heading', label: 'Heading', type: 'text' },
+          { path: 'hero.intro', label: 'Intro', type: 'textarea' },
+        ],
+      },
+      {
+        key: 'faq-items',
+        title: 'Questions',
+        description:
+          'The page ships with a set of answers covering delivery, sizing, payment and collection. Adding a question here replaces that whole set, so copy across anything you want to keep. Leave a blank line between paragraphs in an answer.',
+        repeatable: {
+          path: 'items',
+          label: 'Question',
+          fields: [
+            { path: 'question', label: 'Question', type: 'text' },
+            { path: 'answer', label: 'Answer', type: 'textarea' },
+          ],
+          blank: { question: '', answer: '' },
+          addLabel: 'Add question',
+        },
+      },
+    ],
+  },
+
+  {
     slug: 'terms',
     label: 'Terms',
     href: '/terms',
