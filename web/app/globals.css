@@ -10061,6 +10061,16 @@ img {
 .de-search {
   display: flex;
   gap: 8px;
+  /* Wraps so the scope checkbox drops onto its own line under the input rather
+     than squeezing the search box on narrow screens. */
+  flex-wrap: wrap;
+}
+
+/* "Search all categories", under the search box. Full width so it takes the
+   second line of the wrapped form on its own. */
+.de-search-scope {
+  flex: 1 0 100%;
+  margin-top: 2px;
 }
 
 .de-search input {

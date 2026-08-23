@@ -55,6 +55,16 @@ export function ShopClient() {
   const [searchDraft, setSearchDraft] = useState(search);
   useEffect(() => setSearchDraft(search), [search]);
 
+  /**
+   * Whether a search ignores the chosen category.
+   *
+   * Defaults on: someone who types "Jordan" while browsing Sandals is looking
+   * for Jordans, not for a Jordan sandal, and previously got an empty result
+   * with nothing on screen explaining that the category was still filtering.
+   * Unticking keeps the search inside the current category.
+   */
+  const [searchAllCategories, setSearchAllCategories] = useState(true);
+
   useEffect(() => {
     let cancelled = false;
     void Promise.all([fetchCategories(), fetchFilters()]).then(([cats, filters]) => {
@@ -80,12 +90,26 @@ export function ShopClient() {
     return () => { cancelled = true; };
   }, [category, brand, size, search, sort, inStockOnly]);
 
-  const setParam = useCallback((key: string, value: string) => {
+  /**
+   * Applies several parameters at once.
+   *
+   * Two setParam calls in a row would both read the same `params` snapshot, so
+   * the second would overwrite the first -- which matters for search, where the
+   * term is set and the category cleared in the same action.
+   */
+  const setParams = useCallback((changes: Record<string, string>) => {
     const next = new URLSearchParams(params.toString());
-    if (value) next.set(key, value);
-    else next.delete(key);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
     router.replace(next.toString() ? `/shop?${next.toString()}` : '/shop', { scroll: false });
   }, [params, router]);
+
+  const setParam = useCallback(
+    (key: string, value: string) => setParams({ [key]: value }),
+    [setParams],
+  );
 
   const hasFilters = Boolean(category || brand || size || search || inStockOnly);
   const heading = useMemo(() => {
@@ -106,7 +130,17 @@ export function ShopClient() {
           <div className="de-filters">
             <form
               className="de-search"
-              onSubmit={(event) => { event.preventDefault(); setParam('search', searchDraft.trim()); }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                const term = searchDraft.trim();
+                setParams({
+                  search: term,
+                  // Only cleared when there is a term: unticking the box on an
+                  // empty search should not also drop the category someone is
+                  // browsing.
+                  ...(term && searchAllCategories ? { category: '' } : {}),
+                });
+              }}
             >
               <input
                 type="search"
@@ -119,6 +153,19 @@ export function ShopClient() {
                 <SearchIcon />
                 <span className="de-search-submit-label">Search</span>
               </button>
+              {/* Sits inside the form so it is read as part of searching, not
+                  as another filter -- and so it applies on submit rather than
+                  re-running the query on its own. */}
+              {category ? (
+                <label className="de-check de-search-scope">
+                  <input
+                    type="checkbox"
+                    checked={searchAllCategories}
+                    onChange={(event) => setSearchAllCategories(event.target.checked)}
+                  />
+                  <span>Search all categories</span>
+                </label>
+              ) : null}
             </form>
 
             <div className="de-filter-row">
