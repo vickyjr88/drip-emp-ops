@@ -10073,6 +10073,121 @@ img {
   margin-top: 2px;
 }
 
+/* Instant search dropdown. The box is positioned so the panel can hang from it
+   without the flex row above needing to make space. */
+.de-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.de-search-box input {
+  width: 100%;
+}
+
+.de-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  /* Above the grid and the sticky header, which the panel overlaps. */
+  z-index: 60;
+  max-height: 380px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--de-line);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+}
+
+.de-search-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--de-line);
+  text-decoration: none;
+  color: inherit;
+}
+
+.de-search-result:last-of-type {
+  border-bottom: 0;
+}
+
+/* One highlight for both hover and keyboard, so arrowing down and moving the
+   mouse cannot show two selected rows at once. */
+.de-search-result.is-active {
+  background: #f4f5f5;
+}
+
+.de-search-thumb {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  background: #f1f2f2;
+}
+
+.de-search-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.de-search-thumb-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.de-search-result-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.de-search-result-text strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+  /* Long product names truncate rather than wrapping the row to two lines. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.de-search-result-text small {
+  font-size: 0.78rem;
+  color: #6b6d6b;
+}
+
+.de-search-note {
+  margin: 0;
+  padding: 12px;
+  font-size: 0.85rem;
+  color: #6b6d6b;
+}
+
+.de-search-all {
+  display: block;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-top: 1px solid var(--de-line);
+  background: #fafafa;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.de-search-all:hover {
+  background: #f0f1f1;
+}
+
 .de-search input {
   flex: 1;
   min-width: 0;

@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
+import { ProductSearch } from '../components/product-search';
 import { ProductCard } from '../components/product-card';
 import {
   ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts,
@@ -111,6 +112,21 @@ export function ShopClient() {
     [setParams],
   );
 
+  /**
+   * Runs the full-grid search. Shared by the form's submit and by the
+   * dropdown's "see all results", so both apply the category scope the same
+   * way rather than drifting apart.
+   */
+  const submitSearch = useCallback(() => {
+    const term = searchDraft.trim();
+    setParams({
+      search: term,
+      // Only cleared when there is a term: unticking the box on an empty
+      // search should not also drop the category someone is browsing.
+      ...(term && searchAllCategories ? { category: '' } : {}),
+    });
+  }, [searchDraft, searchAllCategories, setParams]);
+
   const hasFilters = Boolean(category || brand || size || search || inStockOnly);
   const heading = useMemo(() => {
     if (search) return `"${search}"`;
@@ -130,24 +146,16 @@ export function ShopClient() {
           <div className="de-filters">
             <form
               className="de-search"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const term = searchDraft.trim();
-                setParams({
-                  search: term,
-                  // Only cleared when there is a term: unticking the box on an
-                  // empty search should not also drop the category someone is
-                  // browsing.
-                  ...(term && searchAllCategories ? { category: '' } : {}),
-                });
-              }}
+              onSubmit={(event) => { event.preventDefault(); submitSearch(); }}
             >
-              <input
-                type="search"
+              <ProductSearch
                 value={searchDraft}
-                placeholder="Search Nike, Jordan, Samba…"
-                aria-label="Search products"
-                onChange={(event) => setSearchDraft(event.target.value)}
+                onChange={setSearchDraft}
+                onSubmit={submitSearch}
+                // Suggestions follow the same scope the submitted search would:
+                // ticking "all categories" widens the dropdown too, so what is
+                // previewed is what pressing Enter returns.
+                category={searchAllCategories ? '' : category}
               />
               <button type="submit" className="lp-button lp-button-black de-search-submit" aria-label="Search">
                 <SearchIcon />
