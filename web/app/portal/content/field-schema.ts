@@ -584,12 +584,15 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       {
         key: 'footer-social',
         title: 'Social profiles',
-        description: 'Each link is hidden while its address is blank.',
+        description:
+          'Icons under the footer blurb. Paste the full profile address, e.g. https://instagram.com/dripemporium. Each icon is hidden while its address is blank, so an account the shop does not keep never shows as a dead link.',
         fields: [
-          { path: 'social.heading', label: 'Heading', type: 'text' },
+          { path: 'social.heading', label: 'Heading (screen readers only)', type: 'text' },
+          { path: 'social.x', label: 'X URL', type: 'text' },
           { path: 'social.facebook', label: 'Facebook URL', type: 'text' },
           { path: 'social.instagram', label: 'Instagram URL', type: 'text' },
           { path: 'social.tiktok', label: 'TikTok URL', type: 'text' },
+          { path: 'social.youtube', label: 'YouTube URL', type: 'text' },
           { path: 'social.linkedin', label: 'LinkedIn URL', type: 'text' },
         ],
       },

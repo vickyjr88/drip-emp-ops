@@ -9571,39 +9571,36 @@ img {
 }
 
 /* --- Footer: social profiles ------------------------------------------- */
-.lp-footer-social {
-  margin-top: 30px;
-  padding-top: 18px;
-  border-top: 1px solid #474949;
+/* Social icons, under the footer blurb. Marks rather than words: five names in
+   a row read as another link list, which is what the columns beside them
+   already are. */
+.lp-footer-social-icons {
   display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.lp-footer-social-icons a {
+  display: inline-flex;
   align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-
-.lp-footer-social > span {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #9a9c98;
-}
-
-.lp-footer-social-links {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.lp-footer-social-links a {
+  justify-content: center;
+  /* 36px keeps the tap target at the accessible minimum even though the glyph
+     inside is 18px. */
+  width: 36px;
+  height: 36px;
+  border: 1px solid #474949;
+  border-radius: 50%;
   color: #d8d8d8;
-  font-size: 0.9rem;
   text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.lp-footer-social-links a:hover {
-  color: #fff;
-  text-decoration: underline;
+.lp-footer-social-icons a:hover,
+.lp-footer-social-icons a:focus-visible {
+  color: #1a1c1c;
+  background: #d8d8d8;
+  border-color: #d8d8d8;
 }
 
 /* --- Floating WhatsApp button ------------------------------------------ */
