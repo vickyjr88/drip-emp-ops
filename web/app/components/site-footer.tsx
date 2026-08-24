@@ -36,6 +36,7 @@ const DEFAULT_SERVICE_LINKS: FooterLink[] = [
 const DEFAULT_BOTTOM_LINKS: FooterLink[] = [
   { label: 'About', href: '/about' },
   { label: 'Shop', href: '/shop' },
+  { label: 'FAQ', href: '/faq' },
   { label: 'Contact', href: '/contact' },
   { label: 'Portal', href: '/portal' },
 ];

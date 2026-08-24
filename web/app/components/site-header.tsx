@@ -25,6 +25,7 @@ export const DEFAULT_NAV_LINKS: NavLink[] = [
   { label: 'Home', href: '/' },
   { label: 'Shop', href: '/shop' },
   { label: 'About', href: '/about' },
+  { label: 'FAQ', href: '/faq' },
   { label: 'Contact', href: '/contact' },
 ];
 
@@ -42,6 +43,7 @@ export function navKeyForHref(href: string): string {
   if (path === '/') return 'search';
   if (path.startsWith('/shop')) return 'shop';
   if (path.startsWith('/about')) return 'profile';
+  if (path.startsWith('/faq')) return 'faq';
   if (path.startsWith('/contact')) return 'contact';
   if (path.startsWith('/portal')) return 'portal';
   return `path:${path}`;

@@ -92,7 +92,7 @@ export async function FaqPage() {
   const faqs = edited.length ? edited : DEFAULT_FAQS;
 
   return (
-    <EliteLayout active="none">
+    <EliteLayout active="faq">
       <main className="lp-main-content lp-services-page">
         <section className="lp-services-hero">
           <div className="lp-container lp-services-hero-inner">
