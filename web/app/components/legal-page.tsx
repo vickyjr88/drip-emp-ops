@@ -42,7 +42,10 @@ export function parseLegalText(text: string): LegalBlock[] {
       // full of "How do we use your data?" as a section title.
       const endsSentence = /[.!:;,]$/.test(block);
       const numbered = /^(\d+[.)]|[A-Z][.)])\s+/.test(block);
-      const heading = isSingleLine && isShort && (!endsSentence || numbered);
+      // "Last Updated: August 2026", "Phone: 0722617418" -- a label and a
+      // value on one line is a fact about the document, not a section of it.
+      const labelled = /^[^:]{1,30}:\s+\S/.test(block) && !numbered;
+      const heading = isSingleLine && isShort && !labelled && (!endsSentence || numbered);
       return { kind: heading ? ('heading' as const) : ('paragraph' as const), text: block };
     });
 }
@@ -60,9 +63,24 @@ export async function LegalPage({
 
   const kicker = contentValue(content, 'hero.kicker', 'Legal');
   const heading = contentValue(content, 'hero.heading', defaultHeading);
-  const intro = contentValue(content, 'hero.intro', defaultIntro);
+  const rawIntro = contentValue(content, 'hero.intro', defaultIntro);
   const lastUpdated = contentValue(content, 'body.lastUpdated', '');
   const proseText = contentValue(content, 'body.text', '').trim();
+
+  /**
+   * A whole policy pasted into the intro is treated as the policy.
+   *
+   * The intro is a one-line subtitle under the page title, centred and narrow.
+   * Pasting eight thousand characters of terms into it -- which is an easy
+   * mistake, since it is the first large-looking box on the page -- rendered
+   * the entire document as one centred paragraph with no headings at all.
+   * Rather than showing that, anything past the first block is handed to the
+   * body, where it is parsed like any other policy text.
+   */
+  const introBlocks = rawIntro.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+  const introIsWholeDocument = introBlocks.length > 1 || rawIntro.length > 400;
+  const intro = introIsWholeDocument ? introBlocks[0] || '' : rawIntro;
+  const introOverflow = introIsWholeDocument ? introBlocks.slice(1).join('\n\n') : '';
 
   // Anything saved under the old section-per-field shape still renders: it is
   // flattened back into the same text the new editor would hold, so a policy
@@ -74,7 +92,10 @@ export async function LegalPage({
   const sourceText = proseText
     || legacySections
       .map((section) => [section.heading?.trim(), section.body?.trim()].filter(Boolean).join('\n\n'))
-      .join('\n\n');
+      .join('\n\n')
+    // Last resort, and only when the body is genuinely empty: the policy is
+    // still readable, and saving it into the right field puts it right.
+    || introOverflow;
 
   const blocks = sourceText ? parseLegalText(sourceText) : [];
 
