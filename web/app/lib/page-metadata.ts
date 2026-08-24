@@ -45,7 +45,13 @@ export type SeoDefaults = {
  */
 export async function seoMetadata(defaults: SeoDefaults): Promise<Metadata> {
   const content = await fetchPageContent('seo');
-  const preview = previewFor(defaults.path, defaults.image);
+
+  // A share image set in the CMS wins over whatever the page passes in. Home
+  // and about pass their hero, which is a reasonable guess but not always the
+  // right picture for a card; the shop has no hero to pass at all, so without
+  // this it could never have one.
+  const cmsImage = contentValue(content, `${defaults.key}.shareImage`, '').trim();
+  const preview = previewFor(defaults.path, cmsImage || defaults.image);
 
   const base = `${defaults.key}.`;
   const title = contentValue(content, `${base}title`, defaults.title ?? '');

@@ -102,6 +102,15 @@ function seoFields(page: string): Field[] {
       type: 'textarea',
       help: 'Leave blank to reuse the meta description.',
     },
+    {
+      path: `${page}.shareImage`,
+      label: 'Share image',
+      type: 'image',
+      recommendedWidth: 1200,
+      recommendedHeight: 630,
+      help:
+        'The picture on the card when the page is shared on WhatsApp, Facebook or X. Pages with a hero fall back to it; pages without one -- the shop, for instance -- show no picture at all until something is set here.',
+    },
   ];
 }
 
@@ -463,6 +472,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       },
       { key: 'seo-properties', title: 'Shop', fields: seoFields('properties') },
       { key: 'seo-about', title: 'About', fields: seoFields('about') },
+      { key: 'seo-faq', title: 'FAQ', fields: seoFields('faq') },
       { key: 'seo-contact', title: 'Contact', fields: seoFields('contact') },
       { key: 'seo-terms', title: 'Terms', fields: seoFields('terms') },
       { key: 'seo-privacy', title: 'Privacy', fields: seoFields('privacy') },
