@@ -315,6 +315,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
         { label: 'Home', href: '/' },
         { label: 'Shop', href: '/shop' },
         { label: 'About', href: '/about' },
+        { label: 'FAQ', href: '/faq' },
         { label: 'Contact', href: '/contact' },
       ],
     },
@@ -342,6 +343,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
         { label: 'Home', href: '/' },
         { label: 'Shop All', href: '/shop' },
         { label: 'About Us', href: '/about' },
+        { label: 'FAQ', href: '/faq' },
         { label: 'Contact', href: '/contact' },
         { label: 'Staff Portal', href: '/portal' },
       ],
@@ -379,6 +381,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       links: [
         { label: 'About', href: '/about' },
         { label: 'Shop', href: '/shop' },
+        { label: 'FAQ', href: '/faq' },
         { label: 'Contact', href: '/contact' },
         { label: 'Portal', href: '/portal' },
       ],
