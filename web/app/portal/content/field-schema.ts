@@ -7,7 +7,14 @@
  * falls back to its built-in copy when a value is blank.
  */
 
-export type FieldType = 'text' | 'textarea' | 'image' | 'stringList' | 'lineList' | 'boolean';
+/**
+ * "prose" is a textarea sized for a whole document rather than a sentence.
+ *
+ * Legal copy arrives as one long piece of text from a lawyer or a template,
+ * and the page splits it on blank lines, so the editor's job is to paste it
+ * rather than to cut it into fields.
+ */
+export type FieldType = 'text' | 'textarea' | 'prose' | 'image' | 'stringList' | 'lineList' | 'boolean';
 
 export type Field = {
   /** Dot path into the page's content document, e.g. "hero.heading". */
@@ -384,27 +391,23 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       },
       {
         key: 'terms-body',
-        title: 'Policy sections',
+        title: 'Policy text',
         description:
-          'The page says the policy is not published until at least one section is added. Within a section, leave a blank line between paragraphs.',
+          'Paste the whole policy in one go. A blank line starts a new paragraph, and a short line on its own -- no full stop, with a blank line after it -- becomes a heading. Nothing is published until there is text here.',
         fields: [
           {
             path: 'body.lastUpdated',
             label: 'Last updated',
             type: 'text',
-            help: 'Shown above the first section, e.g. "14 August 2026". Hidden while blank.',
+            help: 'Shown above the policy, e.g. "14 August 2026". Hidden while blank.',
+          },
+          {
+            path: 'body.text',
+            label: 'Policy',
+            type: 'prose',
+            help: 'Headings and paragraphs are detected from the layout of the text, so there is no markup to learn.',
           },
         ],
-        repeatable: {
-          path: 'body.sections',
-          label: 'Section',
-          fields: [
-            { path: 'heading', label: 'Heading', type: 'text' },
-            { path: 'body', label: 'Body', type: 'textarea' },
-          ],
-          blank: { heading: '', body: '' },
-          addLabel: 'Add section',
-        },
       },
     ],
   },
@@ -425,27 +428,23 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       },
       {
         key: 'privacy-body',
-        title: 'Policy sections',
+        title: 'Policy text',
         description:
-          'The page says the policy is not published until at least one section is added. Within a section, leave a blank line between paragraphs.',
+          'Paste the whole policy in one go. A blank line starts a new paragraph, and a short line on its own -- no full stop, with a blank line after it -- becomes a heading. Nothing is published until there is text here.',
         fields: [
           {
             path: 'body.lastUpdated',
             label: 'Last updated',
             type: 'text',
-            help: 'Shown above the first section, e.g. "14 August 2026". Hidden while blank.',
+            help: 'Shown above the policy, e.g. "14 August 2026". Hidden while blank.',
+          },
+          {
+            path: 'body.text',
+            label: 'Policy',
+            type: 'prose',
+            help: 'Headings and paragraphs are detected from the layout of the text, so there is no markup to learn.',
           },
         ],
-        repeatable: {
-          path: 'body.sections',
-          label: 'Section',
-          fields: [
-            { path: 'heading', label: 'Heading', type: 'text' },
-            { path: 'body', label: 'Body', type: 'textarea' },
-          ],
-          blank: { heading: '', body: '' },
-          addLabel: 'Add section',
-        },
       },
     ],
   },

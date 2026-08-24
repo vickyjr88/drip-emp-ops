@@ -5402,6 +5402,23 @@ img {
     font-size: 13px;
   }
 
+  /* Policy editor: a whole document rather than a field. Monospaced so a
+     heading line is visibly shorter than the prose around it, which is what
+     decides whether it renders as a heading. */
+  .portal-prose-input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 420px;
+    padding: 12px 14px;
+    border: 1px solid var(--eef-border);
+    background: #fff;
+    color: #1f2121;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    resize: vertical;
+  }
+
   /* Size picker: the 36-46 run on the Add Product form. Toggles rather than a
      multi-select, because the shop is answering "which sizes did this come
      in", scanning a short numeric row, not searching a list. */

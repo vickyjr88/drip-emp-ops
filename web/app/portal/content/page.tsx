@@ -394,6 +394,22 @@ export default function SiteContentPage() {
       );
     }
 
+    // A whole document, not a sentence: tall enough to see the shape of what
+    // was pasted, and monospaced so a heading line is visibly shorter than the
+    // paragraphs around it -- which is what decides whether it renders as one.
+    if (field.type === 'prose') {
+      return (
+        <textarea
+          rows={24}
+          className="portal-prose-input"
+          value={String(value ?? '')}
+          disabled={!canEdit}
+          placeholder={'1. Who we are\n\nDrip Emporium, Ronald Ngala Street, Nairobi.\n\n2. Orders\n\nPrices are in KES and include VAT.'}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      );
+    }
+
     if (field.type === 'textarea') {
       return (
         <textarea
