@@ -5,12 +5,14 @@ import { paginate } from '../common/pagination.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { RecordCartLeadDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
+import { CartReminderQueueService } from './cart-reminder-queue.service';
 
 @Injectable()
 export class CartLeadService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ownerNotification: OwnerNotificationService,
+    private readonly reminderQueue: CartReminderQueueService,
   ) {}
 
   /**
@@ -146,6 +148,10 @@ export class CartLeadService {
       lines: dto.lines,
       total: Number(created.total),
     });
+    // Fire-and-forget like the owner notification above: this endpoint is
+    // public and polled periodically, so it must never be slowed or fail
+    // because Redis is briefly unreachable.
+    void this.reminderQueue.scheduleReminder(created.id);
     return created;
   }
 

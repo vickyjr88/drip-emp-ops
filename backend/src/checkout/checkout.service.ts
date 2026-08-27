@@ -265,6 +265,28 @@ export class CheckoutService {
         );
       }
 
+      // The same shopper placing this order may have an outstanding
+      // abandoned-cart lead on file -- converting it here, the same way
+      // staff convert a WhatsApp-order lead, stops it looking outstanding
+      // and stops its 24h reminder (which only fires while status is NEW)
+      // without losing it from conversion-rate history the way deleting
+      // would. findFirst + a single update, not updateMany: orderId is
+      // unique on CartLead, so this keeps a hypothetical multi-match from
+      // ever hitting that constraint.
+      const abandonedLead = await tx.cartLead.findFirst({
+        where: {
+          status: 'NEW',
+          source: 'ABANDONED_CART',
+          OR: [{ customerId: customer.id }, ...(customer.email ? [{ customerEmail: customer.email }] : [])],
+        },
+      });
+      if (abandonedLead) {
+        await tx.cartLead.update({
+          where: { id: abandonedLead.id },
+          data: { status: 'CONVERTED', orderId: order.id },
+        });
+      }
+
       return { order, customer };
       }),
     );

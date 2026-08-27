@@ -1,19 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailSenderService } from './email-sender.service';
+import { escapeHtml, money } from './email-html.util';
 
-const OWNER_EMAIL = 'emporiumdrip@gmail.com';
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function money(amount: number) {
-  return `KES ${amount.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+/// Reused beyond owner alerts -- also the destination for the daily
+/// operations report -- so it is named for that role, not this file's.
+const OWNER_EMAIL = process.env.OWNER_EMAIL || 'emporiumdrip@gmail.com';
 
 /** A plain `<dt>/<dd>` line, value escaped since every field here ultimately comes from a public form. */
 function row(label: string, value: string) {

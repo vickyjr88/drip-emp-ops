@@ -7,63 +7,101 @@ import { EmailProvider, EmailSendParams, EmailSendResult } from './providers/ema
 /**
  * Chooses which provider sends the mail.
  *
- * EMAIL_PROVIDER picks one by name. Left unset, the first provider that is
- * actually configured wins, so adding a key to .env is enough to switch and
- * nothing silently keeps using the old one after its key is removed.
- *
- * The choice is resolved once at construction rather than per send: a provider
- * changing halfway through a run would make the EmailLog impossible to read.
+ * EMAIL_PROVIDER, when set, forces exactly one provider and disables fallback
+ * entirely -- for locking to Brevo during SMTP maintenance, say. Left unset,
+ * every send tries providers in priority order -- smtp, then brevo, then
+ * billionMail -- moving to the next only when the one before it fails to
+ * deliver. smtp is first because that is where the operator's self-hosted
+ * BillionMail SMTP credentials go: the intended primary, kept for cost and
+ * control, with Brevo as the fallback and BillionMail's HTTP API a last
+ * resort. Trying the next provider is a per-send decision, not a per-boot
+ * one: a transient SMTP outage must not silently drop mail for the rest of
+ * the process's life.
  */
 @Injectable()
 export class EmailSenderService {
   private readonly logger = new Logger(EmailSenderService.name);
   private readonly providers: EmailProvider[];
-  private readonly active: EmailProvider | null;
+  private readonly forcedRequested: string;
+  private readonly forced: EmailProvider | null;
 
   constructor(smtp: SmtpProvider, brevo: BrevoProvider, billionMail: BillionMailProvider) {
-    // SMTP first: it is the plainest of the three and takes subject and body
-    // directly, so it is the right default when more than one is configured.
     this.providers = [smtp, brevo, billionMail];
 
-    const requested = (process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
-    if (requested) {
-      const match = this.providers.find((provider) => provider.name === requested);
+    this.forcedRequested = (process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
+    if (this.forcedRequested) {
+      const match = this.providers.find((provider) => provider.name === this.forcedRequested);
       if (!match) {
         this.logger.error(
-          `EMAIL_PROVIDER="${requested}" is not a provider. Known: ${this.providers
+          `EMAIL_PROVIDER="${this.forcedRequested}" is not a provider. Known: ${this.providers
             .map((provider) => provider.name)
             .join(', ')}. No email will be sent.`,
         );
       } else if (!match.isConfigured) {
         // Named explicitly but unusable: falling back to another provider would
         // send from the wrong domain, which is worse than not sending.
-        this.logger.error(`EMAIL_PROVIDER="${requested}" is selected but not configured.`);
+        this.logger.error(`EMAIL_PROVIDER="${this.forcedRequested}" is selected but not configured.`);
       }
-      this.active = match ?? null;
+      this.forced = match ?? null;
     } else {
-      this.active = this.providers.find((provider) => provider.isConfigured) ?? null;
+      this.forced = null;
     }
 
-    if (this.active?.isConfigured) {
-      this.logger.log(`Sending email via ${this.active.name}`);
+    const configured = this.providers.filter((provider) => provider.isConfigured).map((provider) => provider.name);
+    if (this.forcedRequested) {
+      this.logger.log(
+        this.forced?.isConfigured
+          ? `EMAIL_PROVIDER forces ${this.forced.name} — automatic fallback disabled`
+          : `EMAIL_PROVIDER="${this.forcedRequested}" is not usable — no email will be sent`,
+      );
+    } else if (configured.length) {
+      this.logger.log(`Email fallback order: ${configured.join(' -> ')}`);
     } else {
       this.logger.warn('No email provider is configured — sends will be recorded but not delivered');
     }
   }
 
-  /** Which provider is in use, for the health endpoint and for diagnosis. */
+  /** Which provider would handle the next send, for the health endpoint and diagnosis. */
   get providerName() {
-    return this.active?.name ?? 'none';
+    if (this.forcedRequested) return this.forced?.isConfigured ? this.forced.name : 'none';
+    return this.providers.find((provider) => provider.isConfigured)?.name ?? 'none';
   }
 
   get isConfigured() {
-    return Boolean(this.active?.isConfigured);
+    if (this.forcedRequested) return Boolean(this.forced?.isConfigured);
+    return this.providers.some((provider) => provider.isConfigured);
   }
 
   async send(params: EmailSendParams): Promise<EmailSendResult> {
-    if (!this.active) {
-      return { delivered: false, error: 'No email provider configured' };
+    if (this.forcedRequested) {
+      if (!this.forced?.isConfigured) {
+        return { delivered: false, error: `EMAIL_PROVIDER="${this.forcedRequested}" is not available` };
+      }
+      return this.forced.send(params);
     }
-    return this.active.send(params);
+
+    let lastResult: EmailSendResult = { delivered: false, error: 'No email provider configured' };
+    let attempted = false;
+
+    for (const provider of this.providers) {
+      if (!provider.isConfigured) continue;
+      attempted = true;
+
+      try {
+        lastResult = await provider.send(params);
+      } catch (error) {
+        lastResult = { delivered: false, error: error instanceof Error ? error.message : String(error) };
+      }
+
+      if (lastResult.delivered) return lastResult;
+
+      this.logger.warn(
+        `${provider.name} failed to deliver "${params.subject}" to ${params.to}: ${lastResult.error} — trying next provider`,
+      );
+    }
+
+    // The last failure, so the EmailLog row explains what actually went
+    // wrong rather than a generic "no provider" when one was tried and lost.
+    return attempted ? lastResult : { delivered: false, error: 'No email provider configured' };
   }
 }

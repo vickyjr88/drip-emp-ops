@@ -1708,6 +1708,11 @@ model CartLead {
   order   Order?  @relation(fields: [orderId], references: [id])
   orderId String? @unique
 
+  /// Set when the 24h "come back and buy" email actually sends. Guards a
+  /// double-send if the delayed job is ever retried, and lets the portal show
+  /// reminder state without a join.
+  reminderSentAt DateTime?
+
   lastActivityAt DateTime @default(now())
   createdAt      DateTime @default(now())
 
