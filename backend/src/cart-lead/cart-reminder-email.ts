@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { CartLead } from '@prisma/client';
 import { EmailSenderService } from '../email-log/email-sender.service';
-import { escapeHtml, money } from '../email-log/email-html.util';
+import { escapeHtml, money, ctaButton } from '../email-log/email-html.util';
+import { storefrontOrigin } from '../common/storefront-origin';
 
 type CartLeadLine = { name: string; size: string; quantity: number };
 
@@ -26,7 +27,8 @@ export class CartReminderEmailService {
       <p>You've got items saved from your last visit:</p>
       <ul style="margin:0 0 16px">${items}</ul>
       <p><strong>Total: ${money(Number(lead.total))}</strong></p>
-      <p>Head back to checkout whenever you're ready — nothing has been charged yet.</p>`,
+      <p>Head back to checkout whenever you're ready — nothing has been charged yet.</p>
+      ${ctaButton(`${storefrontOrigin()}/cart`, 'Return to your cart')}`,
     });
   }
 }

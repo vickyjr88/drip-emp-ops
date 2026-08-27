@@ -3,6 +3,7 @@ import { BrevoProvider } from './providers/brevo.provider';
 import { BillionMailProvider } from './providers/billionmail.provider';
 import { SmtpProvider } from './providers/smtp.provider';
 import { EmailProvider, EmailSendParams, EmailSendResult } from './providers/email-provider';
+import { wrapEmailHtml } from './email-html.util';
 
 /**
  * Chooses which provider sends the mail.
@@ -72,12 +73,21 @@ export class EmailSenderService {
     return this.providers.some((provider) => provider.isConfigured);
   }
 
+  /**
+   * Every caller still builds the same bare content fragment it always has
+   * (a <h2>, a few <p> rows, a <ul>) -- wrapping it in the branded shell here,
+   * once, means none of them needed to change to pick up the new look,
+   * including reminder-engine's operator-edited ReminderRule.emailTemplate,
+   * which is just another fragment as far as this is concerned.
+   */
   async send(params: EmailSendParams): Promise<EmailSendResult> {
+    const branded: EmailSendParams = { ...params, html: wrapEmailHtml(params.subject, params.html) };
+
     if (this.forcedRequested) {
       if (!this.forced?.isConfigured) {
         return { delivered: false, error: `EMAIL_PROVIDER="${this.forcedRequested}" is not available` };
       }
-      return this.forced.send(params);
+      return this.forced.send(branded);
     }
 
     let lastResult: EmailSendResult = { delivered: false, error: 'No email provider configured' };
@@ -88,7 +98,7 @@ export class EmailSenderService {
       attempted = true;
 
       try {
-        lastResult = await provider.send(params);
+        lastResult = await provider.send(branded);
       } catch (error) {
         lastResult = { delivered: false, error: error instanceof Error ? error.message : String(error) };
       }

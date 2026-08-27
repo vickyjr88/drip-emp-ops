@@ -3,6 +3,7 @@ import { Prisma, ReminderChannel, ReminderRule } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from '../notifications/sms.service';
 import { EmailSenderService } from '../email-log/email-sender.service';
+import { escapeHtml } from '../email-log/email-html.util';
 import { ReminderTargetService, daysBetween, startOfDay } from './reminder-target.service';
 import { ReminderTarget } from './reminder.types';
 
@@ -31,14 +32,6 @@ function formatDate(value: Date): string {
     year: 'numeric',
     timeZone: 'UTC',
   });
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 @Injectable()

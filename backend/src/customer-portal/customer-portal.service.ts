@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailLogService } from '../email-log/email-log.service';
+import { ctaButton } from '../email-log/email-html.util';
 import { CUSTOMER_TOKEN_KIND } from './customer-jwt.strategy';
 
 /** How long a password-reset link stays usable. */
@@ -101,12 +102,13 @@ export class CustomerPortalService {
       recipient: customer.email,
       subject: 'Reset your Drip Emporium password',
       html: `
+        <h2>Reset your password</h2>
         <p>Hello ${customer.firstName || 'there'},</p>
         <p>Someone asked to reset the password for your Drip Emporium account.
-           If that was you, use the link below. It works once and expires in
+           If that was you, use the button below. It works once and expires in
            ${RESET_TOKEN_TTL_MINUTES} minutes.</p>
-        <p><a href="${link}">Reset my password</a></p>
-        <p>If it was not you, nothing has changed and you can ignore this email.</p>
+        ${ctaButton(link, 'Reset my password')}
+        <p style="color:#5b6480;font-size:13px;">If it was not you, nothing has changed and you can ignore this email.</p>
       `,
     });
 
