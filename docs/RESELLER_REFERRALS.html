@@ -423,7 +423,7 @@
       the shop already has, not a parallel system.</p>
     <div class="meta-row">
       <span><strong>For</strong> Drip Emporium</span>
-      <span><strong>Status</strong> Phase 1 shipped — Phases 2/3 not started</span>
+      <span><strong>Status</strong> Phases 1 & 2 shipped — Phase 3 not started</span>
       <span><strong>Touches</strong> Storefront, checkout, customer portal, ledger</span>
     </div>
   </div>
@@ -606,17 +606,20 @@
     </div>
 
     <div class="phase">
-      <div class="phase-marker">2</div>
+      <div class="phase-marker" style="background:var(--good-bg);color:var(--good);">✓</div>
       <div class="phase-body">
-        <h3>Referral links and attribution</h3>
-        <p>A reseller can generate a link, a click sets an attribution cookie, and an
-          order placed within the window gets stamped with who referred it. No commission
-          math or payouts yet — this phase only proves the shop can correctly answer
-          "who gets credit for this sale."</p>
+        <h3>Referral attribution on share <span class="opt-badge" style="margin-left:0.5rem;">Shipped</span></h3>
+        <p>Built narrower than first scoped: attribution is automatic on every use of
+          the existing Share button, not a link you generate separately. Each reseller
+          gets one implicit, system-issued code; sharing a product silently appends it;
+          landing on that link sets a 30-day cookie; an order placed within that window
+          is stamped with who referred it. Self-referral is blocked outright. No
+          commission math or payouts yet — this phase only proves the shop can
+          correctly answer "who gets credit for this sale."</p>
         <div class="phase-tags">
-          <span class="tag">new: ReferralLink model</span>
-          <span class="tag">new: Order.referredById</span>
-          <span class="tag">middleware / cookie</span>
+          <span class="tag">Customer.referralCode</span>
+          <span class="tag">Order.referredByCustomerId</span>
+          <span class="tag">use-capture-referral.ts</span>
         </div>
         <p class="unlocks">Unlocks → commissions, since every order now knows its referrer</p>
       </div>
@@ -721,11 +724,13 @@
 </div>
 
 <footer class="end">
-  <p>Phase 1 (tier-aware checkout and dual pricing) has shipped: a logged-in reseller
-    or wholesale customer now pays their real tier price at storefront checkout and
-    sees both prices throughout the site. Phases 2 and 3 (referral links, commission
-    ledger and payouts) follow once the two open decisions above — attribution window
-    and payout cadence — are confirmed.</p>
+  <p>Phase 1 (tier-aware checkout and dual pricing) and Phase 2 (automatic referral
+    attribution on share) have both shipped. A logged-in reseller or wholesale
+    customer now pays their real tier price and sees both prices throughout the
+    site; every share of a product silently carries their referral code, and an
+    order placed through it within 30 days is correctly attributed, self-referral
+    included as a guard. Phase 3 (commission ledger and payouts) follows once the
+    payout cadence decision above is confirmed.</p>
 </footer>
 
 </body>
