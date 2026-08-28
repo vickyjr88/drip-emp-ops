@@ -15,7 +15,9 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ShareButton } from './share-button';
 import { useCart } from '../lib/cart';
+import { useCustomerAuth } from '../lib/customer-auth';
 import { absoluteUrl } from '../lib/site';
+import { withReferral } from '../lib/referral';
 import { ShopProduct, priceLabel, formatKes } from '../lib/shop';
 
 /**
@@ -37,9 +39,11 @@ function sizeRange(sizes: string[]) {
 
 export function ProductCard({ product }: { product: ShopProduct }) {
   const cart = useCart();
+  const auth = useCustomerAuth();
   const [pickingSize, setPickingSize] = useState(false);
   const [added, setAdded] = useState(false);
   const productUrl = absoluteUrl(`/shop/${product.slug}`);
+  const shareUrl = withReferral(productUrl, auth.customer);
 
   function addSize(variant: ShopProduct['variants'][number]) {
     cart.add({
@@ -79,7 +83,7 @@ export function ProductCard({ product }: { product: ShopProduct }) {
       <div className="de-card-overlay-actions">
         <ShareButton
           compact
-          url={productUrl}
+          url={shareUrl}
           title={product.name}
           text={`${product.name}${product.brand ? ` by ${product.brand}` : ''} — ${priceLabel(product)}`}
         />

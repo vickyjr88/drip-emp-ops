@@ -26,6 +26,10 @@ export type CustomerProfile = {
   email: string;
   phone: string;
   priceTier?: string;
+  /** Present only for a reseller/wholesale customer once one has been
+   *  generated; absent for a retail customer. Opaque -- carried verbatim
+   *  into a shared product URL's ?ref= param, never decoded client-side. */
+  referralCode?: string | null;
 };
 
 type AuthValue = {

@@ -8,9 +8,11 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
+import { PriceTier } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailLogService } from '../email-log/email-log.service';
 import { ctaButton } from '../email-log/email-html.util';
+import { ensureReferralCode } from '../common/generate-code';
 import { CUSTOMER_TOKEN_KIND } from './customer-jwt.strategy';
 
 /** How long a password-reset link stays usable. */
@@ -165,14 +167,16 @@ export class CustomerPortalService {
     }));
   }
 
-  private issueToken(customer: {
+  private async issueToken(customer: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
     phone: string;
-    priceTier: string;
+    priceTier: PriceTier;
+    referralCode: string | null;
   }) {
+    const referralCode = await ensureReferralCode(this.prisma, customer);
     return {
       access_token: this.jwt.sign({
         sub: customer.id,
@@ -186,6 +190,7 @@ export class CustomerPortalService {
         email: customer.email,
         phone: customer.phone,
         priceTier: customer.priceTier,
+        referralCode,
       },
     };
   }

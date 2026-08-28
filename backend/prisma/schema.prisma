@@ -78,6 +78,11 @@ model Customer {
   businessName String?
   /// Short code for a trade account, as used on consignment paperwork.
   code         String?   @unique
+  /// System-generated public identifier for this customer's implicit
+  /// referral link, e.g. "kZ3F9pQdX2A". Null until first needed -- only a
+  /// RESELLER/WHOLESALE customer ever gets one. Not a secret, unlike
+  /// resetTokenHash below: safe to appear in a shared URL.
+  referralCode String?   @unique
   location     String?
   /// Most stock, at cost, we will have out with them at once. Zero means no
   /// limit. Only meaningful above RETAIL.
@@ -97,6 +102,9 @@ model Customer {
   orders       Order[]
   consignments Consignment[]
   cartLeads    CartLead[]
+  /// Orders placed by someone else that this customer's referral code
+  /// attributed. Distinct from `orders` (this customer's own purchases).
+  referredOrders Order[] @relation("OrderReferredBy")
 }
 
 model CustomerDocument {
@@ -1545,6 +1553,11 @@ model Order {
   orderNumber String      @unique
   customer    Customer?   @relation(fields: [customerId], references: [id])
   customerId  String?
+  /// The reseller whose referral code was attached to this order at
+  /// checkout, if any. Never the same customer as `customerId` -- see the
+  /// self-referral guard in CheckoutService.start().
+  referredBy           Customer? @relation("OrderReferredBy", fields: [referredByCustomerId], references: [id])
+  referredByCustomerId String?
   store       Store       @relation(fields: [storeId], references: [id])
   storeId     String
   status      OrderStatus @default(PENDING)
@@ -1577,6 +1590,7 @@ model Order {
   cartLead CartLead?
 
   @@index([customerId])
+  @@index([referredByCustomerId])
   @@index([storeId])
   @@index([status])
 }

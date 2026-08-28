@@ -62,6 +62,13 @@ export class CheckoutDto {
   @IsOptional()
   @IsString()
   storeId?: string;
+
+  @ApiPropertyOptional({
+    description: "The referring reseller's public code, captured from a shared link. Ignored if unknown or if it would attribute the order to the person placing it.",
+  })
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 }
 
 export class CustomerSignupDto {

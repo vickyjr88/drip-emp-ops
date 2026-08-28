@@ -25,6 +25,8 @@ import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
 import { useCustomerAuth } from '../../lib/customer-auth';
 import { absoluteUrl } from '../../lib/site';
+import { withReferral } from '../../lib/referral';
+import { useCaptureReferral } from '../../lib/use-capture-referral';
 import { ShopProduct, fetchProduct, formatKes, priceLabel } from '../../lib/shop';
 
 export function ProductClient({ product: initialProduct }: { product: ShopProduct }) {
@@ -32,6 +34,11 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
   const cart = useCart();
   const auth = useCustomerAuth();
   const [added, setAdded] = useState(false);
+
+  // Every possible landing point for a shared referral link is this page --
+  // ShareButton only ever links to a product page -- so capturing happens
+  // here, not in a layout.
+  useCaptureReferral();
 
   // The server render has no access to the customer's token (it lives in
   // localStorage), so it always renders at retail. A logged-in reseller's
@@ -167,7 +174,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                 {product.isFeatured ? <span className="de-product-featured-flag">Featured</span> : null}
               </div>
               <ShareButton
-                url={absoluteUrl(`/shop/${product.slug}`)}
+                url={withReferral(absoluteUrl(`/shop/${product.slug}`), auth.customer)}
                 title={product.name}
                 text={`${product.name}${product.brand ? ` by ${product.brand}` : ''} — ${priceLabel(product)}`}
               />

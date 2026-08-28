@@ -2,6 +2,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ensureReferralCode } from '../common/generate-code';
 
 export const CUSTOMER_TOKEN_KIND = 'customer';
 
@@ -37,6 +38,7 @@ export class CustomerJwtStrategy extends PassportStrategy(Strategy, 'customer-jw
         phone: true,
         portalEnabled: true,
         priceTier: true,
+        referralCode: true,
       },
     });
 
@@ -46,6 +48,10 @@ export class CustomerJwtStrategy extends PassportStrategy(Strategy, 'customer-jw
       throw new UnauthorizedException();
     }
 
-    return customer;
+    // Backfilled here, not eagerly for every signup: only a request that
+    // actually needs a reseller's profile pays the (one-time) cost of
+    // minting one, and only ever for a non-RETAIL customer.
+    const referralCode = await ensureReferralCode(this.prisma, customer);
+    return { ...customer, referralCode };
   }
 }

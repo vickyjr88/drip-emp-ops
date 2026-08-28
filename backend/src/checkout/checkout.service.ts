@@ -247,11 +247,27 @@ export class CheckoutService {
       // no longer adds anything to what they pay online.
       const shipping = STOREFRONT_DELIVERY_FEE;
 
+      // A code that matches nothing simply attributes nothing -- it must
+      // never fail the checkout. Self-referral guard: comparing against
+      // customer.id (the row this order is actually being placed under, from
+      // upsertCustomer) covers both a logged-in reseller checking out with
+      // their own referral cookie still set, and a reseller checking out as
+      // a guest with their own email.
+      let referredByCustomerId: string | null = null;
+      if (dto.referralCode) {
+        const referrer = await tx.customer.findUnique({
+          where: { referralCode: dto.referralCode },
+          select: { id: true },
+        });
+        if (referrer && referrer.id !== customer.id) referredByCustomerId = referrer.id;
+      }
+
       const order = await tx.order.create({
         data: {
           orderNumber: await this.nextOrderNumber(tx),
           storeId: store.id,
           customerId: customer.id,
+          referredByCustomerId,
           channel: 'WEBSITE',
           priceTier: tier,
           customerName: `${customer.firstName} ${customer.lastName}`.trim(),

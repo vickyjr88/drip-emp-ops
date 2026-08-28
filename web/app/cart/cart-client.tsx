@@ -20,6 +20,7 @@ import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { fetchProduct, formatKes } from '../lib/shop';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
+import { readCapturedReferral } from '../lib/use-capture-referral';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 /**
@@ -298,6 +299,7 @@ export function CartClient() {
           phone: form.phone,
           shippingAddress: deliver ? form.shippingAddress : undefined,
           password: wantAccount && form.password ? form.password : undefined,
+          referralCode: readCapturedReferral() || undefined,
         }),
       });
       const data = await response.json();
