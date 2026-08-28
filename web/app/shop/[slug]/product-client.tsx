@@ -17,7 +17,7 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { ProductCard } from '../../components/product-card';
 import { ShareButton } from '../../components/share-button';
@@ -25,13 +25,33 @@ import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
 import { useCustomerAuth } from '../../lib/customer-auth';
 import { absoluteUrl } from '../../lib/site';
-import { ShopProduct, formatKes, priceLabel } from '../../lib/shop';
+import { ShopProduct, fetchProduct, formatKes, priceLabel } from '../../lib/shop';
 
-export function ProductClient({ product }: { product: ShopProduct }) {
+export function ProductClient({ product: initialProduct }: { product: ShopProduct }) {
   const enquiry = useEnquiryContact();
   const cart = useCart();
   const auth = useCustomerAuth();
   const [added, setAdded] = useState(false);
+
+  // The server render has no access to the customer's token (it lives in
+  // localStorage), so it always renders at retail. A logged-in reseller's
+  // tier price arrives a moment later once this re-fetches with their token.
+  const [product, setProduct] = useState(initialProduct);
+  useEffect(() => {
+    if (!auth.ready) return;
+    if (!auth.token) {
+      // Signed out (or never signed in): the server-rendered retail data is
+      // already correct, and re-fetching without a token would just repeat
+      // the same request for nothing.
+      setProduct(initialProduct);
+      return;
+    }
+    let cancelled = false;
+    void fetchProduct(initialProduct.slug, auth.token).then((fresh) => {
+      if (!cancelled && fresh) setProduct(fresh);
+    });
+    return () => { cancelled = true; };
+  }, [auth.ready, auth.token, initialProduct]);
   const [sizeId, setSizeId] = useState<string | null>(
     // A discounted size wins the default. Otherwise a shopper landing on a
     // product with a clearance badge would see the full price until they
@@ -164,6 +184,14 @@ export function ProductClient({ product }: { product: ShopProduct }) {
                 </>
               ) : null}
             </p>
+            {/* Only present for a logged-in reseller/wholesale viewer, and
+                only once the client-side re-fetch above has resolved. */}
+            {(chosen?.retailPriceKes ?? product.retailPriceFrom) ? (
+              <p className="de-reseller-price">
+                Retail <s>{formatKes(chosen?.retailPriceKes ?? product.retailPriceFrom!)}</s> · you keep{' '}
+                {formatKes((chosen?.retailPriceKes ?? product.retailPriceFrom!) - (chosen ? chosen.priceKes : product.priceFrom))}
+              </p>
+            ) : null}
 
             <div className="de-sizes">
               <div className="de-sizes-head">

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConsignmentStatus, PriceTier, Prisma } from '@prisma/client';
+import { ConsignmentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { CreateConsignmentDto, SettleConsignmentDto } from './dto/consignment.dto';
@@ -7,6 +7,7 @@ import { ConsignmentQueryDto } from './dto/consignment-query.dto';
 import { customerDisplayName } from '../customer/customer-name';
 import { nextReference } from '../common/next-reference';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
+import { priceForTier } from '../common/price-for-tier';
 
 /** The agreed holding period before unsold stock is due back. */
 export const HOLDING_DAYS = 3;
@@ -35,20 +36,6 @@ export class ConsignmentService {
     private readonly prisma: PrismaService,
     private readonly posting: SalesPostingService,
   ) {}
-
-  /** The price a given tier pays, falling back up the tiers when unset. */
-  static priceFor(
-    variant: { priceKes: Prisma.Decimal; resellerPriceKes: Prisma.Decimal | null; wholesalePriceKes: Prisma.Decimal | null },
-    tier: PriceTier,
-  ): number {
-    if (tier === 'WHOLESALE') {
-      return Number(variant.wholesalePriceKes ?? variant.resellerPriceKes ?? variant.priceKes);
-    }
-    if (tier === 'RESELLER') {
-      return Number(variant.resellerPriceKes ?? variant.priceKes);
-    }
-    return Number(variant.priceKes);
-  }
 
   private async nextReference(tx: Prisma.TransactionClient) {
     return nextReference(tx.consignment, 'reference', 'CON');
@@ -92,7 +79,7 @@ export class ConsignmentService {
         if (!variant) throw new NotFoundException(`Variant ${line.variantId} not found`);
         // Fixed now: a price rise next month does not change what is owed on
         // stock already sitting in their shop.
-        const unitPrice = line.unitPrice ?? ConsignmentService.priceFor(variant, tier);
+        const unitPrice = line.unitPrice ?? priceForTier(variant, tier);
         return {
           variantId: variant.id,
           description: `${variant.name} (${variant.sku})`,

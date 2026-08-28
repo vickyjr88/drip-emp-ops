@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { Controller, Get, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
+import { OptionalCustomerAuthGuard } from '../customer-portal/optional-customer-auth.guard';
 import { StorefrontService } from './storefront.service';
 
 /**
@@ -25,8 +26,10 @@ export class StorefrontController {
   stores() { return this.service.stores(); }
 
   @Public()
+  @UseGuards(OptionalCustomerAuthGuard)
   @Get('products')
   list(
+    @Req() request: Request,
     @Query('category') category?: string,
     @Query('brand') brand?: string,
     @Query('size') size?: string,
@@ -36,22 +39,32 @@ export class StorefrontController {
     @Query('inStockOnly') inStockOnly?: string,
     @Query('sort') sort?: string,
   ) {
-    return this.service.list({ category, brand, size, search, minPrice, maxPrice, inStockOnly, sort });
+    return this.service.list(
+      { category, brand, size, search, minPrice, maxPrice, inStockOnly, sort },
+      (request as any).user,
+    );
   }
 
   // Declared before 'products/:slug' below, or "featured" would be read as a
   // product slug.
   @Public()
+  @UseGuards(OptionalCustomerAuthGuard)
   @Get('products/featured')
-  featured(@Query('limit') limit?: string) {
+  featured(@Req() request: Request, @Query('limit') limit?: string) {
     const parsed = limit ? Number(limit) : undefined;
-    return this.service.featured(parsed && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined);
+    return this.service.featured(
+      parsed && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+      (request as any).user,
+    );
   }
 
   // After the literal routes above, or "categories" is read as a slug.
   @Public()
+  @UseGuards(OptionalCustomerAuthGuard)
   @Get('products/:slug')
-  bySlug(@Param('slug') slug: string) { return this.service.bySlug(slug); }
+  bySlug(@Param('slug') slug: string, @Req() request: Request) {
+    return this.service.bySlug(slug, (request as any).user);
+  }
 
   /**
    * The catalogue as a CSV, for Meta Commerce Manager's scheduled feed.

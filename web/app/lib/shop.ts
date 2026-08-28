@@ -3,7 +3,10 @@
  *
  * Deliberately mirrors what the API returns and nothing more: the shop window
  * has no business knowing cost, trade pricing or per-branch quantities, so
- * those never appear in these types either.
+ * those never appear in these types either -- except a logged-in reseller or
+ * wholesale customer's own tier price, which the API includes only for the
+ * customer it belongs to (verified server-side from their bearer token), and
+ * which surfaces here as `retailPriceKes`/`retailPriceFrom` for comparison.
  */
 
 const BROWSER_API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
@@ -18,6 +21,9 @@ export type ShopVariant = {
   /** Retail before the markdown. Null when nothing is discounted. */
   wasPriceKes?: number | null;
   offerLabel?: string | null;
+  /** Present only for a logged-in reseller/wholesale viewer: retail, for
+   *  comparison against the tier price now in priceKes. Null otherwise. */
+  retailPriceKes?: number | null;
   /** Availability, not a count. */
   inStock: boolean;
   /** Always true today: out-of-shelf sizes are still orderable, sourced from the supplier. */
@@ -40,6 +46,9 @@ export type ShopProduct = {
   variants: ShopVariant[];
   priceFrom: number;
   priceTo: number;
+  /** Product-level retail comparison price, mirroring priceFrom. Present only
+   *  for a logged-in reseller/wholesale viewer. */
+  retailPriceFrom?: number | null;
   sizesInStock: string[];
   anyInStock: boolean;
   related?: ShopProduct[];
@@ -50,9 +59,12 @@ export type ShopStore = { code: string; name: string; location?: string | null }
 
 /** A failed fetch returns empty rather than throwing: a shop window that is
  *  missing a section still sells; one that shows an error page does not. */
-async function get<T>(path: string, fallback: T): Promise<T> {
+async function get<T>(path: string, fallback: T, token?: string | null): Promise<T> {
   try {
-    const response = await fetch(`${API}${path}`, { cache: 'no-store' });
+    const response = await fetch(`${API}${path}`, {
+      cache: 'no-store',
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    });
     if (!response.ok) return fallback;
     return (await response.json()) as T;
   } catch {
@@ -60,22 +72,29 @@ async function get<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
-export function fetchProducts(query: Record<string, string | undefined> = {}) {
+export function fetchProducts(query: Record<string, string | undefined> = {}, token?: string | null) {
   const params = new URLSearchParams();
   Object.entries(query).forEach(([key, value]) => {
     if (value) params.set(key, value);
   });
   const suffix = params.toString() ? `?${params.toString()}` : '';
-  return get<ShopProduct[]>(`/shop/products${suffix}`, []);
+  return get<ShopProduct[]>(`/shop/products${suffix}`, [], token);
 }
 
-export function fetchProduct(slug: string) {
-  return get<ShopProduct | null>(`/shop/products/${slug}`, null);
+/**
+ * `token` is only ever supplied from a client-side re-fetch: the product
+ * detail page is server-rendered for SEO/link-sharing and has no access to
+ * the customer's token (held in localStorage) on that first render, so its
+ * initial fetch is always retail. A logged-in reseller's tier price appears a
+ * moment later once the client component re-fetches with its token.
+ */
+export function fetchProduct(slug: string, token?: string | null) {
+  return get<ShopProduct | null>(`/shop/products/${slug}`, null, token);
 }
 
 /** The "Featured" rail for the home, shop and product pages. */
-export function fetchFeaturedProducts(limit = 10) {
-  return get<ShopProduct[]>(`/shop/products/featured?limit=${limit}`, []);
+export function fetchFeaturedProducts(limit = 10, token?: string | null) {
+  return get<ShopProduct[]>(`/shop/products/featured?limit=${limit}`, [], token);
 }
 
 export const fetchCategories = () => get<ShopCategory[]>('/shop/categories', []);

@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { ShareButton } from './share-button';
 import { useCart } from '../lib/cart';
 import { absoluteUrl } from '../lib/site';
-import { ShopProduct, priceLabel } from '../lib/shop';
+import { ShopProduct, priceLabel, formatKes } from '../lib/shop';
 
 /**
  * "36–44" from a list of sizes, or a single size when only one is left.
@@ -96,6 +96,14 @@ export function ProductCard({ product }: { product: ShopProduct }) {
             <span className="de-offer-badge">{product.offerLabel || 'Offer'}</span>
           ) : null}
         </p>
+        {/* Only present for a logged-in reseller/wholesale viewer -- retail
+            shoppers and guests never see this line. */}
+        {product.retailPriceFrom ? (
+          <p className="de-reseller-price">
+            Retail <s>{formatKes(product.retailPriceFrom)}</s> · you keep{' '}
+            {formatKes(product.retailPriceFrom - product.priceFrom)}
+          </p>
+        ) : null}
 
         {/* A range rather than every size: a full 36-46 run would be
             eleven chips per card and unreadable at a glance. The

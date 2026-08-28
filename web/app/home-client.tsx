@@ -21,6 +21,7 @@ import { ProductCard } from './components/product-card';
 import { PageContentDocument, contentValue, fetchPageContent } from './lib/page-content';
 import { ShopCategory, ShopProduct, fetchCategories, fetchFeaturedProducts } from './lib/shop';
 import { useEnquiryContact } from './lib/use-enquiry-contact';
+import { useCustomerAuth } from './lib/customer-auth';
 
 type TrustBadge = { title: string; description: string };
 type BrandItem = { name: string; logo?: string };
@@ -42,6 +43,7 @@ const FALLBACK_TRUST_ICON = <path key="check" d="m9 16.2-3.5-3.6L4 14.1l5 5 11-1
 export default function HomeClient() {
   const router = useRouter();
   const enquiry = useEnquiryContact();
+  const auth = useCustomerAuth();
 
   const [content, setContent] = useState<PageContentDocument | null>(null);
   const [featured, setFeatured] = useState<ShopProduct[]>([]);
@@ -51,10 +53,12 @@ export default function HomeClient() {
   useEffect(() => {
     let cancelled = false;
     void fetchPageContent('home').then((doc) => { if (!cancelled) setContent(doc); });
-    void fetchFeaturedProducts(10).then((rows) => { if (!cancelled) setFeatured(rows); });
+    void fetchFeaturedProducts(10, auth.token).then((rows) => { if (!cancelled) setFeatured(rows); });
     void fetchCategories().then((rows) => { if (!cancelled) setCategories(rows); });
     return () => { cancelled = true; };
-  }, []);
+    // auth.token so signing in/out while the home page is open re-fetches
+    // the featured rail with the new tier's pricing.
+  }, [auth.token]);
 
   const heroHeading = contentValue(content, 'hero.heading', 'Quality Affordable\nSneakers & Streetwear');
   const heroSubheading = contentValue(

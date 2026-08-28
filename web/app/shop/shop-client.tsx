@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { ProductSearch } from '../components/product-search';
 import { ProductCard } from '../components/product-card';
+import { useCustomerAuth } from '../lib/customer-auth';
 import {
   ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts,
 } from '../lib/shop';
@@ -39,6 +40,7 @@ function SearchIcon() {
 export function ShopClient() {
   const router = useRouter();
   const params = useSearchParams();
+  const auth = useCustomerAuth();
 
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [categories, setCategories] = useState<ShopCategory[]>([]);
@@ -83,13 +85,15 @@ export function ShopClient() {
     void fetchProducts({
       category, brand, size, search, sort,
       inStockOnly: inStockOnly ? 'true' : undefined,
-    }).then((rows) => {
+    }, auth.token).then((rows) => {
       if (cancelled) return;
       setProducts(rows);
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [category, brand, size, search, sort, inStockOnly]);
+    // auth.token in the deps so signing in/out while the grid is open
+    // re-fetches with the new tier's pricing.
+  }, [category, brand, size, search, sort, inStockOnly, auth.token]);
 
   /**
    * Applies several parameters at once.

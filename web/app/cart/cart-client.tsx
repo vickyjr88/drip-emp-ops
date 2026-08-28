@@ -14,11 +14,11 @@
  */
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
-import { formatKes } from '../lib/shop';
+import { fetchProduct, formatKes } from '../lib/shop';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
@@ -67,8 +67,56 @@ export function CartClient() {
     return () => { cancelled = true; };
   }, []);
 
+  /**
+   * A logged-in reseller/wholesale customer's real tier price for what is
+   * currently in the cart, keyed by variant id -- overlaid on the display
+   * only. `useCart()`'s stored `priceKes` and localStorage contents are never
+   * touched here, so a guest cart round-trips exactly as before this existed,
+   * and signing out reverts the display correctly (the map just goes empty).
+   *
+   * Re-fetched per distinct product slug in the cart, via the same tier-aware
+   * `/shop/products/:slug` endpoint the product page uses -- there is no
+   * separate "price these variant ids" lookup, and this reuses what already
+   * exists rather than adding one for a display-only concern.
+   */
+  const [tierPrices, setTierPrices] = useState<Map<string, number>>(new Map());
+  const slugs = useMemo(
+    () => Array.from(new Set(cart.lines.map((line) => line.productSlug))),
+    [cart.lines],
+  );
+  useEffect(() => {
+    if (!auth.ready || !auth.token || slugs.length === 0) {
+      setTierPrices(new Map());
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(slugs.map((slug) => fetchProduct(slug, auth.token))).then((products) => {
+      if (cancelled) return;
+      const next = new Map<string, number>();
+      for (const product of products) {
+        if (!product) continue;
+        for (const variant of product.variants) {
+          if (variant.retailPriceKes != null) next.set(variant.id, variant.priceKes);
+        }
+      }
+      setTierPrices(next);
+    });
+    return () => { cancelled = true; };
+  }, [auth.ready, auth.token, slugs]);
+
+  /** The price actually charged for a line: the reseller/wholesale tier
+   *  price when one was resolved for it, otherwise the price the cart
+   *  already has (retail, or whatever it was added at). */
+  function displayPrice(variantId: string, fallback: number) {
+    return tierPrices.get(variantId) ?? fallback;
+  }
+
   const shipping = DELIVERY_FEE;
-  const total = cart.subtotal + shipping;
+  const subtotal = cart.lines.reduce(
+    (sum, line) => sum + displayPrice(line.variantId, line.priceKes) * line.quantity,
+    0,
+  );
+  const total = subtotal + shipping;
 
   /**
    * Marks this basket as a possible abandoned-cart lead once there is a way to
@@ -123,10 +171,11 @@ export function CartClient() {
   function buildWhatsappMessage() {
     const lines = ['Hello Drip Emporium, I would like to order:'];
     for (const line of cart.lines) {
-      lines.push(`- ${line.quantity} x ${line.name} (${line.size}) - ${formatKes(line.priceKes * line.quantity)}`);
+      const price = displayPrice(line.variantId, line.priceKes);
+      lines.push(`- ${line.quantity} x ${line.name} (${line.size}) - ${formatKes(price * line.quantity)}`);
     }
     lines.push('');
-    lines.push(`Subtotal: ${formatKes(cart.subtotal)}`);
+    lines.push(`Subtotal: ${formatKes(subtotal)}`);
     lines.push(`Delivery: ${deliver ? 'To arrange (billed separately)' : 'Collection at shop'}`);
     lines.push(`Total: ${formatKes(total)}`);
     lines.push('');
@@ -232,7 +281,15 @@ export function CartClient() {
     try {
       const response = await fetch(`${API}/checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // The one thing that actually activates tier-aware pricing on the
+          // backend: a logged-in reseller's real price only applies once the
+          // server can verify who is checking out, not from anything in the
+          // form (that would let a guest buy at trade price just by typing a
+          // known reseller's email).
+          ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
+        },
         body: JSON.stringify({
           lines: cart.lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
           firstName: form.firstName,
@@ -292,42 +349,49 @@ export function CartClient() {
 
         <section className="lp-container de-checkout">
           <div className="de-cart-lines">
-            {cart.lines.map((line) => (
-              <article key={line.variantId} className="de-cart-line">
-                <Link href={`/shop/${line.productSlug}`} className="de-cart-media">
-                  {line.imageUrl ? (
-                    <img src={line.imageUrl} alt="" />
-                  ) : (
-                    <span aria-hidden="true">{line.name.charAt(0)}</span>
-                  )}
-                </Link>
-                <div className="de-cart-detail">
-                  <h2><Link href={`/shop/${line.productSlug}`}>{line.name}</Link></h2>
-                  <p className="de-cart-meta">{line.size} · {line.sku}</p>
-                  <p className="de-cart-unit">{formatKes(line.priceKes)} each</p>
-                </div>
-                <div className="de-cart-qty">
-                  <label>
-                    <span className="lp-visually-hidden">Quantity for {line.name}</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={line.quantity}
-                      onChange={(event) => cart.setQuantity(line.variantId, Number(event.target.value))}
-                    />
-                  </label>
-                  <button type="button" onClick={() => cart.remove(line.variantId)}>Remove</button>
-                </div>
-                <p className="de-cart-total">{formatKes(line.priceKes * line.quantity)}</p>
-              </article>
-            ))}
+            {cart.lines.map((line) => {
+              const price = displayPrice(line.variantId, line.priceKes);
+              const isTierPriced = tierPrices.has(line.variantId);
+              return (
+                <article key={line.variantId} className="de-cart-line">
+                  <Link href={`/shop/${line.productSlug}`} className="de-cart-media">
+                    {line.imageUrl ? (
+                      <img src={line.imageUrl} alt="" />
+                    ) : (
+                      <span aria-hidden="true">{line.name.charAt(0)}</span>
+                    )}
+                  </Link>
+                  <div className="de-cart-detail">
+                    <h2><Link href={`/shop/${line.productSlug}`}>{line.name}</Link></h2>
+                    <p className="de-cart-meta">{line.size} · {line.sku}</p>
+                    <p className="de-cart-unit">
+                      {formatKes(price)} each
+                      {isTierPriced ? <span className="de-reseller-price"> · your price</span> : null}
+                    </p>
+                  </div>
+                  <div className="de-cart-qty">
+                    <label>
+                      <span className="lp-visually-hidden">Quantity for {line.name}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={line.quantity}
+                        onChange={(event) => cart.setQuantity(line.variantId, Number(event.target.value))}
+                      />
+                    </label>
+                    <button type="button" onClick={() => cart.remove(line.variantId)}>Remove</button>
+                  </div>
+                  <p className="de-cart-total">{formatKes(price * line.quantity)}</p>
+                </article>
+              );
+            })}
           </div>
 
           <aside className="de-checkout-panel">
             <h2>Checkout</h2>
 
             <dl className="de-summary">
-              <div><dt>Subtotal</dt><dd>{formatKes(cart.subtotal)}</dd></div>
+              <div><dt>Subtotal</dt><dd>{formatKes(subtotal)}</dd></div>
               <div>
                 <dt>Delivery</dt>
                 <dd>{deliver ? 'Arranged after order' : 'Collection'}</dd>

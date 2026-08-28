@@ -10513,6 +10513,19 @@ img {
   color: var(--de-ink);
 }
 
+/* Shown only to a logged-in reseller/wholesale customer: their tier price is
+   already in de-card-price above, this line names the margin explicitly
+   rather than leaving them to do the subtraction. */
+.de-reseller-price {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--de-muted);
+}
+
+.de-reseller-price s {
+  color: var(--de-muted);
+}
+
 /* Sizes on the card: no need to open a product to learn it is not carried. */
 .de-card-sizes {
   margin: 8px 0 0;

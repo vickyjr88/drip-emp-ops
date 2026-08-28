@@ -1,9 +1,10 @@
 import {
-  Body, Controller, Get, Headers, Param, Post, Query, RawBodyRequest, Req,
+  Body, Controller, Get, Headers, Param, Post, Query, RawBodyRequest, Req, UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
+import { OptionalCustomerAuthGuard } from '../customer-portal/optional-customer-auth.guard';
 import { CheckoutService } from './checkout.service';
 import { PaystackService } from '../paystack/paystack.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
@@ -38,12 +39,17 @@ export class CheckoutController {
   }
 
   @Public()
+  @UseGuards(OptionalCustomerAuthGuard)
   @Post()
   start(@Body() dto: CheckoutDto, @Req() request: Request) {
     // Must be the storefront, not this API. Falling back to the request's own
     // host sent Paystack's callback to :3101/checkout/complete, which 404s --
     // that page lives on the web app.
-    return this.service.start(dto, storefrontOrigin(request.headers.origin as string));
+    return this.service.start(
+      dto,
+      storefrontOrigin(request.headers.origin as string),
+      (request as any).user,
+    );
   }
 
   /** Called when the browser returns from Paystack. */

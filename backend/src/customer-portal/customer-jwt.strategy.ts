@@ -36,6 +36,7 @@ export class CustomerJwtStrategy extends PassportStrategy(Strategy, 'customer-jw
         email: true,
         phone: true,
         portalEnabled: true,
+        priceTier: true,
       },
     });
 

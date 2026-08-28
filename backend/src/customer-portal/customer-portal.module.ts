@@ -20,5 +20,9 @@ import { EmailLogModule } from '../email-log/email-log.module';
   ],
   controllers: [CustomerPortalController],
   providers: [CustomerPortalService, CustomerJwtStrategy],
+  // CustomerJwtStrategy backs OptionalCustomerAuthGuard too, used by modules
+  // outside this one (checkout, storefront) to recognise a logged-in customer
+  // on an otherwise-public route without requiring this whole module's API.
+  exports: [CustomerJwtStrategy],
 })
 export class CustomerPortalModule {}

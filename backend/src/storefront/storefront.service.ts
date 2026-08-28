@@ -1,16 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { storefrontOrigin } from '../common/storefront-origin';
 import { csvField } from '../common/csv.util';
+import { priceForTier } from '../common/price-for-tier';
 
 /**
  * The public catalogue.
  *
  * Deliberately narrow: it returns retail prices and whether a size is in
- * stock, and nothing else. Reseller and wholesale pricing, cost, margin and
- * per-store quantities never leave this service -- the shops buying at those
- * tiers are competitors, and an open endpoint is an open price list.
+ * stock, and nothing else by default. Reseller and wholesale pricing, cost,
+ * margin and per-store quantities never leave this service to anyone else --
+ * the one exception is a logged-in reseller/wholesale customer, verified
+ * server-side by OptionalCustomerAuthGuard, who sees their own tier's price
+ * alongside retail. The shops buying at those tiers are competitors, and an
+ * open endpoint reachable by anyone is still an open price list; this only
+ * ever reveals a tier price to the customer it actually belongs to.
  *
  * Stock is reported as available or not rather than as a count. "3 left" is a
  * number a competitor can watch; "in stock" is all a customer needs.
@@ -19,11 +24,20 @@ import { csvField } from '../common/csv.util';
 export class StorefrontService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Only what a shopper may see. Note the absence of cost and other tiers. */
+  /** RETAIL for a guest or a retail customer; a signed-in reseller/wholesale
+   *  customer's own tier otherwise. Mirrors the same rule checkout uses: the
+   *  tier follows the verified session, never anything the caller can name. */
+  private tierOf(user?: { priceTier?: PriceTier }): PriceTier {
+    return user?.priceTier ?? 'RETAIL';
+  }
+
+  /** Only what a shopper may see. Note the absence of cost and other tiers,
+   *  except the viewer's own when tier is not RETAIL. */
   private shape(
     product: any,
     stockByVariant: Map<string, number>,
     offerByVariant: Map<string, { price: number; was: number; label: string | null }> = new Map(),
+    tier: PriceTier = 'RETAIL',
   ) {
     const variants = product.variants
       .filter((variant: any) => variant.isActive)
@@ -31,16 +45,27 @@ export class StorefrontService {
         const offer = offerByVariant.get(variant.id);
         const retail = Number(variant.priceKes);
         const inStock = (stockByVariant.get(variant.id) ?? 0) > 0;
+        // Offers are retail-only by design, same rule checkout enforces: a
+        // reseller's tier price is never further discounted, or bypassed, by
+        // a markdown meant for retail shoppers.
+        const tierPrice = tier === 'RETAIL' ? null : priceForTier(variant, tier);
         return {
           id: variant.id,
           sku: variant.sku,
           size: variant.name,
-          // The price a shopper pays: the offer when there is one.
-          priceKes: offer ? offer.price : retail,
+          // The price this viewer pays: their tier price outright when they
+          // are a reseller/wholesaler, otherwise the offer price when there
+          // is one, otherwise retail.
+          priceKes: tier === 'RETAIL' ? (offer ? offer.price : retail) : tierPrice!,
           // What it was, so the storefront can strike it through. Null when
           // nothing is discounted, rather than repeating the same number.
-          wasPriceKes: offer ? offer.was : null,
-          offerLabel: offer ? offer.label : null,
+          wasPriceKes: tier === 'RETAIL' && offer ? offer.was : null,
+          offerLabel: tier === 'RETAIL' ? offer?.label ?? null : null,
+          // Present only for a logged-in reseller/wholesale viewer: retail,
+          // for comparison against the tier price now in priceKes. Null
+          // (not omitted) for everyone else, so callers get a consistent
+          // number | null rather than having to also check for undefined.
+          retailPriceKes: tier === 'RETAIL' ? null : retail,
           // Availability, not quantity.
           inStock,
           // Every active listing can be ordered, in stock or not -- an
@@ -53,6 +78,9 @@ export class StorefrontService {
 
     const inStock = variants.filter((variant: any) => variant.inStock);
     const prices = variants.map((variant: any) => variant.priceKes);
+    const retailPrices = variants
+      .map((variant: any) => variant.retailPriceKes)
+      .filter((value: number | null): value is number => value !== null);
 
     return {
       id: product.id,
@@ -74,6 +102,9 @@ export class StorefrontService {
       variants,
       priceFrom: prices.length ? Math.min(...prices) : 0,
       priceTo: prices.length ? Math.max(...prices) : 0,
+      // Product-level retail comparison price, mirroring priceFrom -- lets a
+      // card show "you keep KES X" without assuming a variant ordering.
+      retailPriceFrom: retailPrices.length ? Math.min(...retailPrices) : null,
       sizesInStock: inStock.map((variant: any) => variant.size),
       anyInStock: inStock.length > 0,
       // Drives the badge on a card without the caller inspecting every size.
@@ -207,7 +238,8 @@ export class StorefrontService {
   async list(query: {
     category?: string; brand?: string; size?: string; search?: string;
     minPrice?: string; maxPrice?: string; inStockOnly?: string; sort?: string;
-  }) {
+  }, authedUser?: { priceTier?: PriceTier }) {
+    const tier = this.tierOf(authedUser);
     // Split on whitespace and require every word to match something, in any
     // order. A single contains on the whole phrase meant "white air force"
     // found nothing -- the product is called "Air Force 1 White", which does
@@ -278,7 +310,7 @@ export class StorefrontService {
       this.stockMap(variantIds),
       this.offerMap(variantIds),
     ]);
-    let shaped = products.map((product) => this.shape(product, stock, offers));
+    let shaped = products.map((product) => this.shape(product, stock, offers, tier));
 
     // Price filters run after shaping because the price shown is the cheapest
     // variant, which is not a column on the product.
@@ -312,7 +344,8 @@ export class StorefrontService {
    * is never used as filler since showing something nobody can buy in the
    * shop's best position defeats the point of featuring it.
    */
-  async featured(limit = 10) {
+  async featured(limit = 10, authedUser?: { priceTier?: PriceTier }) {
+    const tier = this.tierOf(authedUser);
     const featuredProducts = await this.prisma.product.findMany({
       where: { isActive: true, isFeatured: true },
       include: {
@@ -346,9 +379,9 @@ export class StorefrontService {
     const variantIds = all.flatMap((product) => product.variants.map((variant) => variant.id));
     const [stock, offers] = await Promise.all([this.stockMap(variantIds), this.offerMap(variantIds)]);
 
-    const shapedFeatured = featuredProducts.map((product) => this.shape(product, stock, offers));
+    const shapedFeatured = featuredProducts.map((product) => this.shape(product, stock, offers, tier));
     const shapedFiller = fillerProducts
-      .map((product) => this.shape(product, stock, offers))
+      .map((product) => this.shape(product, stock, offers, tier))
       // Sold-out filler is worse than showing fewer products in this slot.
       .filter((product) => product.anyInStock);
 
@@ -456,7 +489,8 @@ export class StorefrontService {
     return rows.map((row) => row.map(csvField).join(',')).join('\r\n') + '\r\n';
   }
 
-  async bySlug(slug: string) {
+  async bySlug(slug: string, authedUser?: { priceTier?: PriceTier }) {
+    const tier = this.tierOf(authedUser);
     const product = await this.prisma.product.findFirst({
       where: { slug, isActive: true },
       include: {
@@ -470,7 +504,7 @@ export class StorefrontService {
       this.stockMap(product.variants.map((variant) => variant.id)),
       this.offerMap(product.variants.map((variant) => variant.id)),
     ]);
-    const shaped = this.shape(product, stock, offers);
+    const shaped = this.shape(product, stock, offers, tier);
 
     // A few alternatives from the same category, so a sold-out size is not a
     // dead end.
@@ -486,7 +520,7 @@ export class StorefrontService {
     );
     return {
       ...shaped,
-      related: related.map((item) => this.shape(item, relatedStock, relatedOffers)),
+      related: related.map((item) => this.shape(item, relatedStock, relatedOffers, tier)),
     };
   }
 

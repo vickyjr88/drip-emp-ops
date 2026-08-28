@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, Prisma } from '@prisma/client';
+import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
@@ -8,6 +8,7 @@ import { PaystackService } from '../paystack/paystack.service';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
+import { priceForTier } from '../common/price-for-tier';
 
 /**
  * Delivery is not charged at checkout.
@@ -128,8 +129,14 @@ export class CheckoutService {
    *
    * Prices come from the database, never from the request. A checkout that
    * trusted a posted price would let anyone buy at whatever they sent.
+   *
+   * Tier pricing comes exclusively from `authedCustomer` -- the customer
+   * resolved server-side from a verified JWT (OptionalCustomerAuthGuard),
+   * never from `dto.email`. A guest who types a known reseller's email must
+   * still pay retail: the tier follows the session, not the form, or anyone
+   * could buy at trade price just by knowing an email address.
    */
-  async start(dto: CheckoutDto, origin: string) {
+  async start(dto: CheckoutDto, origin: string, authedCustomer?: { id: string; priceTier: PriceTier }) {
     // Checked before anything is written. Without this the order was created
     // and the stock taken, and only then did Paystack reject the request --
     // so every attempt on an unconfigured shop quietly drained inventory.
@@ -150,6 +157,10 @@ export class CheckoutService {
       if (!store) throw new NotFoundException('No shop is available to fulfil this order.');
 
       const customer = await this.upsertCustomer(tx, dto);
+
+      // See the doc comment on start(): the tier is the authenticated
+      // session's, never derived from the posted email/customer record.
+      const tier: PriceTier = authedCustomer?.priceTier ?? 'RETAIL';
 
       const variants = await tx.productVariant.findMany({
         where: { id: { in: dto.lines.map((line) => line.variantId) }, isActive: true },
@@ -194,7 +205,12 @@ export class CheckoutService {
         const variant = byId.get(line.variantId);
         if (!variant) throw new NotFoundException(`That item is no longer available.`);
         const listPrice = Number(variant.priceKes);
-        const unitPrice = offerByVariant.get(variant.id) ?? listPrice;
+        // Offers are retail-only by design (see the Offer model's own doc
+        // comment): a reseller's or wholesaler's tier price is never further
+        // discounted, or bypassed, by a storefront-wide markdown meant for
+        // retail shoppers. At RETAIL, an active offer still wins over list
+        // price exactly as before this tier resolution existed.
+        const unitPrice = tier === 'RETAIL' ? (offerByVariant.get(variant.id) ?? listPrice) : priceForTier(variant, tier);
         // A drop-ship listing is never held on the shelf, so every order
         // against it is sourced from the supplier -- same rule as the till.
         // A normal listing that has run out gets the same treatment: there is
@@ -213,7 +229,10 @@ export class CheckoutService {
           quantity: line.quantity,
           unitPrice: new Prisma.Decimal(unitPrice),
           // Kept apart so the markdown is visible on the order and totals
-          // into the discount reported by the margin reports.
+          // into the discount reported by the margin reports. Now reads as
+          // "how far below retail this line went, for any reason" -- an
+          // offer markdown or a reseller/wholesale tier price, whichever
+          // actually applied to this line.
           listPrice: new Prisma.Decimal(listPrice),
           discount: new Prisma.Decimal((listPrice - unitPrice) * line.quantity),
           lineTotal: new Prisma.Decimal(unitPrice * line.quantity),
@@ -234,6 +253,7 @@ export class CheckoutService {
           storeId: store.id,
           customerId: customer.id,
           channel: 'WEBSITE',
+          priceTier: tier,
           customerName: `${customer.firstName} ${customer.lastName}`.trim(),
           customerPhone: customer.phone,
           customerEmail: customer.email,

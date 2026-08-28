@@ -8,6 +8,7 @@ import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderLineFulfillmentDto } 
 import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
 import { paginate, searchOr, containsAny } from '../common/pagination.util';
+import { priceForTier } from '../common/price-for-tier';
 
 const INCLUDE = {
   store: { select: { id: true, code: true, name: true } },
@@ -46,20 +47,6 @@ const NEXT: Record<OrderStatus, OrderStatus[]> = {
   CANCELLED: [],
   REFUNDED: [],
 };
-
-/** What a given tier pays, falling back up the tiers when a price is unset. */
-function priceForTier(
-  variant: { priceKes: Prisma.Decimal; resellerPriceKes: Prisma.Decimal | null; wholesalePriceKes: Prisma.Decimal | null },
-  tier: PriceTier,
-): number {
-  if (tier === 'WHOLESALE') {
-    return Number(variant.wholesalePriceKes ?? variant.resellerPriceKes ?? variant.priceKes);
-  }
-  if (tier === 'RESELLER') {
-    return Number(variant.resellerPriceKes ?? variant.priceKes);
-  }
-  return Number(variant.priceKes);
-}
 
 @Injectable()
 export class OrderService {
