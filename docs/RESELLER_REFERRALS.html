@@ -423,7 +423,7 @@
       the shop already has, not a parallel system.</p>
     <div class="meta-row">
       <span><strong>For</strong> Drip Emporium</span>
-      <span><strong>Status</strong> Proposal — Phase 1 in progress</span>
+      <span><strong>Status</strong> Phase 1 shipped — Phases 2/3 not started</span>
       <span><strong>Touches</strong> Storefront, checkout, customer portal, ledger</span>
     </div>
   </div>
@@ -587,16 +587,18 @@
       split of one big feature.</p>
 
     <div class="phase">
-      <div class="phase-marker">1</div>
+      <div class="phase-marker" style="background:var(--good-bg);color:var(--good);">✓</div>
       <div class="phase-body">
-        <h3>Make checkout tier-aware</h3>
-        <p>Resolve the logged-in customer's <code>priceTier</code> at checkout, the same
-          way staff-created orders already do. Show dual pricing to resellers on the
-          storefront. No links, no commissions yet — this alone lets a reseller log in
-          and buy on behalf of a client at reseller price, one of the flows asked for.</p>
+        <h3>Make checkout tier-aware <span class="opt-badge" style="margin-left:0.5rem;">Shipped</span></h3>
+        <p>Resolves the logged-in customer's <code>priceTier</code> at checkout, the same
+          way staff-created orders already do. Shows dual pricing to resellers on the
+          storefront — shop grid, product page and cart. No links, no commissions —
+          this alone lets a reseller log in and buy on behalf of a client at reseller
+          price, one of the flows asked for.</p>
         <div class="phase-tags">
           <span class="tag">checkout.service.ts</span>
           <span class="tag">customer-jwt.strategy.ts</span>
+          <span class="tag">storefront.service.ts</span>
           <span class="tag">shop.ts</span>
         </div>
         <p class="unlocks">Unlocks → referral attribution, since price resolution now has somewhere to plug in</p>
@@ -719,9 +721,11 @@
 </div>
 
 <footer class="end">
-  <p>Phase 1 (tier-aware checkout and dual pricing) is in progress. Phases 2 and 3
-    (referral links, commission ledger and payouts) follow once the two open decisions
-    above — attribution window and payout cadence — are confirmed.</p>
+  <p>Phase 1 (tier-aware checkout and dual pricing) has shipped: a logged-in reseller
+    or wholesale customer now pays their real tier price at storefront checkout and
+    sees both prices throughout the site. Phases 2 and 3 (referral links, commission
+    ledger and payouts) follow once the two open decisions above — attribution window
+    and payout cadence — are confirmed.</p>
 </footer>
 
 </body>
