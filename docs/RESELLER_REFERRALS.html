@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reseller referral program</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:wght@400;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --royal: #06166e;
+    --royal-soft: #2438a8;
+    --ink: #020721;
+    --muted: #5b6480;
+    --line: #dfe2f0;
+    --paper: #f4f5fc;
+    --paper-deep: #e8eaf8;
+    --white: #ffffff;
+    --good: #0f7a40;
+    --good-bg: #e6f5ec;
+    --warn: #a3690b;
+    --warn-bg: #fbf0dd;
+
+    --bg: var(--paper);
+    --surface: var(--white);
+    --surface-2: var(--paper-deep);
+    --text-primary: var(--ink);
+    --text-secondary: var(--muted);
+    --border: var(--line);
+    --accent: var(--royal);
+    --accent-soft: var(--royal-soft);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #05070f;
+      --surface: #0c1024;
+      --surface-2: #10162e;
+      --text-primary: #e7e9f7;
+      --text-secondary: #9aa1c4;
+      --border: #232a4d;
+      --accent: #7f8fe8;
+      --accent-soft: #a6b0f0;
+      --good: #4fbf82;
+      --good-bg: #10261c;
+      --warn: #e0a94a;
+      --warn-bg: #2c2211;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #05070f;
+    --surface: #0c1024;
+    --surface-2: #10162e;
+    --text-primary: #e7e9f7;
+    --text-secondary: #9aa1c4;
+    --border: #232a4d;
+    --accent: #7f8fe8;
+    --accent-soft: #a6b0f0;
+    --good: #4fbf82;
+    --good-bg: #10261c;
+    --warn: #e0a94a;
+    --warn-bg: #2c2211;
+  }
+
+  * { box-sizing: border-box; }
+  html { text-size-adjust: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Manrope', Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 0 6rem;
+  }
+
+  ::selection { background: var(--accent-soft); color: var(--surface); }
+
+  a { color: var(--accent); }
+
+  h1, h2, h3 {
+    font-family: 'Libre Caslon Text', Georgia, 'Times New Roman', serif;
+    color: var(--text-primary);
+    text-wrap: balance;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  code, .mono {
+    font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.85em;
+  }
+
+  .doc {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 1.75rem;
+  }
+
+  header.top {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 3.25rem 0 2.5rem;
+    margin-bottom: 2.75rem;
+  }
+  .eyebrow {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.9rem;
+  }
+  h1.title {
+    font-size: clamp(1.9rem, 4vw, 2.5rem);
+    line-height: 1.18;
+    margin-bottom: 0.85rem;
+  }
+  .dek {
+    font-size: 1.05rem;
+    color: var(--text-secondary);
+    max-width: 60ch;
+    margin: 0;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-top: 1.75rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+  .meta-row strong { color: var(--text-primary); font-weight: 600; }
+
+  section { margin-bottom: 3.25rem; }
+  section > h2 {
+    font-size: 1.4rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.4rem;
+  }
+  .num {
+    display: inline-block;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75em;
+    font-weight: 500;
+    margin-right: 0.5rem;
+    vertical-align: 2px;
+  }
+
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+
+  ul, ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+  li { margin-bottom: 0.4rem; }
+  li:last-child { margin-bottom: 0; }
+
+  .lede {
+    font-size: 1.08rem;
+    color: var(--text-primary);
+  }
+
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow-x: auto;
+    margin: 1.5rem 0;
+  }
+  .flow-step {
+    flex: 1 1 0;
+    min-width: 150px;
+    padding: 1.25rem 1.1rem;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .flow-step:last-child { border-right: none; }
+  .flow-step .fnum {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--accent);
+    font-weight: 500;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .flow-step .fwho {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+  .flow-step .ftxt {
+    font-size: 0.87rem;
+    color: var(--text-primary);
+    line-height: 1.45;
+  }
+  .flow-step::after {
+    content: "";
+    position: absolute;
+    right: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px;
+    height: 7px;
+    border-top: 1.5px solid var(--text-secondary);
+    border-right: 1.5px solid var(--text-secondary);
+    transform: translateY(-50%) rotate(45deg);
+    z-index: 2;
+  }
+  .flow-step:last-child::after { display: none; }
+
+  .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .opt {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.4rem;
+  }
+  .opt.rec { border: 2px solid var(--accent); }
+  .opt-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--surface-2);
+    padding: 0.2rem 0.6rem;
+    border-radius: 5px;
+    margin-bottom: 0.7rem;
+  }
+  .opt h3 {
+    font-size: 1.02rem;
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .opt p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.7rem; }
+  .opt .tradeoff {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    border-top: 1px solid var(--border);
+    padding-top: 0.6rem;
+    margin-top: 0.6rem;
+  }
+  .opt .tradeoff strong { font-weight: 700; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 10px 10px 0;
+    padding: 1rem 1.3rem;
+    margin: 1.4rem 0;
+    font-size: 0.92rem;
+  }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout p { margin: 0; }
+  .callout .label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--warn);
+    margin-bottom: 0.4rem;
+  }
+  .callout:not(.warn) .label { color: var(--accent); }
+
+  .phase {
+    display: flex;
+    gap: 1.1rem;
+    padding: 1.35rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .phase:last-child { border-bottom: none; }
+  .phase-marker {
+    flex: 0 0 auto;
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    font-size: 0.85rem;
+  }
+  .phase-body h3 {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+  }
+  .phase-body p { font-size: 0.92rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+  .phase-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    background: var(--surface-2);
+    color: var(--text-primary);
+    padding: 0.15rem 0.55rem;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+  }
+  .unlocks {
+    font-size: 0.78rem;
+    color: var(--accent);
+    margin-top: 0.6rem;
+    font-weight: 600;
+  }
+
+  .twrap { overflow-x: auto; margin: 1.5rem 0; border: 1px solid var(--border); border-radius: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.87rem; min-width: 480px; }
+  th, td { text-align: left; padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th {
+    background: var(--surface-2);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { background: var(--surface); }
+  td.num-col, th.num-col { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; text-align: right; }
+
+  .example {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem 1.6rem;
+    margin: 1.5rem 0;
+  }
+  .example h3 {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+  }
+  .ledger-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 0.92rem;
+  }
+  .ledger-row:last-child { border-bottom: none; padding-top: 0.8rem; }
+  .ledger-row.total { font-weight: 700; font-size: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); border-bottom: none; margin-top: 0.3rem; }
+  .ledger-row .amt { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  .ledger-row .amt.pos { color: var(--good); }
+  .ledger-row .label-sm { color: var(--text-secondary); font-size: 0.85rem; }
+
+  .missed { display: flex; flex-direction: column; gap: 0.9rem; }
+  .missed-item {
+    display: flex;
+    gap: 0.9rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .missed-item .mtitle { font-weight: 700; font-size: 0.92rem; margin-bottom: 0.25rem; }
+  .missed-item p { font-size: 0.87rem; color: var(--text-secondary); margin: 0; }
+  .why {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.12rem 0.5rem;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+    background: var(--good-bg);
+    color: var(--good);
+    vertical-align: 1px;
+  }
+
+  footer.end {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 1.75rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+  }
+
+  @media (max-width: 640px) {
+    .flow { flex-direction: column; }
+    .flow-step { border-right: none; border-bottom: 1px solid var(--border); }
+    .flow-step:last-child { border-bottom: none; }
+    .flow-step::after { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="doc">
+    <p class="eyebrow">Product &amp; technical proposal</p>
+    <h1 class="title">A referral program for resellers</h1>
+    <p class="dek">Shareable affiliate links, transparent dual pricing, and a commission
+      paid on the margin between retail and reseller price — built on the pricing tier
+      the shop already has, not a parallel system.</p>
+    <div class="meta-row">
+      <span><strong>For</strong> Drip Emporium</span>
+      <span><strong>Status</strong> Proposal — Phase 1 in progress</span>
+      <span><strong>Touches</strong> Storefront, checkout, customer portal, ledger</span>
+    </div>
+  </div>
+</header>
+
+<div class="doc">
+
+  <section>
+    <h2><span class="num">01</span>How it works, end to end</h2>
+    <p class="lede">A reseller gets one link. Sharing it wins them either a commission on
+      a stranger's purchase, or a lower price on a purchase they place themselves — the
+      same mechanic serving two of the flows asked for.</p>
+
+    <div class="flow">
+      <div class="flow-step">
+        <span class="fnum">1</span>
+        <span class="fwho">Reseller</span>
+        <span class="ftxt">Generates a link from their account. One reseller can hold several — one per campaign, if they want to see which one actually converts.</span>
+      </div>
+      <div class="flow-step">
+        <span class="fnum">2</span>
+        <span class="fwho">Shopper</span>
+        <span class="ftxt">Opens the link, browses and adds to cart. A cookie remembers who referred them for a set attribution window.</span>
+      </div>
+      <div class="flow-step">
+        <span class="fnum">3</span>
+        <span class="fwho">System</span>
+        <span class="ftxt">At checkout, the order is stamped with the referring reseller. Shopper still pays retail — nothing changes for them.</span>
+      </div>
+      <div class="flow-step">
+        <span class="fnum">4</span>
+        <span class="fwho">System</span>
+        <span class="ftxt">On payment, a commission line is posted: retail minus reseller price, per unit sold.</span>
+      </div>
+      <div class="flow-step">
+        <span class="fnum">5</span>
+        <span class="fwho">Reseller</span>
+        <span class="ftxt">Sees the commission accrue on their dashboard, and gets paid out on the shop's normal schedule.</span>
+      </div>
+    </div>
+
+    <p>The second flow — a reseller buying <em>as themselves</em>, on behalf of a client
+      standing next to them or messaging on WhatsApp — skips the link and the commission
+      entirely. They just check out logged in, and pay reseller price directly. That's a
+      more direct margin than a commission would give them, which is exactly why it
+      should stay simple rather than routed through the referral machinery.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>What's already there to build on</h2>
+    <p>This is not a system starting from nothing. <code>Customer.priceTier</code>
+      already distinguishes <code>RETAIL</code> / <code>RESELLER</code> / <code>WHOLESALE</code>,
+      and every <code>ProductVariant</code> already carries a <code>resellerPriceKes</code>
+      alongside retail. The margin this program pays out is a number the schema already
+      knows how to compute.</p>
+    <p>One gap changes the shape of the build, though: <strong>the public storefront
+      checkout never looks at price tier today.</strong> Tier pricing only applies when
+      staff create an order by hand, or when stock goes out on consignment. A logged-in
+      reseller shopping the website right now pays full retail regardless of their tier —
+      so before dual pricing or referral commissions can exist online, checkout itself
+      needs to learn what a logged-in shopper's tier is and price accordingly. That's not
+      extra scope this program invented; it's a prerequisite the storefront was always
+      going to need.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>Dual pricing, done transparently</h2>
+    <p>Once checkout is tier-aware, showing both prices to a logged-in reseller is a
+      display decision, not a new pricing engine — the numbers already exist per variant.</p>
+    <ul>
+      <li>Product cards and the product page show retail with reseller struck through
+        or shown alongside, visible only when the viewer is logged in as a reseller.</li>
+      <li>The margin itself — "you keep KES 800 on this pair" — is worth stating outright
+        rather than making the reseller do the subtraction. It's the entire pitch of the
+        program, restated at the moment it matters most.</li>
+      <li>A retail shopper, or anyone not logged in, sees exactly what they see today.
+        Nothing changes for them.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>The two real decisions</h2>
+    <p>Everything else in this proposal follows a default path. These two choices don't
+      have a single obviously-correct answer — they trade real convenience against real
+      risk, and are worth deciding deliberately rather than defaulting into.</p>
+
+    <h3 style="font-size:1rem;font-family:'Manrope',sans-serif;margin-bottom:0.8rem;">Attribution: how long does a link's credit last?</h3>
+    <div class="options">
+      <div class="opt rec">
+        <span class="opt-badge">Recommended</span>
+        <h3>30-day cookie, last click wins</h3>
+        <p>Industry-standard window. If two resellers' links are both clicked before a
+          purchase, the most recent one gets the credit — simplest rule to explain and
+          to dispute.</p>
+        <p class="tradeoff"><strong>Trade-off:</strong> a reseller who does the early
+          convincing can lose the sale to whoever sent the last link, even a cheeky
+          reseller re-sharing someone else's find.</p>
+      </div>
+      <div class="opt">
+        <h3>First click wins</h3>
+        <p>Whoever introduced the shopper first keeps the credit even if a second link
+          is clicked later.</p>
+        <p class="tradeoff"><strong>Trade-off:</strong> harder to explain, and rewards
+          the first link even if it did nothing to actually close the sale.</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:1rem;font-family:'Manrope',sans-serif;margin:1.75rem 0 0.8rem;">Payout: settled per sale, or batched?</h3>
+    <div class="options">
+      <div class="opt rec">
+        <span class="opt-badge">Recommended</span>
+        <h3>Accrue continuously, pay out monthly</h3>
+        <p>Commission posts to a running balance the moment an order is paid and past
+          any return window. The shop pays out on one predictable date, the same way
+          payroll already runs.</p>
+        <p class="tradeoff"><strong>Trade-off:</strong> a reseller waits up to a month
+          to actually receive money they can already see accruing.</p>
+      </div>
+      <div class="opt">
+        <h3>Pay per order, on settlement</h3>
+        <p>Each commission pays out the moment its order clears returns — money moves
+          faster and more often.</p>
+        <p class="tradeoff"><strong>Trade-off:</strong> many small payments instead of
+          one clean batch — more transaction fees, more reconciliation work for staff,
+          for the same total paid out.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>A worked example</h2>
+    <p>Air Max 90, EUR 42. Retail KES 8,999, reseller price KES 7,500. A referred
+      shopper buys two pairs.</p>
+    <div class="example">
+      <h3>Commission on this order</h3>
+      <div class="ledger-row">
+        <span class="label-sm">Retail price × 2 pairs</span>
+        <span class="amt">KES 17,998</span>
+      </div>
+      <div class="ledger-row">
+        <span class="label-sm">Reseller price × 2 pairs</span>
+        <span class="amt">KES 15,000</span>
+      </div>
+      <div class="ledger-row">
+        <span class="label-sm">Shopper actually pays</span>
+        <span class="amt">KES 17,998 <span style="color:var(--text-secondary);font-weight:400;">(retail — unchanged)</span></span>
+      </div>
+      <div class="ledger-row total">
+        <span>Commission owed to the reseller</span>
+        <span class="amt pos">+ KES 2,998</span>
+      </div>
+    </div>
+    <p>Compare the second flow: the same reseller, buying those two pairs themselves to
+      hand to a client, checks out logged in and simply <strong>pays KES 15,000</strong> —
+      the margin is theirs immediately, no commission step, no waiting for payout.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>Build in three phases</h2>
+    <p>Ordered so each phase is useful on its own and unlocks the next — not an arbitrary
+      split of one big feature.</p>
+
+    <div class="phase">
+      <div class="phase-marker">1</div>
+      <div class="phase-body">
+        <h3>Make checkout tier-aware</h3>
+        <p>Resolve the logged-in customer's <code>priceTier</code> at checkout, the same
+          way staff-created orders already do. Show dual pricing to resellers on the
+          storefront. No links, no commissions yet — this alone lets a reseller log in
+          and buy on behalf of a client at reseller price, one of the flows asked for.</p>
+        <div class="phase-tags">
+          <span class="tag">checkout.service.ts</span>
+          <span class="tag">customer-jwt.strategy.ts</span>
+          <span class="tag">shop.ts</span>
+        </div>
+        <p class="unlocks">Unlocks → referral attribution, since price resolution now has somewhere to plug in</p>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-marker">2</div>
+      <div class="phase-body">
+        <h3>Referral links and attribution</h3>
+        <p>A reseller can generate a link, a click sets an attribution cookie, and an
+          order placed within the window gets stamped with who referred it. No commission
+          math or payouts yet — this phase only proves the shop can correctly answer
+          "who gets credit for this sale."</p>
+        <div class="phase-tags">
+          <span class="tag">new: ReferralLink model</span>
+          <span class="tag">new: Order.referredById</span>
+          <span class="tag">middleware / cookie</span>
+        </div>
+        <p class="unlocks">Unlocks → commissions, since every order now knows its referrer</p>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-marker">3</div>
+      <div class="phase-body">
+        <h3>Commission ledger, dashboard, payouts</h3>
+        <p>Post a commission line when a referred order is paid and past its return
+          window. Give resellers a dashboard: links, clicks, conversions, running
+          balance. Give staff a payout run modeled on how supplier payments already
+          work — stage, approve, pay, post to the ledger.</p>
+        <div class="phase-tags">
+          <span class="tag">new: Commission model</span>
+          <span class="tag">new: AccountPurpose.RESELLER_COMMISSIONS</span>
+          <span class="tag">pattern: SupplierPayment</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span>Guardrails worth building in from day one</h2>
+    <div class="callout warn">
+      <span class="label">Self-referral</span>
+      <p>A reseller must not be able to earn a commission by buying through their own
+        link — that's a discount wearing a commission's clothes, and it's the first
+        thing anyone testing the system will try. Block it at the point an order is
+        stamped with a referrer, not after the fact.</p>
+    </div>
+    <div class="callout warn">
+      <span class="label">Returns and refunds</span>
+      <p>A commission should not be finalized the instant an order is paid — it should
+        wait out whatever return window the shop already honors. A refunded order needs
+        to claw the commission back before it's ever paid out, not after.</p>
+    </div>
+    <div class="callout">
+      <span class="label">Reseller pricing on offer stock</span>
+      <p><code>Offer</code> markdowns are explicitly retail-only today, by design — a
+        promotional cut is never meant to erode reseller margin further. Keep that rule:
+        a referred sale on offer stock still commissions off the standing reseller price,
+        not the discounted retail price.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span>Worth adding that wasn't asked for</h2>
+    <div class="missed">
+      <div class="missed-item">
+        <div>
+          <div class="mtitle">Per-link stats, not just a per-reseller total<span class="why">low effort</span></div>
+          <p>If a reseller can create more than one link, showing clicks and sales per
+            link — not just a lump sum — is what turns this from "I get paid sometimes"
+            into something they can actually optimize their posting around.</p>
+        </div>
+      </div>
+      <div class="missed-item">
+        <div>
+          <div class="mtitle">A minimum payout threshold<span class="why">prevents fee waste</span></div>
+          <p>Without one, a KES 200 commission triggers the same payout transaction cost
+            as a KES 20,000 one. Carry small balances forward to the next cycle instead.</p>
+        </div>
+      </div>
+      <div class="missed-item">
+        <div>
+          <div class="mtitle">Tiered commission rates, later<span class="why">defer</span></div>
+          <p>Nothing here stops a top-performing reseller eventually earning a better
+            rate than a new one. Worth naming now so the schema doesn't have to be
+            reshaped to add it — but not worth building before the flat-rate version has
+            actually run for a while.</p>
+        </div>
+      </div>
+      <div class="missed-item">
+        <div>
+          <div class="mtitle">Fraud-shaped monitoring<span class="why">cheap insurance</span></div>
+          <p>A handful of orders from the same device or address, all through one
+            reseller's link, all just under a return-window deadline, is a pattern worth
+            a staff alert — not blocking anything automatically, just surfacing it.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">09</span>New surfaces, at a glance</h2>
+    <div class="twrap">
+      <table>
+        <thead>
+          <tr><th>Who</th><th>Where</th><th>What's new</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Reseller</td><td>Their account</td><td>Generate links, see clicks/conversions, running commission balance</td></tr>
+          <tr><td>Shopper</td><td>Storefront</td><td>Nothing visible — same experience, invisibly attributed</td></tr>
+          <tr><td>Reseller</td><td>Product pages</td><td>Dual pricing, margin called out explicitly</td></tr>
+          <tr><td>Staff</td><td>Portal</td><td>Payout runs, per-reseller performance, fraud flags</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<footer class="end">
+  <p>Phase 1 (tier-aware checkout and dual pricing) is in progress. Phases 2 and 3
+    (referral links, commission ledger and payouts) follow once the two open decisions
+    above — attribution window and payout cadence — are confirmed.</p>
+</footer>
+
+</body>
+</html>
