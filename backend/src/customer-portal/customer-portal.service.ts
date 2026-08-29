@@ -200,7 +200,12 @@ export class CustomerPortalService {
   async myOrders(customerId: string) {
     const orders = await this.prisma.order.findMany({
       where: { customerId },
-      include: { lines: true, store: { select: { name: true, location: true } } },
+      include: {
+        lines: {
+          include: { variant: { select: { product: { select: { featuredImageUrl: true, imageUrls: true } } } } },
+        },
+        store: { select: { name: true, location: true } },
+      },
       orderBy: { placedAt: 'desc' },
       take: 100,
     });
@@ -218,6 +223,7 @@ export class CustomerPortalService {
         description: line.description,
         quantity: line.quantity,
         lineTotal: Number(line.lineTotal),
+        imageUrl: line.variant.product.featuredImageUrl || (line.variant.product.imageUrls as string[] | null)?.[0] || null,
       })),
     }));
   }

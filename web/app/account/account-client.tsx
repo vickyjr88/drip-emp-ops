@@ -27,7 +27,7 @@ type Order = {
   amountPaid: number;
   shippingAddress?: string | null;
   store?: { name: string; location?: string | null } | null;
-  lines: Array<{ description: string; quantity: number; lineTotal: number }>;
+  lines: Array<{ description: string; quantity: number; lineTotal: number; imageUrl?: string | null }>;
 };
 
 type ReferralSummary = {
@@ -203,12 +203,24 @@ export function AccountClient() {
             ) : (
               orders.map((order) => {
                 const owing = order.total - order.amountPaid;
+                // The list rule everywhere else in the app: an order with
+                // several products shows the first one's photo, not a
+                // collage -- this card already lists every line by name
+                // right below, so the thumbnail is just a visual anchor.
+                const imageUrl = order.lines[0]?.imageUrl;
                 return (
                   <article key={order.id} className="de-account-order">
                     <header>
-                      <div>
-                        <strong>{order.orderNumber}</strong>
-                        <span className="de-account-date">{formatDay(order.placedAt)}</span>
+                      <div className="de-account-order-heading">
+                        {imageUrl ? (
+                          <img src={imageUrl} alt="" className="de-account-order-thumb" loading="lazy" />
+                        ) : (
+                          <div className="de-account-order-thumb is-empty" aria-hidden="true" />
+                        )}
+                        <div>
+                          <strong>{order.orderNumber}</strong>
+                          <span className="de-account-date">{formatDay(order.placedAt)}</span>
+                        </div>
                       </div>
                       <span className="de-account-status">{order.status}</span>
                     </header>
