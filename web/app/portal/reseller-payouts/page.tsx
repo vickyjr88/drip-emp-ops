@@ -9,7 +9,7 @@
  */
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
@@ -67,6 +67,10 @@ export default function ResellerPayoutsPage() {
   const [resellers, setResellers] = useState<ResellerOption[]>([]);
   const [showStageForm, setShowStageForm] = useState(false);
   const [stageResellerId, setStageResellerId] = useState('');
+  const [stageResellerName, setStageResellerName] = useState('');
+  /** Search text for the reseller autocomplete. Same pattern as the
+   *  customer picker on the orders till: blank once a reseller is picked. */
+  const [resellerQuery, setResellerQuery] = useState('');
   const [staging, setStaging] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
@@ -120,6 +124,18 @@ export default function ResellerPayoutsPage() {
   const canCreate = hasPermission(profile, 'reseller-payout.create');
   const canUpdate = hasPermission(profile, 'reseller-payout.update');
 
+  const resellerMatches = useMemo(() => {
+    const query = resellerQuery.trim().toLowerCase();
+    if (!query) return resellers.slice(0, 25);
+    return resellers
+      .filter((reseller) => {
+        const label = resellerLabel(reseller).toLowerCase();
+        const fullName = `${reseller.firstName} ${reseller.lastName}`.trim().toLowerCase();
+        return label.includes(query) || fullName.includes(query);
+      })
+      .slice(0, 25);
+  }, [resellers, resellerQuery]);
+
   async function onStage(event: FormEvent) {
     event.preventDefault();
     if (!token || !stageResellerId) return;
@@ -129,6 +145,8 @@ export default function ResellerPayoutsPage() {
       setFeedback('Payout staged.');
       setShowStageForm(false);
       setStageResellerId('');
+      setStageResellerName('');
+      setResellerQuery('');
       pager.reload();
       void load(token);
     } catch (error) {
@@ -235,17 +253,57 @@ export default function ResellerPayoutsPage() {
 
               {showStageForm ? (
                 <form onSubmit={onStage} className="portal-inline-form" style={{ margin: '12px 0' }}>
-                  <select
-                    required
-                    value={stageResellerId}
-                    onChange={(event) => setStageResellerId(event.target.value)}
-                  >
-                    <option value="">Choose a reseller…</option>
-                    {resellers.map((reseller) => (
-                      <option key={reseller.id} value={reseller.id}>{resellerLabel(reseller)}</option>
-                    ))}
-                  </select>
-                  <button type="submit" className="portal-primary-btn" disabled={staging}>
+                  <label style={{ flex: 1, minWidth: 220 }}>
+                    <input
+                      value={stageResellerId ? stageResellerName : resellerQuery}
+                      placeholder="Search a reseller by name…"
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setResellerQuery(value);
+                        // Typing again after a pick starts a fresh search
+                        // instead of editing the picked name in place.
+                        setStageResellerId('');
+                        setStageResellerName('');
+                      }}
+                    />
+                    {stageResellerId ? (
+                      <div className="portal-picked-row">
+                        <span><strong>{stageResellerName}</strong></span>
+                        <button
+                          type="button"
+                          className="portal-inline-btn"
+                          onClick={() => { setStageResellerId(''); setStageResellerName(''); }}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : resellerQuery.trim() ? (
+                      <div className="portal-picker-results">
+                        {resellerMatches.length === 0 ? (
+                          <p className="portal-muted" style={{ margin: 8 }}>No reseller matches that.</p>
+                        ) : (
+                          resellerMatches.map((reseller) => (
+                            <button
+                              key={reseller.id}
+                              type="button"
+                              className="portal-picker-option"
+                              onClick={() => {
+                                setStageResellerId(reseller.id);
+                                setStageResellerName(resellerLabel(reseller));
+                                setResellerQuery('');
+                              }}
+                            >
+                              <span>{resellerLabel(reseller)}</span>
+                              {reseller.businessName ? (
+                                <span className="portal-muted">{reseller.firstName} {reseller.lastName}</span>
+                              ) : null}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    ) : null}
+                  </label>
+                  <button type="submit" className="portal-primary-btn" disabled={staging || !stageResellerId}>
                     {staging ? 'Staging…' : 'Stage payout'}
                   </button>
                 </form>

@@ -7516,6 +7516,30 @@ img {
     margin-bottom: 14px;
   }
 
+  /* A bare, unstyled browser dropdown was the only thing here that didn't
+     match .list-search-input right beside it. Same border, height and font
+     as that search box, so a status filter and its search box read as one
+     matched toolbar rather than two different eras of the app. */
+  .list-toolbar select {
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 8px 30px 8px 12px;
+    border: 1px solid var(--eef-border);
+    border-radius: 0;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235a5c5c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    color: #1a1c1c;
+    cursor: pointer;
+  }
+
+  .list-toolbar select:focus {
+    outline: none;
+    border-color: var(--eef-primary);
+  }
+
 /* ---------------------------------------------------------------------
    404 page (app/not-found.tsx)
 
