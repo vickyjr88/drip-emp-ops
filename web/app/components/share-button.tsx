@@ -31,10 +31,15 @@ export function ShareButton({ url, title, text, className, compact }: ShareButto
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({ title, text, url });
-      } catch {
-        // AbortError when the user cancels the share sheet -- not a failure.
+        return;
+      } catch (error) {
+        // AbortError: the user closed the share sheet themselves -- respect
+        // that and stop, rather than immediately copying behind their back.
+        if (error instanceof Error && error.name === 'AbortError') return;
+        // Anything else (a malformed url, an insecure context, a share
+        // target rejecting the payload) falls through to the copy fallback
+        // below -- without this, a failed share silently did nothing at all.
       }
-      return;
     }
 
     try {
