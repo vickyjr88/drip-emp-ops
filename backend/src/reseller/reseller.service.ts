@@ -21,15 +21,18 @@ export class ResellerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateResellerDto) {
-    const { name, creditLimit, priceTier, contactName, email, ...rest } = dto;
+    const { businessName, creditLimit, priceTier, contactName, email, ...rest } = dto;
     const customer = await this.prisma.customer.create({
       data: {
         ...rest,
-        // A trade account is a shop: the name given is its trading name, and
-        // it doubles as the personal name so the record reads sensibly
-        // wherever a customer name is shown.
-        businessName: name,
-        firstName: contactName?.trim() || name,
+        // Never invented: a reseller with no trading name of their own (e.g.
+        // converted from an ordinary customer) gets businessName left null,
+        // not a copy of their personal name -- customerDisplayName() already
+        // falls back to firstName/lastName for display, and writing a
+        // personal name in here would make that fallback permanently
+        // unreachable (businessName wins whenever it is set).
+        businessName: businessName?.trim() || null,
+        firstName: contactName?.trim() || businessName!.trim(),
         lastName: '',
         // Email is the login and has to be unique. A shop set up over the
         // counter may not have given one, so a placeholder is derived from the
@@ -123,12 +126,18 @@ export class ResellerService {
 
   async update(id: string, dto: UpdateResellerDto) {
     await this.findOne(id);
-    const { name, creditLimit, contactName, email, ...rest } = dto;
+    const { businessName, creditLimit, contactName, email, ...rest } = dto;
     return this.prisma.customer.update({
       where: { id },
       data: {
         ...rest,
-        ...(name !== undefined ? { businessName: name } : {}),
+        // businessName is written only when the caller actually sent it --
+        // never derived from contactName or a display-name fallback, which
+        // is exactly the bug this fixes: the old `name` field conflated "the
+        // trading name" with "whatever the list happens to display", so
+        // re-saving a reseller with no business name silently promoted their
+        // personal name into one.
+        ...(businessName !== undefined ? { businessName: businessName.trim() || null } : {}),
         ...(contactName !== undefined ? { firstName: contactName } : {}),
         ...(email ? { email: email.trim().toLowerCase() } : {}),
         ...(creditLimit !== undefined ? { creditLimit: new Prisma.Decimal(creditLimit) } : {}),

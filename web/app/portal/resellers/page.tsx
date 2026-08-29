@@ -27,6 +27,11 @@ import {
 
 type Reseller = {
   id: string; code: string; name: string;
+  /** The trading name, when there is one. Distinct from `name` (a display
+   *  fallback to the person's own name when this is unset) -- never treat
+   *  the two as interchangeable, or a converted customer's personal name
+   *  gets silently promoted into a business name on the next save. */
+  businessName?: string | null;
   contactName?: string | null; phone?: string | null; location?: string | null;
   priceTier: 'RETAIL' | 'RESELLER' | 'WHOLESALE';
   creditLimit: string | number; isActive: boolean;
@@ -38,7 +43,7 @@ type Customer = {
   businessName?: string | null;
 };
 
-const BLANK = { code: '', name: '', contactName: '', phone: '', location: '', priceTier: 'RESELLER', creditLimit: '' };
+const BLANK = { code: '', businessName: '', contactName: '', phone: '', location: '', priceTier: 'RESELLER', creditLimit: '' };
 
 export default function ResellersPage() {
   const dialog = usePortalDialog();
@@ -76,12 +81,16 @@ export default function ResellersPage() {
 
     void apiRequest<Customer>(`/customers/${customerId}`, { method: 'GET' }, token)
       .then((customer) => {
-        const contactName = `${customer.firstName} ${customer.lastName}`.trim();
         setEditingId(customer.id);
         setForm({
           code: '',
-          name: customer.businessName || contactName,
-          contactName,
+          // Never pre-filled from the person's own name: this customer may
+          // genuinely have no business name, and staff should see that
+          // blank rather than a value that looks entered but is really just
+          // a display fallback -- saving it as-is would wrongly promote
+          // their personal name into a business name.
+          businessName: customer.businessName || '',
+          contactName: `${customer.firstName} ${customer.lastName}`.trim(),
           phone: customer.phone || '',
           location: '',
           priceTier: 'RESELLER',
@@ -148,12 +157,13 @@ export default function ResellersPage() {
     setSaving(true);
     try {
       const body = { ...form, creditLimit: form.creditLimit ? Number(form.creditLimit) : 0 };
+      const label = form.businessName || form.contactName;
       if (editingId) {
         await apiRequest(`/resellers/${editingId}`, { method: 'PATCH', body: JSON.stringify(body) }, token);
-        setFeedback(`${form.name} updated.`);
+        setFeedback(`${label} updated.`);
       } else {
         await apiRequest('/resellers', { method: 'POST', body: JSON.stringify(body) }, token);
-        setFeedback(`${form.name} added.`);
+        setFeedback(`${label} added.`);
       }
       setForm(BLANK); setEditingId(null); setShowForm(false);
       resellersPager.reload();
@@ -167,9 +177,13 @@ export default function ResellersPage() {
   async function onToggle(reseller: Reseller) {
     if (!token) return;
     try {
+      // Only the field actually changing: businessName/contactName are
+      // deliberately omitted (not just re-sent as-is) so this quick action
+      // can never write a name value the backend would otherwise reject or
+      // that came from the display-only computed `name` field.
       await apiRequest(`/resellers/${reseller.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ code: reseller.code, name: reseller.name, isActive: !reseller.isActive }),
+        body: JSON.stringify({ code: reseller.code, isActive: !reseller.isActive }),
       }, token);
       setFeedback(`${reseller.name} ${reseller.isActive ? 'deactivated' : 'reactivated'}.`);
       resellersPager.reload();
@@ -279,16 +293,16 @@ export default function ResellersPage() {
                         onChange={(event) => setForm((prev) => ({ ...prev, code: event.target.value.toUpperCase() }))} />
                     </label>
                     <label>
-                      <span>Shop name</span>
-                      <input value={form.name} placeholder="Mama Njeri Shoes" required
-                        onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} />
+                      <span>Contact name</span>
+                      <input value={form.contactName} placeholder="Njeri Wanjiru" required={!form.businessName}
+                        onChange={(event) => setForm((prev) => ({ ...prev, contactName: event.target.value }))} />
                     </label>
                   </div>
                   <div className="portal-entity-grid-3">
                     <label>
-                      <span>Contact</span>
-                      <input value={form.contactName}
-                        onChange={(event) => setForm((prev) => ({ ...prev, contactName: event.target.value }))} />
+                      <span>Business name (optional)</span>
+                      <input value={form.businessName} placeholder="Leave blank if there isn't one"
+                        onChange={(event) => setForm((prev) => ({ ...prev, businessName: event.target.value }))} />
                     </label>
                     <label>
                       <span>Phone</span>
@@ -393,7 +407,13 @@ export default function ResellersPage() {
                                   setEditingId(reseller.id);
                                   setShowForm(true);
                                   setForm({
-                                    code: reseller.code, name: reseller.name,
+                                    code: reseller.code,
+                                    // The real businessName field, never the
+                                    // computed display `name` -- see the type
+                                    // comment above for why conflating them
+                                    // caused a personal name to get saved as
+                                    // a business name.
+                                    businessName: reseller.businessName || '',
                                     contactName: reseller.contactName || '', phone: reseller.phone || '',
                                     location: reseller.location || '', priceTier: reseller.priceTier,
                                     creditLimit: String(reseller.creditLimit || ''),
