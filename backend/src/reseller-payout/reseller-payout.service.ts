@@ -162,7 +162,7 @@ export class ResellerPayoutService {
   }
 
   async stats() {
-    const [accrued, paidOut, resellersWithBalance] = await Promise.all([
+    const [accrued, paidOut, resellersWithBalance, totalClicks, totalReferredOrders] = await Promise.all([
       this.prisma.commission.aggregate({
         where: { status: 'ACCRUED' },
         _sum: { amount: true },
@@ -175,12 +175,18 @@ export class ResellerPayoutService {
         by: ['resellerId'],
         where: { status: 'ACCRUED' },
       }),
+      this.prisma.referralClick.count(),
+      this.prisma.order.count({ where: { referredByCustomerId: { not: null } } }),
     ]);
 
     return {
       totalAccrued: Number(accrued._sum.amount ?? 0),
       totalPaidOut: Number(paidOut._sum.amount ?? 0),
       resellersWithBalance: resellersWithBalance.length,
+      totalClicks,
+      // Program-wide, across every reseller's link -- not a per-reseller
+      // figure like myReferrals()'s own conversionRate.
+      conversionRate: totalClicks > 0 ? totalReferredOrders / totalClicks : null,
     };
   }
 }

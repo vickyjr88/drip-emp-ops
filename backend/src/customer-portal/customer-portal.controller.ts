@@ -8,6 +8,7 @@ import {
   CustomerLoginDto,
   CustomerResetPasswordDto,
   CustomerSelfSignupDto,
+  RecordReferralClickDto,
   RequestRentChangeDto,
   SubmitResellerApplicationDto,
   UpdateCustomerProfileDto,
@@ -80,6 +81,16 @@ export class CustomerPortalController {
   @Get('referrals')
   myReferrals(@Req() request: any) {
     return this.service.myReferrals(request.user.id);
+  }
+
+  /**
+   * A landing on a shared referral link -- no CustomerAuthGuard, since the
+   * visitor clicking it is very often a guest who has never signed in.
+   */
+  @Public()
+  @Post('referral-click')
+  recordReferralClick(@Body() dto: RecordReferralClickDto) {
+    return this.service.recordReferralClick(dto.code);
   }
 
   @Public()

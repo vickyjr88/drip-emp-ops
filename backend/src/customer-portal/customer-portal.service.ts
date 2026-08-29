@@ -178,6 +178,24 @@ export class CustomerPortalService {
     });
   }
 
+  /**
+   * Records a landing on a shared referral link -- fired once per visit that
+   * actually arrives with ?ref=<code>, from useCaptureReferral() client-side.
+   * Public and silent on a bad code, the same tolerance CheckoutService.start()
+   * has for one: a stale or mistyped code must never break the page for the
+   * visitor, and the caller here is never told whether it matched anything.
+   */
+  async recordReferralClick(code: string) {
+    const reseller = await this.prisma.customer.findUnique({
+      where: { referralCode: code },
+      select: { id: true },
+    });
+    if (reseller) {
+      await this.prisma.referralClick.create({ data: { resellerId: reseller.id } });
+    }
+    return { recorded: true };
+  }
+
   /** The customer's own orders, newest first. */
   async myOrders(customerId: string) {
     const orders = await this.prisma.order.findMany({
@@ -211,15 +229,18 @@ export class CustomerPortalService {
    * an unreliable free-text snapshot a guest checkout can set to anything.
    */
   async myReferrals(customerId: string) {
-    const orders = await this.prisma.order.findMany({
-      where: { referredByCustomerId: customerId },
-      include: {
-        commission: true,
-        customer: { select: { firstName: true } },
-      },
-      orderBy: { placedAt: 'desc' },
-      take: 200,
-    });
+    const [orders, totalClicks] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { referredByCustomerId: customerId },
+        include: {
+          commission: true,
+          customer: { select: { firstName: true } },
+        },
+        orderBy: { placedAt: 'desc' },
+        take: 200,
+      }),
+      this.prisma.referralClick.count({ where: { resellerId: customerId } }),
+    ]);
 
     const accruedBalance = orders
       .filter((order) => order.commission?.status === 'ACCRUED')
@@ -230,7 +251,13 @@ export class CustomerPortalService {
 
     return {
       summary: {
+        totalClicks,
         referredOrders: orders.length,
+        // A click that never converted to an order is by far the common
+        // case (someone clicked, looked, and left), so this is naturally
+        // well under 100% -- shown as a rate, not a fraction of clicks that
+        // "should" have converted.
+        conversionRate: totalClicks > 0 ? orders.length / totalClicks : null,
         accruedBalance,
         paidOutTotal,
       },

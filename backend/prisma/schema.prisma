@@ -111,6 +111,8 @@ model Customer {
   /// themselves) -- this is the money side of the same relationship.
   resellerCommissions Commission[] @relation("ResellerCommissions")
   resellerPayouts     ResellerPayout[] @relation("ResellerPayouts")
+  /// One row per landing on this reseller's shared link -- see ReferralClick.
+  referralClicks      ReferralClick[]
 }
 
 model CustomerDocument {
@@ -1600,6 +1602,21 @@ model Order {
   @@index([referredByCustomerId])
   @@index([storeId])
   @@index([status])
+}
+
+/// One row per landing on a reseller's shared link -- recorded once per
+/// visit that actually arrives with ?ref=<code> in the URL (product page or
+/// shop root), not for every page view while the referral cookie is still
+/// active afterward. No IP or user agent: this is a count for the
+/// reseller's own dashboard, not a tracking record, and the codebase already
+/// avoids collecting more than a given feature needs.
+model ReferralClick {
+  id         String   @id @default(uuid())
+  reseller   Customer @relation(fields: [resellerId], references: [id])
+  resellerId String
+  clickedAt  DateTime @default(now())
+
+  @@index([resellerId])
 }
 
 enum CommissionStatus {

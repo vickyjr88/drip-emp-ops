@@ -19,6 +19,7 @@ import { EliteLayout } from '../components/elite-layout';
 import { ProductSearch } from '../components/product-search';
 import { ProductCard } from '../components/product-card';
 import { useCustomerAuth } from '../lib/customer-auth';
+import { useCaptureReferral } from '../lib/use-capture-referral';
 import {
   ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts,
 } from '../lib/shop';
@@ -41,6 +42,11 @@ export function ShopClient() {
   const router = useRouter();
   const params = useSearchParams();
   const auth = useCustomerAuth();
+  // The account page's "Your referral link" points here (the shop root, the
+  // most general page to share) -- without this, that link never captured
+  // attribution at all, since useCaptureReferral was previously mounted only
+  // on the product detail page.
+  useCaptureReferral();
 
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [categories, setCategories] = useState<ShopCategory[]>([]);

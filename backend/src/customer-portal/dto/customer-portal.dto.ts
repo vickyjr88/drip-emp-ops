@@ -119,3 +119,10 @@ export class UpdateCustomerProfileDto {
   /** Only meaningful for a trade customer; sent as an empty string to clear. */
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) businessName?: string;
 }
+
+export class RecordReferralClickDto {
+  @ApiProperty({ description: "The referring reseller's public code, from a shared link's ?ref= param." })
+  @IsString()
+  @IsNotEmpty()
+  code!: string;
+}

@@ -30,7 +30,13 @@ type Order = {
   lines: Array<{ description: string; quantity: number; lineTotal: number }>;
 };
 
-type ReferralSummary = { referredOrders: number; accruedBalance: number; paidOutTotal: number };
+type ReferralSummary = {
+  totalClicks: number;
+  referredOrders: number;
+  conversionRate: number | null;
+  accruedBalance: number;
+  paidOutTotal: number;
+};
 
 function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString('en-KE', {
@@ -325,6 +331,10 @@ export function AccountClient() {
 
                 {referralSummary ? (
                   <div className="de-stat-grid" style={{ marginTop: 16 }}>
+                    <div className="de-stat-card">
+                      <span>Link clicks</span>
+                      <strong>{referralSummary.totalClicks}</strong>
+                    </div>
                     <div className="de-stat-card">
                       <span>Referred orders</span>
                       <strong>{referralSummary.referredOrders}</strong>

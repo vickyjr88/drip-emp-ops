@@ -35,9 +35,20 @@ type ReferralOrder = {
 };
 
 type Referrals = {
-  summary: { referredOrders: number; accruedBalance: number; paidOutTotal: number };
+  summary: {
+    totalClicks: number;
+    referredOrders: number;
+    conversionRate: number | null;
+    accruedBalance: number;
+    paidOutTotal: number;
+  };
   orders: ReferralOrder[];
 };
+
+function formatConversionRate(rate: number | null) {
+  if (rate === null) return '—';
+  return `${(rate * 100).toLocaleString('en-KE', { maximumFractionDigits: 1 })}%`;
+}
 
 function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -63,7 +74,10 @@ export function ResellerDashboardClient() {
     try {
       setData(await customerApi<Referrals>('/customer-portal/referrals', { method: 'GET' }, auth.token));
     } catch {
-      setData({ summary: { referredOrders: 0, accruedBalance: 0, paidOutTotal: 0 }, orders: [] });
+      setData({
+        summary: { totalClicks: 0, referredOrders: 0, conversionRate: null, accruedBalance: 0, paidOutTotal: 0 },
+        orders: [],
+      });
     }
   }, [auth.token]);
 
@@ -90,8 +104,17 @@ export function ResellerDashboardClient() {
         <section className="lp-container">
           <div className="de-stat-grid">
             <div className="de-stat-card">
+              <span>Link clicks</span>
+              <strong>{data?.summary.totalClicks ?? 0}</strong>
+            </div>
+            <div className="de-stat-card">
               <span>Referred orders</span>
               <strong>{data?.summary.referredOrders ?? 0}</strong>
+              {data?.summary.totalClicks ? (
+                <span style={{ marginTop: 6, marginBottom: 0 }}>
+                  {formatConversionRate(data.summary.conversionRate)} of clicks
+                </span>
+              ) : null}
             </div>
             <div className="de-stat-card">
               <span>Accrued balance</span>

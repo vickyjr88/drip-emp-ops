@@ -38,7 +38,18 @@ type ResellerOption = {
   lastName: string;
 };
 
-type Stats = { totalAccrued: number; totalPaidOut: number; resellersWithBalance: number };
+type Stats = {
+  totalAccrued: number;
+  totalPaidOut: number;
+  resellersWithBalance: number;
+  totalClicks: number;
+  conversionRate: number | null;
+};
+
+function formatConversionRate(rate: number | null) {
+  if (rate === null) return '—';
+  return `${(rate * 100).toLocaleString('en-KE', { maximumFractionDigits: 1 })}%`;
+}
 
 const STATUSES: ResellerPayout['status'][] = ['STAGED', 'APPROVED', 'PAID', 'CANCELLED'];
 
@@ -196,6 +207,11 @@ export default function ResellerPayoutsPage() {
             <article className="portal-card">
               {stats ? (
                 <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+                  <div className="portal-stat"><span>Link clicks</span><h3>{stats.totalClicks}</h3></div>
+                  <div className="portal-stat">
+                    <span>Click → order rate</span>
+                    <h3>{formatConversionRate(stats.conversionRate)}</h3>
+                  </div>
                   <div className="portal-stat"><span>Accrued, unpaid</span><h3>{formatMoney(stats.totalAccrued)}</h3></div>
                   <div className="portal-stat"><span>Paid out to date</span><h3>{formatMoney(stats.totalPaidOut)}</h3></div>
                   <div className="portal-stat"><span>Resellers with a balance</span><h3>{stats.resellersWithBalance}</h3></div>

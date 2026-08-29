@@ -12012,9 +12012,13 @@ img {
   flex-wrap: wrap;
 }
 
+/* auto-fit rather than a fixed column count: this grid holds 3 cards on
+   /account/reseller and 4 in the account page's compact referral panel
+   (which also has less width to work with, sitting in the sidebar column),
+   so a hardcoded repeat(3, ...) left the 4-card case an awkward 3-plus-1. */
 .de-stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
 }
 
@@ -12041,12 +12045,6 @@ img {
 
 .de-stat-card.is-highlight strong {
   color: var(--de-go);
-}
-
-@media (max-width: 640px) {
-  .de-stat-grid {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 
 .de-commission-chip {
