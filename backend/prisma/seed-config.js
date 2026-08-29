@@ -125,7 +125,7 @@ const DEFAULT_CHART_OF_ACCOUNTS = [
   { code: '1500', name: 'Fixed Assets', type: 'ASSET', subtype: 'FIXED_ASSET' },
   { code: '1510', name: 'Accumulated Depreciation', type: 'ASSET', subtype: 'CONTRA_ASSET' },
   { code: '2100', name: 'Accounts Payable', type: 'LIABILITY', subtype: 'PAYABLE' },
-  { code: '2150', name: 'Broker Commission Payable', type: 'LIABILITY', subtype: 'PAYABLE' },
+  { code: '2150', name: 'Reseller Commissions Payable', type: 'LIABILITY', subtype: 'PAYABLE' },
   { code: '2200', name: 'Refunds Payable', type: 'LIABILITY', subtype: 'PAYABLE' },
   { code: '2300', name: 'VAT Output', type: 'LIABILITY', subtype: 'VAT_OUTPUT' },
   { code: '2310', name: 'VAT Input', type: 'ASSET', subtype: 'VAT_INPUT' },
@@ -144,6 +144,7 @@ const DEFAULT_CHART_OF_ACCOUNTS = [
   // costs, so a profit and loss separates margin from overheads.
   { code: '5300', name: 'Cost of Goods Sold', type: 'EXPENSE', subtype: 'COGS' },
   { code: '5310', name: 'Inventory Shrinkage', type: 'EXPENSE', subtype: 'COGS', parentCode: '5300' },
+  { code: '5320', name: 'Reseller Commission Expense', type: 'EXPENSE', subtype: 'COGS', parentCode: '5300' },
   { code: '5400', name: 'Shop Operating Costs', type: 'EXPENSE', subtype: 'OPERATING' },
   { code: '5410', name: 'Salaries & Staff Costs', type: 'EXPENSE', subtype: 'OPERATING', parentCode: '5400' },
   { code: '5420', name: 'Shop Rent', type: 'EXPENSE', subtype: 'OPERATING', parentCode: '5400' },

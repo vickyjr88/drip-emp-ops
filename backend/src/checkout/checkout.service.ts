@@ -6,6 +6,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { PaystackService } from '../paystack/paystack.service';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
+import { CommissionService } from '../commission/commission.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
@@ -47,6 +48,7 @@ export class CheckoutService {
     private readonly posting: SalesPostingService,
     private readonly paystack: PaystackService,
     private readonly ownerNotification: OwnerNotificationService,
+    private readonly commission: CommissionService,
   ) {}
 
   /**
@@ -403,13 +405,22 @@ export class CheckoutService {
       await this.posting.postOrderPayment(payment.id, tx);
 
       const paid = Number(order.amountPaid) + amount;
-      return tx.order.update({
+      const settling = paid >= Number(order.total) - 0.001;
+      const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: {
           amountPaid: new Prisma.Decimal(paid),
-          ...(paid >= Number(order.total) - 0.001 ? { status: OrderStatus.PAID } : {}),
+          ...(settling ? { status: OrderStatus.PAID } : {}),
         },
       });
+
+      // Only on the actual transition into PAID, not a webhook replay against
+      // an order that was already settled.
+      if (settling && order.status !== OrderStatus.PAID) {
+        await this.commission.accrue(order.id, tx);
+      }
+
+      return updatedOrder;
     });
 
     // Only on the transition into PAID, not every settle() call this order

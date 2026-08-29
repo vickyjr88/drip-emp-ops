@@ -45,6 +45,8 @@ import { RefundModule } from './refund/refund.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { SupplierInvoiceModule } from './supplier-invoice/supplier-invoice.module';
 import { SupplierPaymentModule } from './supplier-payment/supplier-payment.module';
+import { CommissionModule } from './commission/commission.module';
+import { ResellerPayoutModule } from './reseller-payout/reseller-payout.module';
 import { SupplierStatementReconciliationModule } from './supplier-statement-reconciliation/supplier-statement-reconciliation.module';
 import { PettyCashBoxModule } from './petty-cash-box/petty-cash-box.module';
 import { PettyCashVoucherModule } from './petty-cash-voucher/petty-cash-voucher.module';
@@ -99,6 +101,8 @@ import { PdfModule } from './pdf/pdf.module';
     SupplierModule,
     SupplierInvoiceModule,
     SupplierPaymentModule,
+    CommissionModule,
+    ResellerPayoutModule,
     SupplierStatementReconciliationModule,
     PettyCashBoxModule,
     PettyCashVoucherModule,

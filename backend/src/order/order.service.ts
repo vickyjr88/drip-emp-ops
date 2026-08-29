@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
+import { CommissionService } from '../commission/commission.service';
 import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderLineFulfillmentDto } from './dto/create-order.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
@@ -55,6 +56,7 @@ export class OrderService {
     private readonly inventory: InventoryService,
     private readonly posting: SalesPostingService,
     private readonly ownerNotification: OwnerNotificationService,
+    private readonly commission: CommissionService,
   ) {}
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
@@ -252,6 +254,12 @@ export class OrderService {
           );
         }
       });
+
+      // Outside the transaction above: LedgerService.reverseJournal opens its
+      // own internal $transaction and cannot be nested inside another one. A
+      // commission already PAID out is left alone -- see CommissionService's
+      // own doc comment on why that clawback is out of scope.
+      await this.commission.reverseForOrder(id);
     }
 
     // The goods leave the balance sheet once they are actually handed over.
@@ -353,17 +361,24 @@ export class OrderService {
 
       const paid = Number(order.amountPaid) + dto.amount;
       const settled = paid >= Number(order.total) - 0.001;
+      const transitioningToPaid = settled && order.status === 'PENDING';
 
-      return tx.order.update({
+      const updated = await tx.order.update({
         where: { id },
         data: {
           amountPaid: new Prisma.Decimal(paid),
           // Settling in full moves a pending order on; a part payment leaves
           // it where it is.
-          ...(settled && order.status === 'PENDING' ? { status: OrderStatus.PAID } : {}),
+          ...(transitioningToPaid ? { status: OrderStatus.PAID } : {}),
         },
         include: INCLUDE,
       });
+
+      if (transitioningToPaid) {
+        await this.commission.accrue(id, tx);
+      }
+
+      return updated;
     });
 
     // WhatsApp orders specifically, per the notification scope -- an in-store

@@ -106,6 +106,11 @@ model Customer {
   /// attributed. Distinct from `orders` (this customer's own purchases).
   referredOrders Order[] @relation("OrderReferredBy")
   resellerApplications ResellerApplication[]
+  /// Commission earned on orders this reseller referred. Named distinctly
+  /// from `orders` (their own purchases) and `referredOrders` (the orders
+  /// themselves) -- this is the money side of the same relationship.
+  resellerCommissions Commission[] @relation("ResellerCommissions")
+  resellerPayouts     ResellerPayout[] @relation("ResellerPayouts")
 }
 
 model CustomerDocument {
@@ -1589,10 +1594,79 @@ model Order {
   lines    OrderLine[]
   payments OrderPayment[]
   cartLead CartLead?
+  commission Commission?
 
   @@index([customerId])
   @@index([referredByCustomerId])
   @@index([storeId])
+  @@index([status])
+}
+
+enum CommissionStatus {
+  ACCRUED
+  PAID
+  CANCELLED
+}
+
+/// One row per referred order, created the moment that order is marked PAID.
+/// The amount is the shop-wide margin (OrderLine.listPrice minus the
+/// variant's resellerPriceKes) summed across the order's lines -- not tied to
+/// the specific referrer's own pricing, since resellerPriceKes is already a
+/// single shop-wide reference value per variant, not something that varies
+/// reseller to reseller. Credited only to the one reseller who actually
+/// referred the order (Order.referredByCustomerId), never split or pooled.
+model Commission {
+  id         String           @id @default(uuid())
+  order      Order            @relation(fields: [orderId], references: [id])
+  orderId    String           @unique
+  reseller   Customer         @relation("ResellerCommissions", fields: [resellerId], references: [id])
+  resellerId String
+  amount     Decimal
+  status     CommissionStatus @default(ACCRUED)
+  accruedAt  DateTime         @default(now())
+  /// The accrual entry: debit Reseller Commission Expense, credit Reseller
+  /// Commissions Payable. Null when amount is 0 -- a balanced journal needs
+  /// non-zero lines, and there is nothing to accrue.
+  journalEntryId         String?
+  payout                 ResellerPayout? @relation(fields: [payoutId], references: [id])
+  payoutId               String?
+  /// Set only if the order was later cancelled/refunded while this
+  /// commission was still ACCRUED -- ledger.reverseJournal's resulting entry.
+  reversalJournalEntryId String?
+  createdAt              DateTime        @default(now())
+
+  @@index([resellerId])
+  @@index([status])
+  @@index([payoutId])
+}
+
+enum ResellerPayoutStatus {
+  STAGED
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+/// A manual, staff-run disbursement of a reseller's accrued commission
+/// balance. Mirrors SupplierPayment's stage -> approve -> release lifecycle;
+/// simpler since there is no per-invoice allocation, just "clear everything
+/// currently ACCRUED and unassigned for this reseller".
+model ResellerPayout {
+  id             String               @id @default(uuid())
+  payoutNumber   String               @unique
+  reseller       Customer             @relation("ResellerPayouts", fields: [resellerId], references: [id])
+  resellerId     String
+  amount         Decimal
+  status         ResellerPayoutStatus @default(STAGED)
+  stagedBy       String?
+  stagedAt       DateTime             @default(now())
+  approvedBy     String?
+  approvedAt     DateTime?
+  paidAt         DateTime?
+  journalEntryId String?
+  commissions    Commission[]
+
+  @@index([resellerId])
   @@index([status])
 }
 
