@@ -9,6 +9,7 @@ import {
   CustomerResetPasswordDto,
   CustomerSelfSignupDto,
   RequestRentChangeDto,
+  SubmitResellerApplicationDto,
 } from './dto/customer-portal.dto';
 import { storefrontOrigin } from '../common/storefront-origin';
 import { Public } from '../auth/decorators/public.decorator';
@@ -80,5 +81,11 @@ export class CustomerPortalController {
     return this.service.changePassword(request.user.id, dto.currentPassword, dto.newPassword);
   }
 
-
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @ApiBearerAuth()
+  @Post('reseller-application')
+  submitResellerApplication(@Req() request: any, @Body() dto: SubmitResellerApplicationDto) {
+    return this.service.submitResellerApplication(request.user.id, dto);
+  }
 }

@@ -13,6 +13,7 @@ type Customer = {
   lastName: string;
   email: string;
   phone: string;
+  priceTier?: 'RETAIL' | 'RESELLER' | 'WHOLESALE';
   portalEnabled?: boolean;
   portalLastLoginAt?: string | null;
   createdAt?: string;
@@ -336,7 +337,20 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                     <span>Phone</span>
                     <strong>{customer.phone}</strong>
                   </div>
+                  <div className="portal-info-row">
+                    <span>Price tier</span>
+                    <strong>{customer.priceTier || 'RETAIL'}</strong>
+                  </div>
                 </div>
+                {canUpdateCustomer && (!customer.priceTier || customer.priceTier === 'RETAIL') ? (
+                  <Link
+                    href={`/portal/resellers?customerId=${customer.id}`}
+                    className="portal-inline-btn"
+                    style={{ marginTop: 12, display: 'inline-flex' }}
+                  >
+                    Convert to reseller
+                  </Link>
+                ) : null}
               </article>
 
               <article className="portal-card">

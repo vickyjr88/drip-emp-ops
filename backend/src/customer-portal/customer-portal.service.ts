@@ -13,6 +13,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmailLogService } from '../email-log/email-log.service';
 import { ctaButton } from '../email-log/email-html.util';
 import { ensureReferralCode } from '../common/generate-code';
+import { ResellerApplicationService } from '../reseller-application/reseller-application.service';
+import { SubmitResellerApplicationDto } from './dto/customer-portal.dto';
 import { CUSTOMER_TOKEN_KIND } from './customer-jwt.strategy';
 
 /** How long a password-reset link stays usable. */
@@ -30,6 +32,7 @@ export class CustomerPortalService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly email: EmailLogService,
+    private readonly resellerApplication: ResellerApplicationService,
   ) {}
 
   /**
@@ -141,6 +144,12 @@ export class CustomerPortalService {
     return this.issueToken(customer);
   }
 
+  /** A customer's own request to buy at trade prices. Staff review it from
+   *  the reseller-applications portal screen. */
+  async submitResellerApplication(customerId: string, dto: SubmitResellerApplicationDto) {
+    return this.resellerApplication.create(customerId, dto);
+  }
+
   /** The customer's own orders, newest first. */
   async myOrders(customerId: string) {
     const orders = await this.prisma.order.findMany({
@@ -177,6 +186,10 @@ export class CustomerPortalService {
     referralCode: string | null;
   }) {
     const referralCode = await ensureReferralCode(this.prisma, customer);
+    const pendingApplication = await this.prisma.resellerApplication.findFirst({
+      where: { customerId: customer.id, status: 'PENDING' },
+      select: { id: true },
+    });
     return {
       access_token: this.jwt.sign({
         sub: customer.id,
@@ -191,6 +204,7 @@ export class CustomerPortalService {
         phone: customer.phone,
         priceTier: customer.priceTier,
         referralCode,
+        hasPendingResellerApplication: Boolean(pendingApplication),
       },
     };
   }

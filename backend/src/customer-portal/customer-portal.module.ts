@@ -6,11 +6,13 @@ import { CustomerPortalController } from './customer-portal.controller';
 import { CustomerPortalService } from './customer-portal.service';
 import { CustomerJwtStrategy } from './customer-jwt.strategy';
 import { EmailLogModule } from '../email-log/email-log.module';
+import { ResellerApplicationModule } from '../reseller-application/reseller-application.module';
 
 @Module({
   imports: [
     PrismaModule,
     EmailLogModule,
+    ResellerApplicationModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'super-secret-key-change-me',

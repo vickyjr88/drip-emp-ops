@@ -39,6 +39,8 @@ export function AccountClient() {
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' });
   const [pwState, setPwState] = useState<{ error?: string; done?: boolean; busy?: boolean }>({});
+  const [applyForm, setApplyForm] = useState({ businessName: '', reason: '' });
+  const [applyState, setApplyState] = useState<{ error?: string; done?: boolean; busy?: boolean }>({});
 
   useEffect(() => {
     if (auth.ready && !auth.customer) router.replace('/account/login');
@@ -67,6 +69,25 @@ export function AccountClient() {
       setPwState({ done: true });
     } catch (caught) {
       setPwState({ error: caught instanceof Error ? caught.message : 'Could not change your password.' });
+    }
+  }
+
+  async function onSubmitApplication(event: FormEvent) {
+    event.preventDefault();
+    setApplyState({ busy: true });
+    try {
+      await customerApi('/customer-portal/reseller-application', {
+        method: 'POST',
+        body: JSON.stringify(applyForm),
+      }, auth.token);
+      setApplyForm({ businessName: '', reason: '' });
+      setApplyState({ done: true });
+      // Refreshes auth.customer so hasPendingResellerApplication flips to
+      // true immediately, swapping the form for the pending message without
+      // a page reload.
+      void auth.refresh();
+    } catch (caught) {
+      setApplyState({ error: caught instanceof Error ? caught.message : 'Could not submit your application.' });
     }
   }
 
@@ -155,6 +176,40 @@ export function AccountClient() {
                 Need a detail changed? Message us on WhatsApp and we will update it.
               </p>
             </div>
+
+            {!isTrade ? (
+              <div className="de-checkout-panel">
+                <h2>Trade pricing</h2>
+                {customer.hasPendingResellerApplication ? (
+                  <p className="de-checkout-note">
+                    Your application is with us for review. We will be in touch.
+                  </p>
+                ) : (
+                  <>
+                    {applyState.error ? <p className="de-checkout-error" role="alert">{applyState.error}</p> : null}
+                    {applyState.done ? (
+                      <p className="de-auth-notice" role="status">Application sent — we will be in touch.</p>
+                    ) : (
+                      <form className="de-checkout-form" onSubmit={onSubmitApplication}>
+                        <label>
+                          <span>Business name</span>
+                          <input required value={applyForm.businessName}
+                            onChange={(event) => setApplyForm((p) => ({ ...p, businessName: event.target.value }))} />
+                        </label>
+                        <label>
+                          <span>Tell us about your business</span>
+                          <textarea required rows={3} value={applyForm.reason}
+                            onChange={(event) => setApplyForm((p) => ({ ...p, reason: event.target.value }))} />
+                        </label>
+                        <button type="submit" className="lp-button lp-button-primary" disabled={applyState.busy}>
+                          {applyState.busy ? 'Sending…' : 'Apply for trade pricing'}
+                        </button>
+                      </form>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : null}
 
             <div className="de-checkout-panel">
               <h2>Change password</h2>

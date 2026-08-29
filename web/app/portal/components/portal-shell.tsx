@@ -14,6 +14,7 @@ export type PortalNavKey =
   | 'inventory'
   | 'orders'
   | 'resellers'
+  | 'resellerApplications'
   | 'consignments'
   | 'offers'
   | 'customers'
@@ -41,6 +42,7 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
   { key: 'consignments', href: '/portal/consignments', label: 'Consignments' },
   { key: 'offers', href: '/portal/offers', label: 'Offers' },
   { key: 'resellers', href: '/portal/resellers', label: 'Resellers' },
+  { key: 'resellerApplications', href: '/portal/reseller-applications', label: 'Reseller Applications' },
   { key: 'customers', href: '/portal/customers', label: 'Customers' },
   { key: 'inquiries', href: '/portal/inquiries', label: 'Inquiries' },
   { key: 'accounting', href: '/portal/accounting', label: 'Accounting' },
@@ -64,6 +66,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   inventory: 'Inventory',
   orders: 'Orders',
   resellers: 'Resellers',
+  resellerApplications: 'Reseller Applications',
   consignments: 'Consignments',
   offers: 'Offers',
   customers: 'Customers',

@@ -106,3 +106,8 @@ export class CustomerResetPasswordDto {
   @MinLength(8)
   password!: string;
 }
+
+export class SubmitResellerApplicationDto {
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) businessName!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(2000) reason!: string;
+}

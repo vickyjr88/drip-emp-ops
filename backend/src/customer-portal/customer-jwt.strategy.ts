@@ -52,6 +52,15 @@ export class CustomerJwtStrategy extends PassportStrategy(Strategy, 'customer-jw
     // actually needs a reseller's profile pays the (one-time) cost of
     // minting one, and only ever for a non-RETAIL customer.
     const referralCode = await ensureReferralCode(this.prisma, customer);
-    return { ...customer, referralCode };
+
+    // Lets the account page show "application pending" instead of the apply
+    // form, without a second round trip -- this runs on every authenticated
+    // request already, the same as the referral-code lookup above.
+    const pendingApplication = await this.prisma.resellerApplication.findFirst({
+      where: { customerId: customer.id, status: 'PENDING' },
+      select: { id: true },
+    });
+
+    return { ...customer, referralCode, hasPendingResellerApplication: Boolean(pendingApplication) };
   }
 }

@@ -105,6 +105,7 @@ model Customer {
   /// Orders placed by someone else that this customer's referral code
   /// attributed. Distinct from `orders` (this customer's own purchases).
   referredOrders Order[] @relation("OrderReferredBy")
+  resellerApplications ResellerApplication[]
 }
 
 model CustomerDocument {
@@ -1767,6 +1768,36 @@ enum InquiryStatus {
   NEW
   CONTACTED
   RESOLVED
+}
+
+/// A customer's own request to buy at trade prices, reviewed by staff.
+/// Approving flips Customer.priceTier directly -- trade code and credit
+/// limit are a separate, later step staff complete from the Resellers list,
+/// the same way ResellerService.remove() already treats "which tier" as
+/// separable from "trade code/credit limit assignment".
+model ResellerApplication {
+  id           String                    @id @default(uuid())
+  customer     Customer                  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId   String
+  businessName String
+  reason       String
+  status       ResellerApplicationStatus @default(PENDING)
+  reviewedAt   DateTime?
+  /// Reviewing staff's email, captured at the moment of decision -- a plain
+  /// string snapshot, not a User FK, matching this codebase's existing
+  /// preference for denormalized audit strings over a relation that would
+  /// need its own onDelete policy for no real benefit here.
+  reviewedBy   String?
+  createdAt    DateTime                  @default(now())
+
+  @@index([status])
+  @@index([customerId])
+}
+
+enum ResellerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 /// A shop that takes goods from us, sells them, and pays for what sold.

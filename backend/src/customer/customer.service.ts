@@ -17,6 +17,8 @@ const CUSTOMER_SELECT = Prisma.validator<Prisma.CustomerSelect>()({
   lastName: true,
   email: true,
   phone: true,
+  priceTier: true,
+  businessName: true,
   portalEnabled: true,
   portalLastLoginAt: true,
   createdAt: true,

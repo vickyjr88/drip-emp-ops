@@ -108,4 +108,21 @@ export class OwnerNotificationService {
       <p style="white-space:pre-wrap">${escapeHtml(submission.message)}</p>`,
     );
   }
+
+  async notifyResellerApplication(application: {
+    customerName: string;
+    customerEmail: string;
+    businessName: string;
+    reason: string;
+  }) {
+    await this.safeSend(
+      `Reseller application: ${application.businessName}`,
+      `<h2>New reseller application</h2>
+      ${row('Customer', application.customerName)}
+      ${row('Email', application.customerEmail)}
+      ${row('Business name', application.businessName)}
+      <p style="margin:16px 0 4px"><strong>Reason:</strong></p>
+      <p style="white-space:pre-wrap">${escapeHtml(application.reason)}</p>`,
+    );
+  }
 }

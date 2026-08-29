@@ -30,6 +30,9 @@ export type CustomerProfile = {
    *  generated; absent for a retail customer. Opaque -- carried verbatim
    *  into a shared product URL's ?ref= param, never decoded client-side. */
   referralCode?: string | null;
+  /** True while a submitted reseller application is awaiting staff review.
+   *  Lets the account page show a status message instead of the apply form. */
+  hasPendingResellerApplication?: boolean;
 };
 
 type AuthValue = {

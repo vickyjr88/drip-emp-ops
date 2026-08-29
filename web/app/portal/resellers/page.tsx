@@ -13,7 +13,7 @@
  */
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
@@ -33,6 +33,11 @@ type Reseller = {
   openConsignments: number; unitsHeld: number; owed: number; overdue: number;
 };
 
+type Customer = {
+  id: string; firstName: string; lastName: string; email: string; phone: string;
+  businessName?: string | null;
+};
+
 const BLANK = { code: '', name: '', contactName: '', phone: '', location: '', priceTier: 'RESELLER', creditLimit: '' };
 
 export default function ResellersPage() {
@@ -48,11 +53,44 @@ export default function ResellersPage() {
   const [showForm, setShowForm] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
+  // Tracks which customerId (from a "Convert to reseller" deep-link) has
+  // already been applied, so the pre-fill effect below doesn't re-fire and
+  // clobber whatever staff have since typed into the form.
+  const prefilledCustomerId = useRef<string | null>(null);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
     setInitialized(true);
   }, []);
+
+  // Reads window.location.search directly rather than next/navigation's
+  // useSearchParams(), which would require wrapping this route's own default
+  // export in a <Suspense> boundary -- a plain one-time read on mount avoids
+  // that for a value that only ever matters once, right after landing here
+  // from the customer detail page's "Convert to reseller" link.
+  useEffect(() => {
+    if (!token) return;
+    const customerId = new URLSearchParams(window.location.search).get('customerId');
+    if (!customerId || prefilledCustomerId.current === customerId) return;
+    prefilledCustomerId.current = customerId;
+
+    void apiRequest<Customer>(`/customers/${customerId}`, { method: 'GET' }, token)
+      .then((customer) => {
+        const contactName = `${customer.firstName} ${customer.lastName}`.trim();
+        setEditingId(customer.id);
+        setForm({
+          code: '',
+          name: customer.businessName || contactName,
+          contactName,
+          phone: customer.phone || '',
+          location: '',
+          priceTier: 'RESELLER',
+          creditLimit: '',
+        });
+        setShowForm(true);
+      })
+      .catch((error) => setErrorMessage(error));
+  }, [token, setErrorMessage]);
 
   const load = useCallback(async (authToken: string) => {
     setLoading(true);
