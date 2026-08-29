@@ -66,7 +66,7 @@ export class CartLeadService {
         : {}),
     };
 
-    return paginate(
+    const page = await paginate(
       (args) =>
         this.prisma.cartLead.findMany({
           ...args,
@@ -78,6 +78,38 @@ export class CartLeadService {
       skip,
       take,
     );
+
+    return { ...page, items: await this.withFirstLineImage(page.items) };
+  }
+
+  /**
+   * A cart's lines are a stored snapshot (see RecordCartLeadDto), not a
+   * relation -- no image URL was ever captured in it. Resolved here, at read
+   * time, from each lead's first line's variantId, one batched query for the
+   * whole page rather than one query per lead.
+   */
+  private async withFirstLineImage<T extends { lines: unknown }>(leads: T[]): Promise<Array<T & { firstLineImageUrl: string | null }>> {
+    const firstVariantIds = leads
+      .map((lead) => (lead.lines as Array<{ variantId?: string }>)?.[0]?.variantId)
+      .filter((id): id is string => Boolean(id));
+
+    const variants = firstVariantIds.length
+      ? await this.prisma.productVariant.findMany({
+          where: { id: { in: firstVariantIds } },
+          select: { id: true, product: { select: { featuredImageUrl: true, imageUrls: true } } },
+        })
+      : [];
+    const imageByVariantId = new Map(
+      variants.map((variant) => {
+        const imageUrls = Array.isArray(variant.product.imageUrls) ? (variant.product.imageUrls as string[]) : [];
+        return [variant.id, variant.product.featuredImageUrl || imageUrls[0] || null];
+      }),
+    );
+
+    return leads.map((lead) => {
+      const firstVariantId = (lead.lines as Array<{ variantId?: string }>)?.[0]?.variantId;
+      return { ...lead, firstLineImageUrl: (firstVariantId && imageByVariantId.get(firstVariantId)) || null };
+    });
   }
 
   async setStatus(id: string, status: CartLeadStatus) {

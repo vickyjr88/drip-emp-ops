@@ -17,7 +17,12 @@ const INCLUDE = {
   lines: {
     include: {
       variant: {
-        select: { id: true, sku: true, name: true, product: { select: { id: true, name: true, brand: true } } },
+        select: {
+          id: true, sku: true, name: true,
+          product: {
+            select: { id: true, name: true, brand: true, featuredImageUrl: true, imageUrls: true },
+          },
+        },
       },
       // Who is actually sourcing a SUPPLIER_ORDER line, once bought in --
       // the detail page names the bill and the supplier, not just a status.

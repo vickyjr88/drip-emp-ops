@@ -14,6 +14,7 @@ import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
+import { ListThumb } from '../components/list-thumb';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
@@ -47,6 +48,7 @@ type OrderLine = {
   id: string; description: string; quantity: number;
   unitPrice: string | number; lineTotal: string | number;
   fulfillmentType: FulfillmentType; fulfillmentStatus: FulfillmentStatus | null;
+  variant?: { product?: { name: string; featuredImageUrl?: string | null; imageUrls?: string[] | null } | null } | null;
 };
 
 type Order = {
@@ -66,6 +68,9 @@ type CartLead = {
   customerName?: string | null; customerPhone?: string | null; customerEmail?: string | null;
   lines: CartLeadLine[]; total: string | number; message?: string | null;
   lastActivityAt: string; createdAt: string;
+  /** Resolved server-side from the first line's variantId -- the cart's own
+   *  snapshot never stored an image, so this is looked up at read time. */
+  firstLineImageUrl?: string | null;
 };
 
 type Draft = {
@@ -800,7 +805,8 @@ export default function OrdersPage() {
                 ) : (
                   leadsPager.items.map((lead) => (
                     <div key={lead.id} className="portal-record">
-                      <div className="portal-list-row">
+                      <div className="portal-list-row has-thumb">
+                        <ListThumb sources={[lead.firstLineImageUrl]} label={lead.lines[0]?.name || lead.customerName || '?'} />
                         <div>
                           <strong>{lead.customerName || lead.customerPhone || lead.customerEmail}</strong>
                           <span className="portal-chip" style={{ marginLeft: 8 }}>
@@ -883,9 +889,15 @@ export default function OrdersPage() {
                     {ordersPager.search || statusFilter || awaitingSupplierOnly ? 'No orders match.' : 'No orders yet.'}
                   </div>
                 ) : (
-                  rows.map((order) => (
+                  rows.map((order) => {
+                    const firstProduct = order.lines[0]?.variant?.product;
+                    return (
                     <div key={order.id} className="portal-record">
-                      <div className="portal-list-row">
+                      <div className="portal-list-row has-thumb">
+                        <ListThumb
+                          sources={[firstProduct?.featuredImageUrl, firstProduct?.imageUrls?.[0]]}
+                          label={firstProduct?.name || order.orderNumber}
+                        />
                         <div>
                           <strong>{order.orderNumber}</strong>
                           {order.lines.some(
@@ -931,7 +943,8 @@ export default function OrdersPage() {
                         </div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
               <ServerListPager pager={ordersPager} noun="orders" />

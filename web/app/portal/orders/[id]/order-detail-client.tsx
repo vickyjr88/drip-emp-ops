@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
 import { usePortalDialog } from '../../components/portal-dialog';
+import { ImageLightbox } from '../../components/image-lightbox';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, formatDate, formatMoney, hasPermission, loadProfile, roleLabelFor,
@@ -33,7 +34,10 @@ type OrderLine = {
   unitPrice: string | number; listPrice?: string | number | null; discount: string | number; lineTotal: string | number;
   fulfillmentType: FulfillmentType; fulfillmentStatus: FulfillmentStatus | null;
   supplierInvoice?: SupplierInvoiceInfo | null;
-  variant: { id: string; sku: string; name: string; product: { name: string; brand?: string | null } };
+  variant: {
+    id: string; sku: string; name: string;
+    product: { name: string; brand?: string | null; featuredImageUrl?: string | null; imageUrls?: string[] | null };
+  };
 };
 
 type Payment = {
@@ -80,6 +84,11 @@ const NEXT_LINE_STATUS: Record<FulfillmentStatus, FulfillmentStatus | null> = {
   HANDED_TO_CUSTOMER: null,
 };
 
+function lineImageUrl(line: OrderLine): string | null {
+  const product = line.variant.product;
+  return product.featuredImageUrl || product.imageUrls?.[0] || null;
+}
+
 export default function OrderDetailClient({ orderId }: { orderId: string }) {
   const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
@@ -94,6 +103,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
 
   const [showPayment, setShowPayment] = useState(false);
   const [payment, setPayment] = useState({ amount: '', method: 'MPESA', reference: '' });
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -410,14 +420,30 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                 <table className="portal-data-table is-doc">
                   <thead>
                     <tr>
+                      <th />
                       <th>Item</th><th>Fulfillment</th><th>Supplier</th><th>Qty</th><th>Unit</th><th>Total</th><th />
                     </tr>
                   </thead>
                   <tbody>
                     {order.lines.map((line) => {
                       const next = line.fulfillmentStatus ? NEXT_LINE_STATUS[line.fulfillmentStatus] : null;
+                      const imageUrl = lineImageUrl(line);
                       return (
                         <tr key={line.id}>
+                          <td>
+                            {imageUrl ? (
+                              <div
+                                className="portal-list-thumb is-clickable"
+                                onClick={() => setLightboxImage({ src: imageUrl, alt: line.description })}
+                              >
+                                <img src={imageUrl} alt="" loading="lazy" />
+                              </div>
+                            ) : (
+                              <div className="portal-list-thumb is-empty" aria-hidden="true">
+                                <span>{(line.variant.product.name || '?').trim().charAt(0).toUpperCase()}</span>
+                              </div>
+                            )}
+                          </td>
                           <td>
                             {line.description}
                             <div className="portal-muted">{line.variant.sku}</div>
@@ -457,23 +483,23 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                       );
                     })}
                     <tr>
-                      <td colSpan={5}><strong>Subtotal</strong></td>
+                      <td colSpan={6}><strong>Subtotal</strong></td>
                       <td colSpan={2}>{formatMoney(order.subtotal)}</td>
                     </tr>
                     {Number(order.discount) > 0 ? (
                       <tr>
-                        <td colSpan={5}><strong>Discount</strong></td>
+                        <td colSpan={6}><strong>Discount</strong></td>
                         <td colSpan={2}>-{formatMoney(order.discount)}</td>
                       </tr>
                     ) : null}
                     {Number(order.shipping) > 0 ? (
                       <tr>
-                        <td colSpan={5}><strong>Shipping</strong></td>
+                        <td colSpan={6}><strong>Shipping</strong></td>
                         <td colSpan={2}>{formatMoney(order.shipping)}</td>
                       </tr>
                     ) : null}
                     <tr>
-                      <td colSpan={5}><strong>Total</strong></td>
+                      <td colSpan={6}><strong>Total</strong></td>
                       <td colSpan={2}><strong>{formatMoney(order.total)}</strong></td>
                     </tr>
                   </tbody>
@@ -546,6 +572,9 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
           </PortalShell>
         </section>
       </main>
+      {lightboxImage ? (
+        <ImageLightbox src={lightboxImage.src} alt={lightboxImage.alt} onClose={() => setLightboxImage(null)} />
+      ) : null}
     </EliteLayout>
   );
 }

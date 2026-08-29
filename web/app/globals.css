@@ -3409,6 +3409,55 @@ img {
     gap: 10px;
   }
 
+  /* A full-size product photo, opened from a thumbnail. Same backdrop and
+     z-index as .portal-dialog-overlay -- it needs to sit above everything
+     else the same way -- but otherwise its own thing: no card, no padding,
+     the image is the entire content. */
+  .portal-lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    background: rgba(15, 15, 15, 0.86);
+    z-index: 1000;
+    cursor: zoom-out;
+  }
+
+  .portal-lightbox-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    cursor: default;
+    background: #fff;
+  }
+
+  .portal-lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    width: 40px;
+    height: 40px;
+    font-size: 28px;
+    line-height: 1;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .portal-lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.22);
+  }
+
+  /* A thumbnail that opens the lightbox reads as clickable, unlike the plain
+     list thumbnails this shares .portal-list-thumb with. */
+  .portal-list-thumb.is-clickable {
+    cursor: zoom-in;
+  }
+
   .portal-main {
     /* Header clearance comes from .lp-main-content; setting it again here
        would double the gap on a phone. */
