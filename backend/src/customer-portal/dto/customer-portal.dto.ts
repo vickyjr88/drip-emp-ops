@@ -111,3 +111,11 @@ export class SubmitResellerApplicationDto {
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) businessName!: string;
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(2000) reason!: string;
 }
+
+export class UpdateCustomerProfileDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() @MaxLength(100) firstName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() @MaxLength(100) lastName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() @MaxLength(30) phone?: string;
+  /** Only meaningful for a trade customer; sent as an empty string to clear. */
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) businessName?: string;
+}

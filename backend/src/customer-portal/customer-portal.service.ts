@@ -14,7 +14,7 @@ import { EmailLogService } from '../email-log/email-log.service';
 import { ctaButton } from '../email-log/email-html.util';
 import { ensureReferralCode } from '../common/generate-code';
 import { ResellerApplicationService } from '../reseller-application/reseller-application.service';
-import { SubmitResellerApplicationDto } from './dto/customer-portal.dto';
+import { SubmitResellerApplicationDto, UpdateCustomerProfileDto } from './dto/customer-portal.dto';
 import { CUSTOMER_TOKEN_KIND } from './customer-jwt.strategy';
 
 /** How long a password-reset link stays usable. */
@@ -150,6 +150,34 @@ export class CustomerPortalService {
     return this.resellerApplication.create(customerId, dto);
   }
 
+  /**
+   * Lets a customer keep their own contact details current without staff
+   * involvement. Only fields actually present in the request are written --
+   * an omitted field is left untouched, matching ResellerService.update()'s
+   * own `!== undefined` convention -- so a PATCH that only changes phone
+   * cannot accidentally blank out the customer's name.
+   */
+  async updateProfile(customerId: string, dto: UpdateCustomerProfileDto) {
+    return this.prisma.customer.update({
+      where: { id: customerId },
+      data: {
+        ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
+        ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
+        ...(dto.businessName !== undefined ? { businessName: dto.businessName.trim() || null } : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        priceTier: true,
+        businessName: true,
+      },
+    });
+  }
+
   /** The customer's own orders, newest first. */
   async myOrders(customerId: string) {
     const orders = await this.prisma.order.findMany({
@@ -176,6 +204,48 @@ export class CustomerPortalService {
     }));
   }
 
+  /**
+   * A reseller's own referral activity: orders their link brought in, and
+   * what each earned them. Redacted to first name only on the referred
+   * customer -- order.customer.firstName, never order.customerName, which is
+   * an unreliable free-text snapshot a guest checkout can set to anything.
+   */
+  async myReferrals(customerId: string) {
+    const orders = await this.prisma.order.findMany({
+      where: { referredByCustomerId: customerId },
+      include: {
+        commission: true,
+        customer: { select: { firstName: true } },
+      },
+      orderBy: { placedAt: 'desc' },
+      take: 200,
+    });
+
+    const accruedBalance = orders
+      .filter((order) => order.commission?.status === 'ACCRUED')
+      .reduce((sum, order) => sum + Number(order.commission!.amount), 0);
+    const paidOutTotal = orders
+      .filter((order) => order.commission?.status === 'PAID')
+      .reduce((sum, order) => sum + Number(order.commission!.amount), 0);
+
+    return {
+      summary: {
+        referredOrders: orders.length,
+        accruedBalance,
+        paidOutTotal,
+      },
+      orders: orders.map((order) => ({
+        orderNumber: order.orderNumber,
+        placedAt: order.placedAt.toISOString(),
+        status: order.status,
+        total: Number(order.total),
+        referredCustomerFirstName: order.customer?.firstName ?? null,
+        commissionAmount: order.commission ? Number(order.commission.amount) : 0,
+        commissionStatus: order.commission?.status ?? null,
+      })),
+    };
+  }
+
   private async issueToken(customer: {
     id: string;
     email: string;
@@ -184,6 +254,7 @@ export class CustomerPortalService {
     phone: string;
     priceTier: PriceTier;
     referralCode: string | null;
+    businessName?: string | null;
   }) {
     const referralCode = await ensureReferralCode(this.prisma, customer);
     const pendingApplication = await this.prisma.resellerApplication.findFirst({
@@ -203,6 +274,7 @@ export class CustomerPortalService {
         email: customer.email,
         phone: customer.phone,
         priceTier: customer.priceTier,
+        businessName: customer.businessName ?? null,
         referralCode,
         hasPendingResellerApplication: Boolean(pendingApplication),
       },

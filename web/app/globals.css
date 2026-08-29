@@ -11409,6 +11409,87 @@ img {
   color: var(--de-ink);
 }
 
+/* Panel header with an edit/action toggle on the right, so a card can show
+   its heading and a "Edit"/"Change" affordance on one line without the form
+   itself needing to be present until that's clicked. */
+.de-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.de-panel-head h2 {
+  margin: 0;
+}
+
+.de-panel-toggle {
+  flex: none;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--de-royal);
+  background: var(--de-050);
+  border: 1px solid var(--de-line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.de-panel-toggle:hover {
+  background: var(--de-100);
+  border-color: var(--de-200);
+}
+
+/* Read-only rows shown before a card's edit form is opened -- a quiet list
+   of label/value pairs, distinct from .de-summary's tighter, numeric-heavy
+   layout (order totals, commission figures) which this isn't. */
+.de-detail-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.de-detail-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.de-detail-rows dt {
+  margin: 0;
+  color: var(--de-muted);
+}
+
+.de-detail-rows dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--de-ink);
+  text-align: right;
+}
+
+.de-badge {
+  display: inline-flex;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--de-royal);
+  background: var(--de-100);
+  border-radius: 999px;
+}
+
+/* The account page stacks several of these panels (details, referral link,
+   trade pricing, password) in one scrolling column -- unlike the cart, which
+   has exactly one, sticky is right there since it is a lone order summary.
+   With several, sticky positioning made every panel pin itself to the same
+   top offset as the page scrolled, so they overlapped instead of stacking. */
+.de-account-side .de-checkout-panel {
+  position: static;
+}
+
 .de-summary {
   display: flex;
   flex-direction: column;
@@ -11898,6 +11979,97 @@ img {
 .de-account-signout {
   justify-content: center;
   width: 100%;
+}
+
+/* Referral link + reseller dashboard: a hero card for the link itself, a
+   3-up stat grid for the headline numbers, and commission-status chips on
+   each referred order -- the same "modern dashboard" language across both
+   the account page's referral panel and the standalone /account/reseller
+   page, rather than plain definition lists everywhere. */
+.de-referral-hero {
+  padding: 16px;
+  background: var(--de-050);
+  border: 1px solid var(--de-line);
+  border-radius: 12px;
+}
+
+.de-referral-hero-link {
+  display: block;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--de-ink);
+  word-break: break-all;
+  background: #fff;
+  border: 1px solid var(--de-line);
+  border-radius: 9px;
+}
+
+.de-referral-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.de-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.de-stat-card {
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--de-line);
+  border-radius: 14px;
+}
+
+.de-stat-card span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--de-muted);
+}
+
+.de-stat-card strong {
+  display: block;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--de-ink);
+}
+
+.de-stat-card.is-highlight strong {
+  color: var(--de-go);
+}
+
+@media (max-width: 640px) {
+  .de-stat-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.de-commission-chip {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+}
+
+.de-commission-chip.is-accrued {
+  color: #6a4a05;
+  background: #fdf5e3;
+}
+
+.de-commission-chip.is-paid {
+  color: var(--de-go);
+  background: #e6f4ec;
+}
+
+.de-commission-chip.is-cancelled {
+  color: var(--de-muted);
+  background: var(--de-100);
 }
 
 /* Sign-in nudge on the cart. */

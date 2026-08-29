@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CustomerPortalService } from './customer-portal.service';
 import { CustomerAuthGuard } from './customer-auth.guard';
@@ -10,6 +10,7 @@ import {
   CustomerSelfSignupDto,
   RequestRentChangeDto,
   SubmitResellerApplicationDto,
+  UpdateCustomerProfileDto,
 } from './dto/customer-portal.dto';
 import { storefrontOrigin } from '../common/storefront-origin';
 import { Public } from '../auth/decorators/public.decorator';
@@ -76,6 +77,14 @@ export class CustomerPortalController {
   @Public()
   @UseGuards(CustomerAuthGuard)
   @ApiBearerAuth()
+  @Get('referrals')
+  myReferrals(@Req() request: any) {
+    return this.service.myReferrals(request.user.id);
+  }
+
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @ApiBearerAuth()
   @Post('change-password')
   changePassword(@Req() request: any, @Body() dto: CustomerChangePasswordDto) {
     return this.service.changePassword(request.user.id, dto.currentPassword, dto.newPassword);
@@ -87,5 +96,13 @@ export class CustomerPortalController {
   @Post('reseller-application')
   submitResellerApplication(@Req() request: any, @Body() dto: SubmitResellerApplicationDto) {
     return this.service.submitResellerApplication(request.user.id, dto);
+  }
+
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @ApiBearerAuth()
+  @Patch('me')
+  updateProfile(@Req() request: any, @Body() dto: UpdateCustomerProfileDto) {
+    return this.service.updateProfile(request.user.id, dto);
   }
 }

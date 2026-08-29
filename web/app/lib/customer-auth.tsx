@@ -26,6 +26,9 @@ export type CustomerProfile = {
   email: string;
   phone: string;
   priceTier?: string;
+  /** Trading name for a reseller/wholesale account. Null/absent for a
+   *  retail customer or a trade account that never set one. */
+  businessName?: string | null;
   /** Present only for a reseller/wholesale customer once one has been
    *  generated; absent for a retail customer. Opaque -- carried verbatim
    *  into a shared product URL's ?ref= param, never decoded client-side. */
