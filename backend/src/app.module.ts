@@ -14,6 +14,7 @@ import { CheckoutModule } from './checkout/checkout.module';
 import { CartLeadModule } from './cart-lead/cart-lead.module';
 import { InquiryModule } from './inquiry/inquiry.module';
 import { ResellerApplicationModule } from './reseller-application/reseller-application.module';
+import { CampaignModule } from './campaign/campaign.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 
@@ -78,6 +79,7 @@ import { PdfModule } from './pdf/pdf.module';
     CartLeadModule,
     InquiryModule,
     ResellerApplicationModule,
+    CampaignModule,
     PrismaModule,
     CustomerModule,
     CustomerPortalModule,

@@ -4,18 +4,25 @@ import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { customerApi } from './customer-auth';
 
-const COOKIE_NAME = 'de_ref';
+const COOKIE_NAME = 'de_attr';
 const COOKIE_TTL_DAYS = 30;
 
+type CapturedAttribution = { type: 'reseller' | 'campaign'; code: string };
+
 /**
- * Captures ?ref=<code> from the URL into a first-party cookie, last-click-wins,
- * and records the landing as a click on the reseller's analytics.
+ * Captures ?ref=<code> (a reseller's link) or ?camp=<code> (an admin-created
+ * paid-marketing link) from the URL into a single first-party cookie, and
+ * records the landing as a click on the relevant analytics.
  *
- * Every landing with a ?ref= overwrites whatever was captured before -- that
- * is what "last click wins" means for attribution, not just for the final
- * purchase decision. A visit with no ?ref= present leaves any existing
- * attribution untouched: browsing further into the site after arriving via a
- * link must not silently erase who sent the shopper here.
+ * There is exactly one attribution slot, tagged by type, not two independent
+ * cookies -- "last click wins overall" means whichever kind of link was
+ * clicked most recently before checkout gets the credit, so a shopper who
+ * arrives via a reseller's link and later clicks a Facebook ad (or the
+ * reverse) has only the second one counted. Every landing with a ?ref= or
+ * ?camp= present overwrites whatever was captured before, of either type. A
+ * visit with neither param leaves any existing attribution untouched --
+ * browsing further into the site after arriving via a link must not silently
+ * erase who sent the shopper here.
  *
  * The click beacon fires once per landing, the same moment the cookie is
  * (re)written -- not on every subsequent page view while that cookie stays
@@ -31,19 +38,38 @@ export function useCaptureReferral() {
 
   useEffect(() => {
     const ref = params.get('ref');
-    if (!ref) return;
+    const camp = params.get('camp');
+    // ?ref= takes precedence only in the pathological case both params are
+    // present on the same URL at once (never true for a real shared link) --
+    // an ordinary landing only ever carries one or the other.
+    const attribution: CapturedAttribution | null = ref
+      ? { type: 'reseller', code: ref }
+      : camp
+        ? { type: 'campaign', code: camp }
+        : null;
+    if (!attribution) return;
+
     const expires = new Date(Date.now() + COOKIE_TTL_DAYS * 24 * 60 * 60 * 1000).toUTCString();
-    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(ref)}; expires=${expires}; path=/; SameSite=Lax`;
-    void customerApi('/customer-portal/referral-click', {
+    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(attribution))}; expires=${expires}; path=/; SameSite=Lax`;
+
+    const endpoint = attribution.type === 'reseller' ? '/customer-portal/referral-click' : `/campaigns/${encodeURIComponent(attribution.code)}/click`;
+    void customerApi(endpoint, {
       method: 'POST',
-      body: JSON.stringify({ code: ref }),
+      body: attribution.type === 'reseller' ? JSON.stringify({ code: attribution.code }) : undefined,
     }).catch(() => {});
   }, [params]);
 }
 
-/** Reads back the captured code, if any. Used by checkout at submit time. */
-export function readCapturedReferral(): string | null {
+/** Reads back the captured attribution, if any. Used by checkout at submit time. */
+export function readCapturedAttribution(): CapturedAttribution | null {
   if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(/(?:^|;\s*)de_ref=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
+  const match = document.cookie.match(/(?:^|;\s*)de_attr=([^;]+)/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(match[1]));
+    if (parsed?.type === 'reseller' || parsed?.type === 'campaign') return parsed;
+    return null;
+  } catch {
+    return null;
+  }
 }

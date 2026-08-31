@@ -1566,6 +1566,14 @@ model Order {
   /// self-referral guard in CheckoutService.start().
   referredBy           Customer? @relation("OrderReferredBy", fields: [referredByCustomerId], references: [id])
   referredByCustomerId String?
+  /// The paid-marketing campaign whose link was attached at checkout, if
+  /// any. Mutually exclusive with referredByCustomerId in practice --
+  /// attribution is last-click-wins across both kinds of link, so only
+  /// whichever was clicked most recently is ever set -- but both columns
+  /// exist independently since a campaign is not a Customer and earns no
+  /// commission.
+  attributedCampaign   MarketingCampaign? @relation("OrderAttributedCampaign", fields: [attributedCampaignId], references: [id])
+  attributedCampaignId String?
   store       Store       @relation(fields: [storeId], references: [id])
   storeId     String
   status      OrderStatus @default(PENDING)
@@ -1600,6 +1608,7 @@ model Order {
 
   @@index([customerId])
   @@index([referredByCustomerId])
+  @@index([attributedCampaignId])
   @@index([storeId])
   @@index([status])
 }
@@ -1617,6 +1626,37 @@ model ReferralClick {
   clickedAt  DateTime @default(now())
 
   @@index([resellerId])
+}
+
+/// An admin-created tracking link for paid marketing (a Facebook or Google
+/// ad, a print flyer's QR code, and so on) -- the same shape of thing a
+/// reseller's referral link is, but owned by the shop itself rather than a
+/// Customer, and never a source of commission. `code` is chosen by the admin
+/// (not generated) so the resulting link stays short and readable in an ad
+/// or on print.
+model MarketingCampaign {
+  id           String              @id @default(uuid())
+  code         String              @unique
+  name         String
+  isActive     Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  createdBy    String?
+  clicks       CampaignClick[]
+  orders       Order[]             @relation("OrderAttributedCampaign")
+
+  @@index([isActive])
+}
+
+/// One row per landing on a campaign's shared link -- the campaign
+/// equivalent of ReferralClick, recorded once per visit that arrives with
+/// ?camp=<code>, not for every page view afterward.
+model CampaignClick {
+  id         String            @id @default(uuid())
+  campaign   MarketingCampaign @relation(fields: [campaignId], references: [id])
+  campaignId String
+  clickedAt  DateTime          @default(now())
+
+  @@index([campaignId])
 }
 
 enum CommissionStatus {

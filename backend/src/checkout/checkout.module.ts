@@ -6,6 +6,7 @@ import { PaystackModule } from '../paystack/paystack.module';
 import { EmailLogModule } from '../email-log/email-log.module';
 import { CustomerPortalModule } from '../customer-portal/customer-portal.module';
 import { CommissionModule } from '../commission/commission.module';
+import { CampaignModule } from '../campaign/campaign.module';
 import { CheckoutService } from './checkout.service';
 import { CheckoutController } from './checkout.controller';
 
@@ -20,6 +21,7 @@ import { CheckoutController } from './checkout.controller';
     // logged-in reseller checking out is priced at their real tier.
     CustomerPortalModule,
     CommissionModule,
+    CampaignModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService],

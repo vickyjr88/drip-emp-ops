@@ -20,7 +20,7 @@ import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { fetchProduct, formatKes } from '../lib/shop';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
-import { readCapturedReferral } from '../lib/use-capture-referral';
+import { readCapturedAttribution } from '../lib/use-capture-referral';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 /**
@@ -280,6 +280,7 @@ export function CartClient() {
     setError(null);
     setSubmitting(true);
     try {
+      const attribution = readCapturedAttribution();
       const response = await fetch(`${API}/checkout`, {
         method: 'POST',
         headers: {
@@ -299,7 +300,8 @@ export function CartClient() {
           phone: form.phone,
           shippingAddress: deliver ? form.shippingAddress : undefined,
           password: wantAccount && form.password ? form.password : undefined,
-          referralCode: readCapturedReferral() || undefined,
+          referralCode: attribution?.type === 'reseller' ? attribution.code : undefined,
+          campaignCode: attribution?.type === 'campaign' ? attribution.code : undefined,
         }),
       });
       const data = await response.json();

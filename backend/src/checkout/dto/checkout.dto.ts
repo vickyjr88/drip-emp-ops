@@ -69,6 +69,13 @@ export class CheckoutDto {
   @IsOptional()
   @IsString()
   referralCode?: string;
+
+  @ApiPropertyOptional({
+    description: 'A paid-marketing campaign code, captured from a shared link (?camp=). Mutually exclusive with referralCode in practice -- attribution is last-click-wins across both, so the client only ever sends whichever was clicked most recently.',
+  })
+  @IsOptional()
+  @IsString()
+  campaignCode?: string;
 }
 
 export class CustomerSignupDto {

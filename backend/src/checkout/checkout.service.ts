@@ -7,6 +7,7 @@ import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { PaystackService } from '../paystack/paystack.service';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CommissionService } from '../commission/commission.service';
+import { CampaignService } from '../campaign/campaign.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
@@ -49,6 +50,7 @@ export class CheckoutService {
     private readonly paystack: PaystackService,
     private readonly ownerNotification: OwnerNotificationService,
     private readonly commission: CommissionService,
+    private readonly campaign: CampaignService,
   ) {}
 
   /**
@@ -264,12 +266,23 @@ export class CheckoutService {
         if (referrer && referrer.id !== customer.id) referredByCustomerId = referrer.id;
       }
 
+      // The campaign equivalent of the block above. The two are mutually
+      // exclusive in practice -- the client only ever carries one attribution
+      // slot at a time (see de_attr / readCapturedAttribution) -- but this is
+      // written defensively rather than assuming that: an inactive/unknown
+      // code simply attributes nothing, same tolerance as a bad referral code.
+      let attributedCampaignId: string | null = null;
+      if (dto.campaignCode) {
+        attributedCampaignId = await this.campaign.resolveActiveCampaignId(dto.campaignCode);
+      }
+
       const order = await tx.order.create({
         data: {
           orderNumber: await this.nextOrderNumber(tx),
           storeId: store.id,
           customerId: customer.id,
           referredByCustomerId,
+          attributedCampaignId,
           channel: 'WEBSITE',
           priceTier: tier,
           customerName: `${customer.firstName} ${customer.lastName}`.trim(),
