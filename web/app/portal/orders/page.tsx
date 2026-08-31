@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
@@ -79,6 +80,7 @@ type Draft = {
 };
 
 export default function OrdersPage() {
+  const router = useRouter();
   const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -804,7 +806,19 @@ export default function OrdersPage() {
                   </div>
                 ) : (
                   leadsPager.items.map((lead) => (
-                    <div key={lead.id} className="portal-record">
+                    <div
+                      key={lead.id}
+                      className={`portal-record${canCreate ? ' is-clickable' : ''}`}
+                      role={canCreate ? 'button' : undefined}
+                      tabIndex={canCreate ? 0 : undefined}
+                      onClick={canCreate ? () => onStartOrderFromLead(lead) : undefined}
+                      onKeyDown={canCreate ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onStartOrderFromLead(lead);
+                        }
+                      } : undefined}
+                    >
                       <div className="portal-list-row has-thumb">
                         <ListThumb sources={[lead.firstLineImageUrl]} label={lead.lines[0]?.name || lead.customerName || '?'} />
                         <div>
@@ -818,7 +832,7 @@ export default function OrdersPage() {
                           </p>
                           <p>{formatMoney(lead.total)}</p>
                         </div>
-                        <div className="portal-action-row">
+                        <div className="portal-action-row" onClick={(event) => event.stopPropagation()}>
                           {canCreate ? (
                             <button type="button" className="portal-inline-btn" onClick={() => onStartOrderFromLead(lead)}>
                               Start Order
@@ -892,7 +906,19 @@ export default function OrdersPage() {
                   rows.map((order) => {
                     const firstProduct = order.lines[0]?.variant?.product;
                     return (
-                    <div key={order.id} className="portal-record">
+                    <div
+                      key={order.id}
+                      className="portal-record is-clickable"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/portal/orders/${order.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          router.push(`/portal/orders/${order.id}`);
+                        }
+                      }}
+                    >
                       <div className="portal-list-row has-thumb">
                         <ListThumb
                           sources={[firstProduct?.featuredImageUrl, firstProduct?.imageUrls?.[0]]}
@@ -915,7 +941,11 @@ export default function OrdersPage() {
                           </p>
                         </div>
                         <span>{order.status}</span>
-                        <div className="portal-action-row">
+                        {/* The card itself now navigates to the order; this row's
+                            own buttons must still act on the order in place
+                            (take a payment, advance status) without also
+                            triggering that navigation underneath them. */}
+                        <div className="portal-action-row" onClick={(event) => event.stopPropagation()}>
                           <Link href={`/portal/orders/${order.id}`} className="portal-inline-btn">
                             View
                           </Link>

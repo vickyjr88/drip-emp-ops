@@ -4880,6 +4880,20 @@ img {
     gap: 8px;
   }
 
+  /* The order and cart-lead cards navigate/act on click; the buttons inside
+     them stop that click reaching the card (see the action row's own
+     onClick), so this is purely the "this whole thing is clickable" cue. */
+  .portal-record.is-clickable {
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .portal-record.is-clickable:hover,
+  .portal-record.is-clickable:focus-visible {
+    border-color: var(--eef-primary);
+    box-shadow: 0 0 0 1px var(--eef-primary);
+  }
+
   .portal-action-row {
     display: flex;
     justify-content: flex-end;

@@ -460,7 +460,13 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                           <td>
                             {line.supplierInvoice ? (
                               <>
-                                <div>{line.supplierInvoice.supplier.name}</div>
+                                {/* Links to the supplier's account page --
+                                    there is no separate per-invoice detail
+                                    route; every invoice for a supplier is
+                                    listed and actioned from their own page. */}
+                                <Link href={`/portal/accounting/payable/${line.supplierInvoice.supplier.id}`}>
+                                  {line.supplierInvoice.supplier.name}
+                                </Link>
                                 <div className="portal-muted">
                                   {line.supplierInvoice.invoiceNumber} · {line.supplierInvoice.status}
                                 </div>
