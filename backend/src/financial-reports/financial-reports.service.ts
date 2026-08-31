@@ -291,8 +291,11 @@ export class FinancialReportsService {
    *
    * Cancelled and refunded orders are not trade: counting them would inflate
    * revenue and, worse, credit a product with margin the shop never kept.
+   * PENDING is not trade either yet -- it is rung up but not yet paid, so
+   * counting it here would report stock as sold and margin as earned before
+   * either has actually happened.
    */
-  private static readonly DEAD_ORDER_STATUSES = ['CANCELLED', 'REFUNDED'] as const;
+  private static readonly DEAD_ORDER_STATUSES = ['CANCELLED', 'REFUNDED', 'PENDING'] as const;
 
   private orderWhere(from?: string, to?: string, storeId?: string) {
     return {

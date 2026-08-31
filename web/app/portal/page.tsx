@@ -32,6 +32,7 @@ type SalesSummary = {
   collected: number;
   outstanding: number;
   averageOrderValue: number;
+  unconfirmed: { count: number; value: number };
   byStatus: Array<{ status: string; count: number; value: number }>;
 };
 
@@ -283,7 +284,7 @@ export default function PortalPage() {
                 <article className="portal-stat-card">
                   <p>Orders</p>
                   <h3>{summary.orderCount}</h3>
-                  <span className="portal-stat-note">excludes cancelled and refunded</span>
+                  <span className="portal-stat-note">confirmed sales only</span>
                 </article>
                 <article className="portal-stat-card">
                   <p>Revenue</p>
@@ -300,6 +301,13 @@ export default function PortalPage() {
                   <p>Outstanding</p>
                   <h3>{formatMoney(summary.outstanding)}</h3>
                   <span className="portal-stat-note">owed on part-paid orders</span>
+                </article>
+                <article className="portal-stat-card">
+                  <p>Unconfirmed</p>
+                  <h3>{summary.unconfirmed.count}</h3>
+                  <span className="portal-stat-note">
+                    {formatMoney(summary.unconfirmed.value)} not yet paid — excluded above
+                  </span>
                 </article>
               </div>
             ) : null}

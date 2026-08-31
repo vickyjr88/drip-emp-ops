@@ -402,10 +402,22 @@ export class OrderService {
     return updated;
   }
 
-  /** What sold, over a period. */
+  /**
+   * What sold, over a period.
+   *
+   * "Sold" means confirmed: PENDING is an order rung up but not yet paid, and
+   * counting it as revenue overstates takings by whatever is still sitting
+   * unconfirmed at the till. It gets its own `unconfirmed` figure instead of
+   * being folded into (or silently excluded from) the headline numbers, so
+   * staff can see it without it inflating revenue/collected/outstanding.
+   *
+   * `byStatus`/`byChannel` are a distribution, not a revenue figure -- they
+   * still include PENDING (alongside every other live status) so the shop can
+   * see how many orders are stuck unconfirmed, which the confirmed-only
+   * totals below cannot show.
+   */
   async salesSummary(query: { storeId?: string; from?: string; to?: string }) {
-    const where: Prisma.OrderWhereInput = {
-      status: { notIn: ['CANCELLED', 'REFUNDED'] },
+    const dateWhere: Prisma.OrderWhereInput = {
       ...(query.storeId ? { storeId: query.storeId } : {}),
       ...(query.from || query.to
         ? {
@@ -416,11 +428,17 @@ export class OrderService {
           }
         : {}),
     };
+    const liveWhere: Prisma.OrderWhereInput = { ...dateWhere, status: { notIn: ['CANCELLED', 'REFUNDED'] } };
+    const confirmedWhere: Prisma.OrderWhereInput = {
+      ...dateWhere,
+      status: { notIn: ['CANCELLED', 'REFUNDED', 'PENDING'] },
+    };
 
-    const [totals, byStatus, byChannel] = await Promise.all([
-      this.prisma.order.aggregate({ where, _count: true, _sum: { total: true, amountPaid: true } }),
-      this.prisma.order.groupBy({ by: ['status'], where, _count: true, _sum: { total: true } }),
-      this.prisma.order.groupBy({ by: ['channel'], where, _count: true, _sum: { total: true } }),
+    const [totals, unconfirmed, byStatus, byChannel] = await Promise.all([
+      this.prisma.order.aggregate({ where: confirmedWhere, _count: true, _sum: { total: true, amountPaid: true } }),
+      this.prisma.order.aggregate({ where: { ...dateWhere, status: 'PENDING' }, _count: true, _sum: { total: true } }),
+      this.prisma.order.groupBy({ by: ['status'], where: liveWhere, _count: true, _sum: { total: true } }),
+      this.prisma.order.groupBy({ by: ['channel'], where: confirmedWhere, _count: true, _sum: { total: true } }),
     ]);
 
     const revenue = Number(totals._sum.total ?? 0);
@@ -432,6 +450,12 @@ export class OrderService {
       collected,
       outstanding: revenue - collected,
       averageOrderValue: totals._count ? revenue / totals._count : 0,
+      // Not sales -- orders placed but not yet paid, shown separately so
+      // they can be chased without inflating the figures above.
+      unconfirmed: {
+        count: unconfirmed._count,
+        value: Number(unconfirmed._sum.total ?? 0),
+      },
       byStatus: byStatus.map((row) => ({
         status: row.status,
         count: row._count,

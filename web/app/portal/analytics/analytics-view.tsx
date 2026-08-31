@@ -79,6 +79,7 @@ type SalesSummary = {
   collected: number;
   outstanding: number;
   averageOrderValue: number;
+  unconfirmed: { count: number; value: number };
   byStatus: Array<{ status: string; count: number; value: number }>;
   byChannel: Array<{ channel: string; count: number; value: number }>;
 };
