@@ -20,8 +20,8 @@ export class CustomerQueryDto extends PagedQueryDto {
   @Transform(toBoolean)
   isActive?: boolean;
 
-  @ApiPropertyOptional({ enum: ['name-asc', 'name-desc', 'email-asc'], default: 'name-asc' })
+  @ApiPropertyOptional({ enum: ['newest', 'name-asc', 'name-desc', 'email-asc'], default: 'newest' })
   @IsOptional()
-  @IsIn(['name-asc', 'name-desc', 'email-asc'])
-  sortBy?: 'name-asc' | 'name-desc' | 'email-asc';
+  @IsIn(['newest', 'name-asc', 'name-desc', 'email-asc'])
+  sortBy?: 'newest' | 'name-asc' | 'name-desc' | 'email-asc';
 }

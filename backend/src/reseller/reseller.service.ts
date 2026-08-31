@@ -63,7 +63,9 @@ export class ResellerService {
       ...(includeInactive ? {} : { isActive: true }),
       ...searchOr(search, (term) => containsAny(['firstName', 'lastName', 'businessName', 'code', 'phone'], term)),
     };
-    const orderBy: Prisma.CustomerOrderByWithRelationInput[] = [{ firstName: 'asc' }, { id: 'asc' }];
+    // Newest reseller first, matching every other list in the portal -- this
+    // used to be alphabetical, the same gap the plain customer list had.
+    const orderBy: Prisma.CustomerOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'asc' }];
 
     const page = await paginate(
       (args) =>

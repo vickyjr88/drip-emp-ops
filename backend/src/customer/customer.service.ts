@@ -56,9 +56,14 @@ export class CustomerService {
     const orderBy: Prisma.CustomerOrderByWithRelationInput[] =
       sortBy === 'name-desc'
         ? [{ firstName: 'desc' }, { lastName: 'desc' }, { id: 'asc' }]
-        : sortBy === 'email-asc'
-          ? [{ email: 'asc' }, { id: 'asc' }]
-          : [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }];
+        : sortBy === 'name-asc'
+          ? [{ firstName: 'asc' }, { lastName: 'asc' }, { id: 'asc' }]
+          : sortBy === 'email-asc'
+            ? [{ email: 'asc' }, { id: 'asc' }]
+            // Default: newest customer first, matching every other list in
+            // the portal -- this used to default to alphabetical, the one
+            // list in the app that didn't.
+            : [{ createdAt: 'desc' }, { id: 'asc' }];
     return paginate(
       (args) => this.prisma.customer.findMany({ where, orderBy, select: CUSTOMER_SELECT, ...args }),
       () => this.prisma.customer.count({ where }),
