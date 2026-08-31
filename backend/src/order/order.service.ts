@@ -18,7 +18,7 @@ const INCLUDE = {
     include: {
       variant: {
         select: {
-          id: true, sku: true, name: true,
+          id: true, sku: true, name: true, costKes: true,
           product: {
             select: { id: true, name: true, brand: true, featuredImageUrl: true, imageUrls: true },
           },

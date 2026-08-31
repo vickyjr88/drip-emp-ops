@@ -11,10 +11,9 @@
  */
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
-import { usePortalDialog } from '../../components/portal-dialog';
 import { ImageLightbox } from '../../components/image-lightbox';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import {
@@ -35,7 +34,7 @@ type OrderLine = {
   fulfillmentType: FulfillmentType; fulfillmentStatus: FulfillmentStatus | null;
   supplierInvoice?: SupplierInvoiceInfo | null;
   variant: {
-    id: string; sku: string; name: string;
+    id: string; sku: string; name: string; costKes?: string | number | null;
     product: { name: string; brand?: string | null; featuredImageUrl?: string | null; imageUrls?: string[] | null };
   };
 };
@@ -58,8 +57,19 @@ type Order = {
 };
 
 type SupplierInvoiceOption = { id: string; invoiceNumber: string; supplier?: { name: string } };
+type SupplierOption = { id: string; name: string };
 
 const METHODS = ['MPESA', 'CASH', 'CARD', 'BANK_TRANSFER'];
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDaysIso(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
 const STATUS_NEXT: Record<string, string[]> = {
   PENDING: ['PAID', 'CANCELLED'],
@@ -90,13 +100,18 @@ function lineImageUrl(line: OrderLine): string | null {
 }
 
 export default function OrderDetailClient({ orderId }: { orderId: string }) {
-  const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [supplierInvoices, setSupplierInvoices] = useState<SupplierInvoiceOption[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  // Resolved once from the chart of accounts (code 5300) rather than staff
+  // ever picking a GL account by hand here -- goods bought in for an order
+  // always belong in Cost of Goods Sold, not a decision this panel needs to
+  // ask about.
+  const [costOfGoodsSoldAccountId, setCostOfGoodsSoldAccountId] = useState<string | undefined>(undefined);
   const [notFound, setNotFound] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
@@ -104,6 +119,22 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
   const [showPayment, setShowPayment] = useState(false);
   const [payment, setPayment] = useState({ amount: '', method: 'MPESA', reference: '' });
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
+
+  // Which line's "raise a supplier bill" panel is open, if any -- only one
+  // at a time, directly under the line it's for rather than a modal, so the
+  // line it applies to never has to be repeated back to the user.
+  const [sourcingLineId, setSourcingLineId] = useState<string | null>(null);
+  const [sourcingBusy, setSourcingBusy] = useState(false);
+  const [sourcingError, setSourcingError] = useState<string | null>(null);
+  const [sourcingForm, setSourcingForm] = useState({
+    existingInvoiceId: '',
+    supplierId: '',
+    newSupplierName: '',
+    invoiceNumber: '',
+    invoiceDate: todayIso(),
+    dueDate: addDaysIso(30),
+    amount: '',
+  });
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -116,16 +147,25 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [orderRow, supplierInvoiceRows] = await Promise.all([
+      const [orderRow, supplierInvoiceRows, supplierRows, accountRows] = await Promise.all([
         apiRequest<Order>(`/orders/${orderId}`, { method: 'GET' }, authToken),
         // Only needed to link a supplier bill when advancing a SUPPLIER_ORDER
         // line -- a user without supplier-invoice.read simply cannot do that
         // step, so a 403 here should not sink the whole page.
         apiRequest<unknown>('/supplier-invoices?take=200', { method: 'GET' }, authToken).catch(() => []),
+        // Same reasoning: only needed for the raise-a-bill panel, and a role
+        // without supplier.read must still see the rest of the order.
+        apiRequest<unknown>('/suppliers?take=500', { method: 'GET' }, authToken).catch(() => []),
+        apiRequest<Array<{ id: string; code: string }>>('/chart-of-accounts', { method: 'GET' }, authToken).catch(() => []),
       ]);
       setOrder(orderRow);
       const rows = supplierInvoiceRows as { items?: SupplierInvoiceOption[] } | SupplierInvoiceOption[];
       setSupplierInvoices(Array.isArray(rows) ? rows : rows.items ?? []);
+      const supplierList = supplierRows as { items?: SupplierOption[] } | SupplierOption[];
+      setSuppliers(Array.isArray(supplierList) ? supplierList : supplierList.items ?? []);
+      setCostOfGoodsSoldAccountId(
+        (Array.isArray(accountRows) ? accountRows : []).find((account) => account.code === '5300')?.id,
+      );
     } catch (error) {
       if (error instanceof Error && /not found/i.test(error.message)) {
         setNotFound(true);
@@ -167,43 +207,119 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
     const next = NEXT_LINE_STATUS[line.fulfillmentStatus];
     if (!next) return;
 
-    let supplierInvoiceId: string | undefined;
     if (next === 'ORDERED_FROM_SUPPLIER') {
-      if (supplierInvoices.length === 0) {
-        setErrorMessage(new Error('No supplier invoices yet. Raise the bill under Accounting → Payable first, then come back and mark this ordered.'));
-        return;
-      }
-      const result = await dialog.prompt({
-        title: 'Mark Ordered from Supplier',
-        message: `Which supplier bill covers "${line.description}"?`,
-        fields: [
-          {
-            name: 'supplierInvoiceId',
-            label: 'Supplier invoice',
-            type: 'select',
-            required: true,
-            options: supplierInvoices.map((invoice) => ({
-              value: invoice.id,
-              label: `${invoice.invoiceNumber} — ${invoice.supplier?.name ?? 'Unknown supplier'}`,
-            })),
-          },
-        ],
-        confirmLabel: 'Mark Ordered',
-      });
-      if (!result) return;
-      supplierInvoiceId = result.supplierInvoiceId;
+      // Which invoice covers this line is decided in the panel below, opened
+      // right under this line -- whether picking an existing bill or raising
+      // a new one, neither needs to leave this page.
+      openSourcingPanel(line);
+      return;
     }
 
     try {
       await apiRequest(
         `/orders/${order.id}/lines/${line.id}/fulfillment`,
-        { method: 'PATCH', body: JSON.stringify({ status: next, supplierInvoiceId }) },
+        { method: 'PATCH', body: JSON.stringify({ status: next }) },
         token,
       );
       setFeedback(`${line.description} is now ${LINE_STATUS_LABEL[next].toLowerCase()}.`);
       await load(token);
     } catch (error) {
       setErrorMessage(error);
+    }
+  }
+
+  function openSourcingPanel(line: OrderLine) {
+    setSourcingError(null);
+    const cost = line.variant.costKes !== null && line.variant.costKes !== undefined ? Number(line.variant.costKes) : null;
+    setSourcingForm({
+      existingInvoiceId: '',
+      supplierId: '',
+      newSupplierName: '',
+      invoiceNumber: '',
+      invoiceDate: todayIso(),
+      dueDate: addDaysIso(30),
+      // Pre-filled from the variant's cost, when it's on file, so staff are
+      // not left to work out the bill amount by hand -- still theirs to
+      // correct, since the real invoice may differ from the recorded cost.
+      amount: cost ? String(Math.round(cost * line.quantity)) : '',
+    });
+    setSourcingLineId(line.id);
+  }
+
+  function closeSourcingPanel() {
+    setSourcingLineId(null);
+    setSourcingError(null);
+  }
+
+  /**
+   * Resolves the invoice to link, raising a new supplier (and/or a new
+   * invoice) first if that's what the form asked for, then marks the line
+   * ordered -- one submit for what used to be a dead end pointing staff at
+   * a whole separate page.
+   */
+  async function onSubmitSourcing(line: OrderLine) {
+    if (!token || !order) return;
+    setSourcingBusy(true);
+    setSourcingError(null);
+    try {
+      let supplierInvoiceId = sourcingForm.existingInvoiceId;
+
+      if (!supplierInvoiceId) {
+        let supplierId = sourcingForm.supplierId;
+        if (!supplierId) {
+          if (!sourcingForm.newSupplierName.trim()) {
+            throw new Error('Pick an existing supplier or enter a name for the new one.');
+          }
+          const supplier = await apiRequest<SupplierOption>(
+            '/suppliers',
+            { method: 'POST', body: JSON.stringify({ name: sourcingForm.newSupplierName.trim() }) },
+            token,
+          );
+          supplierId = supplier.id;
+        }
+        if (!sourcingForm.invoiceNumber.trim() || !sourcingForm.amount) {
+          throw new Error('An invoice number and amount are needed to raise the bill.');
+        }
+        if (!costOfGoodsSoldAccountId) {
+          // Silently falling back to whatever CreateSupplierInvoiceDto
+          // defaults to (General Expense) would understate margin the
+          // moment this bill is approved -- surfaced instead of guessed at.
+          throw new Error("Can't resolve the Cost of Goods Sold account -- ask an admin for chart-of-accounts access, or raise this bill under Accounting → Payable and set it there.");
+        }
+        const invoice = await apiRequest<{ id: string }>(
+          '/supplier-invoices',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              invoiceNumber: sourcingForm.invoiceNumber.trim(),
+              supplierId,
+              invoiceDate: sourcingForm.invoiceDate,
+              dueDate: sourcingForm.dueDate,
+              amount: Number(sourcingForm.amount),
+              // What was bought in is stock sold on, not overhead -- posting
+              // it anywhere but Cost of Goods Sold would understate margin
+              // the moment this bill is approved.
+              glExpenseAccountId: costOfGoodsSoldAccountId,
+              createdBy: profile?.email,
+            }),
+          },
+          token,
+        );
+        supplierInvoiceId = invoice.id;
+      }
+
+      await apiRequest(
+        `/orders/${order.id}/lines/${line.id}/fulfillment`,
+        { method: 'PATCH', body: JSON.stringify({ status: 'ORDERED_FROM_SUPPLIER', supplierInvoiceId }) },
+        token,
+      );
+      setFeedback(`${line.description} is now ordered from supplier.`);
+      closeSourcingPanel();
+      await load(token);
+    } catch (error) {
+      setSourcingError(error instanceof Error ? error.message : 'Could not mark this ordered.');
+    } finally {
+      setSourcingBusy(false);
     }
   }
 
@@ -429,7 +545,8 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                       const next = line.fulfillmentStatus ? NEXT_LINE_STATUS[line.fulfillmentStatus] : null;
                       const imageUrl = lineImageUrl(line);
                       return (
-                        <tr key={line.id}>
+                        <Fragment key={line.id}>
+                        <tr>
                           <td>
                             {imageUrl ? (
                               <div
@@ -486,6 +603,103 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                             ) : null}
                           </td>
                         </tr>
+                        {sourcingLineId === line.id ? (
+                          <tr>
+                          <td colSpan={8}>
+                            <div className="portal-entity-form" style={{ margin: '4px 0' }}>
+                              <h3 style={{ margin: '0 0 4px' }}>Order &quot;{line.description}&quot; from a supplier</h3>
+                              {sourcingError ? <p className="portal-error" style={{ margin: '0 0 8px' }}>{sourcingError}</p> : null}
+
+                              {supplierInvoices.length > 0 ? (
+                                <label>
+                                  <span>Use an existing supplier bill</span>
+                                  <select
+                                    value={sourcingForm.existingInvoiceId}
+                                    onChange={(event) => setSourcingForm((prev) => ({ ...prev, existingInvoiceId: event.target.value }))}
+                                  >
+                                    <option value="">— Raise a new bill instead —</option>
+                                    {supplierInvoices.map((invoice) => (
+                                      <option key={invoice.id} value={invoice.id}>
+                                        {invoice.invoiceNumber} — {invoice.supplier?.name ?? 'Unknown supplier'}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              ) : null}
+
+                              {!sourcingForm.existingInvoiceId ? (
+                                <>
+                                  <div className="portal-entity-grid-2">
+                                    <label>
+                                      <span>Supplier</span>
+                                      <select
+                                        value={sourcingForm.supplierId}
+                                        onChange={(event) => setSourcingForm((prev) => ({ ...prev, supplierId: event.target.value, newSupplierName: '' }))}
+                                      >
+                                        <option value="">— New supplier —</option>
+                                        {suppliers.map((supplier) => (
+                                          <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    {!sourcingForm.supplierId ? (
+                                      <label>
+                                        <span>New supplier&apos;s name</span>
+                                        <input
+                                          value={sourcingForm.newSupplierName}
+                                          placeholder="e.g. Nairobi Sneaker Distributors"
+                                          onChange={(event) => setSourcingForm((prev) => ({ ...prev, newSupplierName: event.target.value }))}
+                                        />
+                                      </label>
+                                    ) : null}
+                                  </div>
+                                  <div className="portal-entity-grid-3">
+                                    <label>
+                                      <span>Invoice number</span>
+                                      <input
+                                        value={sourcingForm.invoiceNumber}
+                                        onChange={(event) => setSourcingForm((prev) => ({ ...prev, invoiceNumber: event.target.value }))}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Invoice date</span>
+                                      <input
+                                        type="date"
+                                        value={sourcingForm.invoiceDate}
+                                        onChange={(event) => setSourcingForm((prev) => ({ ...prev, invoiceDate: event.target.value }))}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Due date</span>
+                                      <input
+                                        type="date"
+                                        value={sourcingForm.dueDate}
+                                        onChange={(event) => setSourcingForm((prev) => ({ ...prev, dueDate: event.target.value }))}
+                                      />
+                                    </label>
+                                  </div>
+                                  <label>
+                                    <span>Amount (KES)</span>
+                                    <input
+                                      type="number" min="0.01" step="0.01"
+                                      value={sourcingForm.amount}
+                                      onChange={(event) => setSourcingForm((prev) => ({ ...prev, amount: event.target.value }))}
+                                    />
+                                  </label>
+                                </>
+                              ) : null}
+
+                              <div className="portal-inline-actions">
+                                <button type="button" className="portal-primary-btn" disabled={sourcingBusy} onClick={() => void onSubmitSourcing(line)}>
+                                  {sourcingBusy ? 'Saving…' : 'Mark Ordered'}
+                                </button>
+                                <button type="button" className="portal-ghost-btn" onClick={closeSourcingPanel}>Cancel</button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                        ) : null}
+                        </Fragment>
                       );
                     })}
                     <tr>
