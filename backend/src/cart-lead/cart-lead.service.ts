@@ -51,10 +51,22 @@ export class CartLeadService {
   }
 
   async findAll(query: CartLeadQueryDto) {
-    const { skip, take, search, source, status } = query;
+    const { skip, take, search, source, status, outstanding } = query;
+    // `status` is an exact match on one status (the history page's own
+    // dropdown); `outstanding` picks a pair of statuses at once (the live
+    // worklist's "still open" vs. the history page's "already resolved").
+    // A caller is only ever expected to send one, but `status` wins if both
+    // somehow arrive, since it is the more specific request.
+    const statusFilter: Prisma.CartLeadWhereInput['status'] = status
+      ? status
+      : outstanding === true
+        ? { in: ['NEW', 'CONTACTED'] }
+        : outstanding === false
+          ? { in: ['EXPIRED', 'CONVERTED'] }
+          : undefined;
     const where: Prisma.CartLeadWhereInput = {
       ...(source ? { source } : {}),
-      ...(status ? { status } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
       ...(search?.trim()
         ? {
             OR: [
@@ -72,7 +84,12 @@ export class CartLeadService {
           ...args,
           where,
           orderBy: [{ lastActivityAt: 'desc' }, { id: 'asc' }],
-          include: { customer: { select: { id: true, firstName: true, lastName: true } } },
+          include: {
+            customer: { select: { id: true, firstName: true, lastName: true } },
+            // A converted lead's own trail to what it became -- the history
+            // view links straight to the order instead of just saying "converted".
+            order: { select: { id: true, orderNumber: true } },
+          },
         }),
       () => this.prisma.cartLead.count({ where }),
       skip,

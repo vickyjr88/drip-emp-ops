@@ -185,9 +185,11 @@ export default function OrdersPage() {
       const query = new URLSearchParams();
       query.set('skip', String(params.skip));
       query.set('take', String(params.take));
-      // A lead already turned into an order, or expired, has nothing left for
-      // staff to act on -- the default view is only the outstanding ones.
-      query.set('status', 'NEW');
+      // A lead already turned into an order, or dismissed, has nothing left
+      // for staff to act on -- the default view is only the outstanding ones
+      // (NEW or already CONTACTED but still unresolved). Dismissed/converted
+      // leads live in their own history view instead of cluttering this one.
+      query.set('outstanding', 'true');
       if (params.search) query.set('search', params.search);
       if (params.source) query.set('source', params.source);
       return apiRequest<ServerPage<CartLead>>(`/cart-leads?${query}`, { method: 'GET' }, token);
@@ -788,6 +790,9 @@ export default function OrdersPage() {
                     Shoppers who chose WhatsApp instead of checking out, or left a cart with contact details filled in.
                   </p>
                 </div>
+                <Link href="/portal/cart-leads/history" className="portal-ghost-btn">
+                  View History
+                </Link>
               </div>
 
               <div className="list-toolbar">
