@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { formatKes } from '../../lib/shop';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
+import { trackPurchase } from '../../lib/meta-pixel';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 
@@ -26,7 +27,7 @@ type OrderView = {
   customerName?: string | null;
   shippingAddress?: string | null;
   store?: { name: string; location?: string | null } | null;
-  lines: Array<{ description: string; quantity: number; lineTotal: number }>;
+  lines: Array<{ description: string; quantity: number; lineTotal: number; sku: string }>;
 };
 
 export function CompleteClient() {
@@ -64,6 +65,23 @@ export function CompleteClient() {
     void run();
     return () => { cancelled = true; };
   }, [reference]);
+
+  // Fires Purchase exactly once per order. sessionStorage, not just a ref,
+  // because this page is reachable again after the fact -- a refresh, a
+  // bookmark, a customer hitting back then forward -- and a plain in-memory
+  // guard would not survive any of those, double-counting the sale in ad
+  // reporting each time the page reloads.
+  useEffect(() => {
+    if (!order || state !== 'paid') return;
+    const dedupeKey = `de_purchase_tracked_${order.orderNumber}`;
+    if (typeof window === 'undefined' || window.sessionStorage.getItem(dedupeKey)) return;
+    trackPurchase({
+      contentIds: order.lines.map((line) => line.sku),
+      value: order.amountPaid,
+      orderNumber: order.orderNumber,
+    });
+    window.sessionStorage.setItem(dedupeKey, '1');
+  }, [order, state]);
 
   return (
     <EliteLayout active="shop">

@@ -457,7 +457,7 @@ export class CheckoutService {
     const order = await this.prisma.order.findFirst({
       where: { orderNumber: orderNumberFromReference(reference) },
       include: {
-        lines: true,
+        lines: { include: { variant: { select: { sku: true } } } },
         store: { select: { name: true, location: true } },
       },
     });
@@ -475,6 +475,10 @@ export class CheckoutService {
         description: line.description,
         quantity: line.quantity,
         lineTotal: Number(line.lineTotal),
+        // The variant SKU, matching catalog.csv's `id` column -- lets the
+        // storefront's Purchase pixel event report content_ids that line up
+        // with Meta's catalog for dynamic-ads and ROAS attribution.
+        sku: line.variant.sku,
       })),
     };
   }

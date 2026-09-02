@@ -30,6 +30,11 @@ ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 ARG NEXT_PUBLIC_GA_MEASUREMENT_ID
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 
+# Meta Pixel ID, same build-time/blank-means-off rule as the GA Measurement
+# ID above -- see StorefrontAnalytics and lib/meta-pixel.ts.
+ARG NEXT_PUBLIC_META_PIXEL_ID
+ENV NEXT_PUBLIC_META_PIXEL_ID=$NEXT_PUBLIC_META_PIXEL_ID
+
 RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 FROM node:18-alpine AS runtime

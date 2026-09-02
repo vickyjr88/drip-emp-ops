@@ -27,6 +27,7 @@ import { useCustomerAuth } from '../../lib/customer-auth';
 import { absoluteUrl } from '../../lib/site';
 import { withReferral } from '../../lib/referral';
 import { useCaptureReferral } from '../../lib/use-capture-referral';
+import { trackAddToCart, trackViewContent } from '../../lib/meta-pixel';
 import { ShopProduct, fetchProduct, formatKes, priceLabel } from '../../lib/shop';
 
 export function ProductClient({ product: initialProduct }: { product: ShopProduct }) {
@@ -75,6 +76,18 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
   const [image, setImage] = useState(0);
 
   const chosen = product.variants.find((variant) => variant.id === sizeId) || null;
+
+  // Once per product landing, not per size tap -- a ViewContent means "saw
+  // this listing," and re-firing it every time someone tries a different
+  // size would inflate it far past actual page views.
+  useEffect(() => {
+    trackViewContent({
+      contentId: product.id,
+      contentName: product.name,
+      value: product.priceFrom,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id]);
 
   /**
    * The enquiry, as a message someone can act on without asking twice.
@@ -247,6 +260,11 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                     sku: chosen.sku,
                     priceKes: chosen.priceKes,
                     imageUrl: product.imageUrls[0] || null,
+                  });
+                  trackAddToCart({
+                    contentId: product.id,
+                    contentName: `${product.name} - ${chosen.size}`,
+                    value: chosen.priceKes,
                   });
                   // Confirmed in place rather than by yanking the shopper to
                   // the cart: most people add a second pair.
