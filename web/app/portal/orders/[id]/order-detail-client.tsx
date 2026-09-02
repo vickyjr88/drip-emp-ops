@@ -17,7 +17,7 @@ import { PortalShell } from '../../components/portal-shell';
 import { ImageLightbox } from '../../components/image-lightbox';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import {
-  AuthProfile, TOKEN_KEY, apiRequest, formatDate, formatMoney, hasPermission, loadProfile, roleLabelFor,
+  AuthProfile, TOKEN_KEY, apiRequest, formatDateTime, formatMoney, hasPermission, loadProfile, roleLabelFor,
 } from '../../accounting/lib';
 
 type FulfillmentType = 'STOCK' | 'SUPPLIER_ORDER';
@@ -402,7 +402,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
           <PortalShell
             active="orders"
             pageTitle={order.orderNumber}
-            pageSubtitle={`${order.channel.replace('_', ' ')} · ${order.store.name} · ${formatDate(order.placedAt)}`}
+            pageSubtitle={`${order.channel.replace('_', ' ')} · ${order.store.name} · ${formatDateTime(order.placedAt)}`}
             email={profile.email}
             roleLabel={roleLabelFor(profile)}
             permissionCount={profile.permissions?.length || 0}
@@ -485,7 +485,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                   </div>
                   <div className="portal-info-row">
                     <span>Placed</span>
-                    <strong>{formatDate(order.placedAt)}</strong>
+                    <strong>{formatDateTime(order.placedAt)}</strong>
                   </div>
                   <div className="portal-info-row">
                     <span>Created By</span>
@@ -494,13 +494,13 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                   {order.fulfilledAt ? (
                     <div className="portal-info-row">
                       <span>Fulfilled</span>
-                      <strong>{formatDate(order.fulfilledAt)}</strong>
+                      <strong>{formatDateTime(order.fulfilledAt)}</strong>
                     </div>
                   ) : null}
                   {order.cancelledAt ? (
                     <div className="portal-info-row">
                       <span>Cancelled</span>
-                      <strong>{formatDate(order.cancelledAt)}</strong>
+                      <strong>{formatDateTime(order.cancelledAt)}</strong>
                     </div>
                   ) : null}
                   {order.notes ? (
@@ -777,7 +777,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                     <tbody>
                       {order.payments.map((paid) => (
                         <tr key={paid.id}>
-                          <td>{formatDate(paid.receivedAt)}</td>
+                          <td>{formatDateTime(paid.receivedAt)}</td>
                           <td>{paid.method}</td>
                           <td>{paid.reference || '—'}</td>
                           <td>{paid.receivedBy}</td>

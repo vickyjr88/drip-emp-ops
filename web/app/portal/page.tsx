@@ -20,6 +20,7 @@ import {
   TOKEN_KEY,
   apiRequest,
   canReadRbacFor,
+  formatDateTime,
   formatMoney,
   hasPermission,
   loadProfile,
@@ -365,7 +366,7 @@ export default function PortalPage() {
                           <strong>{order.orderNumber}</strong>
                           <p className="portal-muted">
                             {order.customerName || 'Walk-in'} · {order.store.name} ·{' '}
-                            {new Date(order.placedAt).toLocaleDateString('en-GB')}
+                            {formatDateTime(order.placedAt)}
                           </p>
                         </div>
                         <span>{order.status}</span>

@@ -121,6 +121,22 @@ export function formatDate(value?: string | null) {
   return date.toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+/**
+ * Date-only fields (an invoice due date, a tax period boundary) have no
+ * meaningful time of day, so formatDate stays date-only for them. This is
+ * for the fields that genuinely happened at a moment -- an order placed, a
+ * cart last touched, a customer's account created -- where the hour and
+ * minute are real information a member of staff would want at a glance.
+ */
+export function formatDateTime(value?: string | null) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('en-GB', {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
 export async function loadProfile(token: string) {
   return apiRequest<AuthProfile>('/auth/profile', { method: 'GET' }, token);
 }

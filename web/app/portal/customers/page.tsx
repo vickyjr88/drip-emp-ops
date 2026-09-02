@@ -21,7 +21,7 @@ import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '.
 import { ListExport } from '../components/list-export';
 import { useErrorState } from '../components/notifications';
 import {
-  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDate,
+  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime,
   hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
@@ -211,7 +211,7 @@ export default function CustomersPage() {
                               order or have to phone the shop. */}
                           {customer.portalEnabled ? 'Has an account' : 'No account'}
                         </span>
-                        <span className="portal-muted">Added {formatDate(customer.createdAt)}</span>
+                        <span className="portal-muted">Added {formatDateTime(customer.createdAt)}</span>
                       </div>
                       <Link href={`/portal/customers/${customer.id}`} className="portal-inline-btn">
                         Open

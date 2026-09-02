@@ -39,8 +39,8 @@ type ReferralSummary = {
 };
 
 function formatDay(iso: string) {
-  return new Date(iso).toLocaleDateString('en-KE', {
-    day: 'numeric', month: 'short', year: 'numeric',
+  return new Date(iso).toLocaleString('en-KE', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
 

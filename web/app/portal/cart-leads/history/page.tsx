@@ -18,7 +18,7 @@ import { ListThumb } from '../../components/list-thumb';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { useErrorState } from '../../components/notifications';
 import {
-  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDate, formatMoney,
+  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, formatMoney,
   hasPermission, loadProfile, roleLabelFor,
 } from '../../accounting/lib';
 
@@ -189,7 +189,7 @@ export default function CartLeadHistoryPage() {
                           </span>
                           <p className="portal-muted">
                             {lead.customerPhone || lead.customerEmail || 'No contact on file'} ·{' '}
-                            {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDate(lead.lastActivityAt)}
+                            {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDateTime(lead.lastActivityAt)}
                           </p>
                           <p>{formatMoney(lead.total)}</p>
                         </div>

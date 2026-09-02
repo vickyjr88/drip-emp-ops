@@ -5,7 +5,7 @@ import { useErrorState, useFeedbackState } from '../../components/notifications'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
-import { formatDate, formatMoney } from '../../accounting/lib';
+import { formatDateTime, formatMoney } from '../../accounting/lib';
 
 type Customer = {
   id: string;
@@ -393,7 +393,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                     <span>Last Sign In</span>
                     <strong>
                       {customer.portalLastLoginAt
-                        ? new Date(customer.portalLastLoginAt).toLocaleString('en-GB')
+                        ? formatDateTime(customer.portalLastLoginAt)
                         : 'Never'}
                     </strong>
                   </div>
@@ -450,7 +450,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                         <div>
                           <strong>{order.orderNumber}</strong>
                           <p className="portal-muted" style={{ margin: '2px 0 0' }}>
-                            {order.store?.name || 'Store not set'} · {formatDate(order.placedAt)}
+                            {order.store?.name || 'Store not set'} · {formatDateTime(order.placedAt)}
                           </p>
                         </div>
                         <div className="portal-list-meta">
@@ -495,7 +495,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                             </a>
                           </strong>
                           <p>
-                            Uploaded {new Date(doc.uploadedAt).toLocaleDateString('en-GB')}
+                            Uploaded {formatDateTime(doc.uploadedAt)}
                             {doc.notes ? ` • ${doc.notes}` : ''}
                           </p>
                         </div>

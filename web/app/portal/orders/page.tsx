@@ -19,7 +19,7 @@ import { ListThumb } from '../components/list-thumb';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
-  AuthProfile, TOKEN_KEY, apiRequest, asList, canReadRbacFor, formatDate,
+  AuthProfile, TOKEN_KEY, apiRequest, asList, canReadRbacFor, formatDateTime,
   formatMoney, hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
@@ -833,7 +833,7 @@ export default function OrdersPage() {
                           </span>
                           <p className="portal-muted">
                             {lead.customerPhone || lead.customerEmail || 'No contact on file'} ·{' '}
-                            {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDate(lead.lastActivityAt)}
+                            {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDateTime(lead.lastActivityAt)}
                           </p>
                           <p>{formatMoney(lead.total)}</p>
                         </div>
@@ -889,7 +889,7 @@ export default function OrdersPage() {
                     fileName: 'orders',
                     columns: [
                       { header: 'Order', value: (row) => row.orderNumber },
-                      { header: 'Date', value: (row) => formatDate(row.placedAt) },
+                      { header: 'Date', value: (row) => formatDateTime(row.placedAt) },
                       { header: 'Store', value: (row) => row.storeName },
                       { header: 'Customer', value: (row) => row.who },
                       { header: 'Channel', value: (row) => row.channel },
@@ -938,7 +938,7 @@ export default function OrdersPage() {
                           ) : null}
                           <p className="portal-muted">
                             {order.who} · {order.storeName} · {order.channel.replace('_', ' ')} ·{' '}
-                            {formatDate(order.placedAt)}
+                            {formatDateTime(order.placedAt)}
                           </p>
                           <p>
                             {formatMoney(order.total)}
