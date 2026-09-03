@@ -36,7 +36,7 @@ defaults or are optional refinements.
 
 | Variable | Required? | What it does |
 |---|---|---|
-| `SMTP_HOST` | For SMTP (primary) | Your mail server's hostname — e.g. your BillionMail server's address |
+| `SMTP_HOST` | For SMTP (primary) | The mail server's own hostname (e.g. `mail.dripemporium.store`) — **not** the website's domain, and not proxied through Cloudflare or any CDN (see the DNS-proxying note below) |
 | `SMTP_PORT` | No — defaults to `587` | `587` for STARTTLS, `465` for implicit TLS |
 | `SMTP_USER` | For SMTP | The mailbox to authenticate as |
 | `SMTP_PASSWORD` | For SMTP | That mailbox's password |
@@ -87,6 +87,26 @@ sync that triggered the email. Look for:
   row to `EmailLog` (visible in the portal) with a `FAILED` status and the
   provider's error message. Owner alerts and the abandoned-cart reminder do
   **not** write to `EmailLog` — check the backend logs for those.
+
+## If SMTP sends hang or fail intermittently: check DNS proxying first
+
+Diagnosed live in production (2026-09): `SMTP_HOST` pointed at a hostname
+that was proxied through Cloudflare (the domain's DNS record was
+"proxied"/orange-clouded rather than "DNS only"/grey-clouded). Cloudflare's
+proxy only forwards HTTP(S) on 80/443 — a connection to any SMTP port
+(25/465/587) on a proxied hostname either hangs indefinitely or gets
+refused, unpredictably, which looked exactly like "emails aren't going out"
+from the app's side while `curl`-ing port 443 on the same host worked fine.
+
+To check: from the backend container (or any machine that can reach the
+mail server), resolve the SMTP host's A/AAAA records and compare them
+against Cloudflare's published IP ranges
+([ipv4](https://www.cloudflare.com/ips-v4), [ipv6](https://www.cloudflare.com/ips-v6)).
+If they match, the fix is entirely in the DNS provider's dashboard —
+switch that record to "DNS only," not a code or env change. A quick
+`nodemailer.createTransport({...}).verify()` from inside the container is
+the fastest way to confirm SMTP is reachable at all before chasing
+anything else.
 
 ## The branded template
 

@@ -80,6 +80,13 @@ export class BillionMailProvider implements EmailProvider {
             ...(params.replyTo ? { reply_to: params.replyTo.email } : {}),
           },
         }),
+        // This is the last provider in the fallback chain -- a hung request
+        // here (a slow or unreachable BillionMail server) would otherwise
+        // block whatever triggered the email (checkout, signup, a password
+        // reset) indefinitely, with no earlier provider left to fall through
+        // to. Fail fast instead: 10s is generous for a plain POST and still
+        // short enough that a caller's own request doesn't hang alongside it.
+        signal: AbortSignal.timeout(10_000),
       });
 
       const text = await response.text();
@@ -120,7 +127,10 @@ export class BillionMailProvider implements EmailProvider {
 
       return { delivered: true };
     } catch (caught) {
-      const error = caught instanceof Error ? caught.message : String(caught);
+      const timedOut = caught instanceof Error && caught.name === 'TimeoutError';
+      const error = timedOut
+        ? `BillionMail request timed out after 10s — ${this.baseUrl} did not respond`
+        : caught instanceof Error ? caught.message : String(caught);
       this.logger.error(`BillionMail request failed: ${error}`);
       return { delivered: false, error };
     }
