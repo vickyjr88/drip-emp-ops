@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthLink, AuthShell } from '../auth-form';
+import { PasswordInput } from '../../components/password-input';
 import { useCustomerAuth } from '../../lib/customer-auth';
 
 export function SignupClient() {
@@ -64,7 +65,7 @@ export function SignupClient() {
         </label>
         <label>
           <span>Password</span>
-          <input type="password" required minLength={8} autoComplete="new-password"
+          <PasswordInput required minLength={8} autoComplete="new-password"
             placeholder="At least 8 characters" value={form.password}
             onChange={(event) => setForm((p) => ({ ...p, password: event.target.value }))} />
         </label>

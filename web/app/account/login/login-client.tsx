@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthLink, AuthShell } from '../auth-form';
+import { PasswordInput } from '../../components/password-input';
 import { useCustomerAuth } from '../../lib/customer-auth';
 
 export function LoginClient() {
@@ -53,7 +54,7 @@ export function LoginClient() {
         </label>
         <label>
           <span>Password</span>
-          <input type="password" required autoComplete="current-password" value={form.password}
+          <PasswordInput required autoComplete="current-password" value={form.password}
             onChange={(event) => setForm((p) => ({ ...p, password: event.target.value }))} />
         </label>
         <button type="submit" className="lp-button lp-button-primary" disabled={busy}>

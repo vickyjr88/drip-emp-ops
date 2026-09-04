@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EliteLayout } from '../components/elite-layout';
+import { PasswordInput } from '../components/password-input';
 import { customerApi, useCustomerAuth } from '../lib/customer-auth';
 import { formatKes } from '../lib/shop';
 import { absoluteUrl } from '../lib/site';
@@ -437,13 +438,13 @@ export function AccountClient() {
                   <form className="de-checkout-form" onSubmit={onChangePassword}>
                     <label>
                       <span>Current password</span>
-                      <input type="password" required autoComplete="current-password"
+                      <PasswordInput required autoComplete="current-password"
                         value={pw.currentPassword}
                         onChange={(event) => setPw((p) => ({ ...p, currentPassword: event.target.value }))} />
                     </label>
                     <label>
                       <span>New password</span>
-                      <input type="password" required minLength={8} autoComplete="new-password"
+                      <PasswordInput required minLength={8} autoComplete="new-password"
                         value={pw.newPassword}
                         onChange={(event) => setPw((p) => ({ ...p, newPassword: event.target.value }))} />
                     </label>

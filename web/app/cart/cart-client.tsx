@@ -16,6 +16,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
+import { PasswordInput } from '../components/password-input';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { fetchProduct, formatKes } from '../lib/shop';
@@ -473,7 +474,7 @@ export function CartClient() {
               {wantAccount && !auth.customer ? (
                 <label>
                   <span>Password</span>
-                  <input type="password" minLength={8} value={form.password} required
+                  <PasswordInput minLength={8} value={form.password} required
                     autoComplete="new-password" placeholder="At least 8 characters"
                     onChange={(event) => setForm((p) => ({ ...p, password: event.target.value }))} />
                 </label>

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthLink, AuthShell } from '../auth-form';
+import { PasswordInput } from '../../components/password-input';
 import { CUSTOMER_TOKEN_KEY, customerApi, useCustomerAuth } from '../../lib/customer-auth';
 
 export function ResetClient() {
@@ -61,13 +62,13 @@ export function ResetClient() {
       <form className="de-checkout-form" onSubmit={onSubmit}>
         <label>
           <span>New password</span>
-          <input type="password" required minLength={8} autoComplete="new-password"
+          <PasswordInput required minLength={8} autoComplete="new-password"
             placeholder="At least 8 characters" value={form.password}
             onChange={(event) => setForm((p) => ({ ...p, password: event.target.value }))} />
         </label>
         <label>
           <span>Confirm password</span>
-          <input type="password" required minLength={8} autoComplete="new-password"
+          <PasswordInput required minLength={8} autoComplete="new-password"
             value={form.confirm}
             onChange={(event) => setForm((p) => ({ ...p, confirm: event.target.value }))} />
         </label>
