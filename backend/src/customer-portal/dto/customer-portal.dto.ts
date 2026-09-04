@@ -13,6 +13,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { IsValidPhoneNumber } from '../../common/phone.util';
 
 export class CustomerLoginDto {
   @ApiProperty()
@@ -83,7 +84,7 @@ export class CustomerSelfSignupDto {
   @ApiProperty() @IsString() @IsNotEmpty() firstName!: string;
   @ApiProperty() @IsString() @IsNotEmpty() lastName!: string;
   @ApiProperty() @IsEmail() email!: string;
-  @ApiProperty() @IsString() @IsNotEmpty() phone!: string;
+  @ApiProperty({ example: '+254113206481' }) @IsValidPhoneNumber() phone!: string;
 
   @ApiProperty({ minLength: 8 })
   @IsString()
@@ -115,7 +116,7 @@ export class SubmitResellerApplicationDto {
 export class UpdateCustomerProfileDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() @MaxLength(100) firstName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() @MaxLength(100) lastName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() @MaxLength(30) phone?: string;
+  @ApiPropertyOptional({ example: '+254113206481' }) @IsOptional() @IsValidPhoneNumber() phone?: string;
   /** Only meaningful for a trade customer; sent as an empty string to clear. */
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) businessName?: string;
 }

@@ -3,6 +3,7 @@ import { CartLeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/pagination.util';
 import { withFirstLineImage } from '../common/cart-lead-image.util';
+import { normalizePhoneNumber } from '../common/phone.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CampaignService } from '../campaign/campaign.service';
 import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
@@ -44,9 +45,23 @@ export class CartLeadService {
    * public boundary and the request body cannot be trusted.
    */
   async record(dto: RecordCartLeadDto) {
-    if (!dto.customerName?.trim() && !dto.customerPhone?.trim() && !dto.customerEmail?.trim()) {
-      throw new BadRequestException('A cart lead needs a name, phone or email to be worth recording.');
+    // A name alone is not a way to reach anyone -- and was the actual
+    // spam gap: an unauthenticated bot could POST any name string with no
+    // phone or email and still get a row created (and, on the abandoned-cart
+    // path, an owner-notification email and a scheduled reminder). Phone and
+    // email are already format-validated on the DTO (IsValidPhoneNumber,
+    // IsEmail), so requiring one of *those* specifically, not just any
+    // non-empty field, is what actually closes it.
+    if (!dto.customerPhone?.trim() && !dto.customerEmail?.trim()) {
+      throw new BadRequestException('A cart lead needs a valid phone number or email to be worth recording.');
     }
+    // Stored in one canonical shape (E.164) regardless of how it was typed
+    // -- 0722..., 254722... and +254722... would otherwise all be treated
+    // as different customers by anything matching on customerPhone later
+    // (the dedup lookup below, staff search, a future Customer match).
+    // Safe to assume it parses: the DTO's IsValidPhoneNumber already
+    // rejected anything that wouldn't.
+    const customerPhone = dto.customerPhone ? normalizePhoneNumber(dto.customerPhone) : undefined;
 
     const subtotal = dto.lines.reduce((sum, line) => sum + line.priceKes * line.quantity, 0);
     const shipping = dto.shipping ?? 0;
@@ -61,7 +76,7 @@ export class CartLeadService {
         source: dto.source,
         customerId: customer?.id,
         customerName: dto.customerName,
-        customerPhone: dto.customerPhone,
+        customerPhone,
         customerEmail: dto.customerEmail,
         shippingAddress: dto.shippingAddress,
         lines: dto.lines as unknown as Prisma.InputJsonValue,
@@ -188,18 +203,29 @@ export class CartLeadService {
    * not a new lead each time an item is added.
    */
   async upsertAbandoned(dto: RecordCartLeadDto) {
-    if (!dto.customerName?.trim() && !dto.customerPhone?.trim() && !dto.customerEmail?.trim()) {
-      throw new BadRequestException('A cart lead needs a name, phone or email to be worth recording.');
+    // A name alone is not a way to reach anyone -- and was the actual
+    // spam gap: an unauthenticated bot could POST any name string with no
+    // phone or email and still get a row created (and, on the abandoned-cart
+    // path, an owner-notification email and a scheduled reminder). Phone and
+    // email are already format-validated on the DTO (IsValidPhoneNumber,
+    // IsEmail), so requiring one of *those* specifically, not just any
+    // non-empty field, is what actually closes it.
+    if (!dto.customerPhone?.trim() && !dto.customerEmail?.trim()) {
+      throw new BadRequestException('A cart lead needs a valid phone number or email to be worth recording.');
     }
+    // Same canonical-shape reasoning as record() above -- without this, the
+    // same shopper syncing from two slightly different phone formats would
+    // be treated as two different leads instead of one ongoing cart.
+    const customerPhone = dto.customerPhone ? normalizePhoneNumber(dto.customerPhone) : undefined;
+
+    // Email or phone is guaranteed present by the check above, so this
+    // always has a real value to match on -- no customerName fallback
+    // needed (name alone is no longer accepted as identifying a lead).
     const existing = await this.prisma.cartLead.findFirst({
       where: {
         source: 'ABANDONED_CART',
         status: 'NEW',
-        ...(dto.customerEmail
-          ? { customerEmail: dto.customerEmail }
-          : dto.customerPhone
-            ? { customerPhone: dto.customerPhone }
-            : { customerName: dto.customerName }),
+        ...(dto.customerEmail ? { customerEmail: dto.customerEmail } : { customerPhone }),
       },
     });
 
@@ -207,7 +233,7 @@ export class CartLeadService {
     const shipping = dto.shipping ?? 0;
     const data = {
       customerName: dto.customerName,
-      customerPhone: dto.customerPhone,
+      customerPhone,
       customerEmail: dto.customerEmail,
       shippingAddress: dto.shippingAddress,
       lines: dto.lines as unknown as Prisma.InputJsonValue,

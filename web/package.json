@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@next/third-parties": "^14.2.15",
+    "libphonenumber-js": "^1.13.12",
     "next": "14.2.15",
     "posthog-js": "^1.418.6",
     "react": "18.3.1",

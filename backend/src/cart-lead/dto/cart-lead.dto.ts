@@ -4,6 +4,7 @@ import {
   ArrayMinSize, IsArray, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Min, ValidateNested,
 } from 'class-validator';
 import { CartLeadSource } from '@prisma/client';
+import { IsValidPhoneNumber } from '../../common/phone.util';
 
 export class CartLeadLineDto {
   @ApiProperty() @IsString() @IsNotEmpty() variantId!: string;
@@ -35,7 +36,8 @@ export class RecordCartLeadDto {
   lines!: CartLeadLineDto[];
 
   @ApiPropertyOptional() @IsOptional() @IsString() customerName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() customerPhone?: string;
+  @ApiPropertyOptional({ example: '+254727206415' })
+  @IsOptional() @IsValidPhoneNumber() customerPhone?: string;
   @ApiPropertyOptional() @IsOptional() @IsEmail() customerEmail?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() shippingAddress?: string;
 

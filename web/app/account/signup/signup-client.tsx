@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthLink, AuthShell } from '../auth-form';
 import { PasswordInput } from '../../components/password-input';
+import { PhoneInput } from '../../components/phone-input';
 import { useCustomerAuth } from '../../lib/customer-auth';
 
 export function SignupClient() {
@@ -60,8 +61,8 @@ export function SignupClient() {
         </label>
         <label>
           <span>Phone</span>
-          <input required placeholder="+254…" autoComplete="tel" value={form.phone}
-            onChange={(event) => setForm((p) => ({ ...p, phone: event.target.value }))} />
+          <PhoneInput required autoComplete="tel" value={form.phone}
+            onChange={(phone) => setForm((p) => ({ ...p, phone }))} />
         </label>
         <label>
           <span>Password</span>

@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize, IsArray, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength, ValidateNested,
 } from 'class-validator';
+import { IsValidPhoneNumber } from '../../common/phone.util';
 
 export class CheckoutLineDto {
   @ApiProperty()
@@ -39,8 +40,7 @@ export class CheckoutDto {
   email!: string;
 
   @ApiProperty({ example: '+254113206481' })
-  @IsString()
-  @IsNotEmpty()
+  @IsValidPhoneNumber()
   phone!: string;
 
   @ApiPropertyOptional({
@@ -82,7 +82,7 @@ export class CustomerSignupDto {
   @ApiProperty() @IsString() @IsNotEmpty() firstName!: string;
   @ApiProperty() @IsString() @IsNotEmpty() lastName!: string;
   @ApiProperty() @IsEmail() email!: string;
-  @ApiProperty() @IsString() @IsNotEmpty() phone!: string;
+  @ApiProperty({ example: '+254113206481' }) @IsValidPhoneNumber() phone!: string;
 
   @ApiProperty({ minLength: 8 })
   @IsString()

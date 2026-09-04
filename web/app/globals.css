@@ -2100,6 +2100,7 @@ img {
 }
 
 .lp-contact-form-card input,
+.lp-contact-form-card select,
 .lp-contact-form-card textarea,
 .lp-detail-body aside input,
 .lp-detail-body aside textarea {
@@ -10081,6 +10082,39 @@ img {
   border: 0;
 }
 
+/* --- Phone field with country selector ---------------------------------- */
+.lp-phone-field {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Fixed rather than flex: a country name plus dial code needs enough room
+   to stay legible, and letting it flex would starve the number field on a
+   narrow phone screen -- the actual number is what needs the space. */
+.lp-phone-country {
+  flex: 0 0 128px;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+}
+
+.lp-phone-number {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .lp-phone-field {
+    flex-direction: column;
+  }
+
+  .lp-phone-country {
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+
 /* ==========================================================================
    Storefront
    --------------------------------------------------------------------------
@@ -11644,6 +11678,7 @@ img {
 }
 
 .de-checkout-form input,
+.de-checkout-form select,
 .de-checkout-form textarea {
   padding: 10px 12px;
   font: inherit;
@@ -11656,6 +11691,7 @@ img {
 }
 
 .de-checkout-form input:focus,
+.de-checkout-form select:focus,
 .de-checkout-form textarea:focus {
   outline: 2px solid var(--de-500);
   outline-offset: 1px;

@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { PasswordInput } from '../components/password-input';
+import { PhoneInput } from '../components/phone-input';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { fetchProduct, formatKes } from '../lib/shop';
@@ -444,8 +445,8 @@ export function CartClient() {
               </label>
               <label>
                 <span>Phone</span>
-                <input value={form.phone} required placeholder="+254…" autoComplete="tel"
-                  onChange={(event) => setForm((p) => ({ ...p, phone: event.target.value }))} />
+                <PhoneInput value={form.phone} required autoComplete="tel"
+                  onChange={(phone) => setForm((p) => ({ ...p, phone }))} />
               </label>
 
               <label className="de-check">

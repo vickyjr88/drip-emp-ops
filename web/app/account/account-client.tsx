@@ -13,6 +13,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EliteLayout } from '../components/elite-layout';
 import { PasswordInput } from '../components/password-input';
+import { PhoneInput } from '../components/phone-input';
 import { customerApi, useCustomerAuth } from '../lib/customer-auth';
 import { formatKes } from '../lib/shop';
 import { absoluteUrl } from '../lib/site';
@@ -293,8 +294,8 @@ export function AccountClient() {
                     </label>
                     <label>
                       <span>Phone</span>
-                      <input required value={profileForm.phone}
-                        onChange={(event) => setProfileForm((p) => ({ ...p, phone: event.target.value }))} />
+                      <PhoneInput required value={profileForm.phone}
+                        onChange={(phone) => setProfileForm((p) => ({ ...p, phone }))} />
                     </label>
                     {/* Trade customers see the price list they buy on, so a
                         wholesale shop knows the prices they are quoted are theirs. */}

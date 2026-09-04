@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
+import { PhoneInput } from '../components/phone-input';
 import { PageContentDocument, contentValue, fetchPageContent } from '../lib/page-content';
 
 function PhoneIcon() {
@@ -164,11 +165,9 @@ export default function ContactClient() {
               </div>
               <label>
                 Phone Number
-                <input
-                  type="tel"
-                  placeholder="+1 (234) 567-8900"
+                <PhoneInput
                   value={form.phone}
-                  onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+                  onChange={(phone) => setForm((prev) => ({ ...prev, phone }))}
                 />
               </label>
               <label>

@@ -5,6 +5,7 @@ import { paginate } from '../common/pagination.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CreateInquiryDto } from './dto/inquiry.dto';
 import { InquiryQueryDto } from './dto/inquiry-query.dto';
+import { normalizePhoneNumber } from '../common/phone.util';
 
 @Injectable()
 export class InquiryService {
@@ -18,7 +19,7 @@ export class InquiryService {
       data: {
         name: dto.name.trim(),
         email: dto.email.trim().toLowerCase(),
-        phone: dto.phone?.trim() || null,
+        phone: dto.phone ? normalizePhoneNumber(dto.phone) ?? dto.phone.trim() : null,
         message: dto.message.trim(),
       },
     });

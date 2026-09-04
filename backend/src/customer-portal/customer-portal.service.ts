@@ -14,6 +14,7 @@ import { EmailLogService } from '../email-log/email-log.service';
 import { ctaButton } from '../email-log/email-html.util';
 import { ensureReferralCode } from '../common/generate-code';
 import { dailyTrend, trendSince } from '../common/daily-trend.util';
+import { normalizePhoneNumber } from '../common/phone.util';
 
 const REFERRAL_TREND_DAYS = 30;
 import { ResellerApplicationService } from '../reseller-application/reseller-application.service';
@@ -66,7 +67,10 @@ export class CustomerPortalService {
     const data = {
       firstName: dto.firstName.trim(),
       lastName: dto.lastName.trim(),
-      phone: dto.phone.trim(),
+      // E.164, one canonical shape regardless of how it was typed -- safe to
+      // assume it parses since IsValidPhoneNumber on the DTO already
+      // rejected anything that wouldn't.
+      phone: normalizePhoneNumber(dto.phone) ?? dto.phone.trim(),
       portalPassword: await bcrypt.hash(dto.password, 10),
       portalEnabled: true,
     };
@@ -166,7 +170,7 @@ export class CustomerPortalService {
       data: {
         ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
         ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
-        ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
+        ...(dto.phone !== undefined ? { phone: normalizePhoneNumber(dto.phone) ?? dto.phone.trim() } : {}),
         ...(dto.businessName !== undefined ? { businessName: dto.businessName.trim() || null } : {}),
       },
       select: {

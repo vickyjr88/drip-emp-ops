@@ -11,6 +11,7 @@ import { CampaignService } from '../campaign/campaign.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
+import { normalizePhoneNumber } from '../common/phone.util';
 
 /**
  * Delivery is not charged at checkout.
@@ -66,6 +67,12 @@ export class CheckoutService {
     details: { firstName: string; lastName: string; email: string; phone: string; password?: string },
   ) {
     const email = details.email.trim().toLowerCase();
+    // Stored in one canonical shape (E.164) regardless of how it was typed --
+    // 0722..., 254722... and +254722... must not be treated as different
+    // numbers by anything matching on Customer.phone later. Safe to assume
+    // it parses: CheckoutDto/CustomerSignupDto's IsValidPhoneNumber already
+    // rejected anything that wouldn't.
+    const phone = normalizePhoneNumber(details.phone) ?? details.phone.trim();
     const existing = await tx.customer.findUnique({ where: { email } });
 
     if (existing) {
@@ -76,7 +83,7 @@ export class CheckoutService {
           data: {
             portalPassword: await bcrypt.hash(details.password!, 10),
             portalEnabled: true,
-            phone: details.phone || existing.phone,
+            phone: phone || existing.phone,
           },
         });
         // A password being set is the actual "signed up" moment -- a bare
@@ -92,7 +99,7 @@ export class CheckoutService {
         firstName: details.firstName.trim(),
         lastName: details.lastName.trim(),
         email,
-        phone: details.phone.trim(),
+        phone,
         ...(details.password
           ? { portalPassword: await bcrypt.hash(details.password, 10), portalEnabled: true }
           : {}),
