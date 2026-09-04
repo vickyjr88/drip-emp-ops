@@ -162,7 +162,10 @@ export class ResellerPayoutService {
   }
 
   async stats() {
-    const [accrued, paidOut, resellersWithBalance, totalClicks, totalReferredOrders] = await Promise.all([
+    const [
+      accrued, paidOut, resellersWithBalance, totalClicks, totalReferredOrders,
+      totalWhatsappClicks, totalWhatsappLeads,
+    ] = await Promise.all([
       this.prisma.commission.aggregate({
         where: { status: 'ACCRUED' },
         _sum: { amount: true },
@@ -177,6 +180,11 @@ export class ResellerPayoutService {
       }),
       this.prisma.referralClick.count(),
       this.prisma.order.count({ where: { referredByCustomerId: { not: null } } }),
+      // Program-wide WhatsApp reach, same reasoning as CampaignService: a
+      // reseller's link often converts through a WhatsApp chat rather than
+      // online checkout, and referredOrders alone would miss that entirely.
+      this.prisma.whatsAppClick.count({ where: { resellerId: { not: null } } }),
+      this.prisma.cartLead.count({ where: { referredByCustomerId: { not: null }, source: 'WHATSAPP_ORDER' } }),
     ]);
 
     return {
@@ -187,6 +195,8 @@ export class ResellerPayoutService {
       // Program-wide, across every reseller's link -- not a per-reseller
       // figure like myReferrals()'s own conversionRate.
       conversionRate: totalClicks > 0 ? totalReferredOrders / totalClicks : null,
+      totalWhatsappClicks,
+      totalWhatsappLeads,
     };
   }
 }

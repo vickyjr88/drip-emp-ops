@@ -113,6 +113,13 @@ model Customer {
   resellerPayouts     ResellerPayout[] @relation("ResellerPayouts")
   /// One row per landing on this reseller's shared link -- see ReferralClick.
   referralClicks      ReferralClick[]
+  /// WhatsApp taps attributed to this reseller's referral -- see WhatsAppClick.
+  whatsappClicks      WhatsAppClick[] @relation("WhatsAppClickReseller")
+  /// WhatsApp leads (CartLead) attributed to this reseller's referral,
+  /// distinct from referredOrders (which only ever holds online-checkout
+  /// orders) -- this is the same relationship for the WhatsApp-then-manual-
+  /// order path.
+  referredCartLeads   CartLead[]      @relation("CartLeadReferredBy")
 }
 
 model CustomerDocument {
@@ -1635,14 +1642,16 @@ model ReferralClick {
 /// (not generated) so the resulting link stays short and readable in an ad
 /// or on print.
 model MarketingCampaign {
-  id           String              @id @default(uuid())
-  code         String              @unique
-  name         String
-  isActive     Boolean             @default(true)
-  createdAt    DateTime            @default(now())
-  createdBy    String?
-  clicks       CampaignClick[]
-  orders       Order[]             @relation("OrderAttributedCampaign")
+  id             String              @id @default(uuid())
+  code           String              @unique
+  name           String
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  createdBy      String?
+  clicks         CampaignClick[]
+  orders         Order[]             @relation("OrderAttributedCampaign")
+  whatsappClicks WhatsAppClick[]     @relation("WhatsAppClickCampaign")
+  cartLeads      CartLead[]          @relation("CartLeadAttributedCampaign")
 
   @@index([isActive])
 }
@@ -1657,6 +1666,34 @@ model CampaignClick {
   clickedAt  DateTime          @default(now())
 
   @@index([campaignId])
+}
+
+/// One row per tap on any WhatsApp link on the storefront -- the floating
+/// chat button, a product page's "order on WhatsApp", the cart page's
+/// WhatsApp checkout button. Most Kenyan shoppers actually buy by chatting
+/// and paying M-Pesa/cash once they trust who is behind the store, not
+/// through online checkout -- this is what makes that visible to campaign
+/// and reseller attribution, which online-only order counts miss entirely.
+///
+/// Attribution mirrors Order's: at most one of campaign/reseller is ever
+/// set, resolved from the same de_attr cookie checkout already reads.
+/// Recorded even with no attribution at all (an organic visitor with no
+/// ?camp=/?ref= ever captured) so the shop-wide WhatsApp click total is
+/// still accurate, not just the attributed slice of it.
+model WhatsAppClick {
+  id            String             @id @default(uuid())
+  campaign      MarketingCampaign? @relation("WhatsAppClickCampaign", fields: [campaignId], references: [id])
+  campaignId    String?
+  reseller      Customer?          @relation("WhatsAppClickReseller", fields: [resellerId], references: [id])
+  resellerId    String?
+  /// Which button was tapped -- lets a campaign's dashboard tell "product
+  /// page enquiry" apart from "cart checkout via WhatsApp" if that distinction
+  /// ever matters, without needing a schema change to add it later.
+  source        String
+  clickedAt     DateTime           @default(now())
+
+  @@index([campaignId])
+  @@index([resellerId])
 }
 
 enum CommissionStatus {
@@ -1854,6 +1891,18 @@ model CartLead {
   order   Order?  @relation(fields: [orderId], references: [id])
   orderId String? @unique
 
+  /// The campaign or reseller referral active (via the de_attr cookie) when
+  /// this WhatsApp lead was captured, mirroring Order's own attribution
+  /// fields exactly. Carried onto the real Order when staff convert this
+  /// lead (see CartLeadService.markConverted) -- a WhatsApp sale attributes
+  /// the same way an online one does once it closes, rather than being
+  /// invisible to campaign/reseller stats just because the money moved
+  /// off-platform.
+  attributedCampaign   MarketingCampaign? @relation("CartLeadAttributedCampaign", fields: [attributedCampaignId], references: [id])
+  attributedCampaignId String?
+  referredBy           Customer?          @relation("CartLeadReferredBy", fields: [referredByCustomerId], references: [id])
+  referredByCustomerId String?
+
   /// Set when the 24h "come back and buy" email actually sends. Guards a
   /// double-send if the delayed job is ever retried, and lets the portal show
   /// reminder state without a join.
@@ -1865,6 +1914,8 @@ model CartLead {
   @@index([customerId])
   @@index([source])
   @@index([status])
+  @@index([attributedCampaignId])
+  @@index([referredByCustomerId])
 }
 
 enum CartLeadSource {

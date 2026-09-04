@@ -288,6 +288,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               <a
                 className="lp-button de-whatsapp"
                 href={enquiry.whatsappHref(message)}
+                onClick={() => enquiry.onWhatsAppClick('product-page')}
                 target="_blank"
                 rel="noreferrer"
               >

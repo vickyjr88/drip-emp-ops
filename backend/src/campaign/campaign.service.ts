@@ -45,31 +45,47 @@ export class CampaignService {
       take,
     );
 
-    // Clicks and orders in one batched pass per page rather than a query per
-    // row -- the same shape as ResellerPayoutService.stats(), just grouped
-    // by campaign instead of aggregated shop-wide.
+    // Clicks, WhatsApp taps, WhatsApp leads and orders in one batched pass
+    // per page rather than a query per row -- the same shape as
+    // ResellerPayoutService.stats(), just grouped by campaign instead of
+    // aggregated shop-wide. WhatsApp taps/leads sit alongside link clicks
+    // and online orders because that is where most of this shop's actual
+    // sales close -- a campaign that drives WhatsApp chats but few online
+    // orders is still working, and without this it would look like it wasn't.
     const campaignIds = page.items.map((c) => c.id);
-    const [clickCounts, orderCounts] = await Promise.all([
+    const [clickCounts, orderCounts, whatsappClickCounts, whatsappLeadCounts] = await Promise.all([
       this.prisma.campaignClick.groupBy({ by: ['campaignId'], where: { campaignId: { in: campaignIds } }, _count: true }),
       this.prisma.order.groupBy({
         by: ['attributedCampaignId'],
         where: { attributedCampaignId: { in: campaignIds } },
         _count: true,
       }),
+      this.prisma.whatsAppClick.groupBy({ by: ['campaignId'], where: { campaignId: { in: campaignIds } }, _count: true }),
+      this.prisma.cartLead.groupBy({
+        by: ['attributedCampaignId'],
+        where: { attributedCampaignId: { in: campaignIds }, source: 'WHATSAPP_ORDER' },
+        _count: true,
+      }),
     ]);
     const clicksById = new Map(clickCounts.map((row) => [row.campaignId, row._count]));
     const ordersById = new Map(orderCounts.map((row) => [row.attributedCampaignId as string, row._count]));
+    const whatsappClicksById = new Map(whatsappClickCounts.map((row) => [row.campaignId as string, row._count]));
+    const whatsappLeadsById = new Map(whatsappLeadCounts.map((row) => [row.attributedCampaignId as string, row._count]));
 
     return {
       ...page,
       items: page.items.map((campaign) => {
         const clicks = clicksById.get(campaign.id) ?? 0;
         const orders = ordersById.get(campaign.id) ?? 0;
+        const whatsappClicks = whatsappClicksById.get(campaign.id) ?? 0;
+        const whatsappLeads = whatsappLeadsById.get(campaign.id) ?? 0;
         return {
           ...campaign,
           clicks,
           orders,
           conversionRate: clicks > 0 ? orders / clicks : null,
+          whatsappClicks,
+          whatsappLeads,
         };
       }),
     };
@@ -81,10 +97,10 @@ export class CampaignService {
     return campaign;
   }
 
-  /** The performance detail behind one campaign: its referred orders, newest first. */
+  /** The performance detail behind one campaign: its referred orders and WhatsApp leads, newest first. */
   async performance(id: string) {
     const campaign = await this.findOne(id);
-    const [totalClicks, orders] = await Promise.all([
+    const [totalClicks, orders, totalWhatsappClicks, whatsappLeads] = await Promise.all([
       this.prisma.campaignClick.count({ where: { campaignId: id } }),
       this.prisma.order.findMany({
         where: { attributedCampaignId: id },
@@ -95,10 +111,20 @@ export class CampaignService {
         orderBy: { placedAt: 'desc' },
         take: 200,
       }),
+      this.prisma.whatsAppClick.count({ where: { campaignId: id } }),
+      // Only WHATSAPP_ORDER leads -- an ABANDONED_CART row was never a
+      // WhatsApp interaction, it's a different funnel this view isn't about.
+      this.prisma.cartLead.findMany({
+        where: { attributedCampaignId: id, source: 'WHATSAPP_ORDER' },
+        select: { id: true, status: true, customerName: true, total: true, createdAt: true, orderId: true },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
     ]);
 
     const confirmedOrders = orders.filter((order) => order.status !== 'CANCELLED' && order.status !== 'REFUNDED' && order.status !== 'PENDING');
     const revenue = confirmedOrders.reduce((sum, order) => sum + Number(order.total), 0);
+    const convertedWhatsappLeads = whatsappLeads.filter((lead) => lead.status === 'CONVERTED');
 
     return {
       campaign,
@@ -108,6 +134,13 @@ export class CampaignService {
         confirmedOrders: confirmedOrders.length,
         revenue,
         conversionRate: totalClicks > 0 ? orders.length / totalClicks : null,
+        // A second funnel alongside the online-checkout one above: taps on
+        // any WhatsApp link attributed to this campaign, how many became a
+        // lead staff can chase, and how many of those staff have since
+        // confirmed as an actual sale.
+        totalWhatsappClicks,
+        whatsappLeads: whatsappLeads.length,
+        convertedWhatsappLeads: convertedWhatsappLeads.length,
       },
       orders: orders.map((order) => ({
         id: order.id,
@@ -116,6 +149,14 @@ export class CampaignService {
         status: order.status,
         total: Number(order.total),
         customerName: order.customerName,
+      })),
+      whatsappLeads: whatsappLeads.map((lead) => ({
+        id: lead.id,
+        status: lead.status,
+        customerName: lead.customerName,
+        total: Number(lead.total),
+        createdAt: lead.createdAt.toISOString(),
+        orderId: lead.orderId,
       })),
     };
   }

@@ -5,7 +5,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { CartLeadService } from './cart-lead.service';
-import { RecordCartLeadDto } from './dto/cart-lead.dto';
+import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
 
 @ApiTags('cart-leads')
@@ -18,6 +18,13 @@ export class CartLeadController {
   @Post()
   record(@Body() dto: RecordCartLeadDto) {
     return this.service.record(dto);
+  }
+
+  /** Called on every tap of any WhatsApp link on the storefront, contact info or not. */
+  @Public()
+  @Post('whatsapp-click')
+  recordWhatsAppClick(@Body() dto: RecordWhatsAppClickDto) {
+    return this.service.recordWhatsAppClick(dto);
   }
 
   /** Called periodically by the cart while it sits with contact details filled in but unconverted. */

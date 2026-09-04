@@ -7,7 +7,7 @@ import { customerApi } from './customer-auth';
 const COOKIE_NAME = 'de_attr';
 const COOKIE_TTL_DAYS = 30;
 
-type CapturedAttribution = { type: 'reseller' | 'campaign'; code: string };
+export type CapturedAttribution = { type: 'reseller' | 'campaign'; code: string };
 
 /**
  * Captures ?ref=<code> (a reseller's link) or ?camp=<code> (an admin-created

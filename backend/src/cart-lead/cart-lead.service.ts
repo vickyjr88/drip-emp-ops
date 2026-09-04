@@ -3,7 +3,8 @@ import { CartLeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/pagination.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
-import { RecordCartLeadDto } from './dto/cart-lead.dto';
+import { CampaignService } from '../campaign/campaign.service';
+import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
 import { CartReminderQueueService } from './cart-reminder-queue.service';
 
@@ -13,7 +14,27 @@ export class CartLeadService {
     private readonly prisma: PrismaService,
     private readonly ownerNotification: OwnerNotificationService,
     private readonly reminderQueue: CartReminderQueueService,
+    private readonly campaign: CampaignService,
   ) {}
+
+  /**
+   * Resolves the same de_attr cookie contents checkout does, for whichever
+   * of the two is present. No self-referral guard here -- unlike checkout,
+   * there is no "customer placing this order" to compare against yet, since
+   * a WhatsApp click or lead happens before any identity is established.
+   */
+  private async resolveAttribution(referralCode?: string, campaignCode?: string) {
+    let referredByCustomerId: string | null = null;
+    if (referralCode) {
+      const referrer = await this.prisma.customer.findUnique({ where: { referralCode }, select: { id: true } });
+      referredByCustomerId = referrer?.id ?? null;
+    }
+    let attributedCampaignId: string | null = null;
+    if (campaignCode) {
+      attributedCampaignId = await this.campaign.resolveActiveCampaignId(campaignCode);
+    }
+    return { referredByCustomerId, attributedCampaignId };
+  }
 
   /**
    * A cart with nobody to reach is not a lead, only browsing -- the caller
@@ -32,6 +53,7 @@ export class CartLeadService {
     const customer = dto.customerEmail
       ? await this.prisma.customer.findUnique({ where: { email: dto.customerEmail } })
       : null;
+    const { referredByCustomerId, attributedCampaignId } = await this.resolveAttribution(dto.referralCode, dto.campaignCode);
 
     return this.prisma.cartLead.create({
       data: {
@@ -46,8 +68,27 @@ export class CartLeadService {
         shipping: new Prisma.Decimal(shipping),
         total: new Prisma.Decimal(subtotal + shipping),
         message: dto.message,
+        referredByCustomerId,
+        attributedCampaignId,
       },
     });
+  }
+
+  /**
+   * A tap on any WhatsApp link, with or without a name/phone/email attached
+   * -- unlike record() above, this never requires contact info, since most
+   * taps (the floating button, "ask about sizes") never carry any. Silent
+   * no-op on an unattributed, organic tap is not right here: every click is
+   * recorded regardless, with campaignId/resellerId simply null, so the
+   * shop-wide WhatsApp click total stays accurate and not just the
+   * attributed slice of it.
+   */
+  async recordWhatsAppClick(dto: RecordWhatsAppClickDto) {
+    const { referredByCustomerId, attributedCampaignId } = await this.resolveAttribution(dto.referralCode, dto.campaignCode);
+    await this.prisma.whatsAppClick.create({
+      data: { source: dto.source, resellerId: referredByCustomerId, campaignId: attributedCampaignId },
+    });
+    return { recorded: true };
   }
 
   async findAll(query: CartLeadQueryDto) {
@@ -135,12 +176,34 @@ export class CartLeadService {
     return this.prisma.cartLead.update({ where: { id }, data: { status } });
   }
 
-  /** Links the lead to the order staff created from it, so it drops off the outstanding list without losing the trail that produced the sale. */
+  /**
+   * Links the lead to the order staff created from it, so it drops off the
+   * outstanding list without losing the trail that produced the sale.
+   *
+   * Also copies whichever campaign/reseller attribution the lead captured
+   * onto the order itself -- only when the order doesn't already carry its
+   * own (an order created directly with a referral/campaign code wins;
+   * this only fills a gap, never overwrites). Without this, a WhatsApp sale
+   * would be permanently invisible to campaign and reseller stats, since
+   * staff create these orders manually with no checkout flow to resolve a
+   * code through.
+   */
   async markConverted(id: string, orderId: string) {
     const lead = await this.prisma.cartLead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException(`Cart lead ${id} not found`);
     const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+
+    if (!order.referredByCustomerId && !order.attributedCampaignId
+      && (lead.referredByCustomerId || lead.attributedCampaignId)) {
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          referredByCustomerId: lead.referredByCustomerId,
+          attributedCampaignId: lead.attributedCampaignId,
+        },
+      });
+    }
 
     return this.prisma.cartLead.update({
       where: { id },

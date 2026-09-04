@@ -14,6 +14,8 @@
 
 import { useEffect, useState } from 'react';
 import { PageContentDocument, contentValue, fetchPageContent } from './page-content';
+import { customerApi } from './customer-auth';
+import { readCapturedAttribution } from './use-capture-referral';
 
 const DEFAULT_WHATSAPP = '254113206481';
 const DEFAULT_PHONE = '+254 113 206 481';
@@ -49,8 +51,38 @@ export function useEnquiryContact() {
     deliveryNote,
     /** tel: links need the punctuation stripped; the displayed text keeps it. */
     phoneHref: `tel:${phone.replace(/[^\d+]/g, '')}`,
-    /** Builds a wa.me link with the message pre-filled. */
+    /** Builds a wa.me link with the message pre-filled. Pure -- building the
+     *  href runs on every render, so recording a click here would count a
+     *  render, not a tap. See onWhatsAppClick below for that. */
     whatsappHref: (message: string) =>
       `https://wa.me/${whatsapp}?text=${encodeURIComponent(message)}`,
+    /**
+     * Records a tap against whichever campaign/reseller link is currently
+     * attributed -- most of this shop's real sales close in this chat, not
+     * at online checkout, so this is what makes a link's WhatsApp reach
+     * visible at all. Attach as the WhatsApp link/button's own onClick, not
+     * called during render. `source` names the button for the campaign
+     * dashboard (e.g. "product-page", "cart", "float") -- required so every
+     * call site states which button it is, rather than an easy-to-forget
+     * optional default that would leave every tap looking the same.
+     */
+    onWhatsAppClick: (source: string) => recordWhatsAppClick(source),
   };
+}
+
+/**
+ * Fire-and-forget, same tolerance as useCaptureReferral's own beacon: a
+ * failed or blocked request must never affect the WhatsApp link itself,
+ * which is the thing the visitor actually came for.
+ */
+function recordWhatsAppClick(source: string) {
+  const attribution = readCapturedAttribution();
+  void customerApi('/cart-leads/whatsapp-click', {
+    method: 'POST',
+    body: JSON.stringify({
+      source,
+      referralCode: attribution?.type === 'reseller' ? attribution.code : undefined,
+      campaignCode: attribution?.type === 'campaign' ? attribution.code : undefined,
+    }),
+  }).catch(() => {});
 }

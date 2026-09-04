@@ -11,7 +11,7 @@
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
 
 export function WhatsAppFloat() {
-  const { whatsapp, whatsappHref } = useEnquiryContact();
+  const { whatsapp, whatsappHref, onWhatsAppClick } = useEnquiryContact();
 
   if (!whatsapp.trim()) return null;
 
@@ -19,6 +19,7 @@ export function WhatsAppFloat() {
     <a
       className="lp-whatsapp-float"
       href={whatsappHref('Hello, I would like to enquire about a pair of shoes.')}
+      onClick={() => onWhatsAppClick('float')}
       target="_blank"
       rel="noreferrer"
       aria-label="Chat with us on WhatsApp"

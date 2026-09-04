@@ -103,6 +103,7 @@ export function CompleteClient() {
               <div className="de-complete-actions">
                 <a className="lp-button de-whatsapp"
                    href={enquiry.whatsappHref(`Hello, I paid but cannot find my order. Reference: ${reference || 'unknown'}`)}
+                   onClick={() => enquiry.onWhatsAppClick('checkout-missing-order')}
                    target="_blank" rel="noreferrer">
                   Message us on WhatsApp
                 </a>
@@ -153,6 +154,7 @@ export function CompleteClient() {
                 <Link className="lp-button lp-button-primary" href="/shop">Keep shopping</Link>
                 <a className="lp-button de-whatsapp"
                    href={enquiry.whatsappHref(`Hello, about order ${order.orderNumber}…`)}
+                   onClick={() => enquiry.onWhatsAppClick('checkout-paid-followup')}
                    target="_blank" rel="noreferrer">
                   Ask about this order
                 </a>
@@ -172,6 +174,7 @@ export function CompleteClient() {
               <div className="de-complete-actions">
                 <a className="lp-button de-whatsapp"
                    href={enquiry.whatsappHref(`Hello, I would like to complete payment for order ${order.orderNumber}.`)}
+                   onClick={() => enquiry.onWhatsAppClick('checkout-unpaid-followup')}
                    target="_blank" rel="noreferrer">
                   Complete on WhatsApp
                 </a>

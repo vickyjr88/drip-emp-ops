@@ -212,6 +212,7 @@ export function CartClient() {
    * be blocked by, this request.
    */
   function recordWhatsappLead() {
+    const attribution = readCapturedAttribution();
     void fetch(`${API}/cart-leads`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -224,6 +225,8 @@ export function CartClient() {
         shippingAddress: deliver ? form.shippingAddress.trim() || undefined : undefined,
         shipping,
         message: buildWhatsappMessage(),
+        referralCode: attribution?.type === 'reseller' ? attribution.code : undefined,
+        campaignCode: attribution?.type === 'campaign' ? attribution.code : undefined,
       }),
     }).catch(() => {
       // Best-effort: the shopper's own WhatsApp order still goes out even if
@@ -269,6 +272,7 @@ export function CartClient() {
         }
       }
       recordWhatsappLead();
+      enquiry.onWhatsAppClick('cart');
       window.open(enquiry.whatsappHref(buildWhatsappMessage()), '_blank', 'noopener');
     } finally {
       setSubmitting(false);

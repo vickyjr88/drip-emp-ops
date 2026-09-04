@@ -44,6 +44,8 @@ type Stats = {
   resellersWithBalance: number;
   totalClicks: number;
   conversionRate: number | null;
+  totalWhatsappClicks: number;
+  totalWhatsappLeads: number;
 };
 
 function formatConversionRate(rate: number | null) {
@@ -230,6 +232,8 @@ export default function ResellerPayoutsPage() {
                     <span>Click → order rate</span>
                     <h3>{formatConversionRate(stats.conversionRate)}</h3>
                   </div>
+                  <div className="portal-stat"><span>WhatsApp taps</span><h3>{stats.totalWhatsappClicks}</h3></div>
+                  <div className="portal-stat"><span>WhatsApp leads</span><h3>{stats.totalWhatsappLeads}</h3></div>
                   <div className="portal-stat"><span>Accrued, unpaid</span><h3>{formatMoney(stats.totalAccrued)}</h3></div>
                   <div className="portal-stat"><span>Paid out to date</span><h3>{formatMoney(stats.totalPaidOut)}</h3></div>
                   <div className="portal-stat"><span>Resellers with a balance</span><h3>{stats.resellersWithBalance}</h3></div>

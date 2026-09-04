@@ -43,4 +43,28 @@ export class RecordCartLeadDto {
 
   /** The WhatsApp message actually sent. Omitted for an abandoned-cart sync. */
   @ApiPropertyOptional() @IsOptional() @IsString() message?: string;
+
+  @ApiPropertyOptional({
+    description: "The referring reseller's public code, captured from a shared link -- same field checkout accepts, so a WhatsApp sale attributes the same way an online one does once staff convert it.",
+  })
+  @IsOptional() @IsString() referralCode?: string;
+
+  @ApiPropertyOptional({ description: 'A paid-marketing campaign code, captured from a shared link. Mutually exclusive with referralCode in practice.' })
+  @IsOptional() @IsString() campaignCode?: string;
+}
+
+/**
+ * Recorded the moment a shopper taps any WhatsApp link on the storefront --
+ * the floating chat button, "ask about sizes", or the cart's WhatsApp
+ * checkout button -- regardless of whether they go on to type their name
+ * into anything. Most of this shop's actual sales close in that chat, not
+ * at online checkout, so this is what makes a campaign or reseller link's
+ * real reach visible instead of just its online-checkout slice.
+ */
+export class RecordWhatsAppClickDto {
+  @ApiProperty({ description: 'Which button was tapped, e.g. "product-page", "cart", "float".' })
+  @IsString() @IsNotEmpty() source!: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() referralCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() campaignCode?: string;
 }

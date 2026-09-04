@@ -160,6 +160,7 @@ export default function HomeClient() {
               <a
                 className="lp-button de-whatsapp"
                 href={enquiry.whatsappHref('Hello Drip Emporium, I am looking for a pair of shoes.')}
+                onClick={() => enquiry.onWhatsAppClick('home-hero')}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -286,6 +287,7 @@ export default function HomeClient() {
               <a
                 className="lp-button lp-button-primary"
                 href={enquiry.whatsappHref('Hello Drip Emporium, do you have my size?')}
+                onClick={() => enquiry.onWhatsAppClick('home-cta')}
                 target="_blank"
                 rel="noreferrer"
               >

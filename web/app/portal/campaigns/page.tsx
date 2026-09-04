@@ -30,6 +30,11 @@ type Campaign = {
   clicks: number;
   orders: number;
   conversionRate: number | null;
+  /** Taps on any WhatsApp link while this campaign was attributed, and how
+   *  many became a lead staff can chase -- most of this shop's real sales
+   *  close in that chat, not at online checkout. */
+  whatsappClicks: number;
+  whatsappLeads: number;
 };
 
 function formatConversionRate(rate: number | null) {
@@ -272,9 +277,13 @@ export default function CampaignsPage() {
                           <p className="portal-muted">
                             <code>{campaign.code}</code>
                             {' · '}{campaign.clicks} click{campaign.clicks === 1 ? '' : 's'}
-                            {' · '}{campaign.orders} order{campaign.orders === 1 ? '' : 's'}
+                            {' · '}{campaign.orders} online order{campaign.orders === 1 ? '' : 's'}
                             {' · '}{formatConversionRate(campaign.conversionRate)} conversion
                             {' · created '}{formatDate(campaign.createdAt)}
+                          </p>
+                          <p className="portal-muted">
+                            {campaign.whatsappClicks} WhatsApp tap{campaign.whatsappClicks === 1 ? '' : 's'}
+                            {' · '}{campaign.whatsappLeads} lead{campaign.whatsappLeads === 1 ? '' : 's'} for staff to chase
                           </p>
                           <p className="portal-muted" style={{ wordBreak: 'break-all' }}>
                             {campaignLink(campaign.code)}
