@@ -213,6 +213,19 @@ export default function OrdersPage() {
     }
   }
 
+  /** A lead someone has actually reached out on, but hasn't converted or
+   *  written off yet -- the missing middle state between "just landed" and
+   *  "done with it". */
+  async function onMarkContacted(lead: CartLead) {
+    if (!token) return;
+    try {
+      await apiRequest(`/cart-leads/${lead.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'CONTACTED' }) }, token);
+      leadsPager.reload();
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  }
+
   /** Pre-fills the till with this lead's items and contact so staff ring it up as a real order instead of retyping it. */
   function onStartOrderFromLead(lead: CartLead) {
     setHead((prev) => ({
@@ -831,6 +844,9 @@ export default function OrdersPage() {
                           <span className="portal-chip" style={{ marginLeft: 8 }}>
                             {lead.source === 'WHATSAPP_ORDER' ? 'WhatsApp' : 'Abandoned cart'}
                           </span>
+                          {lead.status === 'CONTACTED' ? (
+                            <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>Contacted</span>
+                          ) : null}
                           <p className="portal-muted">
                             {lead.customerPhone || lead.customerEmail || 'No contact on file'} ·{' '}
                             {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDateTime(lead.lastActivityAt)}
@@ -841,6 +857,11 @@ export default function OrdersPage() {
                           {canCreate ? (
                             <button type="button" className="portal-inline-btn" onClick={() => onStartOrderFromLead(lead)}>
                               Start Order
+                            </button>
+                          ) : null}
+                          {lead.status === 'NEW' ? (
+                            <button type="button" className="portal-inline-btn" onClick={() => void onMarkContacted(lead)}>
+                              Mark Contacted
                             </button>
                           ) : null}
                           <button type="button" className="portal-inline-btn" onClick={() => void onDismissLead(lead)}>
