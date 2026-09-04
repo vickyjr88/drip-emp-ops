@@ -373,7 +373,7 @@ export function AccountClient() {
             {!isTrade ? (
               <div className="de-checkout-panel">
                 <div className="de-panel-head">
-                  <h2>Trade pricing</h2>
+                  <h2>Affiliate program</h2>
                   {!applyingTrade && !customer.hasPendingResellerApplication && !applyState.done ? (
                     <button type="button" className="de-panel-toggle" onClick={() => setApplyingTrade(true)}>
                       Apply
@@ -407,7 +407,7 @@ export function AccountClient() {
                       </label>
                       <div className="de-referral-hero-actions">
                         <button type="submit" className="lp-button lp-button-primary" disabled={applyState.busy}>
-                          {applyState.busy ? 'Sending…' : 'Apply for trade pricing'}
+                          {applyState.busy ? 'Sending…' : 'Apply to join'}
                         </button>
                         <button type="button" className="lp-button lp-button-ghost" onClick={() => setApplyingTrade(false)}>
                           Cancel

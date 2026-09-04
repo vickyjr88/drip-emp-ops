@@ -141,7 +141,7 @@ export default function ResellerApplicationsPage() {
             tourPermissions={profile.permissions || []}
             tourIsAdmin={profile.role === 'ADMIN' || (profile.roles || []).some((r) => r.name === 'ADMIN')}
             pageTitle="Reseller Applications"
-            pageSubtitle="Customers asking to buy at trade prices."
+            pageSubtitle="Customers asking to join the reseller/affiliate program."
             email={profile.email}
             roleLabel={roleLabelFor(profile)}
             permissionCount={profile.permissions?.length || 0}

@@ -68,7 +68,7 @@ const DEFAULT_FAQS: FaqItem[] = [
   {
     question: 'Do you sell wholesale or to other shops?',
     answer:
-      'Yes. We price separately for resellers and for bulk orders. Get in touch on WhatsApp or by phone and ask for trade pricing.',
+      'Yes. We price separately for resellers and for bulk orders. Get in touch on WhatsApp or by phone and ask about our reseller pricing.',
   },
 ];
 
