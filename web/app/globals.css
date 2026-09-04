@@ -11530,6 +11530,52 @@ img {
   color: var(--de-ink);
 }
 
+/* A full-width chart section, not a sidebar panel -- de-checkout-panel's
+   sticky positioning is meant for a lone summary card that stays in view
+   while a long form scrolls past it (the cart, the account sidebar); it is
+   wrong here, where the panel itself spans the page and a fixed top offset
+   just makes it drift oddly as the page scrolls. Same border/radius/padding
+   as de-checkout-panel so it still reads as the same family of card. */
+.de-trend-panel {
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--de-line);
+  border-radius: 16px;
+}
+
+.de-trend-panel > h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: var(--de-ink);
+}
+
+/* Each chart gets the full content width and its own row -- three 30-point
+   trend lines side by side crush their own axis labels into an unreadable
+   smear on anything narrower than a very wide desktop. Stood one above the
+   other, plus a divider, each one gets the room a 30-day axis needs. */
+.de-trend-grid {
+  display: grid;
+  gap: 28px;
+  margin-top: 20px;
+}
+
+.de-trend-block {
+  padding-top: 20px;
+  border-top: 1px solid var(--de-line);
+}
+
+.de-trend-block:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.de-trend-block h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--de-ink);
+}
+
 /* Panel header with an edit/action toggle on the right, so a card can show
    its heading and a "Edit"/"Change" affordance on one line without the form
    itself needing to be present until that's clicked. */
@@ -12159,6 +12205,26 @@ img {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
+}
+
+/* The reseller dashboard has eight stat cards, not four -- auto-fit alone
+   stretches all eight into a single cramped row on a wide screen. Capped to
+   four columns so it settles into two even rows instead, the same card size
+   as everywhere else de-stat-grid is used. */
+.de-stat-grid.is-wide {
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+@media (max-width: 900px) {
+  .de-stat-grid.is-wide {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .de-stat-grid.is-wide {
+    grid-template-columns: 1fr;
+  }
 }
 
 .de-stat-card {

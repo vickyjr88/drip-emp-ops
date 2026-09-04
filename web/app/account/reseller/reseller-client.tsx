@@ -142,7 +142,7 @@ export function ResellerDashboardClient() {
         </section>
 
         <section className="lp-container">
-          <div className="de-stat-grid">
+          <div className="de-stat-grid is-wide">
             <div className="de-stat-card">
               <span>Link clicks</span>
               <strong>{data?.summary.totalClicks ?? 0}</strong>
@@ -186,30 +186,30 @@ export function ResellerDashboardClient() {
 
         {series ? (
           <section className="lp-container">
-            <div className="de-checkout-panel">
+            <div className="de-trend-panel">
               <h2>Your link, last 30 days</h2>
               <p className="de-checkout-note" style={{ marginTop: 0 }}>
                 Most orders here close through a WhatsApp chat, not the website checkout -- this is why both are
                 tracked.
               </p>
-              <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
-                <div>
-                  <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>Link clicks</h3>
+              <div className="de-trend-grid">
+                <div className="de-trend-block">
+                  <h3>Link clicks</h3>
                   <TrendChart
                     data={series.clicks.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
                     valueFormat={(value) => `${value}`}
                   />
                 </div>
-                <div>
-                  <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>Referred orders</h3>
+                <div className="de-trend-block">
+                  <h3>Referred orders</h3>
                   <TrendChart
                     data={series.orders.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
                     valueFormat={(value) => `${value}`}
                     color="var(--chart-cat-2)"
                   />
                 </div>
-                <div>
-                  <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>WhatsApp leads</h3>
+                <div className="de-trend-block">
+                  <h3>WhatsApp leads</h3>
                   <TrendChart
                     data={series.whatsappLeads.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
                     valueFormat={(value) => `${value}`}
