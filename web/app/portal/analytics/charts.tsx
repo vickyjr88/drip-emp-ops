@@ -165,14 +165,27 @@ export function TrendChart({
   height = 190,
   color = 'var(--chart-cat-1)',
   valueFormat = formatCompact,
+  maxAxisLabels = 10,
 }: {
   data: Array<{ label: string; value: number }>;
   height?: number;
   color?: string;
   valueFormat?: (value: number) => string;
+  /**
+   * Caps how many of the x-axis labels actually render text -- a label per
+   * point works for the 14-day charts this was first built for, but a
+   * 30-day (or longer) series crowds into unreadable overlapping text at
+   * that same density. Every point still plots and is still hoverable via
+   * its marker's title; this only thins which ones get a printed label,
+   * evenly spaced so the first and last day are always shown.
+   */
+  maxAxisLabels?: number;
 }) {
   const gradientId = useId().replace(/:/g, '');
   if (data.length === 0) return <p className="chart-empty">No data for this period yet.</p>;
+
+  const labelStride = Math.max(1, Math.ceil(data.length / maxAxisLabels));
+  const showLabelAt = (index: number) => index % labelStride === 0 || index === data.length - 1;
 
   const max = Math.max(...data.map((d) => d.value), 1);
   const W = 100;
@@ -225,7 +238,7 @@ export function TrendChart({
       </div>
       <div className="chart-trend-axis">
         {data.map((d, i) => (
-          <span key={`${d.label}-${i}`}>{d.label}</span>
+          <span key={`${d.label}-${i}`}>{showLabelAt(i) ? d.label : ''}</span>
         ))}
       </div>
     </div>

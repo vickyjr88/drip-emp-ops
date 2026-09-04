@@ -5,11 +5,17 @@
  * invisible. Same shape as InquiryService.stats()'s own trend, pulled out
  * so campaign and reseller performance can build the same kind of chart
  * without re-deriving the bucketing logic.
+ *
+ * Every boundary here is computed in UTC, not the server's local time zone
+ * (setUTCDate/setUTCHours, never setDate/setHours) -- dayKey() below reads a
+ * date's UTC calendar day via toISOString(), so a `since` cutoff zeroed in
+ * local time would silently disagree with it whenever the server isn't
+ * itself running in UTC, corrupting which bucket a timestamp near midnight
+ * falls into. Using UTC throughout keeps the cutoff and the bucketing the
+ * same clock.
  */
 export function dailyTrend(dates: Date[], days: number): Array<{ date: string; count: number }> {
-  const since = new Date();
-  since.setDate(since.getDate() - (days - 1));
-  since.setHours(0, 0, 0, 0);
+  const since = trendSince(days);
 
   const dayKey = (date: Date) => date.toISOString().slice(0, 10);
   const counts = new Map<string, number>();
@@ -22,7 +28,7 @@ export function dailyTrend(dates: Date[], days: number): Array<{ date: string; c
   const trend: Array<{ date: string; count: number }> = [];
   for (let index = 0; index < days; index += 1) {
     const day = new Date(since);
-    day.setDate(since.getDate() + index);
+    day.setUTCDate(since.getUTCDate() + index);
     const key = dayKey(day);
     trend.push({ date: key, count: counts.get(key) ?? 0 });
   }
@@ -32,7 +38,7 @@ export function dailyTrend(dates: Date[], days: number): Array<{ date: string; c
 /** The `since` cutoff dailyTrend uses internally, exposed so a caller's own query can filter to the same window rather than fetching more rows than it will ever bucket. */
 export function trendSince(days: number): Date {
   const since = new Date();
-  since.setDate(since.getDate() - (days - 1));
-  since.setHours(0, 0, 0, 0);
+  since.setUTCDate(since.getUTCDate() - (days - 1));
+  since.setUTCHours(0, 0, 0, 0);
   return since;
 }

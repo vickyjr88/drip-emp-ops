@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { EliteLayout } from '../../components/elite-layout';
 import { customerApi, useCustomerAuth } from '../../lib/customer-auth';
 import { formatKes } from '../../lib/shop';
+import { TrendChart } from '../../portal/analytics/charts';
 
 // Unlike shop.ts's formatKes (built for a product price, where 0 or less
 // means "no real price yet" and should read as "Price on request"), a
@@ -41,9 +42,24 @@ type Referrals = {
     conversionRate: number | null;
     accruedBalance: number;
     paidOutTotal: number;
+    totalWhatsappClicks: number;
+    whatsappLeads: number;
   };
   orders: ReferralOrder[];
 };
+
+type ReferralSeries = {
+  clicks: Array<{ date: string; count: number }>;
+  orders: Array<{ date: string; count: number }>;
+  whatsappLeads: Array<{ date: string; count: number }>;
+};
+
+/** "20 Aug", matching the staff portal's own trend axis labels. */
+function shortDayLabel(isoDate: string) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+}
 
 function formatConversionRate(rate: number | null) {
   if (rate === null) return '—';
@@ -66,6 +82,7 @@ export function ResellerDashboardClient() {
   const auth = useCustomerAuth();
   const router = useRouter();
   const [data, setData] = useState<Referrals | null>(null);
+  const [series, setSeries] = useState<ReferralSeries | null>(null);
 
   useEffect(() => {
     if (auth.ready && !auth.customer) router.replace('/account/login');
@@ -74,10 +91,18 @@ export function ResellerDashboardClient() {
   const load = useCallback(async () => {
     if (!auth.token) return;
     try {
-      setData(await customerApi<Referrals>('/customer-portal/referrals', { method: 'GET' }, auth.token));
+      const [nextData, nextSeries] = await Promise.all([
+        customerApi<Referrals>('/customer-portal/referrals', { method: 'GET' }, auth.token),
+        customerApi<ReferralSeries>('/customer-portal/referrals/series', { method: 'GET' }, auth.token).catch(() => null),
+      ]);
+      setData(nextData);
+      setSeries(nextSeries);
     } catch {
       setData({
-        summary: { totalClicks: 0, referredOrders: 0, conversionRate: null, accruedBalance: 0, paidOutTotal: 0 },
+        summary: {
+          totalClicks: 0, referredOrders: 0, conversionRate: null, accruedBalance: 0, paidOutTotal: 0,
+          totalWhatsappClicks: 0, whatsappLeads: 0,
+        },
         orders: [],
       });
     }
@@ -126,8 +151,54 @@ export function ResellerDashboardClient() {
               <span>Paid out to date</span>
               <strong>{formatKesAmount(data?.summary.paidOutTotal ?? 0)}</strong>
             </div>
+            <div className="de-stat-card">
+              <span>WhatsApp taps</span>
+              <strong>{data?.summary.totalWhatsappClicks ?? 0}</strong>
+            </div>
+            <div className="de-stat-card">
+              <span>WhatsApp leads</span>
+              <strong>{data?.summary.whatsappLeads ?? 0}</strong>
+              <span style={{ marginTop: 6, marginBottom: 0 }}>shoppers who tapped through and left their details</span>
+            </div>
           </div>
         </section>
+
+        {series ? (
+          <section className="lp-container">
+            <div className="de-checkout-panel">
+              <h2>Your link, last 30 days</h2>
+              <p className="de-checkout-note" style={{ marginTop: 0 }}>
+                Most orders here close through a WhatsApp chat, not the website checkout -- this is why both are
+                tracked.
+              </p>
+              <div style={{ display: 'grid', gap: 20, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>Link clicks</h3>
+                  <TrendChart
+                    data={series.clicks.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
+                    valueFormat={(value) => `${value}`}
+                  />
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>Referred orders</h3>
+                  <TrendChart
+                    data={series.orders.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
+                    valueFormat={(value) => `${value}`}
+                    color="var(--chart-cat-2)"
+                  />
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem' }}>WhatsApp leads</h3>
+                  <TrendChart
+                    data={series.whatsappLeads.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
+                    valueFormat={(value) => `${value}`}
+                    color="var(--chart-cat-3)"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className="lp-container de-account">
           <div className="de-account-main">

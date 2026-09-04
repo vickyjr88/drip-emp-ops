@@ -83,6 +83,14 @@ export class CustomerPortalController {
     return this.service.myReferrals(request.user.id);
   }
 
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @ApiBearerAuth()
+  @Get('referrals/series')
+  myReferralSeries(@Req() request: any) {
+    return this.service.myReferralSeries(request.user.id);
+  }
+
   /**
    * A landing on a shared referral link -- no CustomerAuthGuard, since the
    * visitor clicking it is very often a guest who has never signed in.

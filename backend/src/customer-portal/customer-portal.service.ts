@@ -13,6 +13,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmailLogService } from '../email-log/email-log.service';
 import { ctaButton } from '../email-log/email-html.util';
 import { ensureReferralCode } from '../common/generate-code';
+import { dailyTrend, trendSince } from '../common/daily-trend.util';
+
+const REFERRAL_TREND_DAYS = 30;
 import { ResellerApplicationService } from '../reseller-application/reseller-application.service';
 import { SubmitResellerApplicationDto, UpdateCustomerProfileDto } from './dto/customer-portal.dto';
 import { CUSTOMER_TOKEN_KIND } from './customer-jwt.strategy';
@@ -235,7 +238,7 @@ export class CustomerPortalService {
    * an unreliable free-text snapshot a guest checkout can set to anything.
    */
   async myReferrals(customerId: string) {
-    const [orders, totalClicks] = await Promise.all([
+    const [orders, totalClicks, totalWhatsappClicks, whatsappLeads] = await Promise.all([
       this.prisma.order.findMany({
         where: { referredByCustomerId: customerId },
         include: {
@@ -246,6 +249,12 @@ export class CustomerPortalService {
         take: 200,
       }),
       this.prisma.referralClick.count({ where: { resellerId: customerId } }),
+      // Same second funnel the staff-side reseller detail page shows --
+      // most of this shop's real sales close in a WhatsApp chat, not
+      // online checkout, so a reseller's own dashboard would otherwise
+      // understate their link's actual reach.
+      this.prisma.whatsAppClick.count({ where: { resellerId: customerId } }),
+      this.prisma.cartLead.count({ where: { referredByCustomerId: customerId, source: 'WHATSAPP_ORDER' } }),
     ]);
 
     const accruedBalance = orders
@@ -266,6 +275,8 @@ export class CustomerPortalService {
         conversionRate: totalClicks > 0 ? orders.length / totalClicks : null,
         accruedBalance,
         paidOutTotal,
+        totalWhatsappClicks,
+        whatsappLeads,
       },
       orders: orders.map((order) => ({
         orderNumber: order.orderNumber,
@@ -276,6 +287,26 @@ export class CustomerPortalService {
         commissionAmount: order.commission ? Number(order.commission.amount) : 0,
         commissionStatus: order.commission?.status ?? null,
       })),
+    };
+  }
+
+  /** The same 30-day link-clicks/referred-orders/WhatsApp-leads trend the staff-side reseller detail page shows, scoped to the caller's own link. */
+  async myReferralSeries(customerId: string) {
+    const since = trendSince(REFERRAL_TREND_DAYS);
+
+    const [clicks, orders, whatsappLeads] = await Promise.all([
+      this.prisma.referralClick.findMany({ where: { resellerId: customerId, clickedAt: { gte: since } }, select: { clickedAt: true } }),
+      this.prisma.order.findMany({ where: { referredByCustomerId: customerId, placedAt: { gte: since } }, select: { placedAt: true } }),
+      this.prisma.cartLead.findMany({
+        where: { referredByCustomerId: customerId, source: 'WHATSAPP_ORDER', createdAt: { gte: since } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    return {
+      clicks: dailyTrend(clicks.map((row) => row.clickedAt), REFERRAL_TREND_DAYS),
+      orders: dailyTrend(orders.map((row) => row.placedAt), REFERRAL_TREND_DAYS),
+      whatsappLeads: dailyTrend(whatsappLeads.map((row) => row.createdAt), REFERRAL_TREND_DAYS),
     };
   }
 
