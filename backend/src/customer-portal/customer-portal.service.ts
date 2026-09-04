@@ -242,13 +242,24 @@ export class CustomerPortalService {
    * an unreliable free-text snapshot a guest checkout can set to anything.
    */
   async myReferrals(customerId: string) {
-    const [orders, totalClicks, totalWhatsappClicks, whatsappLeads] = await Promise.all([
+    const [orders, ownOrders, totalClicks, totalWhatsappClicks, whatsappLeads] = await Promise.all([
       this.prisma.order.findMany({
         where: { referredByCustomerId: customerId },
         include: {
           commission: true,
           customer: { select: { firstName: true } },
         },
+        orderBy: { placedAt: 'desc' },
+        take: 200,
+      }),
+      // What this reseller has bought for themselves -- a distinct question
+      // from "is my link working," which `orders` above already answers.
+      // Mirrors ResellerService.performance()'s own ownOrders/referredOrders
+      // split on the staff side; this is the same split for the reseller's
+      // own view of their account.
+      this.prisma.order.findMany({
+        where: { customerId },
+        select: { id: true, orderNumber: true, placedAt: true, status: true, total: true },
         orderBy: { placedAt: 'desc' },
         take: 200,
       }),
@@ -281,6 +292,8 @@ export class CustomerPortalService {
         paidOutTotal,
         totalWhatsappClicks,
         whatsappLeads,
+        ownOrders: ownOrders.length,
+        ownRevenue: ownOrders.reduce((sum, order) => sum + Number(order.total), 0),
       },
       orders: orders.map((order) => ({
         orderNumber: order.orderNumber,
@@ -290,6 +303,12 @@ export class CustomerPortalService {
         referredCustomerFirstName: order.customer?.firstName ?? null,
         commissionAmount: order.commission ? Number(order.commission.amount) : 0,
         commissionStatus: order.commission?.status ?? null,
+      })),
+      ownOrders: ownOrders.map((order) => ({
+        orderNumber: order.orderNumber,
+        placedAt: order.placedAt.toISOString(),
+        status: order.status,
+        total: Number(order.total),
       })),
     };
   }

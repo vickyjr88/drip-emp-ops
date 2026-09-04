@@ -35,6 +35,15 @@ type ReferralOrder = {
   commissionStatus: 'ACCRUED' | 'PAID' | 'CANCELLED' | null;
 };
 
+/** A purchase this reseller made for themselves -- distinct from a
+ *  ReferralOrder, which is someone else's order their link brought in. */
+type OwnOrder = {
+  orderNumber: string;
+  placedAt: string;
+  status: string;
+  total: number;
+};
+
 type Referrals = {
   summary: {
     totalClicks: number;
@@ -44,8 +53,11 @@ type Referrals = {
     paidOutTotal: number;
     totalWhatsappClicks: number;
     whatsappLeads: number;
+    ownOrders: number;
+    ownRevenue: number;
   };
   orders: ReferralOrder[];
+  ownOrders: OwnOrder[];
 };
 
 type ReferralSeries = {
@@ -101,9 +113,10 @@ export function ResellerDashboardClient() {
       setData({
         summary: {
           totalClicks: 0, referredOrders: 0, conversionRate: null, accruedBalance: 0, paidOutTotal: 0,
-          totalWhatsappClicks: 0, whatsappLeads: 0,
+          totalWhatsappClicks: 0, whatsappLeads: 0, ownOrders: 0, ownRevenue: 0,
         },
         orders: [],
+        ownOrders: [],
       });
     }
   }, [auth.token]);
@@ -125,7 +138,7 @@ export function ResellerDashboardClient() {
       <main className="lp-main-content de-shop">
         <section className="lp-container de-shop-head">
           <p style={{ margin: '0 0 10px' }}><Link href="/account">← Back to your account</Link></p>
-          <h1>Your referrals</h1>
+          <h1>Your affiliate dashboard</h1>
         </section>
 
         <section className="lp-container">
@@ -159,6 +172,14 @@ export function ResellerDashboardClient() {
               <span>WhatsApp leads</span>
               <strong>{data?.summary.whatsappLeads ?? 0}</strong>
               <span style={{ marginTop: 6, marginBottom: 0 }}>shoppers who tapped through and left their details</span>
+            </div>
+            <div className="de-stat-card">
+              <span>Your own orders</span>
+              <strong>{data?.summary.ownOrders ?? 0}</strong>
+            </div>
+            <div className="de-stat-card">
+              <span>Your own spend</span>
+              <strong>{formatKesAmount(data?.summary.ownRevenue ?? 0)}</strong>
             </div>
           </div>
         </section>
@@ -232,6 +253,36 @@ export function ResellerDashboardClient() {
                     </span>
                     <strong>{formatKesAmount(order.commissionAmount)}</strong>
                   </footer>
+                </article>
+              ))
+            )}
+
+            <h2 style={{ marginTop: 32 }}>Your own orders</h2>
+            <p className="de-checkout-note" style={{ marginTop: 0 }}>
+              Purchases you made for yourself, separate from the sales your referral link brought in above.
+            </p>
+            {data === null ? (
+              <p className="de-auth-intro">Loading…</p>
+            ) : data.ownOrders.length === 0 ? (
+              <div className="de-empty">
+                <p>You haven't placed an order of your own yet.</p>
+              </div>
+            ) : (
+              data.ownOrders.map((order) => (
+                <article key={order.orderNumber} className="de-account-order">
+                  <header>
+                    <div>
+                      <strong>{order.orderNumber}</strong>
+                      <span className="de-account-date">{formatDay(order.placedAt)}</span>
+                    </div>
+                    <span className="de-account-status">{order.status}</span>
+                  </header>
+                  <ul>
+                    <li>
+                      <span>Total</span>
+                      <em>{formatKes(order.total)}</em>
+                    </li>
+                  </ul>
                 </article>
               ))
             )}
