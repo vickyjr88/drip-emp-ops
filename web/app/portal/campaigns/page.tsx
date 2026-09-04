@@ -290,6 +290,9 @@ export default function CampaignsPage() {
                           </p>
                         </div>
                         <div className="portal-action-row">
+                          <Link href={`/portal/campaigns/${campaign.id}`} className="portal-inline-btn">
+                            View performance
+                          </Link>
                           <button type="button" className="portal-inline-btn" onClick={() => void onCopyLink(campaign)}>
                             {copiedId === campaign.id ? 'Copied!' : 'Copy link'}
                           </button>

@@ -100,6 +100,18 @@ type InquiryStats = {
   trend: Array<{ date: string; count: number }>;
 };
 
+type CampaignSummary = {
+  totalCampaigns: number;
+  activeCampaigns: number;
+  totalClicks: number;
+  totalOrders: number;
+  conversionRate: number | null;
+  totalWhatsappClicks: number;
+  totalWhatsappLeads: number;
+  topByOrders: Array<{ id: string; name: string; code: string; orders: number }>;
+  trend: Array<{ date: string; count: number }>;
+};
+
 type CustomerStats = {
   total: number;
   active: number;
@@ -172,6 +184,7 @@ export function AnalyticsView() {
   const [summary, setSummary] = useState<SalesSummary | null>(null);
   const [leads, setLeads] = useState<LeadStats | null>(null);
   const [inquiries, setInquiries] = useState<InquiryStats | null>(null);
+  const [campaigns, setCampaigns] = useState<CampaignSummary | null>(null);
   const [customers, setCustomers] = useState<CustomerStats | null>(null);
 
   // The day/week/month cut, kept apart from the all-time panels above: this
@@ -206,7 +219,7 @@ export function AnalyticsView() {
         }
       };
 
-      const [nextStores, nextProducts, nextConsignment, nextSummary, nextLeads, nextInquiries, nextCustomers] =
+      const [nextStores, nextProducts, nextConsignment, nextSummary, nextLeads, nextInquiries, nextCampaigns, nextCustomers] =
         await Promise.all([
           load<any>('/reports/store-performance', 'journal-entry.read'),
           load<any>('/reports/product-profitability', 'journal-entry.read'),
@@ -214,6 +227,7 @@ export function AnalyticsView() {
           load<SalesSummary>('/orders/summary', 'order.read'),
           load<LeadStats>('/cart-leads/stats', 'cart-lead.read'),
           load<InquiryStats>('/inquiries/stats', 'inquiry.read'),
+          load<CampaignSummary>('/campaigns/summary', 'marketing-campaign.read'),
           load<CustomerStats>('/customers/stats', 'customer.read'),
         ]);
 
@@ -223,6 +237,7 @@ export function AnalyticsView() {
       setSummary(nextSummary);
       setLeads(nextLeads);
       setInquiries(nextInquiries);
+      setCampaigns(nextCampaigns);
       setCustomers(nextCustomers);
     } catch (error) {
       setErrorMessage(error);
@@ -309,6 +324,7 @@ export function AnalyticsView() {
     !consignmentRows.length &&
     !leads?.total &&
     !inquiries?.total &&
+    !campaigns?.totalCampaigns &&
     !customers?.total;
 
   return (
@@ -759,6 +775,60 @@ export function AnalyticsView() {
                     </div>
                     <Link href="/portal/inquiries" className="portal-inline-btn" style={{ marginTop: 12 }}>
                       Go to Inquiries
+                    </Link>
+                  </article>
+                ) : null}
+
+                {/* ---- Campaign performance -------------------------------------- */}
+                {campaigns && campaigns.totalCampaigns > 0 ? (
+                  <article className="portal-card" style={{ marginTop: 20 }}>
+                    <h2 style={{ marginTop: 0 }}>Campaign performance</h2>
+                    <p className="portal-muted" style={{ marginTop: 0 }}>
+                      Admin-created links for paid marketing -- clicks, checkout orders, and the WhatsApp leads that
+                      close most of this shop's actual sales.
+                    </p>
+                    <div className="portal-stat-grid" style={{ marginBottom: 16 }}>
+                      <div className="portal-stat">
+                        <span>Active campaigns</span>
+                        <h3>{campaigns.activeCampaigns}</h3>
+                        <span className="portal-stat-note">{campaigns.totalCampaigns} created all-time</span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>Click → order rate</span>
+                        <h3>{campaigns.conversionRate === null ? '—' : `${(campaigns.conversionRate * 100).toLocaleString('en-KE', { maximumFractionDigits: 1 })}%`}</h3>
+                        <span className="portal-stat-note">{campaigns.totalOrders} online orders from {campaigns.totalClicks} clicks</span>
+                      </div>
+                      <div className="portal-stat">
+                        <span>WhatsApp leads</span>
+                        <h3>{campaigns.totalWhatsappLeads}</h3>
+                        <span className="portal-stat-note">from {campaigns.totalWhatsappClicks} WhatsApp taps</span>
+                      </div>
+                    </div>
+                    <div className="portal-detail-grid">
+                      <ChartFrame
+                        title="Top campaigns by orders"
+                        table={{
+                          headers: ['Campaign', 'Code', 'Orders'],
+                          rows: campaigns.topByOrders.map((row) => [row.name, row.code, row.orders]),
+                        }}
+                      >
+                        <RankedBars
+                          data={campaigns.topByOrders.map((row) => ({ label: row.name, value: row.orders, sublabel: row.code }))}
+                          valueFormat={(value) => `${value}`}
+                        />
+                      </ChartFrame>
+                      <ChartFrame title="Last 30 days" subtitle="Online orders from any campaign, per day.">
+                        <TrendChart
+                          data={campaigns.trend.map((point) => ({
+                            label: shortDayLabel(point.date),
+                            value: point.count,
+                          }))}
+                          valueFormat={(value) => `${value}`}
+                        />
+                      </ChartFrame>
+                    </div>
+                    <Link href="/portal/campaigns" className="portal-inline-btn" style={{ marginTop: 12 }}>
+                      Go to Campaigns
                     </Link>
                   </article>
                 ) : null}

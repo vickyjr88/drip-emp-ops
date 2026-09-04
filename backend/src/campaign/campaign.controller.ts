@@ -26,6 +26,13 @@ export class CampaignController {
     return this.service.findAll(query);
   }
 
+  // Before ':id'-shaped routes below, or "summary" would be read as an id.
+  @Get('summary')
+  @Permissions(buildPermissionKey('MarketingCampaign', 'read'))
+  summaryAll() {
+    return this.service.summaryAll();
+  }
+
   @Get(':id')
   @Permissions(buildPermissionKey('MarketingCampaign', 'read'))
   findOne(@Param('id') id: string) {
@@ -36,6 +43,12 @@ export class CampaignController {
   @Permissions(buildPermissionKey('MarketingCampaign', 'read'))
   performance(@Param('id') id: string) {
     return this.service.performance(id);
+  }
+
+  @Get(':id/series')
+  @Permissions(buildPermissionKey('MarketingCampaign', 'read'))
+  series(@Param('id') id: string) {
+    return this.service.series(id);
   }
 
   @Patch(':id')

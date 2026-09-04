@@ -5,6 +5,9 @@ import { CreateResellerDto, UpdateResellerDto } from './dto/reseller.dto';
 import { ResellerQueryDto } from './dto/reseller-query.dto';
 import { customerDisplayName } from '../customer/customer-name';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
+import { dailyTrend, trendSince } from '../common/daily-trend.util';
+
+const TREND_DAYS = 30;
 
 /**
  * Trade accounts: the shops that take our stock and pay for what they sell.
@@ -124,6 +127,124 @@ export class ResellerService {
     });
     if (!customer) throw new NotFoundException(`Trade customer ${id} not found`);
     return { ...customer, name: customerDisplayName(customer) };
+  }
+
+  /**
+   * The performance detail behind one reseller: what they have bought
+   * themselves, what their referral link has sold, and the link/WhatsApp
+   * activity behind that -- mirrors CampaignService.performance() in shape,
+   * split into "own orders" and "referred orders" because those answer two
+   * different questions (are they a customer too? is their link working?)
+   * that a single order list would blur together.
+   */
+  async performance(id: string) {
+    // A lean projection, not findOne()'s consignments-and-payments payload
+    // -- this page never shows pickup history, so there's no reason to ship
+    // it down just to get the reseller's own name/tier.
+    const customer = await this.prisma.customer.findUnique({ where: { id } });
+    if (!customer) throw new NotFoundException(`Trade customer ${id} not found`);
+    const reseller = { ...customer, name: customerDisplayName(customer) };
+
+    const [ownOrders, referredOrders, totalClicks, totalWhatsappClicks, whatsappLeads, commissionAccrued, commissionPaid] =
+      await Promise.all([
+        this.prisma.order.findMany({
+          where: { customerId: id },
+          select: { id: true, orderNumber: true, placedAt: true, status: true, total: true },
+          orderBy: { placedAt: 'desc' },
+          take: 200,
+        }),
+        this.prisma.order.findMany({
+          where: { referredByCustomerId: id },
+          select: { id: true, orderNumber: true, placedAt: true, status: true, total: true, customerName: true },
+          orderBy: { placedAt: 'desc' },
+          take: 200,
+        }),
+        this.prisma.referralClick.count({ where: { resellerId: id } }),
+        this.prisma.whatsAppClick.count({ where: { resellerId: id } }),
+        // Only WHATSAPP_ORDER leads -- an ABANDONED_CART row was never a
+        // WhatsApp interaction, same distinction CampaignService draws.
+        this.prisma.cartLead.findMany({
+          where: { referredByCustomerId: id, source: 'WHATSAPP_ORDER' },
+          select: { id: true, status: true, customerName: true, total: true, createdAt: true, orderId: true },
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        }),
+        this.prisma.commission.aggregate({ where: { resellerId: id, status: 'ACCRUED' }, _sum: { amount: true } }),
+        this.prisma.commission.aggregate({ where: { resellerId: id, status: 'PAID' }, _sum: { amount: true } }),
+      ]);
+
+    const confirmedReferred = referredOrders.filter(
+      (order) => order.status !== 'CANCELLED' && order.status !== 'REFUNDED' && order.status !== 'PENDING',
+    );
+    const referredRevenue = confirmedReferred.reduce((sum, order) => sum + Number(order.total), 0);
+    const convertedWhatsappLeads = whatsappLeads.filter((lead) => lead.status === 'CONVERTED');
+
+    return {
+      reseller,
+      summary: {
+        ownOrders: ownOrders.length,
+        ownRevenue: ownOrders.reduce((sum, order) => sum + Number(order.total), 0),
+        totalClicks,
+        referredOrders: referredOrders.length,
+        confirmedReferredOrders: confirmedReferred.length,
+        referredRevenue,
+        conversionRate: totalClicks > 0 ? referredOrders.length / totalClicks : null,
+        totalWhatsappClicks,
+        whatsappLeads: whatsappLeads.length,
+        convertedWhatsappLeads: convertedWhatsappLeads.length,
+        accruedCommission: Number(commissionAccrued._sum.amount ?? 0),
+        paidCommission: Number(commissionPaid._sum.amount ?? 0),
+      },
+      ownOrders: ownOrders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        placedAt: order.placedAt.toISOString(),
+        status: order.status,
+        total: Number(order.total),
+      })),
+      referredOrders: referredOrders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        placedAt: order.placedAt.toISOString(),
+        status: order.status,
+        total: Number(order.total),
+        customerName: order.customerName,
+      })),
+      whatsappLeads: whatsappLeads.map((lead) => ({
+        id: lead.id,
+        status: lead.status,
+        customerName: lead.customerName,
+        total: Number(lead.total),
+        createdAt: lead.createdAt.toISOString(),
+        orderId: lead.orderId,
+      })),
+    };
+  }
+
+  /**
+   * Daily trend over the last 30 days -- link clicks, referred orders and
+   * WhatsApp leads. Own purchases are deliberately not a fourth line here:
+   * this chart is about the referral relationship, not the reseller as an
+   * ordinary customer, which is what ownOrders above is for.
+   */
+  async series(id: string) {
+    await this.findOne(id);
+    const since = trendSince(TREND_DAYS);
+
+    const [clicks, orders, whatsappLeads] = await Promise.all([
+      this.prisma.referralClick.findMany({ where: { resellerId: id, clickedAt: { gte: since } }, select: { clickedAt: true } }),
+      this.prisma.order.findMany({ where: { referredByCustomerId: id, placedAt: { gte: since } }, select: { placedAt: true } }),
+      this.prisma.cartLead.findMany({
+        where: { referredByCustomerId: id, source: 'WHATSAPP_ORDER', createdAt: { gte: since } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    return {
+      clicks: dailyTrend(clicks.map((row) => row.clickedAt), TREND_DAYS),
+      orders: dailyTrend(orders.map((row) => row.placedAt), TREND_DAYS),
+      whatsappLeads: dailyTrend(whatsappLeads.map((row) => row.createdAt), TREND_DAYS),
+    };
   }
 
   async update(id: string, dto: UpdateResellerDto) {

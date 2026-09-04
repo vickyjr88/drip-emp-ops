@@ -26,6 +26,14 @@ export class ResellerController {
   @Permissions(buildPermissionKey('Customer', 'read'))
   findOne(@Param('id') id: string) { return this.service.findOne(id); }
 
+  @Get(':id/performance')
+  @Permissions(buildPermissionKey('Customer', 'read'))
+  performance(@Param('id') id: string) { return this.service.performance(id); }
+
+  @Get(':id/series')
+  @Permissions(buildPermissionKey('Customer', 'read'))
+  series(@Param('id') id: string) { return this.service.series(id); }
+
   @Patch(':id')
   @Permissions(buildPermissionKey('Customer', 'update'))
   update(@Param('id') id: string, @Body() dto: UpdateResellerDto) { return this.service.update(id, dto); }

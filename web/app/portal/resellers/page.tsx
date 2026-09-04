@@ -397,6 +397,9 @@ export default function ResellersPage() {
                           </p>
                         </div>
                         <div className="portal-action-row">
+                          <Link href={`/portal/resellers/${reseller.id}`} className="portal-inline-btn">
+                            View performance
+                          </Link>
                           <Link href={`/portal/consignments?resellerId=${reseller.id}`} className="portal-inline-btn">
                             Pickups
                           </Link>

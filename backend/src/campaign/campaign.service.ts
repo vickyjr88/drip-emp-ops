@@ -5,6 +5,9 @@ import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { CampaignQueryDto } from './dto/campaign-query.dto';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
+import { dailyTrend, trendSince } from '../common/daily-trend.util';
+
+const TREND_DAYS = 30;
 
 /**
  * Admin-created tracking links for paid marketing -- the shop's own version
@@ -158,6 +161,92 @@ export class CampaignService {
         createdAt: lead.createdAt.toISOString(),
         orderId: lead.orderId,
       })),
+    };
+  }
+
+  /**
+   * Daily trend over the last 30 days -- clicks, orders and WhatsApp leads,
+   * each its own line since a single chart only ever reads correctly with
+   * one measure (see TrendChart's own comment on the frontend). Three small
+   * date-only queries rather than one big join: each source table has no
+   * relation to the others, and Prisma can't groupBy a truncated date
+   * directly, so bucketing happens in JS via dailyTrend() either way.
+   */
+  async series(id: string) {
+    await this.findOne(id);
+    const since = trendSince(TREND_DAYS);
+
+    const [clicks, orders, whatsappLeads] = await Promise.all([
+      this.prisma.campaignClick.findMany({ where: { campaignId: id, clickedAt: { gte: since } }, select: { clickedAt: true } }),
+      this.prisma.order.findMany({ where: { attributedCampaignId: id, placedAt: { gte: since } }, select: { placedAt: true } }),
+      this.prisma.cartLead.findMany({
+        where: { attributedCampaignId: id, source: 'WHATSAPP_ORDER', createdAt: { gte: since } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    return {
+      clicks: dailyTrend(clicks.map((row) => row.clickedAt), TREND_DAYS),
+      orders: dailyTrend(orders.map((row) => row.placedAt), TREND_DAYS),
+      whatsappLeads: dailyTrend(whatsappLeads.map((row) => row.createdAt), TREND_DAYS),
+    };
+  }
+
+  /**
+   * Program-wide, across every campaign -- for the analytics page's
+   * "Campaign performance" section, which asks "are campaigns working at
+   * all" rather than "how is this one campaign doing" (that's performance()
+   * above). Mirrors ResellerPayoutService.stats()'s own shape.
+   */
+  async summaryAll() {
+    const since = trendSince(TREND_DAYS);
+    const [
+      totalCampaigns, activeCampaigns, totalClicks, totalOrders, totalWhatsappClicks, totalWhatsappLeads,
+      topByOrders, recentOrders,
+    ] = await Promise.all([
+      this.prisma.marketingCampaign.count(),
+      this.prisma.marketingCampaign.count({ where: { isActive: true } }),
+      this.prisma.campaignClick.count(),
+      this.prisma.order.count({ where: { attributedCampaignId: { not: null } } }),
+      this.prisma.whatsAppClick.count({ where: { campaignId: { not: null } } }),
+      this.prisma.cartLead.count({ where: { attributedCampaignId: { not: null }, source: 'WHATSAPP_ORDER' } }),
+      this.prisma.order.groupBy({
+        by: ['attributedCampaignId'],
+        where: { attributedCampaignId: { not: null } },
+        _count: true,
+        orderBy: { _count: { attributedCampaignId: 'desc' } },
+        take: 5,
+      }),
+      // Program-wide order trend, not per-campaign -- "are campaigns working
+      // at all lately" is the question this section answers; a per-campaign
+      // breakdown is what the detail page (series()) is for.
+      this.prisma.order.findMany({
+        where: { attributedCampaignId: { not: null }, placedAt: { gte: since } },
+        select: { placedAt: true },
+      }),
+    ]);
+
+    const topCampaigns = await this.prisma.marketingCampaign.findMany({
+      where: { id: { in: topByOrders.map((row) => row.attributedCampaignId as string) } },
+      select: { id: true, name: true, code: true },
+    });
+    const nameById = new Map(topCampaigns.map((campaign) => [campaign.id, campaign]));
+
+    return {
+      totalCampaigns,
+      activeCampaigns,
+      totalClicks,
+      totalOrders,
+      conversionRate: totalClicks > 0 ? totalOrders / totalClicks : null,
+      totalWhatsappClicks,
+      totalWhatsappLeads,
+      topByOrders: topByOrders
+        .map((row) => {
+          const campaign = nameById.get(row.attributedCampaignId as string);
+          return campaign ? { id: campaign.id, name: campaign.name, code: campaign.code, orders: row._count } : null;
+        })
+        .filter((row): row is { id: string; name: string; code: string; orders: number } => row !== null),
+      trend: dailyTrend(recentOrders.map((order) => order.placedAt), TREND_DAYS),
     };
   }
 
