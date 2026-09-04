@@ -6,6 +6,7 @@ import { ResellerQueryDto } from './dto/reseller-query.dto';
 import { customerDisplayName } from '../customer/customer-name';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
 import { dailyTrend, trendSince } from '../common/daily-trend.util';
+import { withFirstLineImage } from '../common/cart-lead-image.util';
 
 const TREND_DAYS = 30;
 
@@ -165,7 +166,7 @@ export class ResellerService {
         // WhatsApp interaction, same distinction CampaignService draws.
         this.prisma.cartLead.findMany({
           where: { referredByCustomerId: id, source: 'WHATSAPP_ORDER' },
-          select: { id: true, status: true, customerName: true, total: true, createdAt: true, orderId: true },
+          select: { id: true, status: true, customerName: true, total: true, createdAt: true, orderId: true, lines: true },
           orderBy: { createdAt: 'desc' },
           take: 200,
         }),
@@ -178,6 +179,7 @@ export class ResellerService {
     );
     const referredRevenue = confirmedReferred.reduce((sum, order) => sum + Number(order.total), 0);
     const convertedWhatsappLeads = whatsappLeads.filter((lead) => lead.status === 'CONVERTED');
+    const whatsappLeadsWithImage = await withFirstLineImage(this.prisma, whatsappLeads);
 
     return {
       reseller,
@@ -210,13 +212,14 @@ export class ResellerService {
         total: Number(order.total),
         customerName: order.customerName,
       })),
-      whatsappLeads: whatsappLeads.map((lead) => ({
+      whatsappLeads: whatsappLeadsWithImage.map((lead) => ({
         id: lead.id,
         status: lead.status,
         customerName: lead.customerName,
         total: Number(lead.total),
         createdAt: lead.createdAt.toISOString(),
         orderId: lead.orderId,
+        firstLineImageUrl: lead.firstLineImageUrl,
       })),
     };
   }

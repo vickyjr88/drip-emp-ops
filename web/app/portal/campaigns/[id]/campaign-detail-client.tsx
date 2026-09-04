@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { ListThumb } from '../../components/list-thumb';
 import { useErrorState } from '../../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, formatMoney,
@@ -22,7 +23,10 @@ import { ChartFrame, TrendChart } from '../../analytics/charts';
 type Campaign = { id: string; code: string; name: string; isActive: boolean; createdAt: string };
 
 type OrderRow = { id: string; orderNumber: string; placedAt: string; status: string; total: number; customerName?: string | null };
-type WhatsAppLeadRow = { id: string; status: string; customerName?: string | null; total: number; createdAt: string; orderId?: string | null };
+type WhatsAppLeadRow = {
+  id: string; status: string; customerName?: string | null; total: number; createdAt: string;
+  orderId?: string | null; firstLineImageUrl?: string | null;
+};
 
 type Performance = {
   campaign: Campaign;
@@ -256,7 +260,8 @@ export default function CampaignDetailClient({ campaignId }: { campaignId: strin
                 ) : (
                   performance.whatsappLeads.map((lead) => (
                     <div key={lead.id} className="portal-record">
-                      <div className="portal-list-row">
+                      <div className="portal-list-row has-thumb">
+                        <ListThumb sources={[lead.firstLineImageUrl]} label={lead.customerName || '?'} />
                         <div>
                           <strong>{lead.customerName || 'Unnamed'}</strong>
                           <span className="portal-chip" style={{ marginLeft: 8 }}>{lead.status}</span>

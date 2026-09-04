@@ -6,6 +6,7 @@ import { UpdateCampaignDto } from './dto/update-campaign.dto';
 import { CampaignQueryDto } from './dto/campaign-query.dto';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
 import { dailyTrend, trendSince } from '../common/daily-trend.util';
+import { withFirstLineImage } from '../common/cart-lead-image.util';
 
 const TREND_DAYS = 30;
 
@@ -119,7 +120,7 @@ export class CampaignService {
       // WhatsApp interaction, it's a different funnel this view isn't about.
       this.prisma.cartLead.findMany({
         where: { attributedCampaignId: id, source: 'WHATSAPP_ORDER' },
-        select: { id: true, status: true, customerName: true, total: true, createdAt: true, orderId: true },
+        select: { id: true, status: true, customerName: true, total: true, createdAt: true, orderId: true, lines: true },
         orderBy: { createdAt: 'desc' },
         take: 200,
       }),
@@ -128,6 +129,7 @@ export class CampaignService {
     const confirmedOrders = orders.filter((order) => order.status !== 'CANCELLED' && order.status !== 'REFUNDED' && order.status !== 'PENDING');
     const revenue = confirmedOrders.reduce((sum, order) => sum + Number(order.total), 0);
     const convertedWhatsappLeads = whatsappLeads.filter((lead) => lead.status === 'CONVERTED');
+    const whatsappLeadsWithImage = await withFirstLineImage(this.prisma, whatsappLeads);
 
     return {
       campaign,
@@ -153,13 +155,14 @@ export class CampaignService {
         total: Number(order.total),
         customerName: order.customerName,
       })),
-      whatsappLeads: whatsappLeads.map((lead) => ({
+      whatsappLeads: whatsappLeadsWithImage.map((lead) => ({
         id: lead.id,
         status: lead.status,
         customerName: lead.customerName,
         total: Number(lead.total),
         createdAt: lead.createdAt.toISOString(),
         orderId: lead.orderId,
+        firstLineImageUrl: lead.firstLineImageUrl,
       })),
     };
   }
