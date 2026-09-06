@@ -149,24 +149,41 @@ async function redirects() {
 /**
  * next/image needs every remote host it will ever serve an image from
  * allow-listed here at build time -- an unlisted host 400s instead of
- * loading. Product photos and CMS-uploaded images are both served from
- * MEDIA_PUBLIC_BASE_URL (MinIO behind a public URL in production), passed
- * through as NEXT_PUBLIC_MEDIA_BASE_URL since the original is a
- * backend-only env var otherwise invisible to this build step.
+ * loading. Product photos and CMS-uploaded images are NOT served straight
+ * from MinIO: MediaController streams them through the backend API at
+ * GET /media/:objectKey (see backend/src/media/media.controller.ts), and
+ * MediaService builds every image URL as `${publicBaseUrl}/media/...`,
+ * where publicBaseUrl falls back MEDIA_PUBLIC_BASE_URL ->
+ * NEXT_PUBLIC_API_BASE_URL -> NEXT_PUBLIC_API_URL. So the real image host is
+ * ordinarily just the API's own public origin, not a separate media
+ * subdomain.
+ *
+ * Falls back NEXT_PUBLIC_MEDIA_BASE_URL -> NEXT_PUBLIC_API_BASE_URL, mirroring
+ * that same chain -- the latter is a build arg every existing deploy already
+ * sets, so images work without needing to provision the newer, narrower var.
+ *
+ * Uses the deprecated `images.domains` array, not `images.remotePatterns`,
+ * on purpose: confirmed a real bug in next@14.2.15's remotePatterns handling
+ * by tracing it into node_modules. `writeImagesManifest()`
+ * (next/dist/build/index.js) pre-compiles each pattern's `hostname` into a
+ * regex source string via picomatch at build time, but `matchRemotePattern()`
+ * (next/dist/shared/lib/match-remote-pattern.js) runs picomatch over that
+ * *already-compiled* string again at request time -- double-escaping it into
+ * something that can no longer match the real hostname. Reproduced directly:
+ * a pattern for exactly "localhost" ends up unable to match the literal
+ * string "localhost", and the bug is pattern-shape-independent (a bare `*`
+ * fails the same way), so no remotePatterns config can work around it in
+ * this version. `domains` is untouched by writeImagesManifest() and matched
+ * with plain string equality, sidestepping the bug entirely. Revert to
+ * remotePatterns once next.js is upgraded past whatever version fixes this
+ * (worth rechecking on the next Next.js upgrade -- see
+ * https://github.com/vercel/next.js for the fix once one lands).
  */
-function mediaRemotePatterns() {
-  const raw = process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
+function mediaImageHostname() {
+  const raw = process.env.NEXT_PUBLIC_MEDIA_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!raw) return [];
   try {
-    const url = new URL(raw);
-    return [
-      {
-        protocol: url.protocol.replace(':', ''),
-        hostname: url.hostname,
-        port: url.port || '',
-        pathname: '/**',
-      },
-    ];
+    return [new URL(raw).hostname];
   } catch {
     // A malformed value should not fail the whole build -- images from it
     // just won't load, the same degraded-but-not-broken outcome as today.
@@ -174,11 +191,47 @@ function mediaRemotePatterns() {
   }
 }
 
+/**
+ * next/image's built-in optimizer fetches the *exact* image src server-side
+ * -- there is no hook to fetch via one URL while embedding another in the
+ * page, which a custom loader cannot fix either (a loader only controls the
+ * displayed URL, not the optimizer's own internal fetch). That is fine
+ * whenever the public image origin is reachable from both the browser and
+ * this container -- true in production, where MEDIA_PUBLIC_BASE_URL /
+ * NEXT_PUBLIC_API_BASE_URL is a real public domain DNS resolves the same way
+ * everywhere.
+ *
+ * It breaks specifically in local Docker Compose dev: the browser reaches
+ * the API at localhost:<published port>, but "localhost" from inside the
+ * `web` container is the web container itself, not `backend` -- confirmed
+ * directly (ECONNREFUSED ::1:<port> from image-optimizer.js's own fetch).
+ * The docker-internal address (INTERNAL_API_BASE_URL, e.g. backend:3100) IS
+ * reachable from here, but embedding that in the page would break the
+ * browser instead, so there is no single URL that works for both. Detected
+ * by the API origin's hostname being localhost/127.0.0.1, which the real
+ * public origin used in production never is.
+ */
+function isLikelyUnreachableFromServer() {
+  const raw = process.env.NEXT_PUBLIC_MEDIA_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!raw) return false;
+  try {
+    const { hostname } = new URL(raw);
+    return hostname === 'localhost' || hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   redirects,
   images: {
-    remotePatterns: mediaRemotePatterns(),
+    domains: mediaImageHostname(),
+    // Skips next/image's own optimize-and-cache fetch in local dev (see
+    // isLikelyUnreachableFromServer above) -- images still render, just
+    // without resizing/format conversion, rather than 500ing. Production
+    // keeps full optimization.
+    unoptimized: isLikelyUnreachableFromServer(),
   },
 };
 

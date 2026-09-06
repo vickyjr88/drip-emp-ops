@@ -30,10 +30,14 @@ services:
         # X (Twitter) Pixel ID, same rule.
         - NEXT_PUBLIC_X_PIXEL_ID=${NEXT_PUBLIC_X_PIXEL_ID:-}
         # next/image needs every remote image host allow-listed at build time
-        # (next.config.js's images.remotePatterns) -- product photos are
-        # served from MEDIA_PUBLIC_BASE_URL, which is otherwise a
-        # backend-only, runtime-only env var (see below). Without this,
-        # product images would 400 the moment next/image was adopted.
+        # (next.config.js's images.remotePatterns). Product/CMS images are
+        # actually streamed through the backend API at GET /media/:key (see
+        # MediaController), not served straight from MinIO, so the real host
+        # is ordinarily the API's own public origin -- next.config.js already
+        # falls back to NEXT_PUBLIC_API_BASE_URL when this is unset, so this
+        # build arg only matters for the rarer case of a genuinely separate
+        # media host (MEDIA_PUBLIC_BASE_URL set to something other than the
+        # API origin).
         - NEXT_PUBLIC_MEDIA_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
     ports:
       # host:container. Next binds 3002 inside the container and logs that
@@ -53,6 +57,17 @@ services:
       # the browser keeps using NEXT_PUBLIC_API_BASE_URL. Read at runtime, so it
       # needs no rebuild to change.
       - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://backend:3100}
+      # `next start` re-executes next.config.js at server boot, not just at
+      # build time -- confirmed by tracing a broken-image regression directly:
+      # images.domains (mediaImageHostname() in next.config.js) came back
+      # empty at request time even though the build-time manifest on disk had
+      # the right value, because process.env.NEXT_PUBLIC_API_BASE_URL is
+      # undefined in a container that only ever received it as a build arg.
+      # NEXT_PUBLIC_* vars still need to be build args too (that's what
+      # inlines them into the browser bundle), but next.config.js's own
+      # runtime logic needs them present here as well.
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3101}
+      - NEXT_PUBLIC_MEDIA_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
     depends_on:
       - backend
     restart: unless-stopped
