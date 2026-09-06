@@ -48,6 +48,21 @@ async function redirects() {
     { source: '/en-gb/information/shipping', destination: '/delivery', permanent: true },
     { source: '/en-gb/information/privacy', destination: '/privacy', permanent: true },
     { source: '/en-gb/information/privacy-policy', destination: '/privacy', permanent: true },
+    // The old page at this slug is actually a copy of the Terms & Conditions
+    // (its content covers the Affiliate Program under the site's general
+    // terms), but /affiliate now exists as its own real page -- a visitor
+    // following this link is looking for the program itself, not the legal
+    // text that happens to mention it, so it goes there instead of /terms.
+    { source: '/en-gb/information/affiliate', destination: '/affiliate', permanent: true },
+    // "Find Your Favorite Brand" on the old site -- confirmed live there,
+    // no equivalent brand-listing page exists yet, so this goes to /shop
+    // rather than a dead end.
+    {
+      source: '/en-gb',
+      has: [{ type: 'query', key: 'route', value: 'product/manufacturer' }],
+      destination: '/shop',
+      permanent: true,
+    },
     {
       source: '/en-gb',
       has: [{ type: 'query', key: 'route', value: 'information/about' }],
