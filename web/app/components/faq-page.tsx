@@ -14,7 +14,7 @@
 import { EliteLayout } from './elite-layout';
 import { contentValue, fetchPageContent } from '../lib/page-content';
 
-type FaqItem = { question?: string; answer?: string };
+export type FaqItem = { question?: string; answer?: string };
 
 /**
  * The answers as the shop actually operates today.
@@ -72,7 +72,23 @@ const DEFAULT_FAQS: FaqItem[] = [
   },
 ];
 
-export async function FaqPage() {
+/**
+ * The FAQ content itself, shared between the visible page and its FAQPage
+ * JSON-LD -- so the structured data an assistant reads is never able to drift
+ * out of sync with the answers a visitor actually sees on the page.
+ */
+export async function fetchFaqs(): Promise<FaqItem[]> {
+  const content = await fetchPageContent('faq');
+  // An empty list in the CMS falls back to the built-in answers rather than
+  // rendering a blank page: a shop with no FAQs looks unfinished, and these are
+  // true until someone deliberately changes them.
+  const edited = contentValue<FaqItem[]>(content, 'items', []).filter(
+    (item) => item.question?.trim() || item.answer?.trim(),
+  );
+  return edited.length ? edited : DEFAULT_FAQS;
+}
+
+export async function FaqPage({ faqs }: { faqs: FaqItem[] }) {
   const content = await fetchPageContent('faq');
 
   const kicker = contentValue(content, 'hero.kicker', 'Help');
@@ -82,14 +98,6 @@ export async function FaqPage() {
     'hero.intro',
     'Delivery, sizing, payment and collection — the things people ask us most. Anything else, message us on WhatsApp.',
   );
-
-  // An empty list in the CMS falls back to the built-in answers rather than
-  // rendering a blank page: a shop with no FAQs looks unfinished, and these are
-  // true until someone deliberately changes them.
-  const edited = contentValue<FaqItem[]>(content, 'items', []).filter(
-    (item) => item.question?.trim() || item.answer?.trim(),
-  );
-  const faqs = edited.length ? edited : DEFAULT_FAQS;
 
   return (
     <EliteLayout active="faq">

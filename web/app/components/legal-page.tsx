@@ -54,18 +54,26 @@ export async function LegalPage({
   slug,
   defaultHeading,
   defaultIntro,
+  defaultKicker,
+  defaultBody,
 }: {
-  slug: 'terms' | 'privacy';
+  slug: 'terms' | 'privacy' | 'delivery';
   defaultHeading: string;
   defaultIntro: string;
+  /** Falls back to "Legal", which reads oddly for a non-legal page like delivery. */
+  defaultKicker?: string;
+  /** Body prose shown until an editor saves real copy over it -- without this a
+   *  never-touched CMS doc renders as "not published yet", which is wrong for a
+   *  page whose content is well known in advance rather than pending legal review. */
+  defaultBody?: string;
 }) {
   const content = await fetchPageContent(slug);
 
-  const kicker = contentValue(content, 'hero.kicker', 'Legal');
+  const kicker = contentValue(content, 'hero.kicker', defaultKicker ?? 'Legal');
   const heading = contentValue(content, 'hero.heading', defaultHeading);
   const rawIntro = contentValue(content, 'hero.intro', defaultIntro);
   const lastUpdated = contentValue(content, 'body.lastUpdated', '');
-  const proseText = contentValue(content, 'body.text', '').trim();
+  const proseText = contentValue(content, 'body.text', defaultBody ?? '').trim();
 
   /**
    * A whole policy pasted into the intro is treated as the policy.

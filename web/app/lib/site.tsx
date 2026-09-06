@@ -37,7 +37,7 @@ export function absoluteUrl(path = '/') {
  */
 export function organizationSchema() {
   return {
-    '@type': 'RealEstateAgent',
+    '@type': 'ShoeStore',
     '@id': `${SITE_URL}/#organization`,
     name: SITE_NAME,
     url: SITE_URL,
