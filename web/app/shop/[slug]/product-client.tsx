@@ -16,6 +16,7 @@
  * would cost more than the cart gains.
  */
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
@@ -162,7 +163,14 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
           <div className="de-gallery">
             <div className="de-gallery-main">
               {product.imageUrls[image] ? (
-                <img src={product.imageUrls[image]} alt={product.name} />
+                <Image
+                  src={product.imageUrls[image]}
+                  alt={product.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 500px"
+                  style={{ objectFit: 'cover' }}
+                  priority
+                />
               ) : (
                 <span className="de-gallery-placeholder" aria-hidden="true">
                   {product.name.charAt(0)}
@@ -179,7 +187,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                     onClick={() => setImage(index)}
                     aria-label={`View image ${index + 1}`}
                   >
-                    <img src={url} alt="" />
+                    <Image src={url} alt="" fill sizes="66px" style={{ objectFit: 'cover' }} />
                   </button>
                 ))}
               </div>

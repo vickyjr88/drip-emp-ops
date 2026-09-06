@@ -13,6 +13,7 @@
  * sold out yesterday.
  */
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -217,7 +218,7 @@ export default function HomeClient() {
               {brandItems.map((brand, index) => (
                 <div key={`${brand.name}-${index}`} className="de-brand-item">
                   {brand.logo ? (
-                    <img src={brand.logo} alt={brand.name} loading="lazy" />
+                    <Image src={brand.logo} alt={brand.name} width={120} height={32} loading="lazy" />
                   ) : (
                     <span>{brand.name}</span>
                   )}
@@ -270,7 +271,7 @@ export default function HomeClient() {
               </div>
               {aboutImage ? (
                 <div className="lp-home-about-media">
-                  <img src={aboutImage} alt="" />
+                  <Image src={aboutImage} alt="" fill sizes="(max-width: 900px) 100vw, 50vw" style={{ objectFit: 'cover' }} />
                 </div>
               ) : null}
             </div>

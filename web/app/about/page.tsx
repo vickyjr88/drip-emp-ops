@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { seoMetadata } from '../lib/page-metadata';
 import { EliteLayout } from '../components/elite-layout';
@@ -93,7 +94,7 @@ export default async function AboutPage() {
             </div>
             {storyImage ? (
               <div className="de-about-story-media">
-                <img src={storyImage} alt="" />
+                <Image src={storyImage} alt="" fill sizes="(max-width: 860px) 100vw, 50vw" style={{ objectFit: 'cover' }} />
               </div>
             ) : null}
           </section>
@@ -105,7 +106,14 @@ export default async function AboutPage() {
             <div className="de-gallery-strip">
               {galleryItems.map((photo, index) => (
                 <figure key={`${photo.image}-${index}`}>
-                  <img src={photo.image} alt={photo.caption || ''} loading="lazy" />
+                  <Image
+                    src={photo.image}
+                    alt={photo.caption || ''}
+                    fill
+                    sizes="(max-width: 640px) 50vw, 25vw"
+                    style={{ objectFit: 'cover' }}
+                    loading="lazy"
+                  />
                   {photo.caption ? <figcaption>{photo.caption}</figcaption> : null}
                 </figure>
               ))}

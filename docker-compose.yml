@@ -27,6 +27,14 @@ services:
         # Meta Pixel ID, same build-time/blank-by-default rule as the GA
         # Measurement ID above.
         - NEXT_PUBLIC_META_PIXEL_ID=${NEXT_PUBLIC_META_PIXEL_ID:-}
+        # X (Twitter) Pixel ID, same rule.
+        - NEXT_PUBLIC_X_PIXEL_ID=${NEXT_PUBLIC_X_PIXEL_ID:-}
+        # next/image needs every remote image host allow-listed at build time
+        # (next.config.js's images.remotePatterns) -- product photos are
+        # served from MEDIA_PUBLIC_BASE_URL, which is otherwise a
+        # backend-only, runtime-only env var (see below). Without this,
+        # product images would 400 the moment next/image was adopted.
+        - NEXT_PUBLIC_MEDIA_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
     ports:
       # host:container. Next binds 3002 inside the container and logs that
       # port on startup -- the site is reached on WEB_PORT from the host.

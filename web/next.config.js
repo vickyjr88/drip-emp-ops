@@ -146,9 +146,40 @@ async function redirects() {
   ];
 }
 
+/**
+ * next/image needs every remote host it will ever serve an image from
+ * allow-listed here at build time -- an unlisted host 400s instead of
+ * loading. Product photos and CMS-uploaded images are both served from
+ * MEDIA_PUBLIC_BASE_URL (MinIO behind a public URL in production), passed
+ * through as NEXT_PUBLIC_MEDIA_BASE_URL since the original is a
+ * backend-only env var otherwise invisible to this build step.
+ */
+function mediaRemotePatterns() {
+  const raw = process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
+  if (!raw) return [];
+  try {
+    const url = new URL(raw);
+    return [
+      {
+        protocol: url.protocol.replace(':', ''),
+        hostname: url.hostname,
+        port: url.port || '',
+        pathname: '/**',
+      },
+    ];
+  } catch {
+    // A malformed value should not fail the whole build -- images from it
+    // just won't load, the same degraded-but-not-broken outcome as today.
+    return [];
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   redirects,
+  images: {
+    remotePatterns: mediaRemotePatterns(),
+  },
 };
 
 module.exports = nextConfig;

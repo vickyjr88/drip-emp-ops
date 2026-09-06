@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image';
 import { FormEvent, useEffect, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { PhoneInput } from '../components/phone-input';
@@ -129,7 +130,7 @@ export default function ContactClient() {
         {agentImage ? (
           <section className="lp-container lp-contact-mobile-intro">
             <div>
-              <img src={agentImage} alt={agentName} />
+              <Image src={agentImage} alt={agentName} width={96} height={96} style={{ objectFit: 'cover' }} />
             </div>
             <h2>{agentName}</h2>
             <p>{agentRole}</p>
@@ -198,7 +199,9 @@ export default function ContactClient() {
 
           <aside className="lp-contact-aside">
             <article className="lp-contact-agent-card">
-              {agentImage ? <img src={agentImage} alt={agentName} /> : null}
+              {agentImage ? (
+                <Image src={agentImage} alt={agentName} width={132} height={176} style={{ objectFit: 'cover' }} />
+              ) : null}
               <h3>{agentName}</h3>
               <p>{agentRole}</p>
               <div className="lp-contact-agent-lines">

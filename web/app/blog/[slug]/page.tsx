@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../../lib/site';
@@ -79,7 +80,14 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
           {post.coverImageUrl ? (
             <section className="lp-container de-blog-cover">
-              <img src={post.coverImageUrl} alt="" />
+              <Image
+                src={post.coverImageUrl}
+                alt=""
+                fill
+                sizes="(max-width: 860px) 100vw, 820px"
+                style={{ objectFit: 'cover' }}
+                priority
+              />
             </section>
           ) : null}
 

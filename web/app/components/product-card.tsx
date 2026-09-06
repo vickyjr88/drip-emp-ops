@@ -11,6 +11,7 @@
  * scroll past would undo the point of a quick add.
  */
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ShareButton } from './share-button';
@@ -66,7 +67,13 @@ export function ProductCard({ product }: { product: ShopProduct }) {
     <article className={`de-card${product.anyInStock ? '' : ' is-preorder'}`}>
       <Link href={`/shop/${product.slug}`} className="de-card-media">
         {product.imageUrls[0] ? (
-          <img src={product.imageUrls[0]} alt={product.name} loading="lazy" />
+          <Image
+            src={product.imageUrls[0]}
+            alt={product.name}
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 240px"
+            style={{ objectFit: 'cover' }}
+          />
         ) : (
           <span className="de-card-placeholder" aria-hidden="true">
             {product.name.charAt(0)}
