@@ -15,7 +15,8 @@ import { useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { formatKes } from '../../lib/shop';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
-import { trackPurchase } from '../../lib/meta-pixel';
+import { trackPurchase as trackMetaPurchase } from '../../lib/meta-pixel';
+import { trackPurchase as trackXPurchase } from '../../lib/x-pixel';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 
@@ -75,7 +76,12 @@ export function CompleteClient() {
     if (!order || state !== 'paid') return;
     const dedupeKey = `de_purchase_tracked_${order.orderNumber}`;
     if (typeof window === 'undefined' || window.sessionStorage.getItem(dedupeKey)) return;
-    trackPurchase({
+    trackMetaPurchase({
+      contentIds: order.lines.map((line) => line.sku),
+      value: order.amountPaid,
+      orderNumber: order.orderNumber,
+    });
+    trackXPurchase({
       contentIds: order.lines.map((line) => line.sku),
       value: order.amountPaid,
       orderNumber: order.orderNumber,

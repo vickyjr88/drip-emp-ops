@@ -27,7 +27,8 @@ import { useCustomerAuth } from '../../lib/customer-auth';
 import { absoluteUrl } from '../../lib/site';
 import { withReferral } from '../../lib/referral';
 import { useCaptureReferral } from '../../lib/use-capture-referral';
-import { trackAddToCart, trackViewContent } from '../../lib/meta-pixel';
+import { trackAddToCart as trackMetaAddToCart, trackViewContent as trackMetaViewContent } from '../../lib/meta-pixel';
+import { trackAddToCart as trackXAddToCart, trackViewContent as trackXViewContent } from '../../lib/x-pixel';
 import { ShopProduct, fetchProduct, formatKes, priceLabel } from '../../lib/shop';
 
 export function ProductClient({ product: initialProduct }: { product: ShopProduct }) {
@@ -81,7 +82,12 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
   // this listing," and re-firing it every time someone tries a different
   // size would inflate it far past actual page views.
   useEffect(() => {
-    trackViewContent({
+    trackMetaViewContent({
+      contentId: product.id,
+      contentName: product.name,
+      value: product.priceFrom,
+    });
+    trackXViewContent({
       contentId: product.id,
       contentName: product.name,
       value: product.priceFrom,
@@ -261,7 +267,12 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                     priceKes: chosen.priceKes,
                     imageUrl: product.imageUrls[0] || null,
                   });
-                  trackAddToCart({
+                  trackMetaAddToCart({
+                    contentId: product.id,
+                    contentName: `${product.name} - ${chosen.size}`,
+                    value: chosen.priceKes,
+                  });
+                  trackXAddToCart({
                     contentId: product.id,
                     contentName: `${product.name} - ${chosen.size}`,
                     value: chosen.priceKes,

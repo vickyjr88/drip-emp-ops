@@ -19,6 +19,7 @@ import posthog from 'posthog-js';
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+const X_PIXEL_ID = process.env.NEXT_PUBLIC_X_PIXEL_ID;
 
 // Module-scoped rather than a ref on the component: StorefrontAnalytics
 // itself unmounts and remounts as a shopper crosses in and out of /portal,
@@ -74,6 +75,22 @@ function MetaPixelPageview() {
   return null;
 }
 
+/**
+ * Same reasoning as MetaPixelPageview: the base script's `twq('config', ...)`
+ * call fires one PageView for the URL at load time but does not re-fire on a
+ * client-side route change, so each pathname change tracks its own.
+ */
+function XPixelPageview() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (typeof window.twq !== 'function') return;
+    window.twq('event', 'PageView');
+  }, [pathname]);
+
+  return null;
+}
+
 export function StorefrontAnalytics() {
   const pathname = usePathname();
   if (pathname?.startsWith('/portal')) return null;
@@ -108,6 +125,21 @@ export function StorefrontAnalytics() {
           </noscript>
           <Suspense fallback={null}>
             <MetaPixelPageview />
+          </Suspense>
+        </>
+      ) : null}
+      {X_PIXEL_ID ? (
+        <>
+          <Script id="x-pixel-base" strategy="afterInteractive">
+            {`
+              !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
+              },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
+              a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+              twq('config','${X_PIXEL_ID}');
+            `}
+          </Script>
+          <Suspense fallback={null}>
+            <XPixelPageview />
           </Suspense>
         </>
       ) : null}
