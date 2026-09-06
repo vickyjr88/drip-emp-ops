@@ -26,11 +26,11 @@ const DEFAULT_QUICK_LINKS: FooterLink[] = [
 ];
 
 const DEFAULT_SERVICE_LINKS: FooterLink[] = [
-  { label: 'Sneakers', href: '/shop?category=sneakers' },
-  { label: 'Boots', href: '/shop?category=boots' },
-  { label: 'Casuals', href: '/shop?category=casuals' },
-  { label: 'Sandals', href: '/shop?category=sandals' },
-  { label: 'Officials', href: '/shop?category=officials' },
+  { label: 'Sneakers', href: '/shop/category/sneakers' },
+  { label: 'Boots', href: '/shop/category/boots' },
+  { label: 'Casuals', href: '/shop/category/casuals' },
+  { label: 'Sandals', href: '/shop/category/sandals' },
+  { label: 'Officials', href: '/shop/category/officials' },
 ];
 
 const DEFAULT_BOTTOM_LINKS: FooterLink[] = [

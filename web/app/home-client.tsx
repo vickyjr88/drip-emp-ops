@@ -201,7 +201,7 @@ export default function HomeClient() {
             </div>
             <div className="de-cat-grid">
               {categories.map((category) => (
-                <Link key={category.slug} href={`/shop?category=${category.slug}`} className="de-cat">
+                <Link key={category.slug} href={`/shop/category/${category.slug}`} className="de-cat">
                   <span>{category.name}</span>
                   <em>{category.productCount} style{category.productCount === 1 ? '' : 's'}</em>
                 </Link>

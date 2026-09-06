@@ -106,10 +106,23 @@ async function redirects() {
       permanent: true,
     },
 
-    // --- Categories that still exist: send to the matching filter ---
-    { source: '/en-gb/catalog/sneakers', destination: '/shop?category=sneakers', permanent: true },
-    { source: '/en-gb/catalog/casuals', destination: '/shop?category=casuals', permanent: true },
-    { source: '/en-gb/catalog/officials', destination: '/shop?category=officials', permanent: true },
+    // --- Categories that still exist: send straight to their own crawlable
+    // page (/shop/category/[slug]) rather than the ?category= query form, so
+    // this doesn't redirect into something that itself gets superseded. ---
+    { source: '/en-gb/catalog/sneakers', destination: '/shop/category/sneakers', permanent: true },
+    { source: '/en-gb/catalog/casuals', destination: '/shop/category/casuals', permanent: true },
+    { source: '/en-gb/catalog/officials', destination: '/shop/category/officials', permanent: true },
+
+    // The ?category= query form still works as a live filter on /shop (the
+    // dropdown uses it for fast client-side filtering), but /shop/category/x
+    // is now the canonical, indexable URL for a given category -- an old
+    // bookmark or indexed link using the query form should land there too.
+    {
+      source: '/shop',
+      has: [{ type: 'query', key: 'category', value: '(?<category>.*)' }],
+      destination: '/shop/category/:category',
+      permanent: true,
+    },
 
     // --- Everything else broken: categories retired since migration, every
     // product page, brands, specials, and any other old route -- to /shop,

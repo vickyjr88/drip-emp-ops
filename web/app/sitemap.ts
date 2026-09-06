@@ -35,6 +35,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // search for by name ("does drip emporium deliver"), so it is the one most
     // worth indexing.
     { url: `${SITE_URL}/faq`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${SITE_URL}/delivery`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/affiliate`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
   ];
 
   try {
@@ -50,7 +52,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [
       ...staticRoutes,
       ...categories.map((category) => ({
-        url: `${SITE_URL}/shop?category=${category.slug}`,
+        url: `${SITE_URL}/shop/category/${category.slug}`,
         lastModified: now,
         changeFrequency: 'weekly' as const,
         priority: 0.7,

@@ -43,6 +43,7 @@ export function ShopClient({
   initialCategories = [],
   initialBrands = [],
   initialSizes = [],
+  lockedCategory,
 }: {
   /** Server-rendered for the filters already in the URL, so a crawler (and a
    *  shopper's first paint) sees the real grid rather than an empty shell.
@@ -52,6 +53,11 @@ export function ShopClient({
   initialCategories?: ShopCategory[];
   initialBrands?: string[];
   initialSizes?: string[];
+  /** Set only by /shop/category/[slug] -- the category comes from the path,
+   *  not a ?category= param, and stays fixed rather than being clearable
+   *  like a normal filter (clearing it here would mean leaving the page's
+   *  own URL, which "Clear all" already does for every other filter). */
+  lockedCategory?: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -73,7 +79,7 @@ export function ShopClient({
   const [loading, setLoading] = useState(false);
   const isFirstRender = useRef(true);
 
-  const category = params.get('category') || '';
+  const category = lockedCategory || params.get('category') || '';
   const brand = params.get('brand') || '';
   const size = params.get('size') || '';
   const search = params.get('search') || '';
@@ -222,7 +228,22 @@ export function ShopClient({
             <div className="de-filter-row">
               <label>
                 <span>Category</span>
-                <select value={category} onChange={(event) => setParam('category', event.target.value)}>
+                <select
+                  value={category}
+                  onChange={(event) => {
+                    const nextSlug = event.target.value;
+                    // On the path-based /shop/category/[slug] page, the
+                    // category is the URL itself -- a real navigation to the
+                    // new category's own page (or plain /shop for "All"),
+                    // not a query param that lockedCategory would immediately
+                    // override back to the old one.
+                    if (lockedCategory) {
+                      router.push(nextSlug ? `/shop/category/${nextSlug}` : '/shop');
+                      return;
+                    }
+                    setParam('category', nextSlug);
+                  }}
+                >
                   <option value="">All</option>
                   {categories.map((item) => (
                     <option key={item.slug} value={item.slug}>{item.name}</option>

@@ -147,7 +147,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
           {product.category ? (
             <>
               <span aria-hidden="true">/</span>
-              <Link href={`/shop?category=${product.category.slug}`}>{product.category.name}</Link>
+              <Link href={`/shop/category/${product.category.slug}`}>{product.category.name}</Link>
             </>
           ) : null}
         </nav>
