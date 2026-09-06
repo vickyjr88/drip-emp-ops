@@ -6,9 +6,10 @@ import { InventoryModule } from '../inventory/inventory.module';
 import { SalesPostingModule } from '../sales-posting/sales-posting.module';
 import { EmailLogModule } from '../email-log/email-log.module';
 import { CommissionModule } from '../commission/commission.module';
+import { XConversionModule } from '../x-conversion/x-conversion.module';
 
 @Module({
-  imports: [PrismaModule, InventoryModule, SalesPostingModule, EmailLogModule, CommissionModule],
+  imports: [PrismaModule, InventoryModule, SalesPostingModule, EmailLogModule, CommissionModule, XConversionModule],
   controllers: [OrderController],
   providers: [OrderService],
   exports: [OrderService],
