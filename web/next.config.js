@@ -32,7 +32,22 @@ async function redirects() {
     // /en-gb path (OpenCart's query-string routing), so they must all be
     // checked before the unconditional /en-gb fallback further down, or that
     // fallback would win first and swallow every one of them.
+    //
+    // The old site actually serves these information pages under two
+    // different URL shapes -- a query-string form (?route=information/x, the
+    // only form listed in the sitemap) and a path-based SEO-URL form
+    // (/en-gb/information/<slug>, not in the sitemap but confirmed live and
+    // indexed, e.g. /en-gb/information/about-us). Both need their own rule;
+    // the path-based slugs below were found by probing the live old site
+    // directly, since the sitemap alone missed them entirely.
     { source: '/en-gb/information/terms', destination: '/terms', permanent: true },
+    { source: '/en-gb/information/about', destination: '/about', permanent: true },
+    { source: '/en-gb/information/about-us', destination: '/about', permanent: true },
+    { source: '/en-gb/information/delivery', destination: '/delivery', permanent: true },
+    { source: '/en-gb/information/delivery-information', destination: '/delivery', permanent: true },
+    { source: '/en-gb/information/shipping', destination: '/delivery', permanent: true },
+    { source: '/en-gb/information/privacy', destination: '/privacy', permanent: true },
+    { source: '/en-gb/information/privacy-policy', destination: '/privacy', permanent: true },
     {
       source: '/en-gb',
       has: [{ type: 'query', key: 'route', value: 'information/about' }],
