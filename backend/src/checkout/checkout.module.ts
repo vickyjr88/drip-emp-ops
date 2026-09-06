@@ -7,6 +7,7 @@ import { EmailLogModule } from '../email-log/email-log.module';
 import { CustomerPortalModule } from '../customer-portal/customer-portal.module';
 import { CommissionModule } from '../commission/commission.module';
 import { CampaignModule } from '../campaign/campaign.module';
+import { XConversionModule } from '../x-conversion/x-conversion.module';
 import { CheckoutService } from './checkout.service';
 import { CheckoutController } from './checkout.controller';
 
@@ -22,6 +23,7 @@ import { CheckoutController } from './checkout.controller';
     CustomerPortalModule,
     CommissionModule,
     CampaignModule,
+    XConversionModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService],

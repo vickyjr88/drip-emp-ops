@@ -5,6 +5,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CommissionService } from '../commission/commission.service';
+import { XConversionService } from '../x-conversion/x-conversion.service';
 import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderLineFulfillmentDto } from './dto/create-order.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
@@ -62,6 +63,7 @@ export class OrderService {
     private readonly posting: SalesPostingService,
     private readonly ownerNotification: OwnerNotificationService,
     private readonly commission: CommissionService,
+    private readonly xConversion: XConversionService,
   ) {}
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
@@ -386,9 +388,11 @@ export class OrderService {
       return updated;
     });
 
+    const transitionedToPaid = updated.status === 'PAID' && order.status !== 'PAID';
+
     // WhatsApp orders specifically, per the notification scope -- an in-store
     // walk-in settling at the till is not one of the events worth an email.
-    if (updated.status === 'PAID' && order.status !== 'PAID' && updated.channel === 'WHATSAPP') {
+    if (transitionedToPaid && updated.channel === 'WHATSAPP') {
       void this.ownerNotification.notifyOrderPaid({
         orderNumber: updated.orderNumber,
         channel: updated.channel,
@@ -396,6 +400,20 @@ export class OrderService {
         customerPhone: updated.customerPhone,
         customerEmail: updated.customerEmail,
         total: Number(updated.total),
+      });
+    }
+
+    // Every channel here, not just WhatsApp -- unlike the owner-notification
+    // email above (deliberately scoped to one channel), a sale is a real ad
+    // conversion regardless of how staff recorded the payment. Complements
+    // checkout.service.ts's own call for the online-checkout path; this one
+    // covers a payment staff record by hand (WhatsApp order, in-store
+    // walk-in, or completing a part-payment).
+    if (transitionedToPaid) {
+      void this.xConversion.trackPurchase({
+        orderNumber: updated.orderNumber,
+        email: updated.customerEmail,
+        phone: updated.customerPhone,
       });
     }
 

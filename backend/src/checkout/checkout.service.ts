@@ -8,6 +8,7 @@ import { PaystackService } from '../paystack/paystack.service';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CommissionService } from '../commission/commission.service';
 import { CampaignService } from '../campaign/campaign.service';
+import { XConversionService } from '../x-conversion/x-conversion.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
@@ -52,6 +53,7 @@ export class CheckoutService {
     private readonly ownerNotification: OwnerNotificationService,
     private readonly commission: CommissionService,
     private readonly campaign: CampaignService,
+    private readonly xConversion: XConversionService,
   ) {}
 
   /**
@@ -453,6 +455,17 @@ export class CheckoutService {
         customerPhone: updated.customerPhone,
         customerEmail: updated.customerEmail,
         total: Number(updated.total),
+      });
+      // Complements the browser pixel's own Purchase event (which an ad
+      // blocker can drop) with a server-side report of the same sale.
+      // orderNumber as the conversion_id means a webhook replay against an
+      // already-settled order (which this branch already excludes) or any
+      // other duplicate call reports the same id, letting X's own
+      // deduplication collapse it rather than double-counting the sale.
+      void this.xConversion.trackPurchase({
+        orderNumber: updated.orderNumber,
+        email: updated.customerEmail,
+        phone: updated.customerPhone,
       });
     }
 

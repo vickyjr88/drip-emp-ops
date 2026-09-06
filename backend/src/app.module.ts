@@ -15,6 +15,7 @@ import { CartLeadModule } from './cart-lead/cart-lead.module';
 import { InquiryModule } from './inquiry/inquiry.module';
 import { ResellerApplicationModule } from './reseller-application/reseller-application.module';
 import { CampaignModule } from './campaign/campaign.module';
+import { XConversionModule } from './x-conversion/x-conversion.module';
 import { BlogModule } from './blog/blog.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
@@ -81,6 +82,7 @@ import { PdfModule } from './pdf/pdf.module';
     InquiryModule,
     ResellerApplicationModule,
     CampaignModule,
+    XConversionModule,
     BlogModule,
     PrismaModule,
     CustomerModule,

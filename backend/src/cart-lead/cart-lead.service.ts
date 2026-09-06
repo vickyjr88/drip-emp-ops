@@ -6,6 +6,7 @@ import { withFirstLineImage } from '../common/cart-lead-image.util';
 import { normalizePhoneNumber } from '../common/phone.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CampaignService } from '../campaign/campaign.service';
+import { XConversionService } from '../x-conversion/x-conversion.service';
 import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
 import { CartReminderQueueService } from './cart-reminder-queue.service';
@@ -17,6 +18,7 @@ export class CartLeadService {
     private readonly ownerNotification: OwnerNotificationService,
     private readonly reminderQueue: CartReminderQueueService,
     private readonly campaign: CampaignService,
+    private readonly xConversion: XConversionService,
   ) {}
 
   /**
@@ -261,6 +263,18 @@ export class CartLeadService {
     // public and polled periodically, so it must never be slowed or fail
     // because Redis is briefly unreachable.
     void this.reminderQueue.scheduleReminder(created.id);
+    // The closest server-side signal this app has to an AddToCart/purchase-
+    // intent event: there is no dedicated endpoint for the moment an item is
+    // added (the cart is client-side state until checkout starts), and this
+    // sync already carries the same customer identifiers once contact
+    // details are known. Only on the first sync, matching the notification
+    // and reminder above -- a shopper still typing should not report the
+    // same intent signal on every poll.
+    void this.xConversion.trackCartEngagement({
+      cartLeadId: created.id,
+      email: created.customerEmail,
+      phone: created.customerPhone,
+    });
     return created;
   }
 
