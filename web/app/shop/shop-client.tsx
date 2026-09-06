@@ -14,7 +14,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { ProductSearch } from '../components/product-search';
 import { ProductCard } from '../components/product-card';
@@ -38,7 +38,21 @@ function SearchIcon() {
   );
 }
 
-export function ShopClient() {
+export function ShopClient({
+  initialProducts = [],
+  initialCategories = [],
+  initialBrands = [],
+  initialSizes = [],
+}: {
+  /** Server-rendered for the filters already in the URL, so a crawler (and a
+   *  shopper's first paint) sees the real grid rather than an empty shell.
+   *  Every effect below still re-fetches on its own terms after mount --
+   *  this only seeds the first render. */
+  initialProducts?: ShopProduct[];
+  initialCategories?: ShopCategory[];
+  initialBrands?: string[];
+  initialSizes?: string[];
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const auth = useCustomerAuth();
@@ -48,11 +62,16 @@ export function ShopClient() {
   // on the product detail page.
   useCaptureReferral();
 
-  const [products, setProducts] = useState<ShopProduct[]>([]);
-  const [categories, setCategories] = useState<ShopCategory[]>([]);
-  const [brands, setBrands] = useState<string[]>([]);
-  const [sizes, setSizes] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<ShopProduct[]>(initialProducts);
+  const [categories, setCategories] = useState<ShopCategory[]>(initialCategories);
+  const [brands, setBrands] = useState<string[]>(initialBrands);
+  const [sizes, setSizes] = useState<string[]>(initialSizes);
+  // Server already fetched the anonymous view of exactly this URL's
+  // filters; skip the redundant duplicate client fetch on first mount and
+  // let the existing effect run only when something actually changes
+  // (a filter, or auth.token resolving for tier pricing).
+  const [loading, setLoading] = useState(false);
+  const isFirstRender = useRef(true);
 
   const category = params.get('category') || '';
   const brand = params.get('brand') || '';
@@ -75,6 +94,10 @@ export function ShopClient() {
   const [searchAllCategories, setSearchAllCategories] = useState(true);
 
   useEffect(() => {
+    // Already have these from the server render; only fall back to a client
+    // fetch if that came back empty (e.g. the API was briefly unreachable
+    // during SSR) rather than always re-fetching what we already have.
+    if (initialCategories.length || initialBrands.length || initialSizes.length) return;
     let cancelled = false;
     void Promise.all([fetchCategories(), fetchFilters()]).then(([cats, filters]) => {
       if (cancelled) return;
@@ -83,9 +106,19 @@ export function ShopClient() {
       setSizes(filters.sizes);
     });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    // The server already fetched exactly this URL's filters, anonymously.
+    // Skip only that one redundant first duplicate; auth.token in the deps
+    // below means a real customer token resolving right after mount still
+    // triggers its own fetch on the very next run, same as any other
+    // dependency change.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     void fetchProducts({
