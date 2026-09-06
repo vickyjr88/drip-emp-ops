@@ -44,6 +44,7 @@ export function navKeyForHref(href: string): string {
   if (path.startsWith('/shop')) return 'shop';
   if (path.startsWith('/about')) return 'profile';
   if (path.startsWith('/faq')) return 'faq';
+  if (path.startsWith('/blog')) return 'blog';
   if (path.startsWith('/contact')) return 'contact';
   if (path.startsWith('/portal')) return 'portal';
   return `path:${path}`;

@@ -22,6 +22,7 @@ export const revalidate = 3600;
 
 type Product = { slug: string; updatedAt?: string };
 type Category = { slug: string };
+type BlogPost = { slug: string; updatedAt?: string };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -40,14 +41,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const [productsResponse, categoriesResponse] = await Promise.all([
+    const [productsResponse, categoriesResponse, blogResponse] = await Promise.all([
       fetch(`${API_BASE_URL}/shop/products`, { next: { revalidate } }),
       fetch(`${API_BASE_URL}/shop/categories`, { next: { revalidate } }),
+      fetch(`${API_BASE_URL}/public/blog-posts?take=200`, { next: { revalidate } }),
     ]);
     if (!productsResponse.ok) return staticRoutes;
 
     const products = (await productsResponse.json()) as Product[];
     const categories = categoriesResponse.ok ? ((await categoriesResponse.json()) as Category[]) : [];
+    const blogPosts = blogResponse.ok ? ((await blogResponse.json()).items as BlogPost[]) : [];
 
     return [
       ...staticRoutes,
@@ -62,6 +65,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: product.updatedAt ? new Date(product.updatedAt) : now,
         changeFrequency: 'weekly' as const,
         priority: 0.8,
+      })),
+      { url: `${SITE_URL}/blog`, lastModified: now, changeFrequency: 'weekly' as const, priority: 0.7 },
+      ...blogPosts.map((post) => ({
+        url: `${SITE_URL}/blog/${post.slug}`,
+        lastModified: post.updatedAt ? new Date(post.updatedAt) : now,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
       })),
     ];
   } catch {

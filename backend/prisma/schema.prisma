@@ -1930,6 +1930,34 @@ enum CartLeadStatus {
   EXPIRED
 }
 
+/// A public storefront article -- sizing guides, care tips, style advice --
+/// distinct from PageContent's flat per-page documents: a blog needs its own
+/// listing, its own slug per record, and posts published/unpublished one at
+/// a time, none of which a single-document-per-slug store can express.
+model BlogPost {
+  id              String    @id @default(uuid())
+  slug            String    @unique
+  title           String
+  /// One or two sentences shown on the listing card and used as the meta
+  /// description/share text when nothing more specific is set.
+  excerpt         String
+  /// Sanitised HTML, matching how LegalPage/FaqPage already store rich text
+  /// elsewhere in this app -- no markdown parser exists in this codebase, and
+  /// adding one for a handful of hand-authored posts isn't worth a new
+  /// dependency. Rendered server-side so the full article is in the HTML a
+  /// crawler sees.
+  body            String
+  coverImageUrl   String?
+  author          String    @default("Drip Emporium")
+  /// Null until published; a draft is created with this unset and excluded
+  /// from every public listing/sitemap query until a value is set.
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([publishedAt])
+}
+
 /// A message through the contact form, not attached to any product or order --
 /// someone asking about a size, a general question, or anything else that
 /// does not fit the storefront's other flows.
