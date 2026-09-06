@@ -25,6 +25,7 @@ export type PortalNavKey =
   | 'analytics'
   | 'reminders'
   | 'content'
+  | 'blog'
   | 'users'
   | 'hr'
   | 'payroll'
@@ -53,6 +54,7 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
   { key: 'analytics', href: '/portal/analytics', label: 'Analytics' },
   { key: 'reminders', href: '/portal/reminders', label: 'Reminders' },
   { key: 'content', href: '/portal/content', label: 'Site Content' },
+  { key: 'blog', href: '/portal/blog', label: 'Blog' },
   { key: 'users', href: '/portal/users', label: 'Users' },
   { key: 'hr', href: '/portal/hr', label: 'Staff & Leave' },
   { key: 'payroll', href: '/portal/payroll', label: 'Payroll' },
@@ -81,6 +83,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   analytics: 'Analytics',
   reminders: 'Reminders',
   content: 'Site Content',
+  blog: 'Blog',
   users: 'Users',
   hr: 'Staff & Leave',
   payroll: 'Payroll',
