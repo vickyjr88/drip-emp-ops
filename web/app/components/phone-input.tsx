@@ -19,7 +19,7 @@
  * (`onChange` firing a plain string) as any other controlled text input.
  */
 
-import { ChangeEvent, useId, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useId, useMemo, useState } from 'react';
 import { getCountries, getCountryCallingCode, type CountryCode } from 'libphonenumber-js/min';
 
 const DEFAULT_COUNTRY: CountryCode = 'KE';
@@ -74,11 +74,31 @@ export function PhoneInput({
   autoComplete?: string;
   id?: string;
 }) {
-  const options = useMemo(() => countryOptions(), []);
   const initial = useMemo(() => splitExisting(value), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [country, setCountry] = useState<CountryCode>(initial.country);
   const [local, setLocal] = useState(initial.local);
   const selectId = useId();
+
+  /**
+   * Built client-side only, after mount -- Intl.DisplayNames's country-name
+   * strings are not guaranteed identical between Node (SSR) and a browser's
+   * own ICU data (e.g. Node resolves FK to "Falkland Islands", one browser's
+   * ICU build adds "(Islas Malvinas)"). A module-level cache shared across
+   * both environments meant whichever one rendered first could disagree with
+   * the other, which is a *structural* mismatch React can't reconcile --
+   * it threw real hydration errors on every page carrying this component,
+   * not just a text-diff warning. Deferring to an effect means the list is
+   * always built by the same runtime that will render it.
+   */
+  const [options, setOptions] = useState<Array<{ code: CountryCode; name: string; dialCode: string }>>([]);
+  useEffect(() => {
+    setOptions(countryOptions());
+  }, []);
+  // Kenya's own dial code is enough to keep the select meaningful for the
+  // one frame before the effect above fills in the full list.
+  const selectOptions = options.length
+    ? options
+    : [{ code: initial.country, name: initial.country, dialCode: getCountryCallingCode(initial.country) }];
 
   function emit(nextCountry: CountryCode, nextLocal: string) {
     const dialCode = getCountryCallingCode(nextCountry);
@@ -107,7 +127,7 @@ export function PhoneInput({
         onChange={onCountryChange}
         aria-label="Country code"
       >
-        {options.map((option) => (
+        {selectOptions.map((option) => (
           <option key={option.code} value={option.code}>
             {option.name} (+{option.dialCode})
           </option>
