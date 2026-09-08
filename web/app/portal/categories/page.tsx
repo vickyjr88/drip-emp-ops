@@ -32,11 +32,12 @@ type Category = {
   slug: string;
   description?: string | null;
   parentId?: string | null;
+  isActive: boolean;
   _count?: { products: number; children: number };
   attributes?: CategoryAttribute[];
 };
 
-const BLANK = { name: '', description: '', parentId: '' };
+const BLANK = { name: '', description: '', parentId: '', isActive: true };
 const BLANK_ATTRIBUTE = { label: '', optionsText: '' };
 
 export default function CategoriesPage() {
@@ -136,6 +137,7 @@ export default function CategoriesPage() {
         // Empty select means "top level"; null clears an existing parent,
         // which undefined would leave untouched on a PATCH.
         parentId: form.parentId || (editingId ? null : undefined),
+        isActive: form.isActive,
       });
       if (editingId) {
         await apiRequest(`/product-categories/${editingId}`, { method: 'PATCH', body }, token);
@@ -320,6 +322,18 @@ export default function CategoriesPage() {
                       onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                     />
                   </label>
+                  <label className="portal-check">
+                    <input
+                      type="checkbox"
+                      checked={form.isActive}
+                      onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))}
+                    />
+                    <span>Visible on the storefront</span>
+                  </label>
+                  <small className="portal-muted">
+                    Untick to hide this category (and everything filed under it) from the shop, its filters, the
+                    sitemap and the product feeds -- staff can still add products to it while it's off.
+                  </small>
                   <div className="portal-inline-actions">
                     <button type="submit" className="portal-primary-btn" disabled={saving}>
                       {saving ? 'Saving...' : editingId ? 'Save Category' : 'Add Category'}
@@ -353,6 +367,9 @@ export default function CategoriesPage() {
                           <strong>
                             {depth ? '↳ ' : ''}{category.name}
                           </strong>
+                          <span className={`portal-chip${category.isActive ? '' : ' is-muted'}`} style={{ marginLeft: 8 }}>
+                            {category.isActive ? 'Visible' : 'Hidden'}
+                          </span>
                           <p className="portal-muted">
                             <code>{category.slug}</code>
                             {category.parentId ? ` · in ${nameById.get(category.parentId) ?? 'unknown'}` : ''}
@@ -374,6 +391,7 @@ export default function CategoriesPage() {
                                   name: category.name,
                                   description: category.description || '',
                                   parentId: category.parentId || '',
+                                  isActive: category.isActive,
                                 });
                               }}
                             >
