@@ -92,6 +92,7 @@ export default function OrdersPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showTill, setShowTill] = useState(false);
+  const [activeTab, setActiveTab] = useState<'orders' | 'leads'>('orders');
   const [statusFilter, setStatusFilter] = useState('');
   const [awaitingSupplierOnly, setAwaitingSupplierOnly] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
@@ -546,7 +547,16 @@ export default function OrdersPage() {
           >
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
-            {showTill && canCreate ? (
+            <div className="portal-tabs" style={{ marginBottom: 16 }}>
+              <button type="button" className={activeTab === 'orders' ? 'is-active' : ''} onClick={() => setActiveTab('orders')}>
+                Orders
+              </button>
+              <button type="button" className={activeTab === 'leads' ? 'is-active' : ''} onClick={() => setActiveTab('leads')}>
+                Cart Leads
+              </button>
+            </div>
+
+            {activeTab === 'orders' && showTill && canCreate ? (
               <article className="portal-card" data-tour="orders.new">
                 <h2 style={{ marginTop: 0 }}>New Order</h2>
                 <form className="portal-entity-form" onSubmit={onPlace}>
@@ -795,6 +805,7 @@ export default function OrdersPage() {
               </article>
             ) : null}
 
+            {activeTab === 'leads' ? (
             <article className="portal-card" data-tour="orders.leads">
               <div className="portal-card-header-row">
                 <div>
@@ -875,7 +886,9 @@ export default function OrdersPage() {
               </div>
               <ServerListPager pager={leadsPager} noun="leads" />
             </article>
+            ) : null}
 
+            {activeTab === 'orders' ? (
             <article className="portal-card" data-tour="orders.list">
               <div className="portal-card-header-row">
                 <div>
@@ -1005,6 +1018,7 @@ export default function OrdersPage() {
               </div>
               <ServerListPager pager={ordersPager} noun="orders" />
             </article>
+            ) : null}
           </PortalShell>
         </section>
       </main>
