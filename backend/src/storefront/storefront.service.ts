@@ -6,6 +6,28 @@ import { csvField } from '../common/csv.util';
 import { priceForTier } from '../common/price-for-tier';
 
 /**
+ * Meta's product-feed taxonomy, by this shop's category slug. Was hardcoded
+ * to "Apparel & Accessories > Shoes" for every product -- fine while shoes
+ * were the only thing sold, wrong for a watch or a bottle of perfume, both
+ * of which Meta would then classify (and route to shoppers) as footwear.
+ * Falls back to the old default for a category with no mapping yet, rather
+ * than leaving the field empty (which risks the row being rejected).
+ */
+function googleProductCategory(categorySlug?: string | null): string {
+  const byCategory: Record<string, string> = {
+    sneakers: 'Apparel & Accessories > Shoes',
+    boots: 'Apparel & Accessories > Shoes',
+    casuals: 'Apparel & Accessories > Shoes',
+    sandals: 'Apparel & Accessories > Shoes',
+    officials: 'Apparel & Accessories > Shoes',
+    watches: 'Apparel & Accessories > Jewelry > Watches',
+    clothes: 'Apparel & Accessories > Clothing',
+    perfumes: 'Health & Beauty > Personal Care > Cosmetics > Perfume & Cologne',
+  };
+  return (categorySlug && byCategory[categorySlug]) || 'Apparel & Accessories > Shoes';
+}
+
+/**
  * The public catalogue.
  *
  * Deliberately narrow: it returns retail prices and whether a size is in
@@ -31,6 +53,20 @@ export class StorefrontService {
     return user?.priceTier ?? 'RETAIL';
   }
 
+  /**
+   * Which of this product's category's attributes is "the" size-like one --
+   * the value a shopper picks before adding to cart, shown as chips on a
+   * card and the product page. The first attribute the category defines,
+   * by sortOrder: a category can have more than one attribute (e.g. size
+   * and colour), but only one drives the size picker and sizesInStock.
+   * A category with none (Watches, Perfumes) has nothing to pick from --
+   * every active variant is just orderable on its own.
+   */
+  private sizeAttributeKey(product: any): string | null {
+    const attributes = product.category?.attributes;
+    return Array.isArray(attributes) && attributes.length ? attributes[0].key : null;
+  }
+
   /** Only what a shopper may see. Note the absence of cost and other tiers,
    *  except the viewer's own when tier is not RETAIL. */
   private shape(
@@ -39,6 +75,7 @@ export class StorefrontService {
     offerByVariant: Map<string, { price: number; was: number; label: string | null }> = new Map(),
     tier: PriceTier = 'RETAIL',
   ) {
+    const sizeKey = this.sizeAttributeKey(product);
     const variants = product.variants
       .filter((variant: any) => variant.isActive)
       .map((variant: any) => {
@@ -49,10 +86,16 @@ export class StorefrontService {
         // reseller's tier price is never further discounted, or bypassed, by
         // a markdown meant for retail shoppers.
         const tierPrice = tier === 'RETAIL' ? null : priceForTier(variant, tier);
+        // The category's size-like attribute value when it has one (e.g.
+        // "EUR 42" for Shoes, "M" for Clothes); null for a category with no
+        // such attribute (Watches, Perfumes) rather than falling back to
+        // variant.name, which is a free-text label, not a size.
+        const size = sizeKey ? (variant.attributes as Record<string, unknown> | null)?.[sizeKey] ?? null : null;
         return {
           id: variant.id,
           sku: variant.sku,
-          size: variant.name,
+          name: variant.name,
+          size: typeof size === 'string' ? size : null,
           // The price this viewer pays: their tier price outright when they
           // are a reseller/wholesaler, otherwise the offer price when there
           // is one, otherwise retail.
@@ -105,7 +148,11 @@ export class StorefrontService {
       // Product-level retail comparison price, mirroring priceFrom -- lets a
       // card show "you keep KES X" without assuming a variant ordering.
       retailPriceFrom: retailPrices.length ? Math.min(...retailPrices) : null,
-      sizesInStock: inStock.map((variant: any) => variant.size),
+      // Empty for a sizeless category (Watches, Perfumes) -- every variant's
+      // size is null there, so nothing to show as a size chip.
+      sizesInStock: inStock
+        .map((variant: any) => variant.size)
+        .filter((size: string | null): size is string => size !== null),
       anyInStock: inStock.length > 0,
       // Drives the badge on a card without the caller inspecting every size.
       onOffer: variants.some((variant: any) => variant.wasPriceKes !== null),
@@ -191,19 +238,36 @@ export class StorefrontService {
         select: { brand: true },
         orderBy: { brand: 'asc' },
       }),
-      this.prisma.productVariant.findMany({
-        where: { isActive: true, product: { isActive: true } },
-        distinct: ['name'],
-        select: { name: true },
-      }),
+      // Distinct values across every category's attributes JSON, not
+      // variant.name -- that was a shoe-only assumption (it happened to
+      // work because every variant's name used to be its size). A watch or
+      // perfume variant's attributes has nothing size-like at all, so it
+      // simply contributes no rows here rather than polluting the list with
+      // its free-text name.
+      this.prisma.$queryRaw<{ value: string }[]>`
+        SELECT DISTINCT attr.value
+        FROM "ProductVariant" v
+        CROSS JOIN LATERAL jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) AS attr(key, value)
+        JOIN "Product" p ON p.id = v."productId"
+        WHERE v."isActive" = true AND p."isActive" = true
+      `,
     ]);
 
     return {
       brands: brands.map((row) => row.brand).filter(Boolean),
-      // "EUR 39" sorts before "EUR 7" as text, so order by the number in it.
+      // "EUR 39" sorts before "EUR 7" as text, so order by the leading
+      // number when there is one; values with no number (S/M/L/XL) sort
+      // after, alphabetically among themselves.
       sizes: sizes
-        .map((row) => row.name)
-        .sort((a, b) => (parseInt(a.replace(/\D/g, ''), 10) || 0) - (parseInt(b.replace(/\D/g, ''), 10) || 0)),
+        .map((row) => row.value)
+        .sort((a, b) => {
+          const numA = parseInt(a.replace(/\D/g, ''), 10);
+          const numB = parseInt(b.replace(/\D/g, ''), 10);
+          if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numA - numB;
+          if (!Number.isNaN(numA)) return -1;
+          if (!Number.isNaN(numB)) return 1;
+          return a.localeCompare(b);
+        }),
     };
   }
 
@@ -231,6 +295,26 @@ export class StorefrontService {
         string_to_array(lower(p.name) || ' ' || lower(coalesce(p.brand, '')), ' ')
       ) AS t(part)
       WHERE p."isActive" = true AND similarity(t.part, q.word) > 0.3
+    `;
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * Products with at least one active variant whose attributes JSON has
+   * this value under any key -- a shoe's "size" and a top's "size" are both
+   * just entries in that free-form object, and there is no ambiguity in
+   * practice since filters() below only ever offers values that genuinely
+   * appear somewhere in the catalogue. jsonb_each_text unpacks the object
+   * into key/value rows so a plain value comparison can be used, which
+   * Prisma's typed JSON filters cannot express for an object shape (only
+   * for a specific known key, or array membership).
+   */
+  private async sizeFilterProductIds(size: string): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT DISTINCT v."productId" AS id
+      FROM "ProductVariant" v
+      CROSS JOIN LATERAL jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) AS attr(key, value)
+      WHERE v."isActive" = true AND attr.value = ${size}
     `;
     return rows.map((row) => row.id);
   }
@@ -293,13 +377,17 @@ export class StorefrontService {
           : { AND: wordClauses }
         : {}),
       // A size filter is really a question about variants, not products.
-      ...(query.size ? { variants: { some: { name: query.size, isActive: true } } } : {}),
+      // Resolved via sizeFilterProductIds() below, since matching "any value
+      // in this JSON object equals X" isn't expressible through Prisma's
+      // typed JSON filters (those cover object-key lookups or array
+      // membership, not "does any value in this object equal this string").
+      ...(query.size ? { id: { in: await this.sizeFilterProductIds(query.size) } } : {}),
     };
 
     const products = await this.prisma.product.findMany({
       where,
       include: {
-        category: { select: { name: true, slug: true } },
+        category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -349,7 +437,7 @@ export class StorefrontService {
     const featuredProducts = await this.prisma.product.findMany({
       where: { isActive: true, isFeatured: true },
       include: {
-        category: { select: { name: true, slug: true } },
+        category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },
       },
       orderBy: { updatedAt: 'asc' },
@@ -362,7 +450,7 @@ export class StorefrontService {
       const candidates = await this.prisma.product.findMany({
         where: { isActive: true, isFeatured: false },
         include: {
-          category: { select: { name: true, slug: true } },
+          category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
           variants: { orderBy: { name: 'asc' } },
         },
       });
@@ -418,7 +506,7 @@ export class StorefrontService {
     const products = await this.prisma.product.findMany({
       where: { isActive: true },
       include: {
-        category: { select: { name: true, slug: true } },
+        category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -465,7 +553,9 @@ export class StorefrontService {
         rows.push([
           variant.sku,
           product.id,
-          `${product.name} - ${variant.size}`,
+          // No " - null" for a sizeless product (Watches, Perfumes): the
+          // size suffix only makes sense when there is one.
+          variant.size ? `${product.name} - ${variant.size}` : product.name,
           product.description || product.name,
           // Every listing here is orderable (canOrder is always true, see
           // shape()); a size only drops out of the feed row set entirely if
@@ -478,8 +568,8 @@ export class StorefrontService {
           imageLink || '',
           additional.join(','),
           product.brand || '',
-          'Apparel & Accessories > Shoes',
-          variant.size,
+          googleProductCategory(product.category?.slug),
+          variant.size || '',
           'unisex',
           'adult',
         ]);
@@ -494,7 +584,7 @@ export class StorefrontService {
     const product = await this.prisma.product.findFirst({
       where: { slug, isActive: true },
       include: {
-        category: { select: { name: true, slug: true } },
+        category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },
       },
     });
@@ -510,7 +600,7 @@ export class StorefrontService {
     // dead end.
     const related = await this.prisma.product.findMany({
       where: { isActive: true, id: { not: product.id }, categoryId: product.categoryId },
-      include: { category: { select: { name: true, slug: true } }, variants: true },
+      include: { category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } }, variants: true },
       take: 5,
     });
     const relatedStock = await this.stockMap(related.flatMap((p) => p.variants.map((v) => v.id)));

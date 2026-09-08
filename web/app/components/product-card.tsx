@@ -51,7 +51,10 @@ export function ProductCard({ product }: { product: ShopProduct }) {
       variantId: variant.id,
       productSlug: product.slug,
       name: product.name,
-      size: variant.size,
+      // Falls back to the variant's own name for a sizeless product (a
+      // watch, a perfume) -- the cart line still needs some label, and
+      // that's exactly what the variant name is for.
+      size: variant.size ?? variant.name,
       sku: variant.sku,
       priceKes: variant.priceKes,
       imageUrl: product.imageUrls[0] || null,
@@ -118,7 +121,11 @@ export function ProductCard({ product }: { product: ShopProduct }) {
 
         {/* A range rather than every size: a full 36-46 run would be
             eleven chips per card and unreadable at a glance. The
-            product page carries the exact grid. */}
+            product page carries the exact grid. Omitted entirely for a
+            sizeless category (Watches, Perfumes) that is actually in
+            stock -- anyInStock is the real availability signal there,
+            since sizesInStock is empty by design, not because nothing
+            is available. */}
         {product.sizesInStock.length ? (
           <p className="de-card-sizes">
             <span>EUR</span>
@@ -127,7 +134,7 @@ export function ProductCard({ product }: { product: ShopProduct }) {
               <small>{product.sizesInStock.length} sizes</small>
             ) : null}
           </p>
-        ) : orderableVariants.length ? (
+        ) : product.anyInStock ? null : orderableVariants.length ? (
           <p className="de-card-sizes is-preorder">Ordered in from supplier</p>
         ) : (
           <p className="de-card-sizes is-none">Out of stock — ask us</p>
@@ -149,7 +156,7 @@ export function ProductCard({ product }: { product: ShopProduct }) {
                       className="de-chip"
                       onClick={() => addSize(variant)}
                     >
-                      {variant.size.replace('EUR ', '')}
+                      {(variant.size ?? variant.name).replace('EUR ', '')}
                     </button>
                   ))}
                 </div>
@@ -158,7 +165,13 @@ export function ProductCard({ product }: { product: ShopProduct }) {
               <button
                 type="button"
                 className="lp-button lp-button-ghost de-card-add-btn"
-                onClick={() => setPickingSize(true)}
+                // A single orderable variant (a watch, a perfume, or a shoe
+                // down to its last size) has nothing to pick -- add it
+                // straight away instead of opening a picker with one chip
+                // in it.
+                onClick={() =>
+                  orderableVariants.length === 1 ? addSize(orderableVariants[0]) : setPickingSize(true)
+                }
               >
                 {added ? 'Added ✓' : 'Add to Cart'}
               </button>

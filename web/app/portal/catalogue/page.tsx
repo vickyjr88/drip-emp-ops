@@ -41,26 +41,16 @@ type Product = {
   variants: Variant[];
 };
 
-type Category = { id: string; name: string; slug: string };
+type CategoryAttribute = { id: string; key: string; label: string; options: string[]; sortOrder: number };
+type Category = { id: string; name: string; slug: string; attributes?: CategoryAttribute[] };
 
 const BLANK = { sku: '', name: '', brand: '', categoryId: '', description: '' };
 
-/**
- * Every size the shop stocks, smallest to largest.
- *
- * The picker offers this whole span and the user ticks what a given shoe
- * actually came in -- runs vary by model (36-42 on one, 40-45 on another), and
- * gaps within a run are normal rather than exceptional.
- */
-const SIZE_RANGE = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
-/** Stored as "EUR 39" -- matches every variant already in the catalogue. */
-const sizeLabel = (size: number) => `EUR ${size}`;
-/**
- * The run a new product starts with. Previously every product was created with
- * exactly these sizes and no way to change it, which is why the catalogue has
- * no 40s: the default was silently the only option.
- */
-const DEFAULT_SIZES = [39, 41, 42, 43, 44];
+/** "AF1-BLK-EUR42" from "AF1-BLK" and "EUR 42" -- spaces and slashes dropped
+ *  since a SKU is read off a shelf label and a receipt. */
+function skuSuffix(value: string) {
+  return value.replace(/[^a-z0-9]+/gi, '').toUpperCase();
+}
 
 export default function CataloguePage() {
   const dialog = usePortalDialog();
@@ -79,8 +69,15 @@ export default function CataloguePage() {
   const [cost, setCost] = useState('');
   const [resellerPrice, setResellerPrice] = useState('');
   const [wholesalePrice, setWholesalePrice] = useState('');
-  /** Sizes ticked for the product being created, as numbers from SIZE_RANGE. */
-  const [sizes, setSizes] = useState<number[]>(DEFAULT_SIZES);
+  /**
+   * Attribute values ticked for the product being created, e.g. ["EUR 39",
+   * "EUR 41"] for a shoe or ["M", "L"] for a top -- one variant per value,
+   * at the price above. Which attribute (if any) the picker offers comes
+   * from the selected category (see categoryAttribute below); a category
+   * with none -- Watches, Perfumes -- shows no picker at all, and the
+   * product gets a single variant with no size.
+   */
+  const [attributeValues, setAttributeValues] = useState<string[]>([]);
   /** For a supplier's line we do not stock ourselves -- every size sources per order. */
   const [dropShip, setDropShip] = useState(false);
   /** The product being duplicated, or null when the panel is closed. */
@@ -178,6 +175,15 @@ export default function CataloguePage() {
   const canCreateOffer = hasPermission(profile, 'offer.create');
   const canDelete = hasPermission(profile, 'product.delete');
 
+  /** The selected category's size-like attribute, if it has one -- e.g.
+   *  "Size" with EUR options for Shoes. Null for a category with none
+   *  (Watches, Perfumes), which drops the size picker entirely and
+   *  creates the product with a single sizeless variant. */
+  const categoryAttribute = useMemo(() => {
+    const category = categories.find((item) => item.id === form.categoryId);
+    return category?.attributes?.[0] ?? null;
+  }, [categories, form.categoryId]);
+
   /**
    * Saves one variant's buying cost.
    *
@@ -270,10 +276,13 @@ export default function CataloguePage() {
   async function onCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
-    // A product with no variants cannot be sold at all, so this is refused
-    // here rather than creating a shell someone has to notice and fix later.
-    if (sizes.length === 0) {
-      setErrorMessage('Pick at least one size — a product with no sizes cannot be sold.');
+    // A category with a size-like attribute needs at least one value ticked
+    // -- a product with no variants cannot be sold at all, so this is
+    // refused here rather than creating a shell someone has to notice and
+    // fix later. A category with no such attribute (Watches, Perfumes)
+    // needs nothing ticked -- it gets exactly one variant below.
+    if (categoryAttribute && attributeValues.length === 0) {
+      setErrorMessage(`Pick at least one ${categoryAttribute.label.toLowerCase()} — a product with no variants cannot be sold.`);
       return;
     }
     setSaving(true);
@@ -283,30 +292,44 @@ export default function CataloguePage() {
       // not recorded it", which the reports flag, while 0 would claim the
       // shoes were free and show a 100% margin as though it were real.
       const optionalNumber = (value: string) => (value.trim() === '' ? undefined : Number(value));
+      const commonVariantFields = {
+        priceKes: unitPrice,
+        costKes: optionalNumber(cost),
+        resellerPriceKes: optionalNumber(resellerPrice),
+        wholesalePriceKes: optionalNumber(wholesalePrice),
+        isDropShip: dropShip,
+      };
+      // One variant per ticked value at the same price; edit individually
+      // after. Sorted so they read in the category's own defined order
+      // rather than however they happened to be ticked.
+      const variants = categoryAttribute
+        ? categoryAttribute.options
+            .filter((option) => attributeValues.includes(option))
+            .map((value) => ({
+              sku: `${form.sku}-${skuSuffix(value)}`,
+              name: value,
+              attributes: { [categoryAttribute.key]: value },
+              ...commonVariantFields,
+            }))
+        // No size-like attribute at all: a single variant named after the
+        // product itself, with no size to distinguish it from anything.
+        : [{ sku: form.sku, name: form.name, attributes: {}, ...commonVariantFields }];
       await apiRequest('/products', {
         method: 'POST',
         body: JSON.stringify({
           ...form,
           categoryId: form.categoryId || undefined,
           imageUrls: images.length ? images : undefined,
-          // One variant per ticked size at the same price; edit individually
-          // after. Sorted so the sizes read smallest-first however they were
-          // ticked, which is also the order the table shows them in.
-          variants: [...sizes].sort((a, b) => a - b).map((size) => ({
-            sku: `${form.sku}-EUR${size}`,
-            name: sizeLabel(size),
-            attributes: { size: sizeLabel(size) },
-            priceKes: unitPrice,
-            costKes: optionalNumber(cost),
-            resellerPriceKes: optionalNumber(resellerPrice),
-            wholesalePriceKes: optionalNumber(wholesalePrice),
-            isDropShip: dropShip,
-          })),
+          variants,
         }),
       }, token);
-      setFeedback(`${form.name} added with ${sizes.length} size${sizes.length === 1 ? '' : 's'}.`);
+      setFeedback(
+        categoryAttribute
+          ? `${form.name} added with ${attributeValues.length} ${categoryAttribute.label.toLowerCase()}${attributeValues.length === 1 ? '' : 's'}.`
+          : `${form.name} added.`,
+      );
       setForm(BLANK); setPrice(''); setCost(''); setResellerPrice('');
-      setWholesalePrice(''); setImages([]); setSizes(DEFAULT_SIZES); setDropShip(false); setShowForm(false);
+      setWholesalePrice(''); setImages([]); setAttributeValues([]); setDropShip(false); setShowForm(false);
       await load(token);
       productsPager.reload();
     } catch (error) {
@@ -473,7 +496,13 @@ export default function CataloguePage() {
                     <label>
                       <span>Category</span>
                       <select value={form.categoryId}
-                        onChange={(event) => setForm((prev) => ({ ...prev, categoryId: event.target.value }))}>
+                        onChange={(event) => {
+                          setForm((prev) => ({ ...prev, categoryId: event.target.value }));
+                          // Last category's ticked values are not valid
+                          // options for a different one -- e.g. "EUR 42"
+                          // means nothing for Clothes.
+                          setAttributeValues([]);
+                        }}>
                         <option value="">Uncategorised</option>
                         {(categories || []).map((category) => (
                           <option key={category.id} value={category.id}>{category.name}</option>
@@ -510,50 +539,58 @@ export default function CataloguePage() {
                     </label>
                   </div>
 
-                  <label>
-                    <span>Sizes</span>
-                    <div className="portal-size-picker">
-                      {SIZE_RANGE.map((size) => {
-                        const picked = sizes.includes(size);
-                        return (
-                          <button
-                            key={size}
-                            type="button"
-                            aria-pressed={picked}
-                            className={`portal-size-toggle${picked ? ' is-picked' : ''}`}
-                            onClick={() =>
-                              setSizes((prev) =>
-                                prev.includes(size)
-                                  ? prev.filter((value) => value !== size)
-                                  : [...prev, size],
-                              )
-                            }
-                          >
-                            {size}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="portal-inline-actions">
-                      <button type="button" className="portal-inline-btn"
-                        onClick={() => setSizes(SIZE_RANGE)}>
-                        All
-                      </button>
-                      <button type="button" className="portal-inline-btn"
-                        onClick={() => setSizes(DEFAULT_SIZES)}>
-                        Usual run
-                      </button>
-                      <button type="button" className="portal-inline-btn"
-                        onClick={() => setSizes([])}>
-                        Clear
-                      </button>
-                    </div>
-                    <small className="portal-muted">
-                      {sizes.length
-                        ? `${sizes.length} size${sizes.length === 1 ? '' : 's'}, all at the price above. Adjust individually afterwards.`
-                        : 'Pick at least one size.'}
-                    </small>
-                  </label>
+                  {categoryAttribute ? (
+                    <label>
+                      <span>{categoryAttribute.label}</span>
+                      <div className="portal-size-picker">
+                        {categoryAttribute.options.map((option) => {
+                          const picked = attributeValues.includes(option);
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              aria-pressed={picked}
+                              className={`portal-size-toggle${picked ? ' is-picked' : ''}`}
+                              onClick={() =>
+                                setAttributeValues((prev) =>
+                                  prev.includes(option)
+                                    ? prev.filter((value) => value !== option)
+                                    : [...prev, option],
+                                )
+                              }
+                            >
+                              {option}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="portal-inline-actions">
+                        <button type="button" className="portal-inline-btn"
+                          onClick={() => setAttributeValues(categoryAttribute.options)}>
+                          All
+                        </button>
+                        <button type="button" className="portal-inline-btn"
+                          onClick={() => setAttributeValues([])}>
+                          Clear
+                        </button>
+                      </div>
+                      <small className="portal-muted">
+                        {attributeValues.length
+                          ? `${attributeValues.length} ${categoryAttribute.label.toLowerCase()}${attributeValues.length === 1 ? '' : 's'}, all at the price above. Adjust individually afterwards.`
+                          : `Pick at least one ${categoryAttribute.label.toLowerCase()}.`}
+                      </small>
+                    </label>
+                  ) : form.categoryId ? (
+                    <p className="portal-muted">
+                      This category has no size or variant attribute -- one variant will be created at the price above.
+                      Manage a category&rsquo;s attributes from <Link href="/portal/categories">Categories</Link>.
+                    </p>
+                  ) : (
+                    <p className="portal-muted">
+                      Choose a category above to see its size options, or leave it uncategorised to create a single
+                      variant with no size.
+                    </p>
+                  )}
 
                   <label className="portal-check">
                     <input type="checkbox" checked={dropShip} onChange={(event) => setDropShip(event.target.checked)} />

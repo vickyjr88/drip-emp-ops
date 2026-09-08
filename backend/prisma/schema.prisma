@@ -1383,15 +1383,47 @@ model Product {
 
 /// Self-nesting so "Footwear > Running" needs no second model.
 model ProductCategory {
-  id          String            @id @default(uuid())
+  id          String              @id @default(uuid())
   name        String
-  slug        String            @unique
+  slug        String              @unique
   description String?
-  parent      ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  parent      ProductCategory?    @relation("CategoryTree", fields: [parentId], references: [id])
   parentId    String?
-  children    ProductCategory[] @relation("CategoryTree")
+  children    ProductCategory[]   @relation("CategoryTree")
   products    Product[]
-  createdAt   DateTime          @default(now())
+  /// What distinguishes one variant from another in this category -- "Size"
+  /// with EUR options for Shoes, "Size" with S/M/L/XL for Clothes, nothing
+  /// at all for Watches or Perfumes (a variant there is just colour/edition,
+  /// or a single default). Business-line-specific rather than baked into
+  /// code, since the shop expects to keep adding categories.
+  attributes  CategoryAttribute[]
+  createdAt   DateTime            @default(now())
+}
+
+/// One variant-distinguishing attribute for a category -- e.g. "size" with
+/// options ["EUR 36", ..., "EUR 46"]. A category with none (Watches,
+/// Perfumes) simply has no rows here; ProductVariant.attributes is then
+/// either empty or holds something else entirely (colour, edition) that
+/// isn't meant to drive a picker or a storefront filter.
+model CategoryAttribute {
+  id         String          @id @default(uuid())
+  category   ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+  /// The key stored in ProductVariant.attributes, e.g. "size". Lowercase, no
+  /// spaces -- this is a JSON object key, not display text.
+  key        String
+  /// Shown to staff in the catalogue form, and to shoppers as the
+  /// storefront's size/variant chip label (e.g. "Size", "EUR").
+  label      String
+  /// Fixed choices in display order, e.g. ["EUR 36", "EUR 37", ...] or
+  /// ["S", "M", "L", "XL"]. Plain strings -- nothing here needs its own
+  /// price or stock, only ProductVariant does.
+  options    Json
+  sortOrder  Int             @default(0)
+  createdAt  DateTime        @default(now())
+
+  @@unique([categoryId, key])
+  @@index([categoryId])
 }
 
 /// The sellable unit: a size, a colour, a capacity.

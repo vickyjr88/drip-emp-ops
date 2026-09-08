@@ -24,6 +24,8 @@ import {
   hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
+type CategoryAttribute = { id: string; key: string; label: string; options: string[]; sortOrder: number };
+
 type Category = {
   id: string;
   name: string;
@@ -31,9 +33,11 @@ type Category = {
   description?: string | null;
   parentId?: string | null;
   _count?: { products: number; children: number };
+  attributes?: CategoryAttribute[];
 };
 
 const BLANK = { name: '', description: '', parentId: '' };
+const BLANK_ATTRIBUTE = { label: '', optionsText: '' };
 
 export default function CategoriesPage() {
   const dialog = usePortalDialog();
@@ -48,6 +52,12 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
+  /** Which category's attribute panel is open, or null when every one is
+   *  collapsed -- a shop has a handful of categories, so this is inline
+   *  rather than a separate page, matching the create/edit form above. */
+  const [attributesOpenFor, setAttributesOpenFor] = useState<string | null>(null);
+  const [attributeForm, setAttributeForm] = useState(BLANK_ATTRIBUTE);
+  const [savingAttribute, setSavingAttribute] = useState(false);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -160,6 +170,58 @@ export default function CategoriesPage() {
     try {
       await apiRequest(`/product-categories/${category.id}`, { method: 'DELETE' }, token);
       notifications.success(`${category.name} deleted.`);
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    }
+  }
+
+  /** "EUR 36, EUR 37, EUR 38" -> ["EUR 36", "EUR 37", "EUR 38"], trimmed and
+   *  with blanks (a stray trailing comma) dropped. */
+  function parseOptions(text: string): string[] {
+    return text.split(',').map((option) => option.trim()).filter(Boolean);
+  }
+
+  async function onAddAttribute(categoryId: string, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    const options = parseOptions(attributeForm.optionsText);
+    if (options.length === 0) {
+      setErrorMessage('List at least one option, separated by commas.');
+      return;
+    }
+    setSavingAttribute(true);
+    try {
+      await apiRequest(`/product-categories/${categoryId}/attributes`, {
+        method: 'POST',
+        body: JSON.stringify({
+          key: attributeForm.label.trim().toLowerCase().replace(/\s+/g, '_'),
+          label: attributeForm.label.trim(),
+          options,
+        }),
+      }, token);
+      notifications.success(`${attributeForm.label} added.`);
+      setAttributeForm(BLANK_ATTRIBUTE);
+      await load(token);
+    } catch (error) {
+      setErrorMessage(error);
+    } finally {
+      setSavingAttribute(false);
+    }
+  }
+
+  async function onRemoveAttribute(categoryId: string, attribute: CategoryAttribute) {
+    if (!token) return;
+    const confirmed = await dialog.confirm({
+      title: 'Remove Attribute',
+      message: `Remove "${attribute.label}" from this category? Products already using it keep their existing values -- this only stops it being offered when staff add a new product.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await apiRequest(`/product-categories/${categoryId}/attributes/${attribute.id}`, { method: 'DELETE' }, token);
+      notifications.success(`${attribute.label} removed.`);
       await load(token);
     } catch (error) {
       setErrorMessage(error);
@@ -318,6 +380,18 @@ export default function CategoriesPage() {
                               Edit
                             </button>
                           ) : null}
+                          {canUpdate ? (
+                            <button
+                              type="button"
+                              className="portal-inline-btn"
+                              onClick={() => {
+                                setAttributesOpenFor((prev) => (prev === category.id ? null : category.id));
+                                setAttributeForm(BLANK_ATTRIBUTE);
+                              }}
+                            >
+                              {attributesOpenFor === category.id ? 'Close' : 'Attributes'}
+                            </button>
+                          ) : null}
                           {canDelete ? (
                             <button
                               type="button"
@@ -329,6 +403,71 @@ export default function CategoriesPage() {
                           ) : null}
                         </div>
                       </div>
+
+                      {attributesOpenFor === category.id ? (
+                        <div className="portal-record-detail">
+                          <p className="portal-muted">
+                            What distinguishes a variant in this category -- e.g. &ldquo;Size&rdquo; with EUR options
+                            for shoes. A category with none needs no variant attribute at all: the catalogue form
+                            creates one plain variant for it instead of offering a size picker.
+                          </p>
+                          {category.attributes && category.attributes.length > 0 ? (
+                            <div className="portal-list-stack">
+                              {category.attributes.map((attribute) => (
+                                <div key={attribute.id} className="portal-list-row">
+                                  <div>
+                                    <strong>{attribute.label}</strong>
+                                    <p className="portal-muted">{attribute.options.join(', ')}</p>
+                                  </div>
+                                  {canUpdate ? (
+                                    <button
+                                      type="button"
+                                      className="portal-inline-btn is-danger"
+                                      onClick={() => void onRemoveAttribute(category.id, attribute)}
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="portal-empty-state">No attribute yet -- products here get one plain variant.</p>
+                          )}
+
+                          {canUpdate ? (
+                            <form
+                              className="portal-entity-form"
+                              style={{ marginTop: 16 }}
+                              onSubmit={(event) => void onAddAttribute(category.id, event)}
+                            >
+                              <div className="portal-entity-grid-2">
+                                <label>
+                                  <span>Attribute name</span>
+                                  <input
+                                    value={attributeForm.label}
+                                    placeholder="Size"
+                                    onChange={(event) => setAttributeForm((prev) => ({ ...prev, label: event.target.value }))}
+                                    required
+                                  />
+                                </label>
+                                <label>
+                                  <span>Options (comma-separated)</span>
+                                  <input
+                                    value={attributeForm.optionsText}
+                                    placeholder="EUR 36, EUR 37, EUR 38, EUR 39, EUR 40"
+                                    onChange={(event) => setAttributeForm((prev) => ({ ...prev, optionsText: event.target.value }))}
+                                    required
+                                  />
+                                </label>
+                              </div>
+                              <button type="submit" className="portal-primary-btn" disabled={savingAttribute}>
+                                {savingAttribute ? 'Saving...' : 'Add Attribute'}
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   ))
                 )}

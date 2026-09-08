@@ -43,7 +43,9 @@ export function feedRows(products: ShopProduct[]): FeedRow[] {
     for (const variant of product.variants) {
       rows.push({
         id: variant.sku,
-        title: `${product.name} - ${variant.size}`,
+        // No " - null" for a sizeless product (Watches, Perfumes): the size
+        // suffix only makes sense when the category actually has one.
+        title: variant.size ? `${product.name} - ${variant.size}` : product.name,
         description,
         link,
         imageLink: image,

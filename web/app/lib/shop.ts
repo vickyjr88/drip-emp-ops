@@ -16,7 +16,13 @@ const API = typeof window === 'undefined' ? SERVER_API : BROWSER_API;
 export type ShopVariant = {
   id: string;
   sku: string;
-  size: string;
+  /** The staff-entered variant name/label, e.g. "UK 8 / Black" -- always
+   *  present, unlike size below. */
+  name: string;
+  /** The category's size-like attribute value (e.g. "EUR 42", "M"), when
+   *  the category has one. Null for a category with none -- Watches and
+   *  Perfumes have no size at all, so every variant there is null. */
+  size: string | null;
   priceKes: number;
   /** Retail before the markdown. Null when nothing is discounted. */
   wasPriceKes?: number | null;

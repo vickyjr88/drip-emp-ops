@@ -112,7 +112,10 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
       lines.push('Hello Drip Emporium, I would like to order:');
       lines.push('');
       lines.push(`Item:  ${product.name}${product.brand ? ` (${product.brand})` : ''}`);
-      lines.push(`Size:  ${chosen.size}`);
+      // Omitted entirely for a sizeless product (a watch, a perfume) --
+      // there is nothing to confirm, and "Size: null" would only confuse
+      // whoever reads the message on the other end.
+      if (chosen.size) lines.push(`Size:  ${chosen.size}`);
       lines.push(`SKU:   ${chosen.sku}`);
       lines.push(`Price: ${formatKes(chosen.priceKes)}`);
       // Saying it is out of stock up front stops the shop replying "yes" to
@@ -228,29 +231,36 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
             ) : null}
 
             <div className="de-sizes">
-              <div className="de-sizes-head">
-                <span>Select size (EUR)</span>
-                {!product.anyInStock ? <em>Ordered in from supplier</em> : null}
-              </div>
-              <div className="de-size-buttons">
-                {product.variants.map((variant) => (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    disabled={!variant.canOrder}
-                    className={`de-size${sizeId === variant.id ? ' is-on' : ''}${variant.inStock ? '' : ' is-preorder'}`}
-                    onClick={() => setSizeId(variant.id)}
-                    // Said out loud, because the note in the button styling
-                    // is not available to a screen reader.
-                    aria-label={`${variant.size}${variant.inStock ? '' : ' — ordered in from supplier'}`}
-                  >
-                    {variant.size.replace('EUR ', '')}
-                  </button>
-                ))}
-              </div>
+              {/* A single sizeless variant (a watch, a perfume) has nothing
+                  to pick, so the heading and grid are skipped entirely --
+                  just the SKU/stock note below, which still applies. */}
+              {product.variants.length > 1 || product.variants[0]?.size ? (
+                <>
+                  <div className="de-sizes-head">
+                    <span>{product.variants[0]?.size ? 'Select size' : 'Select an option'}</span>
+                    {!product.anyInStock ? <em>Ordered in from supplier</em> : null}
+                  </div>
+                  <div className="de-size-buttons">
+                    {product.variants.map((variant) => (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        disabled={!variant.canOrder}
+                        className={`de-size${sizeId === variant.id ? ' is-on' : ''}${variant.inStock ? '' : ' is-preorder'}`}
+                        onClick={() => setSizeId(variant.id)}
+                        // Said out loud, because the note in the button
+                        // styling is not available to a screen reader.
+                        aria-label={`${variant.size ?? variant.name}${variant.inStock ? '' : ' — ordered in from supplier'}`}
+                      >
+                        {(variant.size ?? variant.name).replace('EUR ', '')}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
               {chosen ? (
                 <p className="de-size-note">
-                  {chosen.size} · {chosen.sku} · {chosen.inStock ? 'in stock' : 'ordered in from supplier'}
+                  {chosen.size ?? chosen.name} · {chosen.sku} · {chosen.inStock ? 'in stock' : 'ordered in from supplier'}
                 </p>
               ) : (
                 <p className="de-size-note">
@@ -270,19 +280,22 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                     variantId: chosen.id,
                     productSlug: product.slug,
                     name: product.name,
-                    size: chosen.size,
+                    // Falls back to the variant's own name for a sizeless
+                    // product (a watch, a perfume) -- the cart line still
+                    // needs some label, and that's what the name is for.
+                    size: chosen.size ?? chosen.name,
                     sku: chosen.sku,
                     priceKes: chosen.priceKes,
                     imageUrl: product.imageUrls[0] || null,
                   });
                   trackMetaAddToCart({
                     contentId: product.id,
-                    contentName: `${product.name} - ${chosen.size}`,
+                    contentName: `${product.name} - ${chosen.size ?? chosen.name}`,
                     value: chosen.priceKes,
                   });
                   trackXAddToCart({
                     contentId: product.id,
-                    contentName: `${product.name} - ${chosen.size}`,
+                    contentName: `${product.name} - ${chosen.size ?? chosen.name}`,
                     value: chosen.priceKes,
                   });
                   // Confirmed in place rather than by yanking the shopper to
@@ -291,7 +304,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                   window.setTimeout(() => setAdded(false), 2500);
                 }}
               >
-                {added ? 'Added ✓' : chosen ? `Add ${chosen.size} to Cart` : 'Select a size'}
+                {added ? 'Added ✓' : chosen ? `Add ${chosen.size ?? chosen.name} to Cart` : 'Select a size'}
               </button>
 
               {/* Once something is in the cart, checking out is the next thing

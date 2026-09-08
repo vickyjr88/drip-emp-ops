@@ -4889,6 +4889,14 @@ img {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
 
+  /* An expandable section inside a .portal-record -- category attributes,
+     here -- set apart from the row above it without another full card. */
+  .portal-record-detail {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--eef-border);
+  }
+
   .portal-record.is-clickable:hover,
   .portal-record.is-clickable:focus-visible {
     border-color: var(--eef-primary);
