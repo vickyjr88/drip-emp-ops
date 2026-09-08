@@ -5355,8 +5355,40 @@ img {
   }
 
   .portal-inline-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
     border-top: 1px solid var(--eef-border);
     padding-top: 10px;
+  }
+
+  /* Same border/height/font as .list-search-input, so a form dropped into a
+     card header reads as one matched toolbar rather than bare browser
+     controls next to styled ones. */
+  .portal-inline-form input,
+  .portal-inline-form select,
+  .portal-inline-form textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 10px 12px;
+    border: 1px solid var(--eef-border);
+    border-radius: 0;
+    background: #fff;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    color: #1a1c1c;
+  }
+
+  .portal-inline-form textarea {
+    min-height: 80px;
+  }
+
+  .portal-inline-form input:focus,
+  .portal-inline-form select:focus,
+  .portal-inline-form textarea:focus {
+    outline: none;
+    border-color: var(--eef-primary);
   }
 
   .portal-inline-actions {
@@ -10289,6 +10321,13 @@ img {
 
 .de-search-box input {
   width: 100%;
+  /* Matches .lp-button-black's min-height so the search field and its
+     submit button line up instead of the input looking squashed next to it. */
+  min-height: 62px;
+  padding: 0 13px;
+  border: 1px solid var(--de-line);
+  font-size: 0.95rem;
+  box-sizing: border-box;
 }
 
 .de-search-results {
