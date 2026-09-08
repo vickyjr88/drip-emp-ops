@@ -5565,6 +5565,20 @@ img {
     min-width: 120px;
   }
 
+  /* .list-search-input and .list-toolbar select are both a flat 40px -- a
+     button dropped into the same toolbar (e.g. "New campaign") otherwise
+     keeps .portal-primary-btn's 46px min-height AND its 12px vertical
+     padding, which push the rendered height to ~42.5px even after
+     min-height is capped at 40 -- the padding has to come down too. */
+  .list-toolbar .portal-primary-btn,
+  .list-toolbar .portal-ghost-btn,
+  .portal-inline-form .portal-primary-btn,
+  .portal-inline-form .portal-ghost-btn {
+    min-height: 40px;
+    padding-top: 9px;
+    padding-bottom: 9px;
+  }
+
   .portal-card-header-row {
     display: flex;
     align-items: flex-start;
