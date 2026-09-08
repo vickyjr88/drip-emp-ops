@@ -218,8 +218,13 @@ export class StorefrontService {
 
   async categories() {
     const rows = await this.prisma.productCategory.findMany({
-      where: { products: { some: { isActive: true } } },
-      include: { _count: { select: { products: true } } },
+      // isActive gates a category's own storefront visibility -- staff can
+      // load products under Clothes ahead of launch without it appearing
+      // here. products: some(isActive) still applies on top, so a launched
+      // category with everything deactivated or sold out still drops off
+      // the list rather than showing an empty "0 styles" entry.
+      where: { isActive: true, products: { some: { isActive: true } } },
+      include: { _count: { select: { products: { where: { isActive: true } } } } },
       orderBy: { name: 'asc' },
     });
     return rows.map((row) => ({
@@ -233,7 +238,15 @@ export class StorefrontService {
   async filters() {
     const [brands, sizes] = await Promise.all([
       this.prisma.product.findMany({
-        where: { isActive: true, brand: { not: null } },
+        // A not-yet-launched category's brand (a watch brand, before
+        // Watches went live) must not appear in the filter either --
+        // categoryId: null still passes, same "opt out, not opt in" rule
+        // as the size query and catalogCsv() above.
+        where: {
+          isActive: true,
+          brand: { not: null },
+          OR: [{ categoryId: null }, { category: { isActive: true } }],
+        },
         distinct: ['brand'],
         select: { brand: true },
         orderBy: { brand: 'asc' },
@@ -243,13 +256,16 @@ export class StorefrontService {
       // work because every variant's name used to be its size). A watch or
       // perfume variant's attributes has nothing size-like at all, so it
       // simply contributes no rows here rather than polluting the list with
-      // its free-text name.
+      // its free-text name. LEFT JOIN'd to category so an uncategorised
+      // product's variant still counts (coalesce true when there is no
+      // category row to check).
       this.prisma.$queryRaw<{ value: string }[]>`
         SELECT DISTINCT attr.value
         FROM "ProductVariant" v
         CROSS JOIN LATERAL jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) AS attr(key, value)
         JOIN "Product" p ON p.id = v."productId"
-        WHERE v."isActive" = true AND p."isActive" = true
+        LEFT JOIN "ProductCategory" c ON c.id = p."categoryId"
+        WHERE v."isActive" = true AND p."isActive" = true AND coalesce(c."isActive", true) = true
       `,
     ]);
 
@@ -287,14 +303,20 @@ export class StorefrontService {
    */
   private async fuzzyProductIds(words: string[]): Promise<string[]> {
     if (words.length === 0) return [];
+    // LEFT JOIN'd to category, not filtered by ?category= here -- this runs
+    // for an unscoped search too, where the caller's own `where` has no
+    // category clause of its own to catch a not-yet-launched category's
+    // product otherwise. coalesce(..., true) lets an uncategorised product
+    // through, matching every other query's "opt out, not opt in" rule.
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT DISTINCT p.id
       FROM "Product" p
+      LEFT JOIN "ProductCategory" c ON c.id = p."categoryId"
       CROSS JOIN LATERAL unnest(${words}::text[]) AS q(word)
       CROSS JOIN LATERAL unnest(
         string_to_array(lower(p.name) || ' ' || lower(coalesce(p.brand, '')), ' ')
       ) AS t(part)
-      WHERE p."isActive" = true AND similarity(t.part, q.word) > 0.3
+      WHERE p."isActive" = true AND coalesce(c."isActive", true) = true AND similarity(t.part, q.word) > 0.3
     `;
     return rows.map((row) => row.id);
   }
@@ -310,11 +332,16 @@ export class StorefrontService {
    * for a specific known key, or array membership).
    */
   private async sizeFilterProductIds(size: string): Promise<string[]> {
+    // Same reasoning as fuzzyProductIds above: this runs standalone, not
+    // combined with a ?category= clause when none is given, so it needs its
+    // own category-status check rather than relying on the caller's where.
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       SELECT DISTINCT v."productId" AS id
       FROM "ProductVariant" v
+      JOIN "Product" p ON p.id = v."productId"
+      LEFT JOIN "ProductCategory" c ON c.id = p."categoryId"
       CROSS JOIN LATERAL jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) AS attr(key, value)
-      WHERE v."isActive" = true AND attr.value = ${size}
+      WHERE v."isActive" = true AND coalesce(c."isActive", true) = true AND attr.value = ${size}
     `;
     return rows.map((row) => row.id);
   }
@@ -355,7 +382,10 @@ export class StorefrontService {
       ? await this.prisma.product.count({
           where: {
             isActive: true,
-            ...(query.category ? { category: { slug: query.category } } : {}),
+            // isActive: true here too -- a direct or guessed ?category= link to a
+      // not-yet-launched category (Clothes, ahead of launch) must not
+      // surface its products just because someone knows the slug.
+      ...(query.category ? { category: { slug: query.category, isActive: true } } : {}),
             ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
             AND: wordClauses,
           },
@@ -367,7 +397,10 @@ export class StorefrontService {
 
     const where: Prisma.ProductWhereInput = {
       isActive: true,
-      ...(query.category ? { category: { slug: query.category } } : {}),
+      // isActive: true here too -- a direct or guessed ?category= link to a
+      // not-yet-launched category (Clothes, ahead of launch) must not
+      // surface its products just because someone knows the slug.
+      ...(query.category ? { category: { slug: query.category, isActive: true } } : {}),
       ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
       // Either the literal match, or -- only when that found nothing -- the
       // typo rescue. Never both, so a query that works is never widened.
@@ -504,7 +537,12 @@ export class StorefrontService {
    */
   async catalogCsv(): Promise<string> {
     const products = await this.prisma.product.findMany({
-      where: { isActive: true },
+      // A product in a not-yet-launched category (Clothes, ahead of
+      // launch) must not reach Meta/X's catalog just because staff have
+      // started loading stock -- category.isActive: undefined lets an
+      // uncategorised product through (no category to be inactive), the
+      // same "opt out, not opt in" default as list()'s search branches.
+      where: { isActive: true, OR: [{ categoryId: null }, { category: { isActive: true } }] },
       include: {
         category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },

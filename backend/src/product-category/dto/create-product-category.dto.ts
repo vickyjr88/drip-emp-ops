@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateProductCategoryDto {
   @ApiProperty({ example: 'Sneakers' })
@@ -21,4 +21,12 @@ export class CreateProductCategoryDto {
   @IsOptional()
   @IsString()
   parentId?: string;
+
+  @ApiPropertyOptional({
+    default: true,
+    description: 'False hides this category (and its products) from the storefront -- for loading stock ahead of a launch.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

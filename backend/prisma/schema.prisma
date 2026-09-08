@@ -1387,6 +1387,13 @@ model ProductCategory {
   name        String
   slug        String              @unique
   description String?
+  /// A category can exist and hold products before it is ready to sell --
+  /// staff loading Clothes ahead of launch, say. False hides it (and every
+  /// product filed under it) from the storefront's category list, /shop's
+  /// category filter, the sitemap and the product feeds, without deleting
+  /// anything or blocking a direct product link. True by default: an
+  /// existing category was implicitly "on" before this field existed.
+  isActive    Boolean             @default(true)
   parent      ProductCategory?    @relation("CategoryTree", fields: [parentId], references: [id])
   parentId    String?
   children    ProductCategory[]   @relation("CategoryTree")
