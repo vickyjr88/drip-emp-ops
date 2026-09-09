@@ -7609,6 +7609,36 @@ img {
     border-color: var(--eef-primary);
   }
 
+  /* A labelled date input dropped into a list-toolbar -- same 40px height as
+     the search box and select beside it, with the label read inline rather
+     than stacked above (there's no room for a two-line label in a toolbar
+     row). */
+  .portal-inline-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #5a5c5c;
+    white-space: nowrap;
+  }
+
+  .portal-inline-date input {
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid var(--eef-border);
+    border-radius: 0;
+    background: #fff;
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    color: #1a1c1c;
+  }
+
+  .portal-inline-date input:focus {
+    outline: none;
+    border-color: var(--eef-primary);
+  }
+
 /* ---------------------------------------------------------------------
    404 page (app/not-found.tsx)
 

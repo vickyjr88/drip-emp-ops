@@ -87,12 +87,22 @@ export class ProductService {
    * for a shoe types whichever of the three they happen to remember.
    */
   async findAll(query: ProductQueryDto) {
-    const { skip, take, search, categoryId, brand, isActive, isFeatured } = query;
+    const { skip, take, search, categoryId, brand, isActive, isFeatured, sortBy, dateFrom, dateTo } = query;
     const where: Prisma.ProductWhereInput = {
       ...(categoryId ? { categoryId } : {}),
       ...(brand ? { brand: { equals: brand, mode: 'insensitive' } } : {}),
       ...(isActive !== undefined ? { isActive } : {}),
       ...(isFeatured !== undefined ? { isFeatured } : {}),
+      ...(dateFrom || dateTo
+        ? {
+            createdAt: {
+              ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+              // A bare date (no time) is meant to include that whole day, so
+              // the upper bound reaches the end of it rather than midnight.
+              ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999Z`) } : {}),
+            },
+          }
+        : {}),
       ...(search
         ? {
             OR: [
@@ -104,7 +114,14 @@ export class ProductService {
           }
         : {}),
     };
-    const orderBy: Prisma.ProductOrderByWithRelationInput[] = [{ name: 'asc' }, { id: 'asc' }];
+    const orderBy: Prisma.ProductOrderByWithRelationInput[] =
+      sortBy === 'category'
+        ? [{ category: { name: 'asc' } }, { name: 'asc' }, { id: 'asc' }]
+        : sortBy === 'newest'
+          ? [{ createdAt: 'desc' }, { id: 'asc' }]
+          : sortBy === 'oldest'
+            ? [{ createdAt: 'asc' }, { id: 'asc' }]
+            : [{ name: 'asc' }, { id: 'asc' }];
     return paginate(
       (args) => this.prisma.product.findMany({ where, include: INCLUDE, orderBy, ...args }),
       () => this.prisma.product.count({ where }),

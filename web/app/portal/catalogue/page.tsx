@@ -20,7 +20,7 @@ import { usePortalDialog } from '../components/portal-dialog';
 import { OfferQuickAdd, OfferTarget } from '../components/offer-quick-add';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
-  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatMoney,
+  AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDate, formatMoney,
   hasPermission, loadProfile, roleLabelFor, uploadMedia,
 } from '../accounting/lib';
 
@@ -39,7 +39,10 @@ type Product = {
   imageUrls?: string[] | null; featuredImageUrl?: string | null; isActive: boolean;
   category?: { id: string; name: string } | null;
   variants: Variant[];
+  createdAt: string;
 };
+
+type ProductSort = 'name' | 'category' | 'newest' | 'oldest';
 
 type CategoryAttribute = { id: string; key: string; label: string; options: string[]; sortOrder: number };
 type Category = { id: string; name: string; slug: string; attributes?: CategoryAttribute[] };
@@ -62,6 +65,10 @@ export default function CataloguePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState<ProductSort>('name');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [form, setForm] = useState(BLANK);
   const [price, setPrice] = useState('');
   // The three trade tiers and the buying cost. Cost is what makes margin and
@@ -127,19 +134,32 @@ export default function CataloguePage() {
   }, [initialized, token, load]);
 
   const fetchProductsPage = useCallback(
-    async (params: { skip: number; take: number; search: string }): Promise<ServerPage<Product>> => {
+    async (params: {
+      skip: number; take: number; search: string;
+      categoryId?: string; sortBy?: ProductSort; dateFrom?: string; dateTo?: string;
+    }): Promise<ServerPage<Product>> => {
       if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
       const query = new URLSearchParams();
       query.set('skip', String(params.skip));
       query.set('take', String(params.take));
       if (params.search) query.set('search', params.search);
+      if (params.categoryId) query.set('categoryId', params.categoryId);
+      if (params.sortBy) query.set('sortBy', params.sortBy);
+      if (params.dateFrom) query.set('dateFrom', params.dateFrom);
+      if (params.dateTo) query.set('dateTo', params.dateTo);
       return apiRequest<ServerPage<Product>>(`/products?${query}`, { method: 'GET' }, token);
     },
     [token],
   );
 
-  const productsPager = useServerPager<Product>({
+  const productsPager = useServerPager<Product, { categoryId?: string; sortBy?: ProductSort; dateFrom?: string; dateTo?: string }>({
     fetchPage: (params) => fetchProductsPage(params),
+    filters: {
+      categoryId: categoryFilter || undefined,
+      sortBy,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    },
     enabled: Boolean(token),
   });
 
@@ -147,12 +167,15 @@ export default function CataloguePage() {
   useEffect(() => {
     if (!token) return;
     const timer = setTimeout(() => {
-      void fetchProductsPage({ skip: 0, take: 500, search: productsPager.search }).then((page) =>
+      void fetchProductsPage({
+        skip: 0, take: 500, search: productsPager.search,
+        categoryId: categoryFilter || undefined, sortBy, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
+      }).then((page) =>
         setExportRows(Array.isArray(page?.items) ? page.items : Array.isArray(page) ? (page as unknown as Product[]) : []),
       );
     }, 350);
     return () => clearTimeout(timer);
-  }, [fetchProductsPage, productsPager.search, token]);
+  }, [fetchProductsPage, productsPager.search, token, categoryFilter, sortBy, dateFrom, dateTo]);
 
   const shapeRow = (product: Product) => {
     const safeVariants = Array.isArray(product.variants) ? product.variants : [];
@@ -688,6 +711,26 @@ export default function CataloguePage() {
 
               <div className="list-toolbar">
                 <ServerListSearch pager={productsPager} placeholder="Search name, SKU or brand…" />
+                <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Filter by category">
+                  <option value="">All categories</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+                <select value={sortBy} onChange={(event) => setSortBy(event.target.value as ProductSort)} aria-label="Sort by">
+                  <option value="name">Sort: Name (A–Z)</option>
+                  <option value="category">Sort: Category</option>
+                  <option value="newest">Sort: Newest added</option>
+                  <option value="oldest">Sort: Oldest added</option>
+                </select>
+                <label className="portal-inline-date">
+                  <span>Added from</span>
+                  <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => setDateFrom(event.target.value)} />
+                </label>
+                <label className="portal-inline-date">
+                  <span>to</span>
+                  <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} />
+                </label>
                 <ListExport
                   rows={exportRowsShaped}
                   config={{
@@ -700,6 +743,7 @@ export default function CataloguePage() {
                       { header: 'Variants', value: (row) => (row.variants || []).length },
                       { header: 'Price From', value: (row) => row.priceFrom },
                       { header: 'Active', value: (row) => (row.isActive ? 'Yes' : 'No') },
+                      { header: 'Date Added', value: (row) => formatDate(row.createdAt) },
                     ],
                   }}
                 />
@@ -727,6 +771,7 @@ export default function CataloguePage() {
                           </p>
                           <p>
                             {(product.variants || []).length} size(s) from {formatMoney(product.priceFrom)}
+                            {' · added '}{formatDate(product.createdAt)}
                           </p>
                         </div>
                         <div className="portal-action-row">
