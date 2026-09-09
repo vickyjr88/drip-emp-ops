@@ -141,6 +141,14 @@ export class StorefrontService {
           : all;
       })(),
       category: product.category ? { name: product.category.name, slug: product.category.slug } : null,
+      // The top-level ancestor for grouping an unfiltered view -- "Shoes" for
+      // a product filed under Sneakers, or the category itself when it has
+      // no parent (Watches). Null only for an uncategorised product.
+      parentCategory: product.category
+        ? product.category.parent
+          ? { name: product.category.parent.name, slug: product.category.parent.slug }
+          : { name: product.category.name, slug: product.category.slug }
+        : null,
       isFeatured: Boolean(product.isFeatured),
       variants,
       priceFrom: prices.length ? Math.min(...prices) : 0,
@@ -216,22 +224,38 @@ export class StorefrontService {
     return new Map(rows.map((row) => [row.variantId, row._sum.quantity ?? 0]));
   }
 
+  /**
+   * Every browsable category, root and leaf alike -- /shop/category/[slug]
+   * needs to resolve a leaf (Sneakers) as much as a root (Shoes), so this
+   * cannot be narrowed to top-level only. isTopLevel is what /shop's own
+   * dropdown filters on instead, now that picking "Shoes" there means
+   * "Shoes and everything under it" (see descendantCategoryIds): showing
+   * Sneakers/Casuals/etc. there too would just be the same products twice
+   * under two names.
+   *
+   * productCount sums the whole subtree, not just a category's own direct
+   * products -- Shoes holds none directly (Sneakers, Casuals, Officials,
+   * Boots and Sandals do, as its children), so a plain
+   * products:some(isActive) found it empty and dropped it from the list
+   * entirely, same bug the dropdown itself had before this change.
+   */
   async categories() {
     const rows = await this.prisma.productCategory.findMany({
-      // isActive gates a category's own storefront visibility -- staff can
-      // load products under Clothes ahead of launch without it appearing
-      // here. products: some(isActive) still applies on top, so a launched
-      // category with everything deactivated or sold out still drops off
-      // the list rather than showing an empty "0 styles" entry.
-      where: { isActive: true, products: { some: { isActive: true } } },
-      include: { _count: { select: { products: { where: { isActive: true } } } } },
+      where: { isActive: true },
       orderBy: { name: 'asc' },
     });
-    return rows.map((row) => ({
-      name: row.name,
-      slug: row.slug,
-      productCount: row._count.products,
-    }));
+    const shaped = await Promise.all(
+      rows.map(async (row) => {
+        const ids = (await this.descendantCategoryIds(row.slug)) ?? [row.id];
+        const productCount = await this.prisma.product.count({
+          where: { isActive: true, categoryId: { in: ids } },
+        });
+        return { name: row.name, slug: row.slug, productCount, isTopLevel: row.parentId === null };
+      }),
+    );
+    // Same "hide an empty category" rule as before, now judged on the whole
+    // subtree rather than a row's own direct products.
+    return shaped.filter((category) => category.productCount > 0);
   }
 
   /** Distinct brands and sizes actually present, so filters offer only real options. */
@@ -346,11 +370,46 @@ export class StorefrontService {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * A category slug plus every one of its descendants' ids, active only.
+   *
+   * "Shoes" itself holds no products directly -- Sneakers, Casuals, Officials,
+   * Boots and Sandals do, as its children -- so filtering by the parent's own
+   * id alone returned nothing. Walking the tree here means picking "Shoes"
+   * behaves the way a shopper expects: everything under it, not just what is
+   * filed on the parent row itself. Recurses rather than assuming two levels,
+   * so a future subcategory-of-a-subcategory is included automatically.
+   */
+  private async descendantCategoryIds(slug: string): Promise<string[] | null> {
+    const root = await this.prisma.productCategory.findFirst({
+      where: { slug, isActive: true },
+      select: { id: true },
+    });
+    if (!root) return null;
+
+    const ids = [root.id];
+    let frontier = [root.id];
+    while (frontier.length) {
+      const children = await this.prisma.productCategory.findMany({
+        where: { parentId: { in: frontier }, isActive: true },
+        select: { id: true },
+      });
+      frontier = children.map((child) => child.id);
+      ids.push(...frontier);
+    }
+    return ids;
+  }
+
   async list(query: {
     category?: string; brand?: string; size?: string; search?: string;
     minPrice?: string; maxPrice?: string; inStockOnly?: string; sort?: string;
   }, authedUser?: { priceTier?: PriceTier }) {
     const tier = this.tierOf(authedUser);
+    // Null when the slug does not resolve to an active category -- an empty
+    // (never-matches) id list, not "no filter", so a guessed/inactive slug
+    // still returns zero products rather than silently falling back to
+    // everything.
+    const categoryIds = query.category ? (await this.descendantCategoryIds(query.category)) ?? [] : null;
     // Split on whitespace and require every word to match something, in any
     // order. A single contains on the whole phrase meant "white air force"
     // found nothing -- the product is called "Air Force 1 White", which does
@@ -382,10 +441,7 @@ export class StorefrontService {
       ? await this.prisma.product.count({
           where: {
             isActive: true,
-            // isActive: true here too -- a direct or guessed ?category= link to a
-      // not-yet-launched category (Clothes, ahead of launch) must not
-      // surface its products just because someone knows the slug.
-      ...(query.category ? { category: { slug: query.category, isActive: true } } : {}),
+            ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
             ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
             AND: wordClauses,
           },
@@ -397,10 +453,9 @@ export class StorefrontService {
 
     const where: Prisma.ProductWhereInput = {
       isActive: true,
-      // isActive: true here too -- a direct or guessed ?category= link to a
-      // not-yet-launched category (Clothes, ahead of launch) must not
-      // surface its products just because someone knows the slug.
-      ...(query.category ? { category: { slug: query.category, isActive: true } } : {}),
+      // categoryIds already resolved (and tree-expanded) above; empty array
+      // when the slug did not resolve, which correctly matches nothing.
+      ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
       ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
       // Either the literal match, or -- only when that found nothing -- the
       // typo rescue. Never both, so a query that works is never widened.
@@ -420,7 +475,16 @@ export class StorefrontService {
     const products = await this.prisma.product.findMany({
       where,
       include: {
-        category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
+        category: {
+          select: {
+            name: true, slug: true,
+            attributes: { select: { key: true, label: true } },
+            // Only needed to group a category-less view (the "All" segment
+            // and a category-less search) by top-level category -- see
+            // shape()'s parentCategory.
+            parent: { select: { name: true, slug: true } },
+          },
+        },
         variants: { orderBy: { name: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },

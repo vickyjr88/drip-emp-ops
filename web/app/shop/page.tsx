@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { seoMetadata } from '../lib/page-metadata';
-import { fetchCategories, fetchFilters, fetchProducts } from '../lib/shop';
+import { fetchCategories, fetchFilters, fetchProducts, resolveShopCategory } from '../lib/shop';
 import { ShopClient } from './shop-client';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,11 +29,13 @@ export default async function ShopPage({
 }: {
   searchParams: Record<string, string | string[] | undefined>;
 }) {
+  const rawCategory = first(searchParams.category);
+  const search = first(searchParams.search);
   const query = {
-    category: first(searchParams.category),
+    category: resolveShopCategory(rawCategory, Boolean(search)),
     brand: first(searchParams.brand),
     size: first(searchParams.size),
-    search: first(searchParams.search),
+    search,
     sort: first(searchParams.sort),
     inStockOnly: first(searchParams.inStockOnly) === 'true' ? 'true' : undefined,
   };

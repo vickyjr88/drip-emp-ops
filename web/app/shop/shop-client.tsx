@@ -21,7 +21,7 @@ import { ProductCard } from '../components/product-card';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { useCaptureReferral } from '../lib/use-capture-referral';
 import {
-  ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts,
+  ShopCategory, ShopProduct, fetchCategories, fetchFilters, fetchProducts, resolveShopCategory,
 } from '../lib/shop';
 
 /** The label beside this shrinks to icon-only below ~400px -- see .de-search
@@ -79,12 +79,17 @@ export function ShopClient({
   const [loading, setLoading] = useState(false);
   const isFirstRender = useRef(true);
 
-  const category = lockedCategory || params.get('category') || '';
+  const rawCategory = params.get('category') || '';
   const brand = params.get('brand') || '';
   const size = params.get('size') || '';
   const search = params.get('search') || '';
   const sort = params.get('sort') || '';
   const inStockOnly = params.get('inStockOnly') === 'true';
+
+  const category = lockedCategory || resolveShopCategory(rawCategory, Boolean(search));
+  // Only the unfiltered views group by top-level category -- a specific
+  // category (including the Shoes default) is already one coherent grid.
+  const isGrouped = !lockedCategory && !category;
 
   const [searchDraft, setSearchDraft] = useState(search);
   useEffect(() => setSearchDraft(search), [search]);
@@ -170,18 +175,55 @@ export function ShopClient({
     const term = searchDraft.trim();
     setParams({
       search: term,
-      // Only cleared when there is a term: unticking the box on an empty
-      // search should not also drop the category someone is browsing.
-      ...(term && searchAllCategories ? { category: '' } : {}),
+      // Only touched when there is a term: unticking the box on an empty
+      // search should not also change the category someone is browsing.
+      // Scoping to `category` (the *effective* value, e.g. the silent Shoes
+      // default) rather than leaving rawCategory's param untouched: with
+      // nothing in the URL yet, "leave it alone" would still resolve to
+      // "everything" once the search term made resolveShopCategory's own
+      // default stop applying, silently widening a search someone meant to
+      // keep scoped.
+      ...(term ? { category: searchAllCategories ? '' : category } : {}),
     });
-  }, [searchDraft, searchAllCategories, setParams]);
+  }, [searchDraft, searchAllCategories, category, setParams]);
 
-  const hasFilters = Boolean(category || brand || size || search || inStockOnly);
+  /**
+   * Buckets the current results by top-level category, for the unfiltered
+   * views (isGrouped) -- "All", or a search with no category picked. Each
+   * product's own parentCategory (its top-level ancestor, resolved
+   * server-side) decides its section, so a Sneaker lands under "Shoes"
+   * rather than under "Sneakers" -- the whole point of grouping this way is
+   * that a shopper thinks in terms of the shop's main lines, not every leaf
+   * category. Groups are ordered by their first appearance in `products`,
+   * which is already sorted (createdAt desc, then whatever `sort` picked),
+   * so section order stays stable rather than jumping around alphabetically
+   * on every fetch.
+   */
+  const groupedProducts = useMemo(() => {
+    if (!isGrouped) return null;
+    const order: string[] = [];
+    const bySlug = new Map<string, { name: string; slug: string; items: ShopProduct[] }>();
+    for (const product of products) {
+      const group = product.parentCategory;
+      const key = group?.slug ?? '__uncategorised';
+      if (!bySlug.has(key)) {
+        order.push(key);
+        bySlug.set(key, { name: group?.name ?? 'Other', slug: key, items: [] });
+      }
+      bySlug.get(key)!.items.push(product);
+    }
+    return order.map((key) => bySlug.get(key)!);
+  }, [isGrouped, products]);
+
+  // rawCategory, not category: the silent Shoes default is not a filter
+  // someone applied, so it must not make "Clear all" appear on first landing.
+  const hasFilters = Boolean(rawCategory || brand || size || search || inStockOnly);
   const heading = useMemo(() => {
     if (search) return `"${search}"`;
+    if (isGrouped) return 'All Products';
     const found = categories.find((item) => item.slug === category);
-    return found ? found.name : 'All Shoes';
-  }, [search, category, categories]);
+    return found ? found.name : 'Shoes';
+  }, [search, category, categories, isGrouped]);
 
   return (
     <EliteLayout active="shop">
@@ -229,23 +271,23 @@ export function ShopClient({
               <label>
                 <span>Category</span>
                 <select
-                  value={category}
+                  value={lockedCategory || rawCategory || 'shoes'}
                   onChange={(event) => {
                     const nextSlug = event.target.value;
                     // On the path-based /shop/category/[slug] page, the
                     // category is the URL itself -- a real navigation to the
-                    // new category's own page (or plain /shop for "All"),
-                    // not a query param that lockedCategory would immediately
-                    // override back to the old one.
+                    // new category's own page, or to /shop?category=all for
+                    // "All" (plain /shop would just land back on the Shoes
+                    // default, not the "everything" the shopper picked).
                     if (lockedCategory) {
-                      router.push(nextSlug ? `/shop/category/${nextSlug}` : '/shop');
+                      router.push(nextSlug === 'all' ? '/shop?category=all' : `/shop/category/${nextSlug}`);
                       return;
                     }
                     setParam('category', nextSlug);
                   }}
                 >
-                  <option value="">All</option>
-                  {categories.map((item) => (
+                  <option value="all">All</option>
+                  {categories.filter((item) => item.isTopLevel).map((item) => (
                     <option key={item.slug} value={item.slug}>{item.name}</option>
                   ))}
                 </select>
@@ -315,11 +357,26 @@ export function ShopClient({
             </div>
           ) : null}
 
-          <div className="de-grid">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {groupedProducts ? (
+            groupedProducts.map((group) => (
+              <div key={group.slug} className="de-grid-section">
+                <h2 className="de-grid-section-title">
+                  {group.name} <span>({group.items.length})</span>
+                </h2>
+                <div className="de-grid">
+                  {group.items.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="de-grid">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </EliteLayout>

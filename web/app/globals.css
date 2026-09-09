@@ -10611,6 +10611,29 @@ img {
   gap: 22px;
 }
 
+/* An unfiltered view ("All", or a category-less search) groups its results
+   by top-level category instead of one flat grid -- each section is just a
+   heading in front of the same .de-grid used everywhere else. */
+.de-grid-section + .de-grid-section {
+  margin-top: 44px;
+}
+
+.de-grid-section-title {
+  font-family: 'Libre Caslon Text', serif;
+  font-size: 1.4rem;
+  margin: 0 0 16px;
+  color: var(--de-ink);
+  border-bottom: 1px solid var(--de-line);
+  padding-bottom: 10px;
+}
+
+.de-grid-section-title span {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--de-muted);
+}
+
 .de-card {
   position: relative;
   background: #fff;

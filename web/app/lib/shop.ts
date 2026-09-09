@@ -47,6 +47,11 @@ export type ShopProduct = {
   description?: string | null;
   imageUrls: string[];
   category?: { name: string; slug: string } | null;
+  /** Top-level ancestor of `category` -- "Shoes" for a product filed under
+   *  Sneakers, or the same as `category` when it has no parent (Watches).
+   *  Only present in the /shop list response; used to group an unfiltered
+   *  ("All", or a category-less search) view by top-level category. */
+  parentCategory?: { name: string; slug: string } | null;
   /** Merchant-picked for the "Featured" rail, not the per-product hero image. */
   isFeatured?: boolean;
   variants: ShopVariant[];
@@ -60,7 +65,7 @@ export type ShopProduct = {
   related?: ShopProduct[];
 };
 
-export type ShopCategory = { name: string; slug: string; productCount: number };
+export type ShopCategory = { name: string; slug: string; productCount: number; isTopLevel: boolean };
 export type ShopStore = { code: string; name: string; location?: string | null };
 
 /** A failed fetch returns empty rather than throwing: a shop window that is
@@ -76,6 +81,26 @@ async function get<T>(path: string, fallback: T, token?: string | null): Promise
   } catch {
     return fallback;
   }
+}
+
+/**
+ * The category actually sent to the API for a given raw `?category=` value
+ * and whether a search is in play.
+ *
+ * "all" is the dropdown's explicit "everything" choice -- a real value
+ * distinct from no param at all, because that absence now means something
+ * else: default to Shoes, the shop's main line, rather than surfacing every
+ * product line (Watches included) on first landing. A search fired with no
+ * category picked is the other case that resolves to "everything": someone
+ * typing into the search box almost certainly wants it to search past
+ * whatever the default category would otherwise silently narrow it to.
+ * Shared between the server-rendered first paint and the client so both
+ * agree on what an unadorned /shop actually shows.
+ */
+export function resolveShopCategory(rawCategory: string, hasSearch: boolean): string {
+  if (rawCategory === 'all') return '';
+  if (rawCategory) return rawCategory;
+  return hasSearch ? '' : 'shoes';
 }
 
 export function fetchProducts(query: Record<string, string | undefined> = {}, token?: string | null) {

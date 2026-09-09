@@ -117,9 +117,13 @@ async function redirects() {
     // dropdown uses it for fast client-side filtering), but /shop/category/x
     // is now the canonical, indexable URL for a given category -- an old
     // bookmark or indexed link using the query form should land there too.
+    // Excludes "all" -- the dropdown's explicit "show everything" choice has
+    // no /shop/category/all page to redirect to (there is no such category),
+    // and unlike a real category slug it is meant to stay a /shop query
+    // rather than get its own canonical URL.
     {
       source: '/shop',
-      has: [{ type: 'query', key: 'category', value: '(?<category>.*)' }],
+      has: [{ type: 'query', key: 'category', value: '(?<category>(?!all$).*)' }],
       destination: '/shop/category/:category',
       permanent: true,
     },
