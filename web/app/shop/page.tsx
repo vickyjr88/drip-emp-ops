@@ -29,13 +29,11 @@ export default async function ShopPage({
 }: {
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const rawCategory = first(searchParams.category);
-  const search = first(searchParams.search);
   const query = {
-    category: resolveShopCategory(rawCategory, Boolean(search)),
+    category: resolveShopCategory(first(searchParams.category)),
     brand: first(searchParams.brand),
     size: first(searchParams.size),
-    search,
+    search: first(searchParams.search),
     sort: first(searchParams.sort),
     inStockOnly: first(searchParams.inStockOnly) === 'true' ? 'true' : undefined,
   };

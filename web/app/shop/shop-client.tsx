@@ -86,10 +86,13 @@ export function ShopClient({
   const sort = params.get('sort') || '';
   const inStockOnly = params.get('inStockOnly') === 'true';
 
-  const category = lockedCategory || resolveShopCategory(rawCategory, Boolean(search));
-  // Only the unfiltered views group by top-level category -- a specific
-  // category (including the Shoes default) is already one coherent grid.
-  const isGrouped = !lockedCategory && !category;
+  const category = lockedCategory || resolveShopCategory(rawCategory);
+  // Grouped by top-level category only when "All" was explicitly picked --
+  // the plain, no-params landing page is one flat newest-first grid instead
+  // (nothing to group by without a chosen category, and section headers
+  // would be a strange first impression for a shopper who has not filtered
+  // anything yet).
+  const isGrouped = !lockedCategory && rawCategory === 'all';
 
   const [searchDraft, setSearchDraft] = useState(search);
   useEffect(() => setSearchDraft(search), [search]);
@@ -177,27 +180,18 @@ export function ShopClient({
       search: term,
       // Only touched when there is a term: unticking the box on an empty
       // search should not also change the category someone is browsing.
-      // Scoping to `category` (the *effective* value, e.g. the silent Shoes
-      // default) rather than leaving rawCategory's param untouched: with
-      // nothing in the URL yet, "leave it alone" would still resolve to
-      // "everything" once the search term made resolveShopCategory's own
-      // default stop applying, silently widening a search someone meant to
-      // keep scoped.
       ...(term ? { category: searchAllCategories ? '' : category } : {}),
     });
   }, [searchDraft, searchAllCategories, category, setParams]);
 
   /**
-   * Buckets the current results by top-level category, for the unfiltered
-   * views (isGrouped) -- "All", or a search with no category picked. Each
-   * product's own parentCategory (its top-level ancestor, resolved
-   * server-side) decides its section, so a Sneaker lands under "Shoes"
-   * rather than under "Sneakers" -- the whole point of grouping this way is
-   * that a shopper thinks in terms of the shop's main lines, not every leaf
-   * category. Groups are ordered by their first appearance in `products`,
-   * which is already sorted (createdAt desc, then whatever `sort` picked),
-   * so section order stays stable rather than jumping around alphabetically
-   * on every fetch.
+   * Buckets the current results by top-level category, only when "All" was
+   * explicitly picked (isGrouped). Each product's own parentCategory (its
+   * top-level ancestor, resolved server-side -- itself when the category has
+   * no parent, which is every current category) decides its section. Groups
+   * are ordered by their first appearance in `products`, which is already
+   * sorted (createdAt desc, then whatever `sort` picked), so section order
+   * stays stable rather than jumping around alphabetically on every fetch.
    */
   const groupedProducts = useMemo(() => {
     if (!isGrouped) return null;
@@ -215,14 +209,12 @@ export function ShopClient({
     return order.map((key) => bySlug.get(key)!);
   }, [isGrouped, products]);
 
-  // rawCategory, not category: the silent Shoes default is not a filter
-  // someone applied, so it must not make "Clear all" appear on first landing.
   const hasFilters = Boolean(rawCategory || brand || size || search || inStockOnly);
   const heading = useMemo(() => {
     if (search) return `"${search}"`;
-    if (isGrouped) return 'All Products';
+    if (isGrouped || !category) return 'All Products';
     const found = categories.find((item) => item.slug === category);
-    return found ? found.name : 'Shoes';
+    return found ? found.name : 'All Products';
   }, [search, category, categories, isGrouped]);
 
   return (
@@ -271,14 +263,13 @@ export function ShopClient({
               <label>
                 <span>Category</span>
                 <select
-                  value={lockedCategory || rawCategory || 'shoes'}
+                  value={lockedCategory || rawCategory || 'all'}
                   onChange={(event) => {
                     const nextSlug = event.target.value;
                     // On the path-based /shop/category/[slug] page, the
                     // category is the URL itself -- a real navigation to the
                     // new category's own page, or to /shop?category=all for
-                    // "All" (plain /shop would just land back on the Shoes
-                    // default, not the "everything" the shopper picked).
+                    // "All".
                     if (lockedCategory) {
                       router.push(nextSlug === 'all' ? '/shop?category=all' : `/shop/category/${nextSlug}`);
                       return;

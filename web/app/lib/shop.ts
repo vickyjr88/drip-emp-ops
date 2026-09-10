@@ -84,23 +84,20 @@ async function get<T>(path: string, fallback: T, token?: string | null): Promise
 }
 
 /**
- * The category actually sent to the API for a given raw `?category=` value
- * and whether a search is in play.
+ * The category actually sent to the API for a given raw `?category=` value.
  *
- * "all" is the dropdown's explicit "everything" choice -- a real value
- * distinct from no param at all, because that absence now means something
- * else: default to Shoes, the shop's main line, rather than surfacing every
- * product line (Watches included) on first landing. A search fired with no
- * category picked is the other case that resolves to "everything": someone
- * typing into the search box almost certainly wants it to search past
- * whatever the default category would otherwise silently narrow it to.
- * Shared between the server-rendered first paint and the client so both
- * agree on what an unadorned /shop actually shows.
+ * "all" is the dropdown's explicit "everything" choice, kept as a real value
+ * distinct from no param at all so a bookmark/link to it is unambiguous --
+ * both resolve to no filter either way. There is no single hardcoded
+ * category (e.g. "shoes") that reliably exists across environments: the
+ * category tree is merchant-configured and varies (production currently has
+ * no such parent at all, just several top-level lines side by side), so
+ * defaulting to a guessed slug silently showed nothing rather than degrading
+ * to "everything". Shared between the server-rendered first paint and the
+ * client so both agree on what an unadorned /shop actually shows.
  */
-export function resolveShopCategory(rawCategory: string, hasSearch: boolean): string {
-  if (rawCategory === 'all') return '';
-  if (rawCategory) return rawCategory;
-  return hasSearch ? '' : 'shoes';
+export function resolveShopCategory(rawCategory: string): string {
+  return rawCategory === 'all' ? '' : rawCategory;
 }
 
 export function fetchProducts(query: Record<string, string | undefined> = {}, token?: string | null) {
