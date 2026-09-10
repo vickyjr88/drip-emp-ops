@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { JsonLd, SITE_NAME, absoluteUrl } from '../../lib/site';
+import { JsonLd, SITE_NAME, absoluteUrl, productFaqSchema } from '../../lib/site';
 import { fetchProduct, formatKes } from '../../lib/shop';
 import { ProductClient } from './product-client';
 
@@ -81,6 +81,10 @@ export default async function ProductPage({ params }: { params: { slug: string }
           },
         }}
       />
+      {/* Delivery, visiting the shop, authenticity and sizing -- the same
+          questions on every product, answered against this one specifically
+          so an AI engine citing this page has the fact attached to it. */}
+      <JsonLd data={productFaqSchema(product)} />
       <ProductClient product={product} />
     </>
   );

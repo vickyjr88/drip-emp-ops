@@ -53,7 +53,7 @@ const DEFAULT_FAQS: FaqItem[] = [
   {
     question: 'Can I try the shoes before I pay?',
     answer:
-      'At either shop, yes. Come in, try them on, and pay only if they fit. That is the advantage of collecting rather than having them delivered.',
+      'At the shop, yes. Come in, try them on, and pay only if they fit. That is the advantage of collecting rather than having them delivered.',
   },
   {
     question: 'Are your shoes original?',

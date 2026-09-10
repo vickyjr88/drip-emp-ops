@@ -59,6 +59,57 @@ export function organizationSchema(socialUrls: string[] = []) {
 }
 
 /**
+ * The same handful of questions a shopper actually has before buying any one
+ * shoe -- delivery, visiting the shop, authenticity, sizing -- repeated on
+ * every product page rather than left only on /faq. An AI engine answering
+ * "can I get this delivered" or "is this shoe original" from a search result
+ * needs the answer attached to the product it was asked about, not three
+ * clicks away on a separate page it may never reach. The sizing question is
+ * the one genuinely per-product fact, built from what is actually in stock
+ * for this shoe rather than a generic size range that may not apply to it.
+ */
+export function productFaqSchema(product: { name: string; sizesInStock: string[]; anyInStock: boolean }) {
+  const sizingAnswer = product.sizesInStock.length
+    ? `${product.name} is currently in stock in sizes ${product.sizesInStock.join(', ')}. If your size is not listed, message us on WhatsApp -- we can often source it.`
+    : `${product.name} is not on the shelf in any size right now, but every listed size can still be ordered in from our supplier. Message us on WhatsApp with your size and we will tell you honestly how long it will take.`;
+
+  return {
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name: 'Do you deliver outside Nairobi?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes, Drip Emporium delivers countrywide across Kenya. Delivery cost depends on where the parcel is going, so we confirm it with you directly after you place your order.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: 'Can I visit the physical shop?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes, visit us at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD. Open 08:00 to 20:00 daily.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: `Is ${product.name} an original/authentic product?`,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'Yes. We stock genuine branded footwear and are happy for you to inspect any pair in person before you buy.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name: `What sizes does ${product.name} come in?`,
+        acceptedAnswer: { '@type': 'Answer', text: sizingAnswer },
+      },
+    ],
+  };
+}
+
+/**
  * Renders a JSON-LD block.
  *
  * Structured data is what lets an assistant answer "what does Drip Emporium

@@ -10926,6 +10926,20 @@ img {
   justify-items: center;
 }
 
+/* The localized paragraph under a category's own grid (/shop/category/[slug]
+   only) -- on-page text for search engines and AI engines, not meant to
+   compete visually with the products above it. */
+.de-category-copy {
+  padding-block: 32px 44px;
+  max-width: 72ch;
+}
+
+.de-category-copy p {
+  color: var(--de-muted);
+  line-height: 1.7;
+  font-size: 0.95rem;
+}
+
 /* --- product page ------------------------------------------------------- */
 .de-crumbs {
   padding-block: 22px 0;

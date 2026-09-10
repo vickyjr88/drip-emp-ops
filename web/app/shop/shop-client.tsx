@@ -44,6 +44,7 @@ export function ShopClient({
   initialBrands = [],
   initialSizes = [],
   lockedCategory,
+  categoryCopy,
 }: {
   /** Server-rendered for the filters already in the URL, so a crawler (and a
    *  shopper's first paint) sees the real grid rather than an empty shell.
@@ -58,6 +59,12 @@ export function ShopClient({
    *  like a normal filter (clearing it here would mean leaving the page's
    *  own URL, which "Clear all" already does for every other filter). */
   lockedCategory?: string;
+  /** Static, localized paragraph shown under the grid on a category's own
+   *  page only -- the on-page text search engines and AI engines actually
+   *  read to understand what this category page is for, distinct from the
+   *  product cards themselves. Absent on plain /shop, which has no single
+   *  category to write this copy about. */
+  categoryCopy?: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -369,6 +376,12 @@ export function ShopClient({
             </div>
           )}
         </section>
+
+        {categoryCopy ? (
+          <section className="lp-container de-category-copy">
+            <p>{categoryCopy}</p>
+          </section>
+        ) : null}
       </main>
     </EliteLayout>
   );
