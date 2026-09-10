@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { seoMetadata } from '../lib/page-metadata';
 import { EliteLayout } from '../components/elite-layout';
 import { contentValue, fetchPageContent } from '../lib/page-content';
+import { JsonLd, SITE_URL } from '../lib/site';
 import { ContactForm } from './contact-form';
 
 /**
@@ -76,7 +77,7 @@ export default async function ContactPage() {
   const phone = contentValue(content, 'details.phone', '+254 113 206 481');
   const email = contentValue(content, 'details.email', 'info@dripemporium.store');
   const officeName = contentValue(content, 'details.officeName', 'Drip Emporium HQ');
-  const officeAddress = contentValue(content, 'details.officeAddress', 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi');
+  const officeAddress = contentValue(content, 'details.officeAddress', 'Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi');
   const highlights = contentValue<Highlight[]>(content, 'highlights.items', [
     {
       title: 'Ask About Your Size',
@@ -90,12 +91,46 @@ export default async function ContactPage() {
     },
     {
       title: 'Exclusive Inventory',
-      description: 'Two shops on Ronald Ngala Street, open 08:00 to 20:00, and a WhatsApp line that gets answered.',
+      description: 'Ronald Ngala Street, open 08:00 to 20:00, and a WhatsApp line that gets answered.',
     },
   ]);
 
   return (
     <EliteLayout active="contact">
+      {/* The physical shop, distinct from the site-wide Organization entity
+          in layout.tsx (parentOrganization links the two). This is what lets
+          a "sneakers near me" search or an AI answer cite an actual address,
+          phone and hours rather than just the brand. Geo coordinates are
+          left out rather than guessed -- an approximate pin is worse than
+          none, since it actively misleads a map result. Add geo.latitude/
+          geo.longitude here once the Google Business Profile has the
+          confirmed pin. */}
+      <JsonLd
+        data={{
+          '@type': 'ShoeStore',
+          '@id': `${SITE_URL}/contact#store`,
+          parentOrganization: { '@id': `${SITE_URL}/#organization` },
+          name: officeName,
+          image: agentImage || undefined,
+          telephone: phone,
+          email,
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: officeAddress,
+            addressLocality: 'Nairobi',
+            addressCountry: 'KE',
+          },
+          openingHoursSpecification: {
+            '@type': 'OpeningHoursSpecification',
+            dayOfWeek: [
+              'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
+            ],
+            opens: '08:00',
+            closes: '20:00',
+          },
+          priceRange: 'KES',
+        }}
+      />
       <main className="lp-main-content lp-contact-main">
         <section className="lp-container lp-contact-header">
           <p>Connect with our team</p>

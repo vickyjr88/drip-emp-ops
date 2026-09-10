@@ -6,6 +6,7 @@ import { CartProvider } from './lib/cart';
 import { CustomerAuthProvider } from './lib/customer-auth';
 import { JsonLd, SITE_DESCRIPTION, SITE_NAME, SITE_URL, organizationSchema } from './lib/site';
 import { StorefrontAnalytics } from './components/storefront-analytics';
+import { contentValue, fetchPageContent } from './lib/page-content';
 
 export const metadata: Metadata = {
   // Makes every relative canonical/OG URL below resolve against the real
@@ -49,7 +50,16 @@ export const metadata: Metadata = {
   formatDetection: { telephone: true, address: true, email: true },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Footer content already carries the site's social links (portal-edited,
+  // shown as "Follow Us"); reused here rather than duplicating them as a
+  // second field to keep in sync. A failed fetch (fetchPageContent returns
+  // null) just means no sameAs this render, not a broken layout.
+  const footerContent = await fetchPageContent('footer');
+  const socialUrls = ['facebook', 'instagram', 'tiktok', 'x', 'linkedin', 'youtube']
+    .map((key) => contentValue(footerContent, `social.${key}`, ''))
+    .filter(Boolean);
+
   return (
     <html lang="en">
       <body>
@@ -58,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <JsonLd
           data={{
             '@graph': [
-              organizationSchema(),
+              organizationSchema(socialUrls),
               {
                 '@type': 'WebSite',
                 '@id': `${SITE_URL}/#website`,

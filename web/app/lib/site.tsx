@@ -34,8 +34,14 @@ export function absoluteUrl(path = '/') {
  * The organisation, as one object reused by every page's structured data.
  * Repeating @id across pages lets search engines merge them into a single
  * entity rather than treating each page as a separate business.
+ *
+ * sameAs is what tells Google (and an AI engine checking whether a source is
+ * legitimate) that these social profiles and this website are the same
+ * business -- omitted when there is nothing to link, rather than an empty
+ * array, so a fresh install with no social links filled in yet doesn't
+ * publish a sameAs with nothing in it.
  */
-export function organizationSchema() {
+export function organizationSchema(socialUrls: string[] = []) {
   return {
     '@type': 'ShoeStore',
     '@id': `${SITE_URL}/#organization`,
@@ -48,6 +54,7 @@ export function organizationSchema() {
       containedInPlace: { '@type': 'Country', name: 'Kenya' },
     },
     knowsLanguage: ['en', 'sw'],
+    ...(socialUrls.length ? { sameAs: socialUrls } : {}),
   };
 }
 
