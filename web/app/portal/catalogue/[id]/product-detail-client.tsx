@@ -51,7 +51,8 @@ type Product = {
   isActive: boolean; variants: Variant[];
 };
 
-type Category = { id: string; name: string };
+type CategoryAttribute = { id: string; key: string; label: string; options: string[]; sortOrder: number };
+type Category = { id: string; name: string; attributes?: CategoryAttribute[] };
 
 type Store = { id: string; name: string };
 
@@ -97,6 +98,17 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const [edits, setEdits] = useState<Record<string, Partial<Variant>>>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [offerTarget, setOfferTarget] = useState<OfferTarget | null>(null);
+
+  /** This product's category's size-like attribute, if it has one -- same
+   *  "null means sizeless" rule the create form (catalogue/page.tsx) uses.
+   *  Without this, "Add Size" always wrote a literal size key regardless of
+   *  category, which is how a sizeless product (Watches) ended up with a
+   *  placeholder "EUR 36" or, worse, a brand name typed into a size field
+   *  someone had no real answer for. */
+  const categoryAttribute = useMemo(() => {
+    const category = categories.find((item) => item.id === product?.categoryId);
+    return category?.attributes?.[0] ?? null;
+  }, [categories, product?.categoryId]);
 
   // Restock: stores and current levels, plus the quantities being entered.
   const [stores, setStores] = useState<Store[]>([]);
@@ -286,7 +298,11 @@ export default function ProductDetailClient({ productId }: { productId: string }
           // Derived from the product SKU so it matches the pattern the rest of
           // the catalogue uses, unless the shop types its own.
           sku: (newSize.sku.trim() || `${product.sku}-${newSize.name.trim().replace(/\s+/g, '')}`).toUpperCase(),
-          attributes: { size: newSize.name.trim() },
+          // The category's real attribute key (e.g. "size"), not a literal
+          // "size" regardless of category -- a sizeless category (Watches)
+          // has none, so this falls back to no attributes at all rather than
+          // writing a fake size value someone typed to satisfy this form.
+          attributes: categoryAttribute ? { [categoryAttribute.key]: newSize.name.trim() } : {},
           priceKes: Number(newSize.priceKes),
           resellerPriceKes: num(newSize.resellerPriceKes) ?? undefined,
           wholesalePriceKes: num(newSize.wholesalePriceKes) ?? undefined,
@@ -653,7 +669,12 @@ export default function ProductDetailClient({ productId }: { productId: string }
                 </form>
               ) : null}
 
-              {canUpdate ? (
+              {/* A sizeless category (Watches, Perfumes) already has its one
+                  variant from creation -- there is no second "size" to add,
+                  only a second unnamed variant nothing distinguishes from
+                  the first. Hiding this rather than letting it write a fake
+                  size value someone has no real answer for. */}
+              {canUpdate && categoryAttribute ? (
                 <form className="portal-entity-form" style={{ marginTop: 18 }} onSubmit={addSize}>
                   <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>Add a size</h3>
                   {product.variants.length ? (
