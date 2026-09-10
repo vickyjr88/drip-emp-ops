@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/about',
     title: 'About Us',
     description:
-      'Drip Emporium stocks genuine sneakers and streetwear from Nike, Adidas, Jordan and Puma at two shops on Ronald Ngala Street, Nairobi.',
+      'Drip Emporium stocks genuine sneakers and streetwear from Nike, Adidas, Jordan and Puma at Dubai Merchants Mall, Ronald Ngala Street, Nairobi.',
     shareTitle: 'About Drip Emporium',
     image: contentValue(content, 'hero.image', ''),
   });

@@ -506,7 +506,7 @@ export function CartClient() {
                 {online === false
                   ? 'We will confirm your order and payment on WhatsApp. '
                   : 'Paid securely by card or M-Pesa through Paystack. '}
-                Collect at Dubai Merchants Mall shop F53 or Palms Mall shop BF75, open 08:00 to
+                Collect at Dubai Merchants Mall shop F53, open 08:00 to
                 20:00.
               </p>
             </form>

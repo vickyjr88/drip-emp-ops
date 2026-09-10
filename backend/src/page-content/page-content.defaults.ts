@@ -176,7 +176,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
     cta: {
       heading: 'Cannot find your size?',
-      body: 'Message us — stock moves between our two shops and we will tell you straight away what we have.',
+      body: 'Message us and we will tell you straight away what we have.',
       primaryLabel: 'WhatsApp Us',
       secondaryLabel: 'Visit a Shop',
       secondaryHref: '/contact',
@@ -197,7 +197,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       paragraphs: [
         'Drip Emporium started with a simple frustration: finding a genuine pair in your size, at a price that made sense, without trekking across town for it.',
         'We stock sneakers, boots, casuals, sandals and officials from Nike, Adidas, Jordan, Puma, Calvin Klein, Tommy Hilfiger and BOSS. Everything on the shelf is what it says it is, priced so you do not have to negotiate to feel fairly treated.',
-        'Two shops, EUR 36 to 46, and a WhatsApp line that gets answered. If we do not have your size in one shop, we will tell you whether the other one does.',
+        'EUR 36 to 46, and a WhatsApp line that gets answered. If we do not have your size on the shelf, we will tell you straight away.',
       ],
       image: '',
     },
@@ -237,7 +237,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     cta: {
       heading: 'Come and try a pair on',
       body:
-        'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street. Open 08:00 to 20:00.',
+        'Dubai Merchants Mall shop F53, Ronald Ngala Street. Open 08:00 to 20:00.',
       primaryLabel: 'Get Directions',
       secondaryLabel: 'Shop Online',
     },
@@ -247,7 +247,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     home: {
       title: '',
       description:
-        'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall and Palms Mall, Ronald Ngala Street.',
+        'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall, Ronald Ngala Street.',
       shareTitle: 'Drip Emporium | Quality Affordable Sneakers & Streetwear',
     },
     // Key is "properties" rather than "shop" -- a naming leftover from before
@@ -276,7 +276,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     contact: {
       title: 'Contact Us',
       description:
-        'Visit Drip Emporium at Dubai Merchants Mall shop F53 or Palms Mall shop BF75, Ronald Ngala Street. Open 08:00 to 20:00.',
+        'Visit Drip Emporium at Dubai Merchants Mall shop F53, Ronald Ngala Street. Open 08:00 to 20:00.',
       shareTitle: 'Contact Drip Emporium',
     },
   },
@@ -335,7 +335,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     brand: {
       heading: 'Drip Emporium',
       description:
-        'Genuine sneakers and streetwear from Nike, Adidas, Jordan and Puma. Two shops on Ronald Ngala Street, Nairobi.',
+        'Genuine sneakers and streetwear from Nike, Adidas, Jordan and Puma. Ronald Ngala Street, Nairobi.',
     },
     quickLinks: {
       heading: 'Quick Links',
@@ -364,7 +364,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       heading: 'Contact Us',
       email: 'info@dripemporium.store',
       phone: '+254 113 206 481',
-      address: 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi',
+      address: 'Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi',
     },
     // Social profiles, as the old site carries them. Each is hidden while its
     // URL is blank, so an account the firm does not have never renders a link
@@ -411,7 +411,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       phone: '+254 113 206 481',
       email: 'info@dripemporium.store',
       officeName: 'Dubai Merchants Mall, Shop F53',
-      officeAddress: 'Dubai Merchants Mall shop F53 and Palms Mall shop BF75, Ronald Ngala Street, Nairobi',
+      officeAddress: 'Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi',
     },
     highlights: {
       items: [

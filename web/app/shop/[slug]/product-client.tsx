@@ -264,7 +264,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                 </p>
               ) : (
                 <p className="de-size-note">
-                  Not seeing your size? Message us — stock moves between our two shops.
+                  Not seeing your size? Message us and we will let you know.
                 </p>
               )}
             </div>

@@ -46,7 +46,7 @@ const DESTINATIONS = [
   {
     href: '/about',
     title: 'About Drip Emporium',
-    body: 'Who we are, and where to find our two shops on Ronald Ngala Street.',
+    body: 'Who we are, and where to find our shop on Ronald Ngala Street.',
   },
   {
     href: '/contact',

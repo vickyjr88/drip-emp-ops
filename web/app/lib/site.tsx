@@ -23,7 +23,7 @@ export const SITE_NAME = 'Drip Emporium';
 
 export const SITE_DESCRIPTION =
   'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma in ' +
-  'EUR 36-46, at two shops on Ronald Ngala Street.';
+  'EUR 36-46, on Ronald Ngala Street.';
 
 /** Absolute URL for a site-relative path. */
 export function absoluteUrl(path = '/') {

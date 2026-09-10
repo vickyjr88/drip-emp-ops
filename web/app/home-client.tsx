@@ -112,7 +112,7 @@ export default function HomeClient() {
   const ctaBody = contentValue(
     content,
     'cta.body',
-    'Message us — stock moves between our two shops and we will tell you straight away what we have.',
+    'Message us and we will tell you straight away what we have.',
   );
 
   function onSearch(event: FormEvent<HTMLFormElement>) {

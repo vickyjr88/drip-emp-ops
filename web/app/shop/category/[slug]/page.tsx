@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
   const description = `Shop ${category.name} at Drip Emporium -- ${category.productCount} style${
     category.productCount === 1 ? '' : 's'
-  } in stock. Nike, Adidas, Jordan and Puma, EUR 36-46, two shops on Ronald Ngala Street, Nairobi.`;
+  } in stock. Nike, Adidas, Jordan and Puma, EUR 36-46, on Ronald Ngala Street, Nairobi.`;
 
   return {
     title: `${category.name} | Shop`,

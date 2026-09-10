@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
     path: '/shop',
     title: 'Shop Sneakers & Streetwear',
     description:
-      'Nike, Adidas, Jordan and Puma in EUR 36–46. Filter by size, brand and price. Two shops on Ronald Ngala Street, Nairobi.',
+      'Nike, Adidas, Jordan and Puma in EUR 36–46. Filter by size, brand and price. Ronald Ngala Street, Nairobi.',
     shareTitle: 'Shop Sneakers in Nairobi | Drip Emporium',
   });
 }
