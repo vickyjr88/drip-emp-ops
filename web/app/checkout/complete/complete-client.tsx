@@ -17,6 +17,7 @@ import { formatKes } from '../../lib/shop';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { trackPurchase as trackMetaPurchase } from '../../lib/meta-pixel';
 import { trackPurchase as trackXPurchase } from '../../lib/x-pixel';
+import { trackPurchase as trackTikTokPurchase } from '../../lib/tiktok-pixel';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 
@@ -82,6 +83,11 @@ export function CompleteClient() {
       orderNumber: order.orderNumber,
     });
     trackXPurchase({
+      contentIds: order.lines.map((line) => line.sku),
+      value: order.amountPaid,
+      orderNumber: order.orderNumber,
+    });
+    trackTikTokPurchase({
       contentIds: order.lines.map((line) => line.sku),
       value: order.amountPaid,
       orderNumber: order.orderNumber,

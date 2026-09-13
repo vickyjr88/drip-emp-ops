@@ -30,6 +30,7 @@ import { withReferral } from '../../lib/referral';
 import { useCaptureReferral } from '../../lib/use-capture-referral';
 import { trackAddToCart as trackMetaAddToCart, trackViewContent as trackMetaViewContent } from '../../lib/meta-pixel';
 import { trackAddToCart as trackXAddToCart, trackViewContent as trackXViewContent } from '../../lib/x-pixel';
+import { trackAddToCart as trackTikTokAddToCart, trackViewContent as trackTikTokViewContent } from '../../lib/tiktok-pixel';
 import { ShopProduct, fetchProduct, formatKes, priceLabel } from '../../lib/shop';
 
 export function ProductClient({ product: initialProduct }: { product: ShopProduct }) {
@@ -89,6 +90,11 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
       value: product.priceFrom,
     });
     trackXViewContent({
+      contentId: product.id,
+      contentName: product.name,
+      value: product.priceFrom,
+    });
+    trackTikTokViewContent({
       contentId: product.id,
       contentName: product.name,
       value: product.priceFrom,
@@ -294,6 +300,11 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                     value: chosen.priceKes,
                   });
                   trackXAddToCart({
+                    contentId: product.id,
+                    contentName: `${product.name} - ${chosen.size ?? chosen.name}`,
+                    value: chosen.priceKes,
+                  });
+                  trackTikTokAddToCart({
                     contentId: product.id,
                     contentName: `${product.name} - ${chosen.size ?? chosen.name}`,
                     value: chosen.priceKes,
