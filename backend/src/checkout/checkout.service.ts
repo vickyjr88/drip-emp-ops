@@ -9,6 +9,7 @@ import { OwnerNotificationService } from '../email-log/owner-notification.servic
 import { CommissionService } from '../commission/commission.service';
 import { CampaignService } from '../campaign/campaign.service';
 import { XConversionService } from '../x-conversion/x-conversion.service';
+import { TikTokConversionService } from '../tiktok-conversion/tiktok-conversion.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
@@ -54,6 +55,7 @@ export class CheckoutService {
     private readonly commission: CommissionService,
     private readonly campaign: CampaignService,
     private readonly xConversion: XConversionService,
+    private readonly tiktokConversion: TikTokConversionService,
   ) {}
 
   /**
@@ -466,6 +468,12 @@ export class CheckoutService {
         orderNumber: updated.orderNumber,
         email: updated.customerEmail,
         phone: updated.customerPhone,
+      });
+      void this.tiktokConversion.trackPurchase({
+        orderNumber: updated.orderNumber,
+        email: updated.customerEmail,
+        phone: updated.customerPhone,
+        value: Number(updated.total),
       });
     }
 

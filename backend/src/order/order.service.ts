@@ -6,6 +6,7 @@ import { SalesPostingService } from '../sales-posting/sales-posting.service';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CommissionService } from '../commission/commission.service';
 import { XConversionService } from '../x-conversion/x-conversion.service';
+import { TikTokConversionService } from '../tiktok-conversion/tiktok-conversion.service';
 import { CreateOrderDto, RecordOrderPaymentDto, UpdateOrderLineFulfillmentDto } from './dto/create-order.dto';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
@@ -64,6 +65,7 @@ export class OrderService {
     private readonly ownerNotification: OwnerNotificationService,
     private readonly commission: CommissionService,
     private readonly xConversion: XConversionService,
+    private readonly tiktokConversion: TikTokConversionService,
   ) {}
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
@@ -414,6 +416,12 @@ export class OrderService {
         orderNumber: updated.orderNumber,
         email: updated.customerEmail,
         phone: updated.customerPhone,
+      });
+      void this.tiktokConversion.trackPurchase({
+        orderNumber: updated.orderNumber,
+        email: updated.customerEmail,
+        phone: updated.customerPhone,
+        value: Number(updated.total),
       });
     }
 

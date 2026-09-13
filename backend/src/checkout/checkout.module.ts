@@ -8,6 +8,7 @@ import { CustomerPortalModule } from '../customer-portal/customer-portal.module'
 import { CommissionModule } from '../commission/commission.module';
 import { CampaignModule } from '../campaign/campaign.module';
 import { XConversionModule } from '../x-conversion/x-conversion.module';
+import { TikTokConversionModule } from '../tiktok-conversion/tiktok-conversion.module';
 import { CheckoutService } from './checkout.service';
 import { CheckoutController } from './checkout.controller';
 
@@ -24,6 +25,7 @@ import { CheckoutController } from './checkout.controller';
     CommissionModule,
     CampaignModule,
     XConversionModule,
+    TikTokConversionModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService],

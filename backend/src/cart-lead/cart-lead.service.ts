@@ -7,6 +7,7 @@ import { normalizePhoneNumber } from '../common/phone.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CampaignService } from '../campaign/campaign.service';
 import { XConversionService } from '../x-conversion/x-conversion.service';
+import { TikTokConversionService } from '../tiktok-conversion/tiktok-conversion.service';
 import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
 import { CartReminderQueueService } from './cart-reminder-queue.service';
@@ -19,6 +20,7 @@ export class CartLeadService {
     private readonly reminderQueue: CartReminderQueueService,
     private readonly campaign: CampaignService,
     private readonly xConversion: XConversionService,
+    private readonly tiktokConversion: TikTokConversionService,
   ) {}
 
   /**
@@ -274,6 +276,12 @@ export class CartLeadService {
       cartLeadId: created.id,
       email: created.customerEmail,
       phone: created.customerPhone,
+    });
+    void this.tiktokConversion.trackCartEngagement({
+      cartLeadId: created.id,
+      email: created.customerEmail,
+      phone: created.customerPhone,
+      value: Number(created.total),
     });
     return created;
   }

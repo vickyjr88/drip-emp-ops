@@ -7,9 +7,10 @@ import { SalesPostingModule } from '../sales-posting/sales-posting.module';
 import { EmailLogModule } from '../email-log/email-log.module';
 import { CommissionModule } from '../commission/commission.module';
 import { XConversionModule } from '../x-conversion/x-conversion.module';
+import { TikTokConversionModule } from '../tiktok-conversion/tiktok-conversion.module';
 
 @Module({
-  imports: [PrismaModule, InventoryModule, SalesPostingModule, EmailLogModule, CommissionModule, XConversionModule],
+  imports: [PrismaModule, InventoryModule, SalesPostingModule, EmailLogModule, CommissionModule, XConversionModule, TikTokConversionModule],
   controllers: [OrderController],
   providers: [OrderService],
   exports: [OrderService],
