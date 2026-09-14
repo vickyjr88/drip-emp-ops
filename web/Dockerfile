@@ -1,10 +1,10 @@
-FROM node:18-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm install
 
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -47,7 +47,7 @@ ENV NEXT_PUBLIC_TIKTOK_PIXEL_ID=$NEXT_PUBLIC_TIKTOK_PIXEL_ID
 
 RUN --mount=type=cache,target=/app/.next/cache npm run build
 
-FROM node:18-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production

@@ -9,22 +9,36 @@
  * EmailSenderService (same SMTP->Brevo fallback, same branded HTML shell)
  * rather than duplicating email config and sending logic here.
  *
- * Run with:
- *   FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/key.json npx ts-node -r tsconfig-paths/register scripts/migrate-firestore-users.ts
+ * Lives under src/ (not a top-level scripts/ directory) specifically so
+ * `npm run build`'s tsc pass picks it up -- tsconfig.json's rootDir is "src"
+ * and include is ["src/**\/*.ts"], so a file outside src/ is never compiled
+ * and the runtime image (which ships only dist/, not raw TypeScript) would
+ * have nothing to run. This compiles to dist/scripts/migrate-firestore-users.js
+ * alongside every other module, with its relative imports resolving exactly
+ * as they do here since dist/ mirrors src/'s structure 1:1.
+ *
+ * Run with (inside the backend container, where DATABASE_URL/email config
+ * are already injected by docker-compose -- no .env file to load here):
+ *   docker exec drip-emp-ops-backend-1 node dist/scripts/migrate-firestore-users.js
+ *
+ * Pass --dry-run first to see exactly what would happen -- how many
+ * Firestore users, how many already exist as a Customer, how many would be
+ * newly created -- with zero writes and zero emails sent:
+ *   docker exec drip-emp-ops-backend-1 node dist/scripts/migrate-firestore-users.js --dry-run
  *
  * Safe to re-run: a Firestore user whose email already exists as a Customer
  * is skipped (not updated, not re-emailed) -- see `existingEmails` below.
  * Only genuinely new customers get created and emailed.
  */
 
-import 'dotenv/config';
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { EmailSenderService } from '../src/email-log/email-sender.service';
-import { escapeHtml, money, ctaButton } from '../src/email-log/email-html.util';
-import { storefrontOrigin } from '../src/common/storefront-origin';
+import { AppModule } from '../app.module';
+import { PrismaService } from '../prisma/prisma.service';
+import { EmailSenderService } from '../email-log/email-sender.service';
+import { escapeHtml, money, ctaButton } from '../email-log/email-html.util';
+import { storefrontOrigin } from '../common/storefront-origin';
 
 const SERVICE_ACCOUNT_PATH = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 
@@ -103,9 +117,8 @@ async function pickRandomProducts(prisma: PrismaService, count: number): Promise
 
 function productGridHtml(products: FeaturedProduct[]): string {
   const origin = storefrontOrigin();
-  const cells = products
-    .map(
-      (product) => `
+  const cells = products.map(
+    (product) => `
         <td style="width:33.33%;padding:8px;vertical-align:top;">
           <a href="${escapeHtml(`${origin}/shop/${product.slug}`)}" style="text-decoration:none;">
             ${
@@ -117,8 +130,7 @@ function productGridHtml(products: FeaturedProduct[]): string {
             <p style="margin:2px 0 0;font-size:13px;text-align:center;color:#5b6480;">${escapeHtml(money(product.priceKes))}</p>
           </a>
         </td>`,
-    )
-    .join('');
+  );
 
   // Two rows of three rather than one <table> per product -- table-based
   // layout, same as ctaButton's own reasoning, for the mail clients (Outlook
@@ -156,16 +168,20 @@ async function sendWelcomeEmail(
 }
 
 async function main() {
-  admin.initializeApp({
-    credential: admin.credential.cert(require(SERVICE_ACCOUNT_PATH!)),
+  const dryRun = process.argv.includes('--dry-run');
+
+  const app = initializeApp({
+    credential: cert(require(SERVICE_ACCOUNT_PATH!)),
   });
-  const firestore = admin.firestore();
+  const firestore = getFirestore(app);
 
   const appContext = await NestFactory.createApplicationContext(AppModule, { logger: ['warn', 'error'] });
   const prisma = appContext.get(PrismaService);
   const emailSender = appContext.get(EmailSenderService);
 
   try {
+    if (dryRun) console.log('--- DRY RUN: no Customer rows will be created, no email will be sent ---\n');
+
     console.log('Reading Firestore users collection...');
     const snapshot = await firestore.collection('users').get();
     console.log(`Found ${snapshot.size} Firestore user documents.`);
@@ -194,6 +210,14 @@ async function main() {
         continue;
       }
 
+      if (dryRun) {
+        const { firstName, lastName } = splitName(data.displayName, rawEmail);
+        console.log(`  Would create: ${firstName} ${lastName.trim()} <${rawEmail}>`);
+        existingEmails.add(rawEmail); // mirrors the real run's de-dup within this batch
+        created++;
+        continue;
+      }
+
       const { firstName, lastName } = splitName(data.displayName, rawEmail);
       const phone = normalisePhone(data.mobileNumber);
 
@@ -219,11 +243,11 @@ async function main() {
       }
     }
 
-    console.log('\nMigration complete.');
-    console.log(`  Created:            ${created}`);
+    console.log(`\n${dryRun ? 'Dry run' : 'Migration'} complete.`);
+    console.log(`  ${dryRun ? 'Would create' : 'Created'}:            ${created}`);
     console.log(`  Skipped (existing): ${skippedExisting}`);
     console.log(`  Skipped (no email): ${skippedNoEmail}`);
-    console.log(`  Email failures:     ${emailFailures}`);
+    if (!dryRun) console.log(`  Email failures:     ${emailFailures}`);
   } finally {
     await appContext.close();
   }
