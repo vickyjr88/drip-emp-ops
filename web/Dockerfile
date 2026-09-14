@@ -35,6 +35,16 @@ ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 ARG NEXT_PUBLIC_META_PIXEL_ID
 ENV NEXT_PUBLIC_META_PIXEL_ID=$NEXT_PUBLIC_META_PIXEL_ID
 
+# X (Twitter) Pixel ID, same rule -- see lib/x-pixel.ts. Was already a
+# docker-compose.yml build arg but missing the corresponding Dockerfile
+# ARG/ENV pair, so it never actually reached `next build` until now.
+ARG NEXT_PUBLIC_X_PIXEL_ID
+ENV NEXT_PUBLIC_X_PIXEL_ID=$NEXT_PUBLIC_X_PIXEL_ID
+
+# TikTok Pixel ID, same rule -- see lib/tiktok-pixel.ts.
+ARG NEXT_PUBLIC_TIKTOK_PIXEL_ID
+ENV NEXT_PUBLIC_TIKTOK_PIXEL_ID=$NEXT_PUBLIC_TIKTOK_PIXEL_ID
+
 RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 FROM node:18-alpine AS runtime

@@ -29,6 +29,8 @@ services:
         - NEXT_PUBLIC_META_PIXEL_ID=${NEXT_PUBLIC_META_PIXEL_ID:-}
         # X (Twitter) Pixel ID, same rule.
         - NEXT_PUBLIC_X_PIXEL_ID=${NEXT_PUBLIC_X_PIXEL_ID:-}
+        # TikTok Pixel ID, same rule.
+        - NEXT_PUBLIC_TIKTOK_PIXEL_ID=${NEXT_PUBLIC_TIKTOK_PIXEL_ID:-}
         # next/image needs every remote image host allow-listed at build time
         # (next.config.js's images.remotePatterns). Product/CMS images are
         # actually streamed through the backend API at GET /media/:key (see
