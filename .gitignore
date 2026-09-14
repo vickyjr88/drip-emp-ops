@@ -14,3 +14,11 @@ stitch_realtor_landing_page.zip
 # restore.sh takes. These are database dumps of live customer data -- they must
 # never be committable.
 backups/
+
+# Firebase Admin SDK service account keys (e.g. downloaded from Firebase
+# Console -> Project Settings -> Service Accounts). Grants full server-side
+# access to the Firestore project -- must never be committed. Lives at
+# backend/secrets/ on hosts that need it (see backend/Dockerfile and
+# FIREBASE_SERVICE_ACCOUNT_PATH in docker-compose.yml); backend/secrets/.gitkeep
+# is tracked so the directory (and this COPY's build target) always exists.
+*firebase-adminsdk*.json

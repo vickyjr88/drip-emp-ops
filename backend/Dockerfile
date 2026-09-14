@@ -48,6 +48,18 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/prisma ./prisma
+# Firebase Admin SDK service account key, for the one-off Firestore user
+# migration script (scripts/migrate-firestore-users.ts). Kept out of git
+# entirely (.gitignore's *firebase-adminsdk*.json), so most checkouts have no
+# such file -- a COPY naming it directly would fail the whole build wherever
+# it is absent (a fresh clone, CI, another machine). secrets/ is copied as a
+# directory instead: Docker only errors when a COPY source resolves to zero
+# paths, and a directory (even one holding nothing, via secrets/.gitkeep)
+# always resolves to exactly one path, so the build never fails on its
+# absence -- the file simply is not there at runtime, and
+# migrate-firestore-users.ts already requires FIREBASE_SERVICE_ACCOUNT_PATH to
+# be set to do anything, so an empty directory is a normal, harmless build.
+COPY secrets ./secrets
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # chmod here rather than relying on the checked-in bit, which does not survive
 # every checkout (Windows clones, archive exports).
