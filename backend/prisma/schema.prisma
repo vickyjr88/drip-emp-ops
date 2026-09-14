@@ -120,6 +120,7 @@ model Customer {
   /// orders) -- this is the same relationship for the WhatsApp-then-manual-
   /// order path.
   referredCartLeads   CartLead[]      @relation("CartLeadReferredBy")
+  favorites           Favorite[]
 }
 
 model CustomerDocument {
@@ -1375,7 +1376,8 @@ model Product {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  variants ProductVariant[]
+  variants  ProductVariant[]
+  favorites Favorite[]
 
   @@index([categoryId])
   @@index([isFeatured])
@@ -1967,6 +1969,22 @@ enum CartLeadStatus {
   CONTACTED
   CONVERTED
   EXPIRED
+}
+
+/// A customer's saved product on the storefront/mobile app. Customer-facing
+/// only (no staff/portal surface) -- read and written exclusively through
+/// customer-portal's JWT-guarded endpoints, the same trust boundary as
+/// CartLead.referredBy and Order.customer.
+model Favorite {
+  id         String   @id @default(uuid())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  String
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, productId])
+  @@index([customerId])
 }
 
 /// A public storefront article -- sizing guides, care tips, style advice --

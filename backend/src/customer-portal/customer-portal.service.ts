@@ -236,6 +236,58 @@ export class CustomerPortalService {
   }
 
   /**
+   * A light shape for a favorites grid -- not the full product, since the
+   * mobile/storefront client only needs enough to render a card and link
+   * through to the real product page.
+   */
+  async myFavorites(customerId: string) {
+    const favorites = await this.prisma.favorite.findMany({
+      where: { customerId },
+      include: {
+        product: { select: { id: true, slug: true, name: true, featuredImageUrl: true, imageUrls: true, variants: { select: { priceKes: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return favorites.map((favorite) => ({
+      productId: favorite.product.id,
+      slug: favorite.product.slug,
+      name: favorite.product.name,
+      imageUrl: favorite.product.featuredImageUrl || (favorite.product.imageUrls as string[] | null)?.[0] || null,
+      priceFrom: favorite.product.variants.length
+        ? Math.min(...favorite.product.variants.map((variant) => Number(variant.priceKes)))
+        : null,
+    }));
+  }
+
+  /**
+   * Idempotent -- a duplicate tap (a slow network retry, a double-tap) must
+   * not error, it should just leave the favorite in place. The unique
+   * (customerId, productId) index is what a plain create would otherwise
+   * violate on the second call.
+   */
+  async addFavorite(customerId: string, productId: string) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true } });
+    if (!product) throw new NotFoundException(`Product ${productId} not found`);
+
+    await this.prisma.favorite.upsert({
+      where: { customerId_productId: { customerId, productId } },
+      create: { customerId, productId },
+      update: {},
+    });
+    return { productId, favorited: true };
+  }
+
+  /**
+   * Also idempotent: removing a favorite that is already gone (a duplicate
+   * tap, or two devices racing) is a no-op, not an error.
+   */
+  async removeFavorite(customerId: string, productId: string) {
+    await this.prisma.favorite.deleteMany({ where: { customerId, productId } });
+    return { productId, favorited: false };
+  }
+
+  /**
    * A reseller's own referral activity: orders their link brought in, and
    * what each earned them. Redacted to first name only on the referred
    * customer -- order.customer.firstName, never order.customerName, which is

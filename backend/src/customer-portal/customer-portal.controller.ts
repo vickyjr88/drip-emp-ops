@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CustomerPortalService } from './customer-portal.service';
 import { CustomerAuthGuard } from './customer-auth.guard';
@@ -73,6 +73,30 @@ export class CustomerPortalController {
   @Get('orders')
   myOrders(@Req() request: any) {
     return this.service.myOrders(request.user.id);
+  }
+
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @ApiBearerAuth()
+  @Get('favorites')
+  myFavorites(@Req() request: any) {
+    return this.service.myFavorites(request.user.id);
+  }
+
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @ApiBearerAuth()
+  @Post('favorites/:productId')
+  addFavorite(@Req() request: any, @Param('productId') productId: string) {
+    return this.service.addFavorite(request.user.id, productId);
+  }
+
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @ApiBearerAuth()
+  @Delete('favorites/:productId')
+  removeFavorite(@Req() request: any, @Param('productId') productId: string) {
+    return this.service.removeFavorite(request.user.id, productId);
   }
 
   @Public()
