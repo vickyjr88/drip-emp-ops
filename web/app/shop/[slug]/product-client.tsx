@@ -22,6 +22,7 @@ import { useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { ProductCard } from '../../components/product-card';
 import { ShareButton } from '../../components/share-button';
+import { FavoriteButton } from '../../components/favorite-button';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
 import { useCustomerAuth } from '../../lib/customer-auth';
@@ -209,11 +210,14 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                 {product.brand ? <p className="de-product-brand">{product.brand}</p> : null}
                 {product.isFeatured ? <span className="de-product-featured-flag">Featured</span> : null}
               </div>
-              <ShareButton
-                url={withReferral(absoluteUrl(`/shop/${product.slug}`), auth.customer)}
-                title={product.name}
-                text={`${product.name}${product.brand ? ` by ${product.brand}` : ''} — ${priceLabel(product)}`}
-              />
+              <div className="de-product-title-row-actions">
+                <FavoriteButton productId={product.id} />
+                <ShareButton
+                  url={withReferral(absoluteUrl(`/shop/${product.slug}`), auth.customer)}
+                  title={product.name}
+                  text={`${product.name}${product.brand ? ` by ${product.brand}` : ''} — ${priceLabel(product)}`}
+                />
+              </div>
             </div>
             <h1>{product.name}</h1>
             <p className="de-product-price">

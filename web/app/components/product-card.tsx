@@ -15,6 +15,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ShareButton } from './share-button';
+import { FavoriteButton } from './favorite-button';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { absoluteUrl } from '../lib/site';
@@ -91,6 +92,7 @@ export function ProductCard({ product }: { product: ShopProduct }) {
       </Link>
 
       <div className="de-card-overlay-actions">
+        <FavoriteButton compact productId={product.id} />
         <ShareButton
           compact
           url={shareUrl}

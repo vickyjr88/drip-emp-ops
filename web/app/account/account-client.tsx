@@ -190,6 +190,7 @@ export function AccountClient() {
         <section className="lp-container de-shop-head">
           <h1>Hello, {customer.firstName}</h1>
           <p>{customer.email}</p>
+          <p><Link href="/favorites">View your saved favorites →</Link></p>
         </section>
 
         <section className="lp-container de-account">

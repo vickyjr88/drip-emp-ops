@@ -10889,6 +10889,34 @@ img {
   background: rgba(255, 255, 255, 0.92);
 }
 
+.de-favorite-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--de-line);
+  background: #fff;
+  color: var(--de-ink);
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.de-favorite-btn:hover {
+  border-color: var(--de-royal);
+}
+
+.de-favorite-btn.is-active {
+  color: #d21b3c;
+  border-color: #d21b3c;
+}
+
+.de-favorite-btn.is-compact {
+  padding: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+}
+
 .de-product-title-row {
   display: flex;
   align-items: flex-start;
@@ -10904,6 +10932,12 @@ img {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.de-product-title-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .de-product-featured-flag {

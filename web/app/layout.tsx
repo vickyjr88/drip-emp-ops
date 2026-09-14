@@ -4,6 +4,7 @@ import { PortalDialogProvider } from './portal/components/portal-dialog';
 import { NotificationsProvider } from './portal/components/notifications';
 import { CartProvider } from './lib/cart';
 import { CustomerAuthProvider } from './lib/customer-auth';
+import { FavoritesProvider } from './lib/favorites';
 import { JsonLd, SITE_DESCRIPTION, SITE_NAME, SITE_URL, organizationSchema } from './lib/site';
 import { StorefrontAnalytics } from './components/storefront-analytics';
 import { contentValue, fetchPageContent } from './lib/page-content';
@@ -81,11 +82,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
         <CustomerAuthProvider>
+        <FavoritesProvider>
         <CartProvider>
           <NotificationsProvider>
           <PortalDialogProvider>{children}</PortalDialogProvider>
         </NotificationsProvider>
         </CartProvider>
+        </FavoritesProvider>
         </CustomerAuthProvider>
         <StorefrontAnalytics />
       </body>
