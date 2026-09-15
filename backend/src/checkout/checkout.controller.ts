@@ -5,6 +5,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { OptionalCustomerAuthGuard } from '../customer-portal/optional-customer-auth.guard';
+import { CustomerAuthGuard } from '../customer-portal/customer-auth.guard';
 import { CheckoutService } from './checkout.service';
 import { PaystackService } from '../paystack/paystack.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
@@ -57,6 +58,19 @@ export class CheckoutController {
   @Get('verify')
   verify(@Query('reference') reference: string) {
     return this.service.settle(reference);
+  }
+
+  /**
+   * A signed-in customer resuming payment on their own order that's still
+   * PENDING -- checkout was abandoned, or an earlier payment attempt
+   * failed. Requires the customer's own token; the order id alone is not
+   * enough (checked against customerId in the service).
+   */
+  @Public()
+  @UseGuards(CustomerAuthGuard)
+  @Post('orders/:id/pay')
+  resumePayment(@Param('id') id: string, @Req() request: Request) {
+    return this.service.resumePayment(id, (request as any).user.id, storefrontOrigin(request.headers.origin as string));
   }
 
   @Public()

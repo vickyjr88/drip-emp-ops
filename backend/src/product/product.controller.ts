@@ -26,6 +26,13 @@ export class ProductController {
     return this.service.findAll(query);
   }
 
+  // Declared before ':id' so Nest does not read "favorites" as a product id.
+  @Get('favorites/stats')
+  @Permissions(buildPermissionKey('Product', 'read'))
+  favoriteStats(@Query('take') take?: string) {
+    return this.service.favoriteStats(take ? Number(take) : undefined);
+  }
+
   // Declared before ':id' so Nest does not read "variants" as a product id.
   @Patch('variants/:variantId')
   @Permissions(buildPermissionKey('Product', 'update'))

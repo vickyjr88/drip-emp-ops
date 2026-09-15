@@ -136,6 +136,55 @@ export class ProductService {
     return product;
   }
 
+  /**
+   * Which products shoppers actually want, ranked by how many customers
+   * favorited each one -- the demand signal a raw sales count alone can't
+   * give, since a favorite happens before a purchase decision (or instead
+   * of one, e.g. a size that's out of stock). Grouped rather than joined
+   * per-favorite: with potentially thousands of Favorite rows, counting in
+   * the database is the only version of this that stays fast.
+   */
+  async favoriteStats(take = 20) {
+    const grouped = await this.prisma.favorite.groupBy({
+      by: ['productId'],
+      _count: { productId: true },
+      orderBy: { _count: { productId: 'desc' } },
+      take: Math.min(Math.max(take, 1), 100),
+    });
+    if (grouped.length === 0) return [];
+
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: grouped.map((row) => row.productId) } },
+      select: {
+        id: true, name: true, slug: true, brand: true, featuredImageUrl: true, imageUrls: true, isActive: true,
+        category: { select: { name: true, slug: true } },
+      },
+    });
+    const productById = new Map(products.map((product) => [product.id, product]));
+
+    return grouped
+      .map((row) => {
+        const product = productById.get(row.productId);
+        if (!product) return null;
+        const imageUrls = Array.isArray(product.imageUrls) ? (product.imageUrls as string[]) : [];
+        return {
+          product: {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            brand: product.brand,
+            category: product.category,
+            isActive: product.isActive,
+            imageUrl: product.featuredImageUrl || imageUrls[0] || null,
+          },
+          favoriteCount: row._count.productId,
+        };
+      })
+      // A favorited-then-deleted product has no row to join -- dropped
+      // rather than shown with blank fields.
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+  }
+
   async update(id: string, dto: UpdateProductDto) {
     const current = await this.findOne(id);
     const { slug, imageUrls, featuredImageUrl, ...rest } = dto;

@@ -1985,6 +1985,7 @@ model Favorite {
 
   @@unique([customerId, productId])
   @@index([customerId])
+  @@index([productId])
 }
 
 /// A public storefront article -- sizing guides, care tips, style advice --

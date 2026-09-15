@@ -51,6 +51,13 @@ export class CartLeadController {
   }
 
   @ApiBearerAuth()
+  @Get(':id')
+  @Permissions(buildPermissionKey('CartLead', 'read'))
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+
+  @ApiBearerAuth()
   @Patch(':id/status')
   @Permissions(buildPermissionKey('CartLead', 'update'))
   setStatus(@Param('id') id: string, @Body() body: { status: CartLeadStatus }) {

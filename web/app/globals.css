@@ -12332,6 +12332,25 @@ img {
   font-variant-numeric: tabular-nums;
 }
 
+.de-account-order.is-unpaid {
+  border-color: #e4b34a;
+}
+
+.de-account-status.is-unpaid {
+  color: #92620a;
+  background: #fbe9c9;
+}
+
+.de-account-order-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--de-line);
+}
+
+.de-account-order-actions .lp-button {
+  width: 100%;
+}
+
 .de-account-side {
   display: flex;
   flex-direction: column;

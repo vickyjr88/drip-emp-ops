@@ -1,26 +1,26 @@
 "use client";
 
 /**
- * What happened to every dismissed or converted cart lead.
+ * Cart Leads, as its own section rather than a tab buried inside Orders.
  *
- * The working Cart Leads list on /portal/orders only ever shows what's still
- * outstanding (NEW/CONTACTED) -- once a lead is dismissed or turned into a
- * real order it drops off that list entirely, which is right for a worklist
- * but leaves no way to look back. This is that look-back: the same records,
- * kept rather than deleted, filterable by how each one was resolved.
+ * The till on /portal/orders still owns "start an order from this lead" --
+ * that workflow needs the order-creation form in place, so it stays there.
+ * This page is the read/browse half: outstanding leads by default, a link
+ * into each one's own detail page, and a link across to the resolved
+ * (dismissed/converted) history.
  */
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { EliteLayout } from '../../../components/elite-layout';
-import { PortalShell } from '../../components/portal-shell';
-import { ListThumb } from '../../components/list-thumb';
-import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
-import { useErrorState } from '../../components/notifications';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { EliteLayout } from '../../components/elite-layout';
+import { PortalShell } from '../components/portal-shell';
+import { ListThumb } from '../components/list-thumb';
+import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
+import { useErrorState } from '../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, formatMoney,
   hasPermission, loadProfile, roleLabelFor,
-} from '../../accounting/lib';
+} from '../accounting/lib';
 
 type CartLeadLine = { variantId: string; sku: string; name: string; size: string; quantity: number; priceKes: number };
 type CartLead = {
@@ -35,21 +35,13 @@ type CartLead = {
   lastActivityAt: string;
   createdAt: string;
   firstLineImageUrl?: string | null;
-  order?: { id: string; orderNumber: string } | null;
 };
 
-const HISTORY_STATUSES: Array<CartLead['status']> = ['EXPIRED', 'CONVERTED'];
-
-function statusChipClass(status: CartLead['status']) {
-  return status === 'CONVERTED' ? 'portal-chip' : 'portal-chip is-muted';
-}
-
-export default function CartLeadHistoryPage() {
+export default function CartLeadsPage() {
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [statusFilter, setStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [errorMessage, setErrorMessage] = useErrorState();
 
@@ -75,26 +67,25 @@ export default function CartLeadHistoryPage() {
     void load(token);
   }, [initialized, token, load]);
 
+  const filters = useMemo(() => ({ source: sourceFilter || undefined }), [sourceFilter]);
+
   const fetchPage = useCallback(
-    async (params: { skip: number; take: number; search: string; status?: string; source?: string }): Promise<ServerPage<CartLead>> => {
+    async (params: { skip: number; take: number; search: string; source?: string }): Promise<ServerPage<CartLead>> => {
       if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
       const query = new URLSearchParams();
       query.set('skip', String(params.skip));
       query.set('take', String(params.take));
+      query.set('outstanding', 'true');
       if (params.search) query.set('search', params.search);
       if (params.source) query.set('source', params.source);
-      // No status picked means "the full history" -- both resolved statuses,
-      // never the outstanding ones the live worklist already owns.
-      if (params.status) query.set('status', params.status);
-      else query.set('outstanding', 'false');
       return apiRequest<ServerPage<CartLead>>(`/cart-leads?${query}`, { method: 'GET' }, token);
     },
     [token],
   );
 
-  const pager = useServerPager<CartLead, { status?: string; source?: string }>({
+  const pager = useServerPager<CartLead, typeof filters>({
     fetchPage: (params) => fetchPage(params),
-    filters: { status: statusFilter || undefined, source: sourceFilter || undefined },
+    filters,
     enabled: Boolean(token),
   });
 
@@ -103,7 +94,7 @@ export default function CartLeadHistoryPage() {
       <EliteLayout active="portal">
         <main className="lp-main-content portal-main">
           <section className="lp-container" style={{ paddingTop: 72 }}>
-            <article className="portal-card portal-loading">Loading cart lead history...</article>
+            <article className="portal-card portal-loading">Loading cart leads...</article>
           </section>
         </main>
       </EliteLayout>
@@ -133,8 +124,7 @@ export default function CartLeadHistoryPage() {
         <section className="lp-container portal-auth-section">
           <PortalShell
             active="cartLeads"
-            pageTitle="Cart Lead History"
-            pageSubtitle="Every dismissed or converted cart lead -- the outstanding ones live on the Cart Leads page."
+            pageSubtitle="Shoppers who chose WhatsApp instead of checking out, or left a cart with contact details filled in."
             email={profile.email}
             roleLabel={roleLabelFor(profile)}
             permissionCount={profile.permissions?.length || 0}
@@ -145,23 +135,26 @@ export default function CartLeadHistoryPage() {
           >
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
-            <div className="portal-action-row" style={{ marginBottom: 16 }}>
-              <Link href="/portal/cart-leads" className="portal-ghost-btn">
-                ← Back to Cart Leads
-              </Link>
-            </div>
-
             <article className="portal-card">
-              <h2 style={{ marginTop: 0 }}>History</h2>
+              <div className="portal-card-header-row">
+                <div>
+                  <h2 style={{ margin: 0 }}>Outstanding Leads</h2>
+                  <p className="portal-muted" style={{ margin: '4px 0 0' }}>
+                    To ring one up as a sale, use the Cart Leads tab on the Orders page.
+                  </p>
+                </div>
+                <div className="portal-action-row">
+                  <Link href="/portal/orders" className="portal-ghost-btn">
+                    Start Order From a Lead
+                  </Link>
+                  <Link href="/portal/cart-leads/history" className="portal-ghost-btn">
+                    View History
+                  </Link>
+                </div>
+              </div>
 
               <div className="list-toolbar">
                 <ServerListSearch pager={pager} placeholder="Search name, phone or email…" />
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                  <option value="">Dismissed & converted</option>
-                  {HISTORY_STATUSES.map((status) => (
-                    <option key={status} value={status}>{status === 'CONVERTED' ? 'Converted' : 'Dismissed'}</option>
-                  ))}
-                </select>
                 <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
                   <option value="">All sources</option>
                   <option value="WHATSAPP_ORDER">WhatsApp order</option>
@@ -172,39 +165,29 @@ export default function CartLeadHistoryPage() {
               <div className="portal-list-stack">
                 {!pager.loading && pager.items.length === 0 ? (
                   <div className="portal-empty-state">
-                    {pager.search || statusFilter || sourceFilter ? 'No leads match.' : 'Nothing dismissed or converted yet.'}
+                    {pager.search || sourceFilter ? 'No leads match.' : 'No outstanding leads.'}
                   </div>
                 ) : (
                   pager.items.map((lead) => (
-                    <div key={lead.id} className="portal-record">
+                    <Link key={lead.id} href={`/portal/cart-leads/${lead.id}`} className="portal-record is-clickable">
                       <div className="portal-list-row has-thumb">
                         <ListThumb sources={[lead.firstLineImageUrl]} label={lead.lines[0]?.name || lead.customerName || '?'} />
                         <div>
                           <strong>{lead.customerName || lead.customerPhone || lead.customerEmail}</strong>
-                          <span className={statusChipClass(lead.status)} style={{ marginLeft: 8 }}>
-                            {lead.status === 'CONVERTED' ? 'Converted' : 'Dismissed'}
-                          </span>
-                          <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>
+                          <span className="portal-chip" style={{ marginLeft: 8 }}>
                             {lead.source === 'WHATSAPP_ORDER' ? 'WhatsApp' : 'Abandoned cart'}
                           </span>
+                          {lead.status === 'CONTACTED' ? (
+                            <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>Contacted</span>
+                          ) : null}
                           <p className="portal-muted">
                             {lead.customerPhone || lead.customerEmail || 'No contact on file'} ·{' '}
                             {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDateTime(lead.lastActivityAt)}
                           </p>
                           <p>{formatMoney(lead.total)}</p>
                         </div>
-                        <div className="portal-action-row">
-                          <Link href={`/portal/cart-leads/${lead.id}`} className="portal-inline-btn">
-                            View
-                          </Link>
-                          {lead.order ? (
-                            <Link href={`/portal/orders/${lead.order.id}`} className="portal-inline-btn">
-                              View Order {lead.order.orderNumber}
-                            </Link>
-                          ) : null}
-                        </div>
                       </div>
-                    </div>
+                    </Link>
                   ))
                 )}
               </div>

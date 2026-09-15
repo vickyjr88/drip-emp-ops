@@ -38,3 +38,35 @@ export async function withFirstLineImage<T extends { lines: unknown }>(
     return { ...lead, firstLineImageUrl: (firstVariantId && imageByVariantId.get(firstVariantId)) || null };
   });
 }
+
+/**
+ * The same resolution as {@link withFirstLineImage}, but for every line on
+ * one lead rather than just the first -- used by the lead detail view,
+ * which shows each item's own picture rather than a single representative
+ * thumbnail for the whole cart.
+ */
+export async function withLineImages<T extends { lines: unknown }>(
+  prisma: Pick<PrismaService, 'productVariant'>,
+  lead: T,
+): Promise<T & { lines: Array<Record<string, unknown> & { imageUrl: string | null }> }> {
+  const lines = (lead.lines as Array<Record<string, unknown> & { variantId?: string }>) || [];
+  const variantIds = lines.map((line) => line.variantId).filter((id): id is string => Boolean(id));
+
+  const variants = variantIds.length
+    ? await prisma.productVariant.findMany({
+        where: { id: { in: variantIds } },
+        select: { id: true, product: { select: { featuredImageUrl: true, imageUrls: true } } },
+      })
+    : [];
+  const imageByVariantId = new Map(
+    variants.map((variant) => {
+      const imageUrls = Array.isArray(variant.product.imageUrls) ? (variant.product.imageUrls as string[]) : [];
+      return [variant.id, variant.product.featuredImageUrl || imageUrls[0] || null];
+    }),
+  );
+
+  return {
+    ...lead,
+    lines: lines.map((line) => ({ ...line, imageUrl: (line.variantId && imageByVariantId.get(line.variantId)) || null })),
+  };
+}

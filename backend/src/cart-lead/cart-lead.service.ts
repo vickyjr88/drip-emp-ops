@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CartLeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/pagination.util';
-import { withFirstLineImage } from '../common/cart-lead-image.util';
+import { withFirstLineImage, withLineImages } from '../common/cart-lead-image.util';
 import { normalizePhoneNumber } from '../common/phone.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CampaignService } from '../campaign/campaign.service';
@@ -158,6 +158,23 @@ export class CartLeadService {
     );
 
     return { ...page, items: await withFirstLineImage(this.prisma, page.items) };
+  }
+
+  /**
+   * The detail view's fetch -- unlike findAll's list rows, every line here
+   * gets its own resolved image (withLineImages), not just a single
+   * representative thumbnail for the whole cart.
+   */
+  async findOne(id: string) {
+    const lead = await this.prisma.cartLead.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+        order: { select: { id: true, orderNumber: true } },
+      },
+    });
+    if (!lead) throw new NotFoundException(`Cart lead ${id} not found`);
+    return withLineImages(this.prisma, lead);
   }
 
   async setStatus(id: string, status: CartLeadStatus) {

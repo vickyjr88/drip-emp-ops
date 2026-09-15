@@ -61,6 +61,15 @@ type ProductRow = {
   averagePrice: number | null;
 };
 
+type FavoriteRow = {
+  product: {
+    id: string; name: string; slug: string; brand: string | null; isActive: boolean;
+    category: { name: string; slug: string } | null;
+    imageUrl: string | null;
+  };
+  favoriteCount: number;
+};
+
 type ConsignmentRow = {
   consignmentId: string;
   reference: string;
@@ -180,6 +189,7 @@ export function AnalyticsView() {
 
   const [stores, setStores] = useState<{ rows: StoreRow[]; totals: any } | null>(null);
   const [products, setProducts] = useState<{ rows: ProductRow[]; totals: any; costIncomplete: boolean } | null>(null);
+  const [favorites, setFavorites] = useState<FavoriteRow[] | null>(null);
   const [consignment, setConsignment] = useState<{ rows: ConsignmentRow[]; totals: any } | null>(null);
   const [summary, setSummary] = useState<SalesSummary | null>(null);
   const [leads, setLeads] = useState<LeadStats | null>(null);
@@ -219,10 +229,11 @@ export function AnalyticsView() {
         }
       };
 
-      const [nextStores, nextProducts, nextConsignment, nextSummary, nextLeads, nextInquiries, nextCampaigns, nextCustomers] =
+      const [nextStores, nextProducts, nextFavorites, nextConsignment, nextSummary, nextLeads, nextInquiries, nextCampaigns, nextCustomers] =
         await Promise.all([
           load<any>('/reports/store-performance', 'journal-entry.read'),
           load<any>('/reports/product-profitability', 'journal-entry.read'),
+          load<FavoriteRow[]>('/products/favorites/stats?take=8', 'product.read'),
           load<any>('/reports/consignment-exposure', 'journal-entry.read'),
           load<SalesSummary>('/orders/summary', 'order.read'),
           load<LeadStats>('/cart-leads/stats', 'cart-lead.read'),
@@ -233,6 +244,7 @@ export function AnalyticsView() {
 
       setStores(nextStores);
       setProducts(nextProducts);
+      setFavorites(nextFavorites);
       setConsignment(nextConsignment);
       setSummary(nextSummary);
       setLeads(nextLeads);
@@ -313,6 +325,7 @@ export function AnalyticsView() {
 
   const storeRows = stores?.rows || [];
   const productRows = products?.rows || [];
+  const favoriteRows = favorites || [];
   const consignmentRows = consignment?.rows || [];
   const storeTotals = stores?.totals || {};
   const productTotals = products?.totals || {};
@@ -321,6 +334,7 @@ export function AnalyticsView() {
   const nothingYet =
     !storeRows.length &&
     !productRows.length &&
+    !favoriteRows.length &&
     !consignmentRows.length &&
     !leads?.total &&
     !inquiries?.total &&
@@ -623,6 +637,38 @@ export function AnalyticsView() {
                       ) : (
                         <p className="chart-empty">Everything sold at the marked price.</p>
                       )}
+                    </ChartFrame>
+                  </div>
+                ) : null}
+
+                {/* ---- Favorites --------------------------------------------
+                    A favorite is demand signalled before a sale happens (or
+                    instead of one -- a size out of stock, a price a shopper
+                    is waiting out), so it's shown on its own rather than
+                    folded into the revenue-ranked Products panel above. */}
+                {favoriteRows.length ? (
+                  <div className="portal-detail-grid" style={{ marginBottom: 20 }}>
+                    <ChartFrame
+                      title="Most favorited products"
+                      subtitle="What shoppers want, not just what's selling -- ranked by how many customers favorited it."
+                      table={{
+                        headers: ['Product', 'Category', 'Favorites'],
+                        rows: favoriteRows.map((row) => [
+                          row.product.isActive ? row.product.name : `${row.product.name} (inactive)`,
+                          row.product.category?.name || '—',
+                          row.favoriteCount,
+                        ]),
+                      }}
+                    >
+                      <RankedBars
+                        data={favoriteRows.map((row) => ({
+                          label: row.product.name,
+                          value: row.favoriteCount,
+                          sublabel: row.product.category?.name || undefined,
+                        }))}
+                        valueFormat={(value) => `${value} ${value === 1 ? 'favorite' : 'favorites'}`}
+                        color="var(--chart-cat-2)"
+                      />
                     </ChartFrame>
                   </div>
                 ) : null}

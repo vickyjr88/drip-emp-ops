@@ -381,6 +381,53 @@ export class CheckoutService {
   }
 
   /**
+   * A fresh Paystack authorization URL for an order that already exists but
+   * was never paid -- the checkout page was closed, the payment sheet was
+   * abandoned, or an earlier attempt simply failed. Reuses the exact
+   * reference-and-initialise mechanics `start()` ends with, against the
+   * order's own stored total rather than re-pricing the cart: the order was
+   * already priced and its stock already reserved, so this only needs to
+   * ask Paystack for a new way to pay the same bill.
+   *
+   * Scoped to the customer who placed the order (customerId must match) so
+   * one signed-in shopper cannot pay -- or be tricked into paying -- for
+   * someone else's order by guessing an id.
+   */
+  async resumePayment(orderId: string, customerId: string, origin: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order || order.customerId !== customerId) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException(`Order ${order.orderNumber} is not awaiting payment.`);
+    }
+    if (!order.customerEmail) {
+      throw new BadRequestException('This order has no email on file to send a receipt to.');
+    }
+
+    // Same per-attempt reference scheme as start(): Paystack refuses a
+    // repeat of a reference it has already seen, including an abandoned one,
+    // so resuming needs its own fresh reference rather than reusing the
+    // order number or an earlier attempt's reference.
+    const paymentReference = `${order.orderNumber}-${Date.now().toString(36).toUpperCase()}`;
+
+    const init = await this.paystack.initialise({
+      email: order.customerEmail,
+      amountKes: Number(order.total) - Number(order.amountPaid),
+      reference: paymentReference,
+      callbackUrl: `${origin}/checkout/complete?ref=${paymentReference}`,
+      metadata: { orderId: order.id, orderNumber: order.orderNumber },
+    });
+
+    return {
+      orderNumber: order.orderNumber,
+      total: Number(order.total) - Number(order.amountPaid),
+      authorizationUrl: init.authorization_url,
+      reference: init.reference,
+    };
+  }
+
+  /**
    * Settles an order against what Paystack says happened.
    *
    * Used by both the browser callback and the webhook, and safe to run twice:

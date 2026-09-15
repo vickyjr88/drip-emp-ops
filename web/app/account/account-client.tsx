@@ -58,6 +58,8 @@ export function AccountClient() {
   const auth = useCustomerAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[] | null>(null);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+  const [payError, setPayError] = useState<{ orderId: string; message: string } | null>(null);
   const [pw, setPw] = useState({ currentPassword: '', newPassword: '' });
   const [pwState, setPwState] = useState<{ error?: string; done?: boolean; busy?: boolean }>({});
   const [applyForm, setApplyForm] = useState({ businessName: '', reason: '' });
@@ -87,6 +89,27 @@ export function AccountClient() {
   }, [auth.token]);
 
   useEffect(() => { void loadOrders(); }, [loadOrders]);
+
+  /**
+   * Resuming payment on an order that already exists but was never paid --
+   * checkout was closed before finishing, or an earlier attempt failed.
+   * Redirects straight to the fresh Paystack authorization URL, same as the
+   * cart's own checkout flow does.
+   */
+  async function onResumePayment(orderId: string) {
+    if (!auth.token) return;
+    setPayError(null);
+    setPayingOrderId(orderId);
+    try {
+      const result = await customerApi<{ authorizationUrl: string }>(
+        `/checkout/orders/${orderId}/pay`, { method: 'POST' }, auth.token,
+      );
+      window.location.href = result.authorizationUrl;
+    } catch (error) {
+      setPayError({ orderId, message: error instanceof Error ? error.message : 'Could not start payment. Try again.' });
+      setPayingOrderId(null);
+    }
+  }
 
   // Only a trade customer has a referral link to have earned anything
   // against, so this stays unfetched (and the panel below unrendered) for a
@@ -206,13 +229,14 @@ export function AccountClient() {
             ) : (
               orders.map((order) => {
                 const owing = order.total - order.amountPaid;
+                const isUnpaid = order.status === 'PENDING';
                 // The list rule everywhere else in the app: an order with
                 // several products shows the first one's photo, not a
                 // collage -- this card already lists every line by name
                 // right below, so the thumbnail is just a visual anchor.
                 const imageUrl = order.lines[0]?.imageUrl;
                 return (
-                  <article key={order.id} className="de-account-order">
+                  <article key={order.id} className={`de-account-order${isUnpaid ? ' is-unpaid' : ''}`}>
                     <header>
                       <div className="de-account-order-heading">
                         {imageUrl ? (
@@ -225,7 +249,9 @@ export function AccountClient() {
                           <span className="de-account-date">{formatDay(order.placedAt)}</span>
                         </div>
                       </div>
-                      <span className="de-account-status">{order.status}</span>
+                      <span className={`de-account-status${isUnpaid ? ' is-unpaid' : ''}`}>
+                        {isUnpaid ? 'Awaiting payment' : order.status}
+                      </span>
                     </header>
                     <ul>
                       {order.lines.map((line, index) => (
@@ -246,6 +272,19 @@ export function AccountClient() {
                         {owing > 0.001 ? ` · ${formatKes(owing)} owing` : ''}
                       </strong>
                     </footer>
+                    {isUnpaid ? (
+                      <div className="de-account-order-actions">
+                        {payError?.orderId === order.id ? <p className="de-checkout-error" role="alert">{payError.message}</p> : null}
+                        <button
+                          type="button"
+                          className="lp-button lp-button-primary"
+                          disabled={payingOrderId === order.id}
+                          onClick={() => void onResumePayment(order.id)}
+                        >
+                          {payingOrderId === order.id ? 'Starting payment…' : 'Complete Payment'}
+                        </button>
+                      </div>
+                    ) : null}
                   </article>
                 );
               })

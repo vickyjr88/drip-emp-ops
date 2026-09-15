@@ -865,6 +865,9 @@ export default function OrdersPage() {
                           <p>{formatMoney(lead.total)}</p>
                         </div>
                         <div className="portal-action-row" onClick={(event) => event.stopPropagation()}>
+                          <Link href={`/portal/cart-leads/${lead.id}`} className="portal-inline-btn">
+                            View
+                          </Link>
                           {canCreate ? (
                             <button type="button" className="portal-inline-btn" onClick={() => onStartOrderFromLead(lead)}>
                               Start Order
