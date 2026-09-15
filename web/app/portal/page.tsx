@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { PortalShell } from './components/portal-shell';
+import { ListThumb } from './components/list-thumb';
 import { PasswordInput } from '../components/password-input';
 import { useErrorState, useNotifications } from './components/notifications';
 import {
@@ -43,7 +44,10 @@ type StockRow = {
   sellable: number;
   needsReorder: boolean;
   store: { id: string; code: string; name: string };
-  variant: { id: string; sku: string; name: string; product: { name: string; brand?: string | null } };
+  variant: {
+    id: string; sku: string; name: string;
+    product: { name: string; brand?: string | null; featuredImageUrl?: string | null; imageUrls?: string[] | null };
+  };
 };
 
 type OrderRow = {
@@ -55,7 +59,12 @@ type OrderRow = {
   placedAt: string;
   customerName?: string | null;
   store: { name: string };
+  lines?: Array<{ variant: { product: { featuredImageUrl?: string | null; imageUrls?: string[] | null } } }>;
 };
+
+function productImageUrl(product?: { featuredImageUrl?: string | null; imageUrls?: string[] | null } | null) {
+  return product?.featuredImageUrl || product?.imageUrls?.[0] || null;
+}
 
 /** One quick-jump card at the top of the dashboard: where it goes, and how
  *  many rows live there. Null while the count has not loaded (or the role
@@ -329,7 +338,8 @@ export default function PortalPage() {
                 <div className="portal-list-stack">
                   {lowStock.slice(0, 8).map((row) => (
                     <div key={`${row.variant.id}-${row.store.id}`} className="portal-record">
-                      <div className="portal-list-row">
+                      <div className="portal-list-row has-thumb">
+                        <ListThumb sources={[productImageUrl(row.variant.product)]} label={row.variant.product.name} />
                         <div>
                           <strong>
                             {row.variant.product.name} — {row.variant.name}
@@ -361,7 +371,11 @@ export default function PortalPage() {
                 ) : (
                   recentOrders.map((order) => (
                     <div key={order.id} className="portal-record">
-                      <div className="portal-list-row">
+                      <div className="portal-list-row has-thumb">
+                        <ListThumb
+                          sources={[productImageUrl(order.lines?.[0]?.variant.product)]}
+                          label={order.customerName || order.orderNumber}
+                        />
                         <div>
                           <strong>{order.orderNumber}</strong>
                           <p className="portal-muted">

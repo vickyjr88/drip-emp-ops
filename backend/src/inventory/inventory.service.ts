@@ -49,7 +49,7 @@ export class InventoryService {
         variant: {
           select: {
             id: true, sku: true, name: true, priceKes: true,
-            product: { select: { id: true, name: true, brand: true } },
+            product: { select: { id: true, name: true, brand: true, featuredImageUrl: true, imageUrls: true } },
           },
         },
       },
