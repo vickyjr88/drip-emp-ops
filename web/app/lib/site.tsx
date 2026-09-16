@@ -71,7 +71,7 @@ export function organizationSchema(socialUrls: string[] = []) {
 export function productFaqSchema(product: { name: string; sizesInStock: string[]; anyInStock: boolean }) {
   const sizingAnswer = product.sizesInStock.length
     ? `${product.name} is currently in stock in sizes ${product.sizesInStock.join(', ')}. If your size is not listed, message us on WhatsApp -- we can often source it.`
-    : `${product.name} is not on the shelf in any size right now, but every listed size can still be ordered in from our supplier. Message us on WhatsApp with your size and we will tell you honestly how long it will take.`;
+    : `${product.name} is not on the shelf in any size right now, but every listed size is still available to order. Message us on WhatsApp with your size and we will tell you honestly how long it will take.`;
 
   return {
     '@type': 'FAQPage',
