@@ -78,6 +78,11 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
       null,
   );
   const [image, setImage] = useState(0);
+  // For a shopper whose size isn't among the ones listed at all (not just
+  // out of stock) -- typed in and sent along with the WhatsApp enquiry
+  // rather than silently dropped, since the size buttons have nothing for
+  // a size the product doesn't carry.
+  const [manualSize, setManualSize] = useState('');
 
   const chosen = product.variants.find((variant) => variant.id === sizeId) || null;
 
@@ -127,11 +132,15 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
       lines.push(`Price: ${formatKes(chosen.priceKes)}`);
       // Saying it is out of stock up front stops the shop replying "yes" to
       // something that needs a supplier order first.
-      if (!chosen.inStock) lines.push('(Currently ordered in from our supplier — usual lead time applies)');
+      if (!chosen.inStock) lines.push('(Available to Order — usual lead time applies)');
     } else {
       lines.push(`Hello Drip Emporium, I am interested in the ${product.name}.`);
       lines.push('');
       lines.push('What sizes do you have?');
+    }
+
+    if (manualSize.trim()) {
+      lines.push(`Size needed (not listed): ${manualSize.trim()}`);
     }
 
     if (typeof window !== 'undefined') {
@@ -248,7 +257,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                 <>
                   <div className="de-sizes-head">
                     <span>{product.variants[0]?.size ? 'Select size' : 'Select an option'}</span>
-                    {!product.anyInStock ? <em>Ordered in from supplier</em> : null}
+                    {!product.anyInStock ? <em>Available to Order</em> : null}
                   </div>
                   <div className="de-size-buttons">
                     {product.variants.map((variant) => (
@@ -260,7 +269,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                         onClick={() => setSizeId(variant.id)}
                         // Said out loud, because the note in the button
                         // styling is not available to a screen reader.
-                        aria-label={`${variant.size ?? variant.name}${variant.inStock ? '' : ' — ordered in from supplier'}`}
+                        aria-label={`${variant.size ?? variant.name}${variant.inStock ? '' : ' — available to order'}`}
                       >
                         {(variant.size ?? variant.name).replace('EUR ', '')}
                       </button>
@@ -270,13 +279,24 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               ) : null}
               {chosen ? (
                 <p className="de-size-note">
-                  {chosen.size ?? chosen.name} · {chosen.sku} · {chosen.inStock ? 'in stock' : 'ordered in from supplier'}
+                  {chosen.size ?? chosen.name} · {chosen.sku} · {chosen.inStock ? 'in stock' : 'available to order'}
                 </p>
               ) : (
                 <p className="de-size-note">
                   Not seeing your size? Message us and we will let you know.
                 </p>
               )}
+              {product.variants.length > 1 || product.variants[0]?.size ? (
+                <label className="de-manual-size">
+                  <span>Don&apos;t see your size? Type it in</span>
+                  <input
+                    type="text"
+                    value={manualSize}
+                    onChange={(event) => setManualSize(event.target.value)}
+                    placeholder="e.g. EUR 46"
+                  />
+                </label>
+              ) : null}
             </div>
 
             <div className="de-actions">

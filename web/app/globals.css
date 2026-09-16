@@ -11133,6 +11133,34 @@ img {
   color: var(--de-muted);
 }
 
+.de-manual-size {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--de-ink);
+}
+
+.de-manual-size input {
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--de-ink);
+  background: #fff;
+  border: 1px solid var(--de-line);
+  border-radius: 9px;
+  max-width: 240px;
+}
+
+.de-manual-size input:focus {
+  outline: 2px solid var(--de-500);
+  outline-offset: 1px;
+  border-color: var(--de-500);
+}
+
 .de-actions {
   margin-top: 22px;
   display: grid;

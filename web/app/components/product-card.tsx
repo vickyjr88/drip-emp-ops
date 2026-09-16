@@ -137,7 +137,7 @@ export function ProductCard({ product }: { product: ShopProduct }) {
             ) : null}
           </p>
         ) : product.anyInStock ? null : orderableVariants.length ? (
-          <p className="de-card-sizes is-preorder">Ordered in from supplier</p>
+          <p className="de-card-sizes is-preorder">Available to Order</p>
         ) : (
           <p className="de-card-sizes is-none">Out of stock — ask us</p>
         )}
