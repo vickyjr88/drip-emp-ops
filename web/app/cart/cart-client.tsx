@@ -109,13 +109,20 @@ export function CartClient() {
 
   /** The price actually charged for a line: the reseller/wholesale tier
    *  price when one was resolved for it, otherwise the price the cart
-   *  already has (retail, or whatever it was added at). */
-  function displayPrice(variantId: string, fallback: number) {
-    return tierPrices.get(variantId) ?? fallback;
+   *  already has (retail, or whatever it was added at). A custom-size line
+   *  has no variantId to look a tier price up by, so it always falls
+   *  through to whatever was shown when it was added -- itself only ever a
+   *  placeholder, since there is no real price to quote until the shop
+   *  confirms the size is available at all. */
+  function displayPrice(variantId: string | null, fallback: number) {
+    return (variantId ? tierPrices.get(variantId) : undefined) ?? fallback;
   }
 
   const shipping = DELIVERY_FEE;
-  const subtotal = cart.lines.reduce(
+  // Only the payable lines count toward what checkout will actually charge
+  // -- a custom-size line rides along in the cart for the WhatsApp order,
+  // but has nothing behind it to bill online.
+  const subtotal = cart.payableLines.reduce(
     (sum, line) => sum + displayPrice(line.variantId, line.priceKes) * line.quantity,
     0,
   );
@@ -174,6 +181,10 @@ export function CartClient() {
   function buildWhatsappMessage() {
     const lines = ['Hello Drip Emporium, I would like to order:'];
     for (const line of cart.lines) {
+      if (line.isCustomSize) {
+        lines.push(`- ${line.quantity} x ${line.name} (size ${line.size} -- not listed, please confirm availability/price)`);
+        continue;
+      }
       const price = displayPrice(line.variantId, line.priceKes);
       lines.push(`- ${line.quantity} x ${line.name} (${line.size}) - ${formatKes(price * line.quantity)}`);
     }
@@ -198,12 +209,13 @@ export function CartClient() {
   /** The cart's lines in the shape the backend keeps a lead snapshot in. */
   function leadLines() {
     return cart.lines.map((line) => ({
-      variantId: line.variantId,
-      sku: line.sku,
+      variantId: line.variantId ?? undefined,
+      sku: line.sku || undefined,
       name: line.name,
       size: line.size,
       quantity: line.quantity,
       priceKes: line.priceKes,
+      isCustomSize: line.isCustomSize || undefined,
     }));
   }
 
@@ -299,7 +311,10 @@ export function CartClient() {
           ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}),
         },
         body: JSON.stringify({
-          lines: cart.lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
+          // Only real, priced variants can be charged -- a custom-size line
+          // has no variantId for the backend to look up or reserve stock
+          // against, so it never goes into the checkout payload at all.
+          lines: cart.payableLines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
           firstName: form.firstName,
           lastName: form.lastName,
           email: form.email,
@@ -361,9 +376,9 @@ export function CartClient() {
           <div className="de-cart-lines">
             {cart.lines.map((line) => {
               const price = displayPrice(line.variantId, line.priceKes);
-              const isTierPriced = tierPrices.has(line.variantId);
+              const isTierPriced = line.variantId ? tierPrices.has(line.variantId) : false;
               return (
-                <article key={line.variantId} className="de-cart-line">
+                <article key={line.id} className={`de-cart-line${line.isCustomSize ? ' de-cart-line--custom' : ''}`}>
                   <Link href={`/shop/${line.productSlug}`} className="de-cart-media">
                     {line.imageUrl ? (
                       <img src={line.imageUrl} alt="" />
@@ -373,11 +388,17 @@ export function CartClient() {
                   </Link>
                   <div className="de-cart-detail">
                     <h2><Link href={`/shop/${line.productSlug}`}>{line.name}</Link></h2>
-                    <p className="de-cart-meta">{line.size} · {line.sku}</p>
-                    <p className="de-cart-unit">
-                      {formatKes(price)} each
-                      {isTierPriced ? <span className="de-reseller-price"> · your price</span> : null}
-                    </p>
+                    <p className="de-cart-meta">{line.size} · {line.sku || 'size to be confirmed'}</p>
+                    {line.isCustomSize ? (
+                      <p className="de-cart-custom-note">
+                        Not a listed size -- we&apos;ll confirm availability and price over WhatsApp before this is charged.
+                      </p>
+                    ) : (
+                      <p className="de-cart-unit">
+                        {formatKes(price)} each
+                        {isTierPriced ? <span className="de-reseller-price"> · your price</span> : null}
+                      </p>
+                    )}
                   </div>
                   <div className="de-cart-qty">
                     <label>
@@ -386,10 +407,10 @@ export function CartClient() {
                         type="number"
                         min="1"
                         value={line.quantity}
-                        onChange={(event) => cart.setQuantity(line.variantId, Number(event.target.value))}
+                        onChange={(event) => cart.setQuantity(line.id, Number(event.target.value))}
                       />
                     </label>
-                    <button type="button" onClick={() => cart.remove(line.variantId)}>Remove</button>
+                    <button type="button" onClick={() => cart.remove(line.id)}>Remove</button>
                   </div>
                   <p className="de-cart-total">{formatKes(price * line.quantity)}</p>
                 </article>
@@ -413,6 +434,14 @@ export function CartClient() {
               <p className="de-summary-note">
                 Delivery is not charged here. We will contact you after you order to
                 arrange it and confirm the cost separately.
+              </p>
+            ) : null}
+
+            {cart.hasCustomSizeLine ? (
+              <p className="de-summary-note">
+                Your cart has a size we don&apos;t list online, so it isn&apos;t included in the total
+                above. Use &quot;Order on WhatsApp&quot; below to send the whole cart, including that
+                item, and we&apos;ll confirm it with you there.
               </p>
             ) : null}
 

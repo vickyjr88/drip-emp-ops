@@ -297,6 +297,29 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                   />
                 </label>
               ) : null}
+              {manualSize.trim() ? (
+                <button
+                  type="button"
+                  className="lp-button de-manual-size-add"
+                  onClick={() => {
+                    cart.add({
+                      variantId: null,
+                      productSlug: product.slug,
+                      name: product.name,
+                      size: manualSize.trim(),
+                      sku: '',
+                      priceKes: chosen?.priceKes ?? product.priceFrom,
+                      imageUrl: product.imageUrls[0] || null,
+                      isCustomSize: true,
+                    });
+                    setManualSize('');
+                    setAdded(true);
+                    window.setTimeout(() => setAdded(false), 2500);
+                  }}
+                >
+                  Add size {manualSize.trim()} to cart (pending confirmation)
+                </button>
+              ) : null}
             </div>
 
             <div className="de-actions">

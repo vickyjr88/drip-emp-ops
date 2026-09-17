@@ -7,12 +7,18 @@ import { CartLeadSource } from '@prisma/client';
 import { IsValidPhoneNumber } from '../../common/phone.util';
 
 export class CartLeadLineDto {
-  @ApiProperty() @IsString() @IsNotEmpty() variantId!: string;
-  @ApiProperty() @IsString() @IsNotEmpty() sku!: string;
+  // Optional: a line for a customer-typed size with no matching variant
+  // ("My size isn't listed") has neither a real variantId nor a SKU to
+  // report -- there is nothing in the catalogue it corresponds to yet. Every
+  // other line (the overwhelming majority) still sends both.
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() variantId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() sku?: string;
   @ApiProperty() @IsString() @IsNotEmpty() name!: string;
   @ApiProperty() @IsString() @IsNotEmpty() size!: string;
   @ApiProperty({ example: 1 }) @IsInt() @Min(1) quantity!: number;
   @ApiProperty() @IsInt() @Min(0) priceKes!: number;
+  @ApiPropertyOptional({ description: "True for a customer-typed size with no matching variant." })
+  @IsOptional() isCustomSize?: boolean;
 }
 
 /**

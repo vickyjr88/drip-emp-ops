@@ -11161,6 +11161,13 @@ img {
   border-color: var(--de-500);
 }
 
+.de-manual-size-add {
+  margin-top: 10px;
+  align-self: flex-start;
+  font-size: 0.7rem;
+  padding: 11px 20px;
+}
+
 .de-actions {
   margin-top: 22px;
   display: grid;
@@ -11674,6 +11681,18 @@ img {
   margin: 0;
   font-size: 13px;
   color: var(--de-muted);
+}
+
+.de-cart-line--custom {
+  border-style: dashed;
+  border-color: var(--de-300);
+}
+
+.de-cart-custom-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--de-royal);
 }
 
 .de-cart-qty {

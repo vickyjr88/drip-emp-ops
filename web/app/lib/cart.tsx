@@ -14,6 +14,16 @@
  *
  * A line is a variant, not a product. Two sizes of the same shoe are two
  * lines, because that is what gets picked off the shelf.
+ *
+ * One exception: a line can carry a customer-typed size that isn't one of
+ * the product's real variants at all ("My size isn't listed"). It has no
+ * variantId -- there is nothing in the catalogue to price or reserve stock
+ * against -- so it can never go through Paystack checkout. It exists in the
+ * cart purely so the shopper sees it alongside everything else and so the
+ * WhatsApp order (already a free-text message, not a priced API call) can
+ * include it. `id` is what every line is keyed and looked up by now,
+ * because a custom line has no variantId to serve that purpose; a real
+ * line's id is just its variantId, so nothing about existing carts changes.
  */
 
 import {
@@ -23,7 +33,9 @@ import {
 const STORAGE_KEY = 'de_cart_v1';
 
 export type CartLine = {
-  variantId: string;
+  id: string;
+  /** Null for a custom-size line -- see the file comment above. */
+  variantId: string | null;
   productSlug: string;
   name: string;
   size: string;
@@ -31,15 +43,20 @@ export type CartLine = {
   priceKes: number;
   imageUrl?: string | null;
   quantity: number;
+  /** True only for a customer-typed size with no matching variant. */
+  isCustomSize?: boolean;
 };
 
 type CartValue = {
   lines: CartLine[];
   count: number;
   subtotal: number;
-  add: (line: Omit<CartLine, 'quantity'>, quantity?: number) => void;
-  setQuantity: (variantId: string, quantity: number) => void;
-  remove: (variantId: string) => void;
+  /** The lines checkout can actually charge -- excludes any custom-size line. */
+  payableLines: CartLine[];
+  hasCustomSizeLine: boolean;
+  add: (line: Omit<CartLine, 'id' | 'quantity'> & { id?: string }, quantity?: number) => void;
+  setQuantity: (id: string, quantity: number) => void;
+  remove: (id: string) => void;
   clear: () => void;
   ready: boolean;
 };
@@ -71,44 +88,55 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [lines, ready]);
 
-  const add = useCallback((line: Omit<CartLine, 'quantity'>, quantity = 1) => {
+  const add = useCallback((line: Omit<CartLine, 'id' | 'quantity'> & { id?: string }, quantity = 1) => {
     setLines((prev) => {
-      const existing = prev.find((item) => item.variantId === line.variantId);
+      // A real variant line still dedupes/merges by variantId, exactly as
+      // before -- its id defaults to the variantId itself when the caller
+      // does not pass one, so this lookup and the merge below both still
+      // work unchanged for every existing call site.
+      const id = line.id ?? line.variantId ?? undefined;
+      const existing = id ? prev.find((item) => item.id === id) : undefined;
       if (existing) {
         return prev.map((item) =>
-          item.variantId === line.variantId
-            ? { ...item, quantity: item.quantity + quantity }
-            : item,
+          item.id === id ? { ...item, quantity: item.quantity + quantity } : item,
         );
       }
-      return [...prev, { ...line, quantity }];
+      // A custom-size line (no variantId) always gets its own fresh id --
+      // two different customer-typed sizes for the same shoe are never the
+      // same line, so there is nothing to merge into.
+      const newId = id ?? `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      return [...prev, { ...line, id: newId, quantity }];
     });
   }, []);
 
-  const setQuantity = useCallback((variantId: string, quantity: number) => {
+  const setQuantity = useCallback((id: string, quantity: number) => {
     setLines((prev) =>
       quantity <= 0
-        ? prev.filter((item) => item.variantId !== variantId)
-        : prev.map((item) => (item.variantId === variantId ? { ...item, quantity } : item)),
+        ? prev.filter((item) => item.id !== id)
+        : prev.map((item) => (item.id === id ? { ...item, quantity } : item)),
     );
   }, []);
 
-  const remove = useCallback((variantId: string) => {
-    setLines((prev) => prev.filter((item) => item.variantId !== variantId));
+  const remove = useCallback((id: string) => {
+    setLines((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   const clear = useCallback(() => setLines([]), []);
+
+  const payableLines = useMemo(() => lines.filter((line) => !line.isCustomSize), [lines]);
 
   const value = useMemo<CartValue>(() => ({
     lines,
     count: lines.reduce((sum, line) => sum + line.quantity, 0),
     subtotal: lines.reduce((sum, line) => sum + line.priceKes * line.quantity, 0),
+    payableLines,
+    hasCustomSizeLine: lines.some((line) => line.isCustomSize),
     add,
     setQuantity,
     remove,
     clear,
     ready,
-  }), [lines, add, setQuantity, remove, clear, ready]);
+  }), [lines, payableLines, add, setQuantity, remove, clear, ready]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
