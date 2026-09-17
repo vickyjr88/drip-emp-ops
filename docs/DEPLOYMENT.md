@@ -48,8 +48,10 @@ never touches stay on loopback.
 
 | Service | Host port | Binding | Reached via |
 |---|---|---|---|
-| web (Next.js) | `3003` | `0.0.0.0` | nginx vhost, site domain |
-| backend (API) | `3101` | `0.0.0.0` | nginx vhost, API domain |
+| web (Next.js), slot a | `3003` | `0.0.0.0` | nginx vhost, site domain (`web_pool`) |
+| web (Next.js), slot b (standby) | `3004` | `0.0.0.0` | nginx vhost, site domain (`web_pool`) |
+| backend (API), slot a | `3101` | `0.0.0.0` | nginx vhost, API domain (`backend_pool`) |
+| backend (API), slot b (standby) | `3102` | `0.0.0.0` | nginx vhost, API domain (`backend_pool`) |
 | MinIO S3 | `19002` | `0.0.0.0` | nginx, for `MEDIA_PUBLIC_BASE_URL` |
 | MinIO console | `19003` | `127.0.0.1` | SSH tunnel only — never proxy this |
 | Postgres | `15433` | `127.0.0.1` | SSH tunnel only |
@@ -121,6 +123,56 @@ Keep the forwarding headers the UI generates — `Host`, `X-Forwarded-For` and
 especially `X-Forwarded-Proto`, without which the app builds `http://` links
 behind an `https://` proxy.
 
+### Zero-downtime deploys — the upstream pool
+
+`scripts/deploy.sh` runs a rolling deploy: each app has two slots (`web`/
+`web2`, `backend`/`backend2` in `docker-compose.yml`, on ports 3003/3004 and
+3101/3102). A deploy starts the *idle* slot on the new image, waits for it to
+pass its own healthcheck, and only then stops the slot that was serving —
+there is never a moment where both are down.
+
+For that to actually remove downtime, nginx has to be able to reach **either**
+slot at any time, not just the one deploy.sh currently considers "active" —
+which slot that is changes on every deploy, and nginx has no way to know. The
+fix is an `upstream` block per app listing both ports, added once in each
+site's **Config File** panel (same place `client_max_body_size` lives above),
+with `proxy_pass` pointed at the pool instead of a single port:
+
+```nginx
+# In the API site's Config File, above the server block:
+upstream backend_pool {
+    server 172.17.0.1:3101 max_fails=2 fail_timeout=5s;
+    server 172.17.0.1:3102 max_fails=2 fail_timeout=5s backup;
+}
+```
+
+```nginx
+# In the storefront site's Config File, above the server block:
+upstream web_pool {
+    server 172.17.0.1:3003 max_fails=2 fail_timeout=5s;
+    server 172.17.0.1:3004 max_fails=2 fail_timeout=5s backup;
+}
+```
+
+Then change each site's `proxy_pass` from `http://172.17.0.1:3101` /
+`http://172.17.0.1:3003` to `http://backend_pool` / `http://web_pool`
+respectively — everything else in the reverse-proxy config (headers,
+`client_max_body_size`, `proxy_read_timeout`) stays as it is.
+
+`backup` marks port 3102/3004 as nginx's fallback: normal traffic goes to
+3101/3003 unless that one is failing, in which case nginx retries against the
+backup automatically. This is deliberately asymmetric rather than a 50/50
+load-balanced pool — during the handful of seconds where slot b is up but
+slot a has not been stopped yet, requests should not intermittently land on
+a container about to be torn down. `max_fails`/`fail_timeout` is what makes
+nginx notice a stopped container within a couple of requests instead of
+timing every request out against a closed port.
+
+This is a one-time change per site. Once both ports are in the pool,
+`scripts/deploy.sh` needs nothing further from nginx on any later deploy —
+it only ever starts and stops the plain `web`/`backend` containers, and
+whichever one nginx finds listening is the one that answers.
+
 **A site that used to run something else (e.g. `dripemporium.store` previously
 ran OpenCart) can carry a leftover PHP handler.** aaPanel provisions a "PHP
 site" with a `location ~ \.php$` block pointing at a PHP-FPM pool by default,
@@ -156,10 +208,10 @@ takes effect on restart without a rebuild.
 
 ### Firewall — the only thing closing the app ports
 
-Because nginx is containerised, `3003`, `3101` and `19002` are published on
-`0.0.0.0`. Nothing but the firewall keeps them off the public internet. In
-aaPanel → Security, only 80, 443, the SSH port and the panel port should be
-open.
+Because nginx is containerised, `3003`, `3004`, `3101`, `3102` and `19002` are
+published on `0.0.0.0`. Nothing but the firewall keeps them off the public
+internet. In aaPanel → Security, only 80, 443, the SSH port and the panel port
+should be open.
 
 **Verify rather than assume.** Docker writes its own iptables rules in the
 `DOCKER` chain, which are consulted before the `INPUT` chain most firewall UIs
@@ -168,7 +220,9 @@ closed. Check from somewhere other than the server:
 
 ```bash
 curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://<server-ip>:3003   # want: timeout/refused
+curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://<server-ip>:3004   # want: timeout/refused
 curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://<server-ip>:3101   # want: timeout/refused
+curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://<server-ip>:3102   # want: timeout/refused
 ```
 
 If either answers, the firewall is not actually filtering Docker's traffic. Add

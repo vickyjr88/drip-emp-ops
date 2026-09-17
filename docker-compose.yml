@@ -1,77 +1,117 @@
 
+# Shared by the two backend/web service pairs below (the active slot and its
+# rolling-deploy standby), so the two never drift apart on anything but the
+# one thing that has to differ: which host port each is published on. See
+# scripts/deploy.sh for how the two slots are actually swapped during a
+# deploy -- this file only defines that both can run at once.
+x-web-build: &web-build
+  context: ./web
+  dockerfile: Dockerfile
+  args:
+    - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3101}
+    - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
+    - NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY:-}
+    - NEXT_PUBLIC_GA_MEASUREMENT_ID=${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
+    - NEXT_PUBLIC_META_PIXEL_ID=${NEXT_PUBLIC_META_PIXEL_ID:-}
+    - NEXT_PUBLIC_X_PIXEL_ID=${NEXT_PUBLIC_X_PIXEL_ID:-}
+    - NEXT_PUBLIC_TIKTOK_PIXEL_ID=${NEXT_PUBLIC_TIKTOK_PIXEL_ID:-}
+    - NEXT_PUBLIC_MEDIA_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
+
+x-web-environment: &web-environment
+  INTERNAL_API_BASE_URL: ${INTERNAL_API_BASE_URL:-http://backend:3100}
+  NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3101}
+  NEXT_PUBLIC_MEDIA_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+
+x-web-healthcheck: &web-healthcheck
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3002/ || exit 1"]
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 30s
+
+x-backend-environment: &backend-environment
+  DATABASE_URL: ${DATABASE_URL}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio}
+  MINIO_PORT: ${MINIO_PORT:-9000}
+  MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+  MINIO_BUCKET: ${MINIO_BUCKET:-project-media}
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+  BREVO_API_KEY: ${BREVO_API_KEY:-}
+  BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL:-}
+  BREVO_SENDER_NAME: ${BREVO_SENDER_NAME:-}
+  STOREFRONT_ORIGIN: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
+  PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+  SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
+  SMTP_REJECT_UNAUTHORIZED: ${SMTP_REJECT_UNAUTHORIZED:-}
+  BILLIONMAIL_API_KEY: ${BILLIONMAIL_API_KEY:-}
+  BILLIONMAIL_BASE_URL: ${BILLIONMAIL_BASE_URL:-}
+  BILLIONMAIL_SENDER_EMAIL: ${BILLIONMAIL_SENDER_EMAIL:-}
+  INQUIRY_FALLBACK_EMAIL: ${INQUIRY_FALLBACK_EMAIL:-}
+  ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL:-}
+  ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:-}
+  FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+  AT_API_KEY: ${AT_API_KEY:-}
+  AT_USERNAME: ${AT_USERNAME:-sandbox}
+  AT_SENDER_ID: ${AT_SENDER_ID:-}
+  REMINDERS_CRON: ${REMINDERS_CRON:-0 8 * * *}
+  REMINDERS_TIMEZONE: ${REMINDERS_TIMEZONE:-Africa/Nairobi}
+
+x-backend-healthcheck: &backend-healthcheck
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/health || exit 1"]
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 30s
+
+x-backend-depends-on: &backend-depends-on
+  db:
+    condition: service_healthy
+  minio:
+    condition: service_started
+  redis:
+    condition: service_healthy
 
 services:
+  # Two slots per app, "web"/"web2" and "backend"/"backend2", so a deploy can
+  # bring the idle slot up on the new image, wait for its healthcheck, cut
+  # nginx's upstream over to it, and only then stop the slot that was serving
+  # -- see scripts/deploy.sh. Exactly one slot is meant to be running outside
+  # of a deploy; which one is active is tracked by deploy.sh, not by Compose.
   web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-      args:
-        # Next.js inlines NEXT_PUBLIC_* at build time, so these have to be build
-        # args. Setting them only at runtime leaves the browser bundle pointing at
-        # the localhost defaults and the deployed site cannot reach the API.
-        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3101}
-        # The site's own public origin, used for canonical URLs, Open Graph tags,
-        # sitemap.xml and robots.txt -- all of which are absolute. Left at the
-        # localhost default in production, every canonical would point at
-        # localhost and the site would effectively de-index itself.
-        - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
-        # Paystack's publishable key. Not used today: checkout redirects to a
-        # URL the server creates with the secret key, so the browser never
-        # needs a key of its own. Wired through for the inline popup, which
-        # would need it, and safe in the bundle either way -- it identifies the
-        # merchant; only the secret key can move money.
-        - NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY:-}
-        # GA4 Measurement ID. Blank by default so local/staging builds never
-        # send analytics traffic; only a real deploy sets this.
-        - NEXT_PUBLIC_GA_MEASUREMENT_ID=${NEXT_PUBLIC_GA_MEASUREMENT_ID:-}
-        # Meta Pixel ID, same build-time/blank-by-default rule as the GA
-        # Measurement ID above.
-        - NEXT_PUBLIC_META_PIXEL_ID=${NEXT_PUBLIC_META_PIXEL_ID:-}
-        # X (Twitter) Pixel ID, same rule.
-        - NEXT_PUBLIC_X_PIXEL_ID=${NEXT_PUBLIC_X_PIXEL_ID:-}
-        # TikTok Pixel ID, same rule.
-        - NEXT_PUBLIC_TIKTOK_PIXEL_ID=${NEXT_PUBLIC_TIKTOK_PIXEL_ID:-}
-        # next/image needs every remote image host allow-listed at build time
-        # (next.config.js's images.remotePatterns). Product/CMS images are
-        # actually streamed through the backend API at GET /media/:key (see
-        # MediaController), not served straight from MinIO, so the real host
-        # is ordinarily the API's own public origin -- next.config.js already
-        # falls back to NEXT_PUBLIC_API_BASE_URL when this is unset, so this
-        # build arg only matters for the rarer case of a genuinely separate
-        # media host (MEDIA_PUBLIC_BASE_URL set to something other than the
-        # API origin).
-        - NEXT_PUBLIC_MEDIA_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
+    build: *web-build
     ports:
-      # host:container. Next binds 3002 inside the container and logs that
-      # port on startup -- the site is reached on WEB_PORT from the host.
-      #
-      # Bound on all interfaces, matching the dirrir-realtors stack that already
-      # works behind this server's containerised nginx: to that container,
-      # 127.0.0.1 is itself rather than the host, so a loopback binding is
-      # unreachable from the proxy.
-      #
-      # That leaves the site answering on http://<ip>:3003, bypassing TLS. The
-      # firewall is what closes that -- see docs/DEPLOYMENT.md.
+      # host:container. Next binds 3002 inside the container; this slot is
+      # reached on WEB_PORT from the host. See scripts/deploy.sh for why both
+      # this and web2's port need to sit in nginx's upstream pool together.
       - "${WEB_PORT:-3003}:3002"
-    environment:
-      # Server-side rendering runs inside this container, where localhost is the
-      # web app itself. Server fetches must go to the backend service directly;
-      # the browser keeps using NEXT_PUBLIC_API_BASE_URL. Read at runtime, so it
-      # needs no rebuild to change.
-      - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://backend:3100}
-      # `next start` re-executes next.config.js at server boot, not just at
-      # build time -- confirmed by tracing a broken-image regression directly:
-      # images.domains (mediaImageHostname() in next.config.js) came back
-      # empty at request time even though the build-time manifest on disk had
-      # the right value, because process.env.NEXT_PUBLIC_API_BASE_URL is
-      # undefined in a container that only ever received it as a build arg.
-      # NEXT_PUBLIC_* vars still need to be build args too (that's what
-      # inlines them into the browser bundle), but next.config.js's own
-      # runtime logic needs them present here as well.
-      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3101}
-      - NEXT_PUBLIC_MEDIA_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
+    environment: *web-environment
+    healthcheck: *web-healthcheck
     depends_on:
       - backend
+    restart: unless-stopped
+
+  web2:
+    build: *web-build
+    ports:
+      - "${WEB_PORT2:-3004}:3002"
+    environment: *web-environment
+    healthcheck: *web-healthcheck
+    depends_on:
+      - backend
+    # Not started by a plain `docker compose up -d` -- only deploy.sh brings
+    # this up, on purpose, during a rolling swap. `docker compose --profile
+    # standby up -d` would also start it, if that is ever wanted directly.
+    profiles: ["standby"]
     restart: unless-stopped
 
   backend:
@@ -83,68 +123,30 @@ services:
       # cannot reach a host loopback binding. Closed off by the firewall.
       - "${API_PORT:-3101}:3100"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      # No default: auth falls back to a hardcoded dev key when this is unset,
-      # which would let anyone mint admin tokens against a deployed instance.
-      # Compose errors on an empty value, so a misconfigured host fails loudly.
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio}
-      - MINIO_PORT=${MINIO_PORT:-9000}
-      - MINIO_USE_SSL=${MINIO_USE_SSL:-false}
-      - MINIO_BUCKET=${MINIO_BUCKET:-project-media}
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - MEDIA_PUBLIC_BASE_URL=${MEDIA_PUBLIC_BASE_URL:-}
-      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
-      - BREVO_API_KEY=${BREVO_API_KEY:-}
-      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
-      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-}
-      # Where the customer's browser is. Paystack callbacks and password-reset
-      # links must point at the storefront, not at this API -- derived from the
-      # request they would point at :3101, where those pages do not exist.
-      - STOREFRONT_ORIGIN=${NEXT_PUBLIC_SITE_URL:-http://localhost:3003}
-      # Paystack. The secret key never leaves the server; without it the API
-      # reports checkout as unavailable and refuses to take an order.
-      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY:-}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
-      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
-      - SMTP_REJECT_UNAUTHORIZED=${SMTP_REJECT_UNAUTHORIZED:-}
-      - BILLIONMAIL_API_KEY=${BILLIONMAIL_API_KEY:-}
-      - BILLIONMAIL_BASE_URL=${BILLIONMAIL_BASE_URL:-}
-      - BILLIONMAIL_SENDER_EMAIL=${BILLIONMAIL_SENDER_EMAIL:-}
-      - INQUIRY_FALLBACK_EMAIL=${INQUIRY_FALLBACK_EMAIL:-}
-      - ADMIN_SEED_EMAIL=${ADMIN_SEED_EMAIL:-}
-      - ADMIN_SEED_PASSWORD=${ADMIN_SEED_PASSWORD:-}
-      # Used only by the one-off scripts/migrate-firestore-users.ts. Blank on
-      # any host that is not actively running that migration.
-      - FIREBASE_SERVICE_ACCOUNT_PATH=${FIREBASE_SERVICE_ACCOUNT_PATH:-}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      # Africa's Talking. Blank key => reminder SMS is skipped and logged
-      # rather than failing the run, matching how Brevo behaves.
-      - AT_API_KEY=${AT_API_KEY:-}
-      - AT_USERNAME=${AT_USERNAME:-sandbox}
-      - AT_SENDER_ID=${AT_SENDER_ID:-}
-      # Set false on replicas so only one instance runs the scheduler.
-      - REMINDERS_ENABLED=${REMINDERS_ENABLED:-true}
-      - REMINDERS_CRON=${REMINDERS_CRON:-0 8 * * *}
-      - REMINDERS_TIMEZONE=${REMINDERS_TIMEZONE:-Africa/Nairobi}
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-    depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_started
-      redis:
-        condition: service_healthy
+      <<: *backend-environment
+      # Set false on replicas so only one instance runs the scheduler. The
+      # standby slot below is the one this actually matters for now.
+      REMINDERS_ENABLED: ${REMINDERS_ENABLED:-true}
+    healthcheck: *backend-healthcheck
+    depends_on: *backend-depends-on
+    restart: unless-stopped
+
+  backend2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT2:-3102}:3100"
+    environment:
+      <<: *backend-environment
+      # Never true for this slot: two schedulers double-sending reminder
+      # SMS/emails is the exact failure this flag exists to prevent, and
+      # deploy.sh brings this slot up alongside, not instead of, the active
+      # one during a swap.
+      REMINDERS_ENABLED: "false"
+    healthcheck: *backend-healthcheck
+    depends_on: *backend-depends-on
+    profiles: ["standby"]
     restart: unless-stopped
 
   redis:
