@@ -9,6 +9,7 @@ import { CommissionModule } from '../commission/commission.module';
 import { CampaignModule } from '../campaign/campaign.module';
 import { XConversionModule } from '../x-conversion/x-conversion.module';
 import { TikTokConversionModule } from '../tiktok-conversion/tiktok-conversion.module';
+import { MauticModule } from '../mautic/mautic.module';
 import { CheckoutService } from './checkout.service';
 import { CheckoutController } from './checkout.controller';
 
@@ -26,6 +27,7 @@ import { CheckoutController } from './checkout.controller';
     CampaignModule,
     XConversionModule,
     TikTokConversionModule,
+    MauticModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService],

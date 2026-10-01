@@ -3,6 +3,7 @@ import { InquiryStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/pagination.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
+import { MauticService } from '../mautic/mautic.service';
 import { CreateInquiryDto } from './dto/inquiry.dto';
 import { InquiryQueryDto } from './dto/inquiry-query.dto';
 import { normalizePhoneNumber } from '../common/phone.util';
@@ -12,6 +13,7 @@ export class InquiryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ownerNotification: OwnerNotificationService,
+    private readonly mautic: MauticService,
   ) {}
 
   async create(dto: CreateInquiryDto) {
@@ -30,6 +32,7 @@ export class InquiryService {
       phone: inquiry.phone,
       message: inquiry.message,
     });
+    void this.mautic.syncInquiry({ email: inquiry.email, name: inquiry.name, phone: inquiry.phone });
 
     return inquiry;
   }

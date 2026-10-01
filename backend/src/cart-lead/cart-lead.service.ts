@@ -8,6 +8,7 @@ import { OwnerNotificationService } from '../email-log/owner-notification.servic
 import { CampaignService } from '../campaign/campaign.service';
 import { XConversionService } from '../x-conversion/x-conversion.service';
 import { TikTokConversionService } from '../tiktok-conversion/tiktok-conversion.service';
+import { MauticService } from '../mautic/mautic.service';
 import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
 import { CartReminderQueueService } from './cart-reminder-queue.service';
@@ -21,6 +22,7 @@ export class CartLeadService {
     private readonly campaign: CampaignService,
     private readonly xConversion: XConversionService,
     private readonly tiktokConversion: TikTokConversionService,
+    private readonly mautic: MauticService,
   ) {}
 
   /**
@@ -75,7 +77,7 @@ export class CartLeadService {
       : null;
     const { referredByCustomerId, attributedCampaignId } = await this.resolveAttribution(dto.referralCode, dto.campaignCode);
 
-    return this.prisma.cartLead.create({
+    const created = await this.prisma.cartLead.create({
       data: {
         source: dto.source,
         customerId: customer?.id,
@@ -92,6 +94,8 @@ export class CartLeadService {
         attributedCampaignId,
       },
     });
+    void this.mautic.syncCartLead({ email: created.customerEmail, name: created.customerName, phone: created.customerPhone });
+    return created;
   }
 
   /**
@@ -300,6 +304,7 @@ export class CartLeadService {
       phone: created.customerPhone,
       value: Number(created.total),
     });
+    void this.mautic.syncCartLead({ email: created.customerEmail, name: created.customerName, phone: created.customerPhone });
     return created;
   }
 

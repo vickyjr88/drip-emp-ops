@@ -10,6 +10,7 @@ import { CommissionService } from '../commission/commission.service';
 import { CampaignService } from '../campaign/campaign.service';
 import { XConversionService } from '../x-conversion/x-conversion.service';
 import { TikTokConversionService } from '../tiktok-conversion/tiktok-conversion.service';
+import { MauticService } from '../mautic/mautic.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
@@ -56,6 +57,7 @@ export class CheckoutService {
     private readonly campaign: CampaignService,
     private readonly xConversion: XConversionService,
     private readonly tiktokConversion: TikTokConversionService,
+    private readonly mautic: MauticService,
   ) {}
 
   /**
@@ -93,6 +95,7 @@ export class CheckoutService {
         // A password being set is the actual "signed up" moment -- a bare
         // customer record from an earlier guest checkout was never that.
         void this.ownerNotification.notifySignup(updated);
+        void this.mautic.syncSignup({ email: updated.email, firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
         return updated;
       }
       return existing;
@@ -111,7 +114,10 @@ export class CheckoutService {
     });
     // Same distinction as above: only a password makes this a real signup,
     // not just a new guest-checkout customer row.
-    if (details.password) void this.ownerNotification.notifySignup(created);
+    if (details.password) {
+      void this.ownerNotification.notifySignup(created);
+      void this.mautic.syncSignup({ email: created.email, firstName: created.firstName, lastName: created.lastName, phone: created.phone });
+    }
     return created;
   }
 
@@ -521,6 +527,16 @@ export class CheckoutService {
         email: updated.customerEmail,
         phone: updated.customerPhone,
         value: Number(updated.total),
+      });
+      // Syncs the contact (creating one if this order's email is new to
+      // Mautic) and enrolls it in the welcome campaign -- a paid order is as
+      // strong a signal as a signup that this is a real customer worth
+      // following up with.
+      void this.mautic.syncOrder({
+        email: updated.customerEmail,
+        firstName: updated.customerName?.split(/\s+/)[0],
+        lastName: updated.customerName?.split(/\s+/).slice(1).join(' ') || undefined,
+        phone: updated.customerPhone,
       });
     }
 
