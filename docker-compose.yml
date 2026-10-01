@@ -65,6 +65,10 @@ x-backend-environment: &backend-environment
   AT_SENDER_ID: ${AT_SENDER_ID:-}
   REMINDERS_CRON: ${REMINDERS_CRON:-0 8 * * *}
   REMINDERS_TIMEZONE: ${REMINDERS_TIMEZONE:-Africa/Nairobi}
+  MAUTIC_BASE_URL: ${MAUTIC_BASE_URL:-}
+  MAUTIC_CLIENT_ID: ${MAUTIC_CLIENT_ID:-}
+  MAUTIC_CLIENT_SECRET: ${MAUTIC_CLIENT_SECRET:-}
+  MAUTIC_CAMPAIGN_ID: ${MAUTIC_CAMPAIGN_ID:-}
 
 x-backend-healthcheck: &backend-healthcheck
   test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/health || exit 1"]
