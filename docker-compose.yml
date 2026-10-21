@@ -115,10 +115,16 @@ services:
     build: *web-build
     ports:
       - "${WEB_PORT2:-3004}:3002"
-    environment: *web-environment
+    environment:
+      <<: *web-environment
+      # Slot b talks to slot b's backend. It used to inherit http://backend:3100, but once slot a is stopped
+      # (the normal state after a swap) that name does not exist, every server-side API call fell back to the
+      # public URL and waited out two 10-second connect timeouts: pages took ~21 seconds, rendered without CMS
+      # content (no og:image), and link previews failed.
+      INTERNAL_API_BASE_URL: http://backend2:3100
     healthcheck: *web-healthcheck
     depends_on:
-      - backend
+      - backend2
     # Not started by a plain `docker compose up -d` -- only deploy.sh brings
     # this up, on purpose, during a rolling swap. `docker compose --profile
     # standby up -d` would also start it, if that is ever wanted directly.
