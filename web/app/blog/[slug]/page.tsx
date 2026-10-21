@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../../lib/site';
 import { EliteLayout } from '../../components/elite-layout';
 import { fetchBlogPost, formatBlogDate, readingTime } from '../../lib/blog';
+import { brandPreviewImage, sharePreviewUrl } from '../../lib/preview-image';
 
 // Rendered per request, matching /blog and /shop/[slug]: content should
 // appear without a rebuild, and this is the page a crawler most needs to
@@ -15,6 +16,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const post = await fetchBlogPost(params.slug);
   if (!post) return { title: 'Post not found', robots: { index: false, follow: true } };
 
+  // A post with no cover of its own previews with the brand banner rather than as a bare card.
+  const shareImage = post.coverImageUrl || (await brandPreviewImage());
+
   return {
     title: post.title,
     description: post.excerpt,
@@ -23,13 +27,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       title: `${post.title} | ${SITE_NAME}`,
       description: post.excerpt,
       type: 'article',
-      ...(post.coverImageUrl ? { images: [{ url: post.coverImageUrl }] } : {}),
+      ...(shareImage ? { images: [{ url: sharePreviewUrl(shareImage), width: 1200, height: 630, type: 'image/jpeg' }] } : {}),
     },
     twitter: {
-      card: post.coverImageUrl ? 'summary_large_image' : 'summary',
+      card: shareImage ? 'summary_large_image' : 'summary',
       title: `${post.title} | ${SITE_NAME}`,
       description: post.excerpt,
-      ...(post.coverImageUrl ? { images: [post.coverImageUrl] } : {}),
+      ...(shareImage ? { images: [sharePreviewUrl(shareImage)] } : {}),
     },
   };
 }

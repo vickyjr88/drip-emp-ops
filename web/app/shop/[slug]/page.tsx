@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { JsonLd, SITE_NAME, absoluteUrl, productFaqSchema } from '../../lib/site';
 import { fetchProduct, formatKes } from '../../lib/shop';
+import { sharePreviewUrl } from '../../lib/preview-image';
 import { ProductClient } from './product-client';
 
 // Rendered per request so price and stock are never stale on the page a
@@ -30,13 +31,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     openGraph: {
       title: `${product.name} | ${SITE_NAME}`,
       description,
-      ...(shareImage ? { images: [{ url: shareImage }] } : {}),
+      ...(shareImage ? { images: [{ url: sharePreviewUrl(shareImage), width: 1200, height: 630, type: 'image/jpeg' }] } : {}),
     },
     twitter: {
       card: shareImage ? 'summary_large_image' : 'summary',
       title: `${product.name} | ${SITE_NAME}`,
       description,
-      ...(shareImage ? { images: [shareImage] } : {}),
+      ...(shareImage ? { images: [sharePreviewUrl(shareImage)] } : {}),
     },
   };
 }

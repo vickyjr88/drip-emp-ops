@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../../../lib/site';
 import { fetchCategories, fetchFilters, fetchProducts } from '../../../lib/shop';
+import { brandPreviewImage, sharePreviewUrl } from '../../../lib/preview-image';
 import { ShopClient } from '../../shop-client';
 
 // Rendered per request, matching /shop: a crawler's first paint should see
@@ -49,6 +50,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const category = categories.find((item) => item.slug === params.slug);
   if (!category) return { title: 'Category not found', robots: { index: false, follow: true } };
 
+  const shareImage = await brandPreviewImage();
   const description = `Shop ${category.name} at Drip Emporium -- ${category.productCount} style${
     category.productCount === 1 ? '' : 's'
   } in stock. Nike, Adidas, Jordan and Puma, EUR 36-46, on Ronald Ngala Street, Nairobi.`;
@@ -57,8 +59,17 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     title: `${category.name} | Shop`,
     description,
     alternates: { canonical: `/shop/category/${category.slug}` },
-    openGraph: { title: `${category.name} | ${SITE_NAME}`, description },
-    twitter: { card: 'summary', title: `${category.name} | ${SITE_NAME}`, description },
+    openGraph: {
+      title: `${category.name} | ${SITE_NAME}`,
+      description,
+      ...(shareImage ? { images: [{ url: sharePreviewUrl(shareImage), width: 1200, height: 630, type: 'image/jpeg' }] } : {}),
+    },
+    twitter: {
+      card: shareImage ? 'summary_large_image' : 'summary',
+      title: `${category.name} | ${SITE_NAME}`,
+      description,
+      ...(shareImage ? { images: [sharePreviewUrl(shareImage)] } : {}),
+    },
   };
 }
 

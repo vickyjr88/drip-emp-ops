@@ -15,7 +15,7 @@
 
 import type { Metadata } from 'next';
 import { contentValue, fetchPageContent } from './page-content';
-import { previewFor } from './preview-image';
+import { brandPreviewImage, previewFor } from './preview-image';
 
 export type SeoDefaults = {
   /** Slugged into the CMS document, e.g. "about". */
@@ -51,7 +51,7 @@ export async function seoMetadata(defaults: SeoDefaults): Promise<Metadata> {
   // right picture for a card; the shop has no hero to pass at all, so without
   // this it could never have one.
   const cmsImage = contentValue(content, `${defaults.key}.shareImage`, '').trim();
-  const preview = previewFor(defaults.path, cmsImage || defaults.image);
+  const preview = previewFor(defaults.path, cmsImage || defaults.image || (await brandPreviewImage()));
 
   const base = `${defaults.key}.`;
   const title = contentValue(content, `${base}title`, defaults.title ?? '');

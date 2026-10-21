@@ -26,6 +26,24 @@ hours, contact details, prices and main brands, then links the categories, every
 - The shop address and hours are constants in `web/app/lib/site.tsx` (`STORE_ADDRESS`, `STORE_HOURS`); change them there.
 - Treat it as a cheap extra, not a ranking lever: no major AI provider has said it reads `llms.txt` when choosing what to cite.
 
+## Link previews (WhatsApp, Facebook, X, LinkedIn)
+
+`og:image` never points at the raw upload any more. Every page's share image is `/og/share.jpg?src=<picture>`
+(`web/app/lib/og-image.ts`), the same picture recomposed to exactly 1200x630 as a small JPEG (the 2 MB home hero is about
+110 KB). WhatsApp drops images over ~300 KB and ignores one whose real size differs from the declared size, which is what
+made previews fail intermittently.
+
+- Pages without a picture of their own (categories, blog posts with no cover, the FAQ, ...) use the home hero as the card.
+- The route only fetches pictures from the site's own media host (the API origin, plus `OG_IMAGE_EXTRA_HOSTS`, comma-separated, if ever
+  needed); any other address is refused. It fetches over `INTERNAL_API_BASE_URL`, not the public hostname, and falls back to
+  redirecting to the original if anything goes wrong, so a preview is never worse than before.
+- Platforms **cache previews**, failures included. After a fix, ask them to re-fetch: Facebook/Instagram/WhatsApp (Meta) use the
+  Sharing Debugger (developers.facebook.com/tools/debug/ -> Scrape Again); for a single WhatsApp chat, share the link with
+  `?v=2` on the end.
+- A preview also needs the page itself to answer within a few seconds, with its meta tags in the first part of the HTML. If
+  previews fail again, first time `curl -s -o /dev/null -w "%{time_starttransfer}\n" https://dripemporium.store/` and check it is
+  well under 2 seconds; a slow page was once caused by the web slot b pointing at a backend that was not running.
+
 ## Server settings this depends on (aaPanel / nginx)
 
 Both are per-site extension files, included at server level, so they only affect the site they sit in. Back up the folder first
