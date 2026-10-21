@@ -21,23 +21,30 @@ const API_BASE_URL = (
 export const revalidate = 3600;
 
 type Product = { slug: string; updatedAt?: string };
+
+/** The newest change in a list of dated rows, or undefined when none has a usable date. */
+function latest(dates: Array<string | undefined>): Date | undefined {
+  const times = dates.map((d) => (d ? new Date(d).getTime() : NaN)).filter((t) => Number.isFinite(t));
+  return times.length ? new Date(Math.max(...times)) : undefined;
+}
 type Category = { slug: string };
 type BlogPost = { slug: string; updatedAt?: string };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
-
+  // lastModified is only ever a date something actually changed: a date that is "now" on every request
+  // teaches search engines to ignore it. The static pages are edited in the CMS with no change date
+  // available here, so they carry none; the catalogue pages use the newest product change.
   const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${SITE_URL}/`, lastModified: now, changeFrequency: 'weekly', priority: 1 },
-    { url: `${SITE_URL}/shop`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
-    { url: `${SITE_URL}/about`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${SITE_URL}/contact`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/`, changeFrequency: 'weekly', priority: 1 },
+    { url: `${SITE_URL}/shop`, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/contact`, changeFrequency: 'monthly', priority: 0.6 },
     // Higher priority than the other static pages: FAQ answers are what people
     // search for by name ("does drip emporium deliver"), so it is the one most
     // worth indexing.
-    { url: `${SITE_URL}/faq`, lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${SITE_URL}/delivery`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
-    { url: `${SITE_URL}/affiliate`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/faq`, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${SITE_URL}/delivery`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${SITE_URL}/affiliate`, changeFrequency: 'monthly', priority: 0.5 },
   ];
 
   try {
@@ -52,24 +59,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const categories = categoriesResponse.ok ? ((await categoriesResponse.json()) as Category[]) : [];
     const blogPosts = blogResponse.ok ? ((await blogResponse.json()).items as BlogPost[]) : [];
 
+    const catalogueChanged = latest(products.map((p) => p.updatedAt));
+    const blogChanged = latest(blogPosts.map((p) => p.updatedAt));
+    const dated = staticRoutes.map((route) =>
+      route.url === `${SITE_URL}/` || route.url === `${SITE_URL}/shop`
+        ? { ...route, ...(catalogueChanged ? { lastModified: catalogueChanged } : {}) }
+        : route,
+    );
+
     return [
-      ...staticRoutes,
+      ...dated,
       ...categories.map((category) => ({
         url: `${SITE_URL}/shop/category/${category.slug}`,
-        lastModified: now,
+        ...(catalogueChanged ? { lastModified: catalogueChanged } : {}),
         changeFrequency: 'weekly' as const,
         priority: 0.7,
       })),
       ...products.map((product) => ({
         url: `${SITE_URL}/shop/${product.slug}`,
-        lastModified: product.updatedAt ? new Date(product.updatedAt) : now,
+        ...(product.updatedAt ? { lastModified: new Date(product.updatedAt) } : {}),
         changeFrequency: 'weekly' as const,
         priority: 0.8,
       })),
-      { url: `${SITE_URL}/blog`, lastModified: now, changeFrequency: 'weekly' as const, priority: 0.7 },
+      { url: `${SITE_URL}/blog`, ...(blogChanged ? { lastModified: blogChanged } : {}), changeFrequency: 'weekly' as const, priority: 0.7 },
       ...blogPosts.map((post) => ({
         url: `${SITE_URL}/blog/${post.slug}`,
-        lastModified: post.updatedAt ? new Date(post.updatedAt) : now,
+        ...(post.updatedAt ? { lastModified: new Date(post.updatedAt) } : {}),
         changeFrequency: 'monthly' as const,
         priority: 0.6,
       })),

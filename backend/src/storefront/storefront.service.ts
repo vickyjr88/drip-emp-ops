@@ -150,6 +150,9 @@ export class StorefrontService {
           : { name: product.category.name, slug: product.category.slug }
         : null,
       isFeatured: Boolean(product.isFeatured),
+      // When the listing last changed: the sitemap's lastmod, so search engines can tell a fresh page
+      // from an old one instead of seeing every URL as modified on every request.
+      updatedAt: product.updatedAt,
       variants,
       priceFrom: prices.length ? Math.min(...prices) : 0,
       priceTo: prices.length ? Math.max(...prices) : 0,

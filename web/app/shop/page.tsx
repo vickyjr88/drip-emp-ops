@@ -4,8 +4,16 @@ import { seoMetadata } from '../lib/page-metadata';
 import { fetchCategories, fetchFilters, fetchProducts, resolveShopCategory } from '../lib/shop';
 import { ShopClient } from './shop-client';
 
-export async function generateMetadata(): Promise<Metadata> {
-  return seoMetadata({
+// Any of these in the URL means a filtered or searched view of the same catalogue, not a page of its own.
+const VIEW_PARAMS = ['brand', 'size', 'search', 'sort', 'inStockOnly'];
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}): Promise<Metadata> {
+  const filtered = VIEW_PARAMS.some((key) => Boolean(first(searchParams[key])));
+  const metadata = await seoMetadata({
     key: 'properties',
     path: '/shop',
     title: 'Shop Sneakers & Streetwear',
@@ -13,6 +21,9 @@ export async function generateMetadata(): Promise<Metadata> {
       'Nike, Adidas, Jordan and Puma in EUR 36–46. Filter by size, brand and price. Ronald Ngala Street, Nairobi.',
     shareTitle: 'Shop Sneakers in Nairobi | Drip Emporium',
   });
+  // Kept out of the index (links still followed): the canonical already points at /shop, and a
+  // filtered grid is thin, duplicate content that should not compete with the pages it filters.
+  return filtered ? { ...metadata, robots: { index: false, follow: true } } : metadata;
 }
 
 // Rendered per request: a crawler or a shopper's first paint should see the

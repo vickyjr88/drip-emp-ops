@@ -54,6 +54,8 @@ export type ShopProduct = {
   parentCategory?: { name: string; slug: string } | null;
   /** Merchant-picked for the "Featured" rail, not the per-product hero image. */
   isFeatured?: boolean;
+  /** When the listing last changed (the sitemap's lastmod). */
+  updatedAt?: string;
   variants: ShopVariant[];
   priceFrom: number;
   priceTo: number;

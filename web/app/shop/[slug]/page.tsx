@@ -64,7 +64,12 @@ export default async function ProductPage({ params }: { params: { slug: string }
       <JsonLd
         data={{
           '@type': 'Product',
+          '@id': `${absoluteUrl(`/shop/${product.slug}`)}#product`,
+          url: absoluteUrl(`/shop/${product.slug}`),
           name: product.name,
+          // Every pair is sold new, and the first size's SKU identifies the model for shopping feeds.
+          ...(product.variants[0]?.sku ? { sku: product.variants[0].sku } : {}),
+          ...(product.category?.name ? { category: product.category.name } : {}),
           ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
           ...(product.imageUrls.length ? { image: product.imageUrls } : {}),
           ...(product.description ? { description: product.description } : {}),
@@ -78,6 +83,8 @@ export default async function ProductPage({ params }: { params: { slug: string }
               ? 'https://schema.org/InStock'
               : 'https://schema.org/OutOfStock',
             url: absoluteUrl(`/shop/${product.slug}`),
+            itemCondition: 'https://schema.org/NewCondition',
+            seller: { '@id': `${absoluteUrl('/')}#organization` },
           },
         }}
       />

@@ -25,6 +25,10 @@ export const SITE_DESCRIPTION =
   'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma in ' +
   'EUR 36-46, on Ronald Ngala Street.';
 
+/** The shop floor, as quoted in the footer, structured data and /llms.txt. */
+export const STORE_ADDRESS = 'Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD';
+export const STORE_HOURS = 'Every day, 08:00 to 20:00';
+
 /** Absolute URL for a site-relative path. */
 export function absoluteUrl(path = '/') {
   return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
