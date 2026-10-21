@@ -20,7 +20,7 @@ hours, contact details, prices and main brands, then links the categories, every
 `/llms-full.txt` adds every FAQ answer in full. Both are generated per request from the same sources as the pages
 (CMS `contact`/`header`/`footer`/`faq` documents, the live catalogue, the blog), so they cannot go stale, and are cached for an hour.
 
-- The phone number is the Contact page's; WhatsApp is the number the WhatsApp buttons use (`header` document, `enquiries.whatsapp`).
+- The phone number is the Contact page's; WhatsApp is the number the WhatsApp buttons use (`header` document, `enquiries.whatsapp`). When they are the same number it is printed once as "Phone and WhatsApp".
 - "Main brands" lists only brands with at least three products, so a stray value in the product `brand` field is not
   quoted as a brand the shop stocks.
 - The shop address and hours are constants in `web/app/lib/site.tsx` (`STORE_ADDRESS`, `STORE_HOURS`); change them there.
@@ -72,5 +72,6 @@ To undo either, delete its file and reload nginx.
 - **Google Business Profile:** claim "Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street". Its name, address,
   phone and hours must match the site exactly.
 - **Google Merchant Center:** upload `https://dripemporium.store/product-feed.xml` for free product listings.
-- **One set of contact details.** The Contact page and the WhatsApp buttons use different numbers from the footer; see the
-  CMS `contact`, `header` and `footer` documents and pick one set for phone and email everywhere.
+- **One set of contact details.** Phone and WhatsApp are +254 113 206 481 everywhere (CMS `contact`, `header`, `footer`, `terms`,
+  `privacy`). The email still differs: the Contact page and footer document say `support@dripemporium.store`, while the rendered
+  footer shows `info@dripemporium.store`. Pick one and use it in the CMS, Google Business Profile and socials.

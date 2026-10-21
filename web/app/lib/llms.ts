@@ -42,6 +42,7 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
   const phone = contentValue(contact, 'details.phone', contentValue(header, 'enquiries.phone', '+254 113 206 481'));
   const whatsappDigits = contentValue(header, 'enquiries.whatsapp', '254113206481').replace(/[^\d]/g, '');
   const email = contentValue(contact, 'details.email', 'info@dripemporium.store');
+  const samePhoneAndWhatsapp = phone.replace(/[^\d]/g, '').replace(/^0/, '254') === whatsappDigits;
 
   const prices = products.flatMap((p) => [p.priceFrom, p.priceTo]).filter((n) => Number.isFinite(n) && n > 0);
   // Brands with at least three products: a single odd value in the product data (a style name typed
@@ -62,8 +63,9 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
     '',
     `- Location: ${STORE_ADDRESS}`,
     `- Opening hours: ${STORE_HOURS}`,
-    `- Phone: ${phone}`,
-    whatsappDigits ? `- WhatsApp: +${whatsappDigits}` : null,
+    // One line when calls and WhatsApp go to the same number (as they do now), two when they differ.
+    samePhoneAndWhatsapp ? `- Phone and WhatsApp: ${phone}` : `- Phone: ${phone}`,
+    whatsappDigits && !samePhoneAndWhatsapp ? `- WhatsApp: +${whatsappDigits}` : null,
     `- Email: ${email}`,
     `- Delivery: countrywide across Kenya; the cost depends on the destination and is confirmed after you order. You can also collect from the shop.`,
     '- Currency: Kenyan shillings (KES)',
