@@ -72,6 +72,7 @@ To undo either, delete its file and reload nginx.
 - **Google Business Profile:** claim "Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street". Its name, address,
   phone and hours must match the site exactly.
 - **Google Merchant Center:** upload `https://dripemporium.store/product-feed.xml` for free product listings.
-- **One set of contact details.** Phone and WhatsApp are +254 113 206 481 everywhere (CMS `contact`, `header`, `footer`, `terms`,
-  `privacy`). The email still differs: the Contact page and footer document say `support@dripemporium.store`, while the rendered
-  footer shows `info@dripemporium.store`. Pick one and use it in the CMS, Google Business Profile and socials.
+- **One set of contact details.** Phone and WhatsApp are +254 113 206 481 and the public email is `hello@dripemporium.store`
+  everywhere (CMS `contact`, `header`, `footer`, `terms`, `privacy`, and the compiled-in defaults). Use the same details in Google
+  Business Profile and on the social profiles. The mail-sending and admin addresses (`no-reply@`, `noreply@`, `admin@`) are
+  operational and unrelated to what customers see; leave them as configured.

@@ -75,7 +75,7 @@ export default async function ContactPage() {
   const agentRole = contentValue(content, 'agent.role', 'Customer Care');
   const agentImage = contentValue(content, 'agent.image', '');
   const phone = contentValue(content, 'details.phone', '+254 113 206 481');
-  const email = contentValue(content, 'details.email', 'info@dripemporium.store');
+  const email = contentValue(content, 'details.email', 'hello@dripemporium.store');
   const officeName = contentValue(content, 'details.officeName', 'Drip Emporium HQ');
   const officeAddress = contentValue(content, 'details.officeAddress', 'Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi');
   const highlights = contentValue<Highlight[]>(content, 'highlights.items', [

@@ -362,7 +362,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
     contact: {
       heading: 'Contact Us',
-      email: 'info@dripemporium.store',
+      email: 'hello@dripemporium.store',
       phone: '+254 113 206 481',
       address: 'Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi',
     },
@@ -409,7 +409,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     },
     details: {
       phone: '+254 113 206 481',
-      email: 'info@dripemporium.store',
+      email: 'hello@dripemporium.store',
       officeName: 'Dubai Merchants Mall, Shop F53',
       officeAddress: 'Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi',
     },

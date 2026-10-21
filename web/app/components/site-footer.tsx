@@ -101,7 +101,7 @@ export function SiteFooter() {
   const serviceLinks = contentValue<FooterLink[]>(content, 'services.items', DEFAULT_SERVICE_LINKS);
 
   const contactHeading = contentValue(content, 'contact.heading', 'Contact Us');
-  const email = contentValue(content, 'contact.email', 'info@dripemporium.store');
+  const email = contentValue(content, 'contact.email', 'hello@dripemporium.store');
   const phone = contentValue(content, 'contact.phone', '+254 113 206 481');
   const address = contentValue(content, 'contact.address', 'Nairobi, Kenya');
 

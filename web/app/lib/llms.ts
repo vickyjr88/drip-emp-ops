@@ -41,7 +41,7 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
   // The same numbers the Contact page and the WhatsApp buttons show, read from the same CMS documents.
   const phone = contentValue(contact, 'details.phone', contentValue(header, 'enquiries.phone', '+254 113 206 481'));
   const whatsappDigits = contentValue(header, 'enquiries.whatsapp', '254113206481').replace(/[^\d]/g, '');
-  const email = contentValue(contact, 'details.email', 'info@dripemporium.store');
+  const email = contentValue(contact, 'details.email', 'hello@dripemporium.store');
   const samePhoneAndWhatsapp = phone.replace(/[^\d]/g, '').replace(/^0/, '254') === whatsappDigits;
 
   const prices = products.flatMap((p) => [p.priceFrom, p.priceTo]).filter((n) => Number.isFinite(n) && n > 0);
