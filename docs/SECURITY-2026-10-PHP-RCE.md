@@ -9,15 +9,14 @@ Audit date: 2026-10-23. Server: Ubuntu 24.04, kernel 6.8.0-147, Docker 29.5.3. N
 | 0. Close public ports | **Done.** `/usr/local/sbin/docker-user-firewall.sh` plus `docker-user-firewall.service` (enabled, runs after Docker at boot) drop new public connections to 20 published internal ports. Verified from outside: all closed; SSH, mail, 80/443 and 18185 open; every site answers. Still to do: bind those ports to 127.0.0.1 in each compose file and set a Redis password (realtors). |
 | 1. Mautic | **Done.** Staging, then production, on `mautic/mautic:7.2.1-20261021-apache`: PHP **8.3.36** in all four containers. Database and Redis untouched (`--no-deps`), pre-patch dump at `/root/mautic-backups/pre-php-patch-2026-10-23.sql.gz`, `.env.bak-2026-10-23` in both project folders. Verified: public login 200, clean logs, cron connected, 4,575 contacts intact. |
 | 2. Roundcube webmail | **Not done, needs a decision.** Still PHP 8.1.32 and publicly reachable at `/roundcube/`. |
-| 3. OS packages (66, incl. Docker) | **Not done.** Do it in a quiet window; restarts every container. |
+| 3. OS packages (66, incl. Docker) | **Done** (2026-10-23). 58 routine packages, then Docker 29.5.3 -> 29.9.2, containerd 2.2.4 -> 2.4.2, Compose 5.6.1, buildx 0.38.1. `live-restore` was enabled first (via `systemctl reload docker`, no restart) so **no container restarted**: all 36 kept their start times. `/etc/docker/daemon.json` now sets `live-restore` and `json-file` log limits (20 MB x 3, applied to containers created from now on). Left: `cloud-init` and `tmux` (Ubuntu-phased). Pre-upgrade package list: `/root/dpkg-before-2026-10-23.txt`; rollback: `apt-get install docker-ce=5:29.5.3-1~ubuntu.24.04~noble containerd.io=2.2.4-1~ubuntu.24.04~noble` (plus the matching `docker-ce-cli`). |
 | Clean-up | **Done**, see below. |
 
-Clean-up result: `/` went from **153 GB used (79%) to 77 GB used (40%)**, 117 GB free.
+Clean-up result: `/` went from **153 GB used (79%) to 30 GB used (16%)**, 163 GB free.
 Removed: unused images (Mautic 5, 5.2.11, 6.0.9 and the superseded 7.2.1, MySQL 8.0, `debug-builder`, `node:18-alpine`); 94 orphaned anonymous volumes
 (74 empty Postgres clusters and 20 empty stubs; `gari_me_minio_data` kept); Docker build cache older than 24 h (~61 GB); the journal (4.0 GB to 0.46 GB, now capped at 500 MB);
 the 5.7 GB `dripemporium.store.log` (rotated; archived to `/root/dripemporium.store.access.2026-10-23.log.gz`, 280 MB) with weekly rotation for every file in `/www/wwwlogs`
-(`/etc/logrotate.d/aapanel-sites`). Kept on purpose: the 6.8.0-124 kernel (fallback), 51 GB of build cache from the last 24 h (`docker builder prune -af` would free it
-at the cost of one slower deploy), the two exited one-off containers.
+(`/etc/logrotate.d/aapanel-sites`). The remaining 51 GB of build cache was then cleared too (`docker builder prune -af`; the next deploy of each app rebuilds from scratch, a few minutes slower once). Kept on purpose: the 6.8.0-124 kernel (fallback), the two exited one-off containers. Final state: **30 GB used of 193 GB (16%)**.
 
 Note: the DOCKER-USER rules survive a Docker restart but not a reboot; the unit above re-applies them at boot.
 
