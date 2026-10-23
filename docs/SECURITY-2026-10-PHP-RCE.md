@@ -2,6 +2,25 @@
 
 Audit date: 2026-10-23. Server: Ubuntu 24.04, kernel 6.8.0-147, Docker 29.5.3. Nothing in this document has been applied yet.
 
+## Status (updated 2026-10-23)
+
+| Step | Result |
+|---|---|
+| 0. Close public ports | **Done.** `/usr/local/sbin/docker-user-firewall.sh` plus `docker-user-firewall.service` (enabled, runs after Docker at boot) drop new public connections to 20 published internal ports. Verified from outside: all closed; SSH, mail, 80/443 and 18185 open; every site answers. Still to do: bind those ports to 127.0.0.1 in each compose file and set a Redis password (realtors). |
+| 1. Mautic | **Done.** Staging, then production, on `mautic/mautic:7.2.1-20261021-apache`: PHP **8.3.36** in all four containers. Database and Redis untouched (`--no-deps`), pre-patch dump at `/root/mautic-backups/pre-php-patch-2026-10-23.sql.gz`, `.env.bak-2026-10-23` in both project folders. Verified: public login 200, clean logs, cron connected, 4,575 contacts intact. |
+| 2. Roundcube webmail | **Not done, needs a decision.** Still PHP 8.1.32 and publicly reachable at `/roundcube/`. |
+| 3. OS packages (66, incl. Docker) | **Not done.** Do it in a quiet window; restarts every container. |
+| Clean-up | **Done**, see below. |
+
+Clean-up result: `/` went from **153 GB used (79%) to 77 GB used (40%)**, 117 GB free.
+Removed: unused images (Mautic 5, 5.2.11, 6.0.9 and the superseded 7.2.1, MySQL 8.0, `debug-builder`, `node:18-alpine`); 94 orphaned anonymous volumes
+(74 empty Postgres clusters and 20 empty stubs; `gari_me_minio_data` kept); Docker build cache older than 24 h (~61 GB); the journal (4.0 GB to 0.46 GB, now capped at 500 MB);
+the 5.7 GB `dripemporium.store.log` (rotated; archived to `/root/dripemporium.store.access.2026-10-23.log.gz`, 280 MB) with weekly rotation for every file in `/www/wwwlogs`
+(`/etc/logrotate.d/aapanel-sites`). Kept on purpose: the 6.8.0-124 kernel (fallback), 51 GB of build cache from the last 24 h (`docker builder prune -af` would free it
+at the cost of one slower deploy), the two exited one-off containers.
+
+Note: the DOCKER-USER rules survive a Docker restart but not a reboot; the unit above re-applies them at boot.
+
 ## The vulnerability
 
 Two critical flaws in PHP core (CVSS v4 9.2), fixed on 2026-10-21 in **PHP 8.5.12, 8.4.27, 8.3.36 and 8.2.35**. Both allow
@@ -60,7 +79,7 @@ done
 for p in 15432 16379 19000 9090 8080 3101; do nc -z -G 3 185.190.142.143 $p && echo "STILL OPEN $p" || echo "closed $p"; done
 ```
 
-These rules vanish when Docker restarts. Make them permanent by also setting each project's `ports:` to `127.0.0.1:PORT:PORT`
+The rules above are applied by a small script and a systemd unit (see Status); they survive Docker restarts. As a second layer, also set each project's `ports:` to `127.0.0.1:PORT:PORT`
 (realtors db/redis/minio, drip-emp-ops and shops-platform web/backend, gari-me minio) and set a Redis password for realtors.
 To undo the rules: `iptables -D DOCKER-USER ...` with the same arguments.
 
