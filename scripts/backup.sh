@@ -114,7 +114,9 @@ if [[ "${VERIFY}" == "true" ]]; then
     -e POSTGRES_DB=verify \
     postgres:16-alpine >/dev/null
 
-  verify_cleanup() { docker rm -f "${VERIFY_NAME}" >/dev/null 2>&1 || true; }
+  # -v: the postgres image declares its data directory a VOLUME, so without it every run leaves one anonymous ~51 MB
+  # volume behind (74 of them had piled up on the VPS, one per nightly backup).
+  verify_cleanup() { docker rm -f -v "${VERIFY_NAME}" >/dev/null 2>&1 || true; }
   trap 'verify_cleanup; cleanup' EXIT
 
   for _ in $(seq 1 30); do
