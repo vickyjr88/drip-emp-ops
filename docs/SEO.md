@@ -67,6 +67,14 @@ made previews fail intermittently.
 
 ## Server settings this depends on (aaPanel / nginx)
 
+**Status: both applied on 2026-10-31** (backup of the extension folders in `/root/nginx-backup-drip-20261031-000832`). Verified: missing pages
+(`/no-such-page`, `/shop/not-a-real-shoe`, `/blog/not-a-post`) now answer **404**, not 502; `www.dripemporium.store` answers **301** to the same path on
+`dripemporium.store` (path and query kept, http and https); real pages, `/llms.txt`, the brand/model pages and the IndexNow key file still answer 200; a real
+certificate challenge file on `www` is still served (200), so certificate renewal is unaffected. Two details: `www` is proxied by Cloudflare while the apex is not;
+and when the app answers 404 for a path on `www`, nginx's `error_page` internal redirect makes the redirect rule fire, so the visitor is sent to the apex, which
+returns the real 404. That is harmless and needs no action.
+
+
 Both are per-site extension files, included at server level, so they only affect the site they sit in. Back up the folder first
 (`cp -a /www/server/panel/vhost/nginx/extension/dripemporium.store /root/nginx-backup-drip-$(date +%F)`).
 
