@@ -16,6 +16,6 @@ go to **Blog**, read and edit a draft, then press **Publish** (list row or edito
 - **Prices** in the pricing post against `/shop` (they change as stock does).
 - **Facts about the shop** (address, hours, "try on and pay only if they fit", "unworn shoes in the original box are easiest to exchange", delivery cost confirmed after
   ordering): all taken from the site's own FAQ, Delivery and Contact pages. Change the posts if any of those change.
-- **Publish order:** post 1 and post 3 link to post 2 (and post 2 links to the Ronald Ngala post's topic); publish all four close together, or the links to unpublished posts will 404.
+- **Publish order:** the Ronald Ngala post links to the "buy sneakers online safely" post, so publish that one first or together with it, otherwise the link 404s. The other posts only link to articles that are already live.
 - **Cover images:** none set (the existing posts have none either). Without one, shared links use the brand banner.
 - After publishing, run `scripts/indexnow.sh` so Bing (and ChatGPT search) learn about them quickly, and submit the new URLs in Google Search Console.
