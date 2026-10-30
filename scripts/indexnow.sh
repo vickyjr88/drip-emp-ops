@@ -27,5 +27,15 @@ print(json.dumps({"host": site.split("//", 1)[1], "key": key, "keyLocation": f"{
 ' "${SITE}" "${KEY}")"
 
 echo "Submitting $(echo "${PAYLOAD}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["urlList"]))') URLs to IndexNow"
-curl -sS -o /dev/null -w "IndexNow responded HTTP %{http_code} (200 or 202 = accepted)\n" \
-  -X POST "https://api.indexnow.org/indexnow" -H "Content-Type: application/json; charset=utf-8" -d "${PAYLOAD}"
+# A brand-new key is validated lazily: IndexNow fetches the key file itself, and the first submission can come back 403
+# ("key not valid") if that check has not completed yet. Wait and retry before treating it as a real failure.
+for attempt in 1 2 3; do
+  CODE="$(curl -sS -o /dev/null -w "%{http_code}" -X POST "https://api.indexnow.org/indexnow" \
+    -H "Content-Type: application/json; charset=utf-8" -d "${PAYLOAD}")"
+  echo "IndexNow responded HTTP ${CODE} (200 or 202 = accepted)"
+  [[ "${CODE}" == "200" || "${CODE}" == "202" ]] && exit 0
+  [[ "${CODE}" == "403" && "${attempt}" -lt 3 ]] || break
+  echo "403 usually means the new key has not been validated yet; retrying in 30 seconds (attempt ${attempt} of 3)"
+  sleep 30
+done
+exit 1
