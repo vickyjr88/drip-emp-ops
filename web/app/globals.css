@@ -12815,3 +12815,34 @@ img {
   color: inherit;
   text-decoration: underline;
 }
+
+/* --- brand and model pages ---------------------------------------------- */
+.de-collection-faq h2,
+.de-collection-links h2 {
+  font-family: 'Libre Caslon Text', serif;
+  font-size: 1.35rem;
+  color: var(--de-ink);
+  margin: 0 0 14px;
+}
+
+.de-collection-faq h3 {
+  font-size: 1rem;
+  color: var(--de-ink);
+  margin: 22px 0 4px;
+}
+
+.de-collection-faq h3 + p {
+  margin: 0;
+}
+
+.de-collection-links p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.de-collection-links a {
+  color: var(--de-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

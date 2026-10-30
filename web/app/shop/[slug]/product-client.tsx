@@ -27,6 +27,7 @@ import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
 import { useCustomerAuth } from '../../lib/customer-auth';
 import { absoluteUrl } from '../../lib/site';
+import { slugify } from '../../lib/collections';
 import { withReferral } from '../../lib/referral';
 import { useCaptureReferral } from '../../lib/use-capture-referral';
 import { trackAddToCart as trackMetaAddToCart, trackViewContent as trackMetaViewContent } from '../../lib/meta-pixel';
@@ -216,7 +217,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
           <div className="de-product-info">
             <div className="de-product-title-row">
               <div className="de-product-title-row-left">
-                {product.brand ? <p className="de-product-brand">{product.brand}</p> : null}
+                {product.brand ? <p className="de-product-brand"><Link href={`/shop/brand/${slugify(product.brand)}`}>{product.brand}</Link></p> : null}
                 {product.isFeatured ? <span className="de-product-featured-flag">Featured</span> : null}
               </div>
               <div className="de-product-title-row-actions">

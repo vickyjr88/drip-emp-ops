@@ -1,5 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { SITE_URL } from './lib/site';
+import { buildCollections, collectionPath, isIndexable } from './lib/collections';
+import type { ShopProduct } from './lib/shop';
 
 /**
  * Sitemap, including every active product and category.
@@ -61,6 +63,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const catalogueChanged = latest(products.map((p) => p.updatedAt));
     const blogChanged = latest(blogPosts.map((p) => p.updatedAt));
+    // Brand and model landing pages (only those big enough to be worth indexing).
+    const collections = buildCollections(products as unknown as ShopProduct[]).filter(isIndexable);
     const dated = staticRoutes.map((route) =>
       route.url === `${SITE_URL}/` || route.url === `${SITE_URL}/shop`
         ? { ...route, ...(catalogueChanged ? { lastModified: catalogueChanged } : {}) }
@@ -71,6 +75,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...dated,
       ...categories.map((category) => ({
         url: `${SITE_URL}/shop/category/${category.slug}`,
+        ...(catalogueChanged ? { lastModified: catalogueChanged } : {}),
+        changeFrequency: 'weekly' as const,
+        priority: 0.7,
+      })),
+      ...collections.map((collection) => ({
+        url: `${SITE_URL}${collectionPath(collection)}`,
         ...(catalogueChanged ? { lastModified: catalogueChanged } : {}),
         changeFrequency: 'weekly' as const,
         priority: 0.7,

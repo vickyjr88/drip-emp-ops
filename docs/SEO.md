@@ -26,6 +26,27 @@ hours, contact details, prices and main brands, then links the categories, every
 - The shop address and hours are constants in `web/app/lib/site.tsx` (`STORE_ADDRESS`, `STORE_HOURS`); change them there.
 - Treat it as a cheap extra, not a ranking lever: no major AI provider has said it reads `llms.txt` when choosing what to cite.
 
+## Brand and model landing pages
+
+`/shop/brand/<brand>` ("Nike Sneakers in Nairobi, Kenya") and `/shop/collection/<model>` ("Nike Air Force 1 Price in Kenya") target
+the searches people actually type: a brand or model plus "price in Kenya" / "Nairobi". They are built from the live catalogue
+(`web/app/lib/collections.ts`), so the price range, sizes and "n of m on the shelf" in the opening paragraph and FAQ are always current.
+Each page has a direct answer first, the product grid, a visible FAQ marked up as `FAQPage` (the markup repeats exactly what is shown),
+`CollectionPage` + `BreadcrumbList`, and links to related brands, models and categories. They are in the sitemap and `/llms.txt`, linked
+from the footer and from each product's brand name.
+
+- A brand page is indexed from 3 products, a model page from 2; smaller ones exist but are `noindex, follow`.
+- **Adding a model page:** add an entry to `SERIES` in `lib/collections.ts` (a slug, a display name, a regex matched against product names,
+  and one factual sentence: only a safe fact such as the year it first appeared).
+- **Luxury names are excluded** (`NO_BRAND_PAGE`: Rolex, Hublot, Patek Philippe, Seiko, Versace, Dior, ...). Some catalogue items are described as
+  "styled after" such a brand; a page titled "Rolex watches in Nairobi" with a price of a few thousand shillings would mislead searchers.
+
+## IndexNow (Bing and AI search)
+
+`scripts/indexnow.sh` posts every sitemap URL to IndexNow (Bing, Yandex, Seznam, Naver). Bing's index also feeds ChatGPT search and Copilot,
+so fresh pages there help AI visibility. The key file lives in `web/public/<key>.txt`. Run it after a deploy that adds pages, or weekly from cron
+(see the script header). Google does not use IndexNow: submit the sitemap in Search Console.
+
 ## Link previews (WhatsApp, Facebook, X, LinkedIn)
 
 `og:image` never points at the raw upload any more. Every page's share image is `/og/share.jpg?src=<picture>`

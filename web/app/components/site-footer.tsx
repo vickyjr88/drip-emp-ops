@@ -16,6 +16,16 @@ type FooterLink = { label: string; href: string };
  * does not shift beyond the text itself.
  */
 
+/** Brand and model landing pages worth a link from every page (see lib/collections.ts). */
+const POPULAR_LINKS = [
+  { label: 'Nike', href: '/shop/brand/nike' },
+  { label: 'Adidas', href: '/shop/brand/adidas' },
+  { label: 'New Balance', href: '/shop/brand/new-balance' },
+  { label: 'Air Force 1', href: '/shop/collection/air-force-1' },
+  { label: 'Air Max', href: '/shop/collection/air-max' },
+  { label: 'Jordan 4', href: '/shop/collection/jordan-4' },
+];
+
 const DEFAULT_QUICK_LINKS: FooterLink[] = [
   { label: 'Home', href: '/' },
   { label: 'Shop All', href: '/shop' },
@@ -171,6 +181,12 @@ export function SiteFooter() {
             <h4>{servicesHeading}</h4>
             {serviceLinks.map((link, index) => (
               <Link key={`${link.href}-${index}`} href={link.href || '/shop'}>
+                {link.label}
+              </Link>
+            ))}
+            {/* Brand and model pages: a sitewide route in for the searches people actually type. */}
+            {POPULAR_LINKS.map((link) => (
+              <Link key={link.href} href={link.href}>
                 {link.label}
               </Link>
             ))}

@@ -10,6 +10,7 @@
 import { contentValue, fetchPageContent } from './page-content';
 import { fetchBlogPosts } from './blog';
 import { fetchCategories, fetchProducts } from './shop';
+import { buildCollections, collectionFacts, collectionHeading, collectionPath, isIndexable } from './collections';
 import { fetchFaqs } from '../components/faq-page';
 import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME, STORE_ADDRESS, STORE_HOURS } from './site';
 
@@ -82,6 +83,17 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
     '',
   ];
   const lines: string[] = head.filter((line): line is string => line !== null);
+
+  // Brand and model pages: the pages that answer "X price in Kenya" directly, with live prices.
+  const collections = buildCollections(products).filter(isIndexable);
+  if (collections.length) {
+    lines.push('## Brands and models', '');
+    for (const collection of collections) {
+      const facts = collectionFacts(collection);
+      lines.push(`- [${collectionHeading(collection)}](${absoluteUrl(collectionPath(collection))}): ${facts.count} styles${facts.minPrice ? ` from KSh ${Math.round(facts.minPrice).toLocaleString('en-KE')}` : ''}`);
+    }
+    lines.push('');
+  }
 
   const posts = blog.items ?? [];
   if (posts.length) {
