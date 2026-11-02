@@ -123,3 +123,15 @@ To undo either, delete its file and reload nginx.
   everywhere (CMS `contact`, `header`, `footer`, `terms`, `privacy`, and the compiled-in defaults). Use the same details in Google
   Business Profile and on the social profiles. The mail-sending and admin addresses (`no-reply@`, `noreply@`, `admin@`) are
   operational and unrelated to what customers see; leave them as configured.
+
+## Google reviews and the WhatsApp group
+
+A strip at the top of every page footer asks customers to rate the shop on Google (with the rating as it stands) and to join the WhatsApp
+group. Both addresses, the rating and the review count are editable in the portal under **Site content > Footer > Google reviews and
+WhatsApp group** (`footer` document, `community.*`); each button is hidden while its address is blank, and the rating line while the rating or
+the count is blank.
+
+- The rating is typed in by hand: Google has no free feed of it without a Places API key. Update it when the profile's rating changes.
+- No `AggregateRating` markup is added on purpose: Google does not show review stars for a business's reviews of itself.
+- For the link, a direct "write a review" link works best (Google Business Profile > Get more reviews). The `share.google` profile link opens the
+  business panel, where "Write a review" is one tap away.

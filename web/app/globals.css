@@ -12846,3 +12846,72 @@ img {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* --- Footer: rate us on Google / join the WhatsApp group --------------- */
+.lp-footer-community {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 56px;
+  padding-bottom: 34px;
+  margin-bottom: 34px;
+  border-bottom: 1px solid #474949;
+}
+
+.lp-footer-community-item {
+  flex: 1 1 280px;
+}
+
+.lp-footer-community-item h4 {
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.lp-footer-rating {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lp-footer-rating strong {
+  color: #fff;
+  margin-left: -2px;
+}
+
+.lp-footer-stars {
+  color: #fbbc05;
+  letter-spacing: 2px;
+}
+
+/* The footer styles every link as a block of text; these are buttons. */
+.lp-footer a.lp-footer-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 20px;
+  margin: 6px 0 0;
+  border: 1px solid #d8d8d8;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.lp-footer a.lp-footer-cta:hover,
+.lp-footer a.lp-footer-cta:focus-visible {
+  background: #fff;
+  color: #1a1c1c;
+}
+
+.lp-footer a.lp-footer-cta.is-whatsapp {
+  border-color: #25d366;
+}
+
+.lp-footer a.lp-footer-cta.is-whatsapp:hover,
+.lp-footer a.lp-footer-cta.is-whatsapp:focus-visible {
+  background: #25d366;
+  color: #0b2e18;
+}

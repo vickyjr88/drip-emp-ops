@@ -376,6 +376,20 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       tiktok: '',
       linkedin: '',
     },
+    // Two asks of customers, shown as a strip at the top of the footer. Each button is hidden
+    // while its address is blank. The rating is typed in by hand (Google offers no free feed of it
+    // without an API key), so update it when the profile's rating changes; blank either field to
+    // hide the rating line and keep the buttons.
+    community: {
+      googleHeading: 'Bought from us? Tell others how it went',
+      googleProfileUrl: 'https://share.google/2l2oBRzoms7F5Cv5N',
+      googleRating: '5.0',
+      googleReviewCount: '3',
+      googleButtonLabel: 'Rate us on Google',
+      whatsappHeading: 'Get new arrivals first',
+      whatsappGroupUrl: 'https://chat.whatsapp.com/EUnVMV4LAEl1DS19vtbzPG?s=cl&p=i&mlu=4&ilr=4&iam=2',
+      whatsappButtonLabel: 'Join our WhatsApp group',
+    },
     bottom: {
       copyright: '© 2026 Drip Emporium. All Rights Reserved.',
       links: [

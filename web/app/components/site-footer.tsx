@@ -84,6 +84,63 @@ const SOCIAL_ICONS: Record<string, JSX.Element> = {
   ),
 };
 
+/** Only web addresses are ever linked: a mistyped or hostile value in the CMS must not become a javascript: link. */
+const safeHref = (value: string) => (/^https:\/\//i.test(value.trim()) ? value.trim() : '');
+
+const GoogleG = (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.45a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81Z" />
+    <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.88-3a7.2 7.2 0 0 1-10.7-3.78H1.34v3.09A12 12 0 0 0 12 24Z" />
+    <path fill="#FBBC05" d="M5.36 14.31a7.2 7.2 0 0 1 0-4.62V6.6H1.34a12 12 0 0 0 0 10.8l4.02-3.09Z" />
+    <path fill="#EA4335" d="M12 4.75c1.76 0 3.34.61 4.59 1.8l3.44-3.44A11.5 11.5 0 0 0 12 0 12 12 0 0 0 1.34 6.6l4.02 3.09A7.15 7.15 0 0 1 12 4.75Z" />
+  </svg>
+);
+
+/**
+ * Two asks of customers, set from the CMS "footer" document: rate the shop on Google (with the rating
+ * as it stands) and join the WhatsApp group. Each half is hidden while its address is blank.
+ */
+function CommunityStrip({ content }: { content: PageContentDocument | null }) {
+  const googleUrl = safeHref(contentValue(content, 'community.googleProfileUrl', ''));
+  const whatsappUrl = safeHref(contentValue(content, 'community.whatsappGroupUrl', ''));
+  if (!googleUrl && !whatsappUrl) return null;
+
+  const rating = Number.parseFloat(contentValue(content, 'community.googleRating', ''));
+  const count = Number.parseInt(contentValue(content, 'community.googleReviewCount', ''), 10);
+  const showRating = Number.isFinite(rating) && rating > 0 && rating <= 5 && Number.isFinite(count) && count > 0;
+  const filled = Math.round(rating);
+
+  return (
+    <div className="lp-footer-community">
+      {googleUrl ? (
+        <div className="lp-footer-community-item">
+          <h4>{contentValue(content, 'community.googleHeading', 'Bought from us? Tell others how it went')}</h4>
+          {showRating ? (
+            <p className="lp-footer-rating" aria-label={`Rated ${rating.toFixed(1)} out of 5 from ${count} Google review${count === 1 ? '' : 's'}`}>
+              <span className="lp-footer-stars" aria-hidden="true">{'★'.repeat(filled)}{'☆'.repeat(5 - filled)}</span>
+              <strong>{rating.toFixed(1)}</strong> from {count} Google review{count === 1 ? '' : 's'}
+            </p>
+          ) : null}
+          <a className="lp-footer-cta" href={googleUrl} target="_blank" rel="noreferrer">
+            {GoogleG} {contentValue(content, 'community.googleButtonLabel', 'Rate us on Google')}
+          </a>
+        </div>
+      ) : null}
+      {whatsappUrl ? (
+        <div className="lp-footer-community-item">
+          <h4>{contentValue(content, 'community.whatsappHeading', 'Get new arrivals first')}</h4>
+          <a className="lp-footer-cta is-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+              <path d="M12.04 2a9.9 9.9 0 0 0-8.5 14.95L2 22l5.2-1.5A9.9 9.9 0 1 0 12.04 2Zm5.8 14.1c-.25.7-1.45 1.33-2 1.4-.5.07-1.13.1-1.82-.12a16.6 16.6 0 0 1-1.65-.6c-2.9-1.25-4.8-4.15-4.95-4.35-.15-.2-1.18-1.57-1.18-3 0-1.43.75-2.13 1.02-2.42.27-.3.58-.37.78-.37h.55c.18 0 .42-.07.65.5.25.58.83 2.02.9 2.17.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.32.38-.45.52-.15.15-.3.3-.13.6.17.3.77 1.27 1.65 2.05 1.13 1 2.08 1.3 2.38 1.45.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.27.1 1.7.8 2 .95.3.15.5.22.57.35.07.12.07.72-.18 1.4Z" />
+            </svg>{' '}
+            {contentValue(content, 'community.whatsappButtonLabel', 'Join our WhatsApp group')}
+          </a>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SiteFooter() {
   const [content, setContent] = useState<PageContentDocument | null>(null);
 
@@ -142,6 +199,7 @@ export function SiteFooter() {
   return (
     <footer className="lp-footer">
       <div className="lp-container">
+        <CommunityStrip content={content} />
         <div className="lp-footer-grid">
           <section className="lp-footer-brand">
             <h3>{brandHeading}</h3>

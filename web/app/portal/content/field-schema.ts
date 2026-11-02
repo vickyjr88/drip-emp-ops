@@ -624,6 +624,32 @@ export const PAGE_SCHEMAS: PageSchema[] = [
         },
       },
       {
+        key: 'footer-community',
+        title: 'Google reviews and WhatsApp group',
+        description:
+          'A strip at the top of every page footer asking customers to rate the shop on Google and to join the WhatsApp group. Each button is hidden while its address is blank. For the Google link, a direct "write a review" link works best: in Google Business Profile, open "Get more reviews" and paste the short link here.',
+        fields: [
+          { path: 'community.googleHeading', label: 'Google heading', type: 'text' },
+          { path: 'community.googleProfileUrl', label: 'Google profile / review link', type: 'text' },
+          {
+            path: 'community.googleRating',
+            label: 'Google rating shown (e.g. 4.8)',
+            type: 'text',
+            help: 'Copy it from the Google profile and update it when it changes. Leave blank to hide the rating line.',
+          },
+          {
+            path: 'community.googleReviewCount',
+            label: 'Number of Google reviews shown',
+            type: 'text',
+            help: 'Copy it from the Google profile. Leave blank to hide the rating line.',
+          },
+          { path: 'community.googleButtonLabel', label: 'Google button label', type: 'text' },
+          { path: 'community.whatsappHeading', label: 'WhatsApp heading', type: 'text' },
+          { path: 'community.whatsappGroupUrl', label: 'WhatsApp group invite link', type: 'text' },
+          { path: 'community.whatsappButtonLabel', label: 'WhatsApp button label', type: 'text' },
+        ],
+      },
+      {
         key: 'footer-social',
         title: 'Social profiles',
         description:
