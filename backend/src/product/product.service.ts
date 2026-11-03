@@ -6,6 +6,7 @@ import { UpdateProductDto, UpdateVariantDto } from './dto/update-product.dto';
 import { DuplicateProductDto } from './dto/duplicate-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { paginate } from '../common/pagination.util';
+import { CatalogueSyncService } from '../catalogue-sync/catalogue-sync.service';
 
 const INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -19,7 +20,10 @@ function toNullableDecimal(value: number | null | undefined) {
 
 @Injectable()
 export class ProductService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalogueSync: CatalogueSyncService,
+  ) {}
 
   /** Lower-case, hyphenated, no punctuation — safe in a URL. */
   private slugify(value: string) {
@@ -64,7 +68,7 @@ export class ProductService {
 
   async create(dto: CreateProductDto) {
     const { variants, slug, imageUrls, featuredImageUrl, ...rest } = dto;
-    return this.prisma.product.create({
+    const created = await this.prisma.product.create({
       data: {
         ...rest,
         slug: await this.uniqueSlug(slug || dto.name),
@@ -78,6 +82,8 @@ export class ProductService {
       },
       include: INCLUDE,
     });
+    this.catalogueSync.notify();
+    return created;
   }
 
   /**
@@ -196,7 +202,7 @@ export class ProductService {
     const wanted = featuredImageUrl ?? current.featuredImageUrl ?? undefined;
     const resolvedFeatured =
       wanted && gallery.includes(wanted) ? wanted : gallery[0] ?? null;
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: {
         ...rest,
@@ -210,6 +216,8 @@ export class ProductService {
       },
       include: INCLUDE,
     });
+    this.catalogueSync.notify();
+    return updated;
   }
 
   /**
@@ -284,7 +292,7 @@ export class ProductService {
       );
     }
 
-    return this.prisma.product.create({
+    const copy = await this.prisma.product.create({
       data: {
         sku: dto.sku,
         name: dto.name,
@@ -301,22 +309,26 @@ export class ProductService {
       },
       include: INCLUDE,
     });
+    this.catalogueSync.notify();
+    return copy;
   }
 
   // --- variants ------------------------------------------------------------
 
   async addVariant(productId: string, dto: CreateVariantDto) {
     await this.findOne(productId);
-    return this.prisma.productVariant.create({
+    const variant = await this.prisma.productVariant.create({
       data: { productId, ...this.variantData(dto) },
     });
+    this.catalogueSync.notify();
+    return variant;
   }
 
   async updateVariant(variantId: string, dto: UpdateVariantDto) {
     const variant = await this.prisma.productVariant.findUnique({ where: { id: variantId } });
     if (!variant) throw new NotFoundException(`Variant ${variantId} not found`);
 
-    return this.prisma.productVariant.update({
+    const updated = await this.prisma.productVariant.update({
       where: { id: variantId },
       data: {
         ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
@@ -340,6 +352,8 @@ export class ProductService {
         ...(dto.isDropShip !== undefined ? { isDropShip: dto.isDropShip } : {}),
       },
     });
+    this.catalogueSync.notify();
+    return updated;
   }
 
   async removeVariant(variantId: string) {

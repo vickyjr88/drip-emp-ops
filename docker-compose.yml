@@ -68,6 +68,10 @@ x-backend-environment: &backend-environment
   CART_REMINDERS_ENABLED: ${CART_REMINDERS_ENABLED:-true}
   CART_REMINDER_DELAY_HOURS: ${CART_REMINDER_DELAY_HOURS:-24}
   OWNER_EMAIL: ${OWNER_EMAIL:-}
+  # Tells the Nairobi Gents storefront (shops-platform) when this catalogue changes; see docs/CATALOGUE-SYNC.md.
+  # Off until both are set.
+  CATALOGUE_SYNC_URL: ${CATALOGUE_SYNC_URL:-}
+  CATALOGUE_SYNC_SECRET: ${CATALOGUE_SYNC_SECRET:-}
   X_PIXEL_ID: ${X_PIXEL_ID:-}
   X_PIXEL_TOKEN: ${X_PIXEL_TOKEN:-}
   TIKTOK_PIXEL_ID: ${TIKTOK_PIXEL_ID:-}

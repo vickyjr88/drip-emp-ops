@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogueSyncService } from '../catalogue-sync/catalogue-sync.service';
 import { ImportDefinition, ImportField, IMPORT_DEFINITIONS, findDefinition } from './import-definitions';
 
 export type ImportRow = { rowNumber: number; [field: string]: unknown };
@@ -22,7 +23,10 @@ export type RowResult = {
  */
 @Injectable()
 export class DataImportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalogueSync: CatalogueSyncService,
+  ) {}
 
   definitions() {
     return IMPORT_DEFINITIONS.map((definition) => ({
@@ -406,6 +410,7 @@ export class DataImportService {
       },
       { timeout: 120_000, maxWait: 20_000 },
     );
+    if (created.length > 0) this.catalogueSync.notify();
 
     return {
       key: 'products',
