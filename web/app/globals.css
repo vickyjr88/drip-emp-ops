@@ -13232,11 +13232,22 @@ img {
   pointer-events: none;
 }
 
+/* Darkens the picture outside the crop box. Clipped to the picture, so it cannot reach the rest of the dialog. */
+.portal-crop-dim {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.portal-crop-dim-hole {
+  position: absolute;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+}
+
 .portal-crop-box {
   position: absolute;
   border: 2px solid #fff;
-  /* Darkens everything outside the box without a second image. */
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
   cursor: move;
   touch-action: none;
   background-image:

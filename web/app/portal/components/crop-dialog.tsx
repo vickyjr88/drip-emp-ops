@@ -244,6 +244,12 @@ export function CropDialog({
           <div className="portal-crop-stage">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img ref={imgRef} src={freshUrl(image)} alt="" draggable={false} onLoad={measure} className="portal-crop-image" />
+            {/* The dimming outside the box lives in its own clipped layer: left on the box itself it spilled over the whole dialog. */}
+            {box ? (
+              <div className="portal-crop-dim" aria-hidden="true">
+                <div className="portal-crop-dim-hole" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />
+              </div>
+            ) : null}
             {box ? (
               <div
                 className="portal-crop-box"
