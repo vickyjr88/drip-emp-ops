@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsOptional, IsString } from 'class-validator';
 import { PagedQueryDto } from '../../common/dto/paged-query.dto';
 import { OUTREACH_KINDS, type OutreachKind } from '../whatsapp-outreach.kinds';
 
@@ -37,4 +37,15 @@ export class OutreachUnsentQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+}
+
+/** What a Mautic campaign's "Send a webhook" step posts: which message, and which contact (by email). */
+export class OutreachHookDto {
+  @ApiProperty({ enum: OUTREACH_KINDS })
+  @IsIn(OUTREACH_KINDS)
+  kind!: OutreachKind;
+
+  @ApiProperty()
+  @IsEmail()
+  email!: string;
 }

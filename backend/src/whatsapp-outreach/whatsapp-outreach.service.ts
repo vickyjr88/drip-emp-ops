@@ -187,6 +187,22 @@ export class WhatsAppOutreachService {
     return { sent: count('SENT'), failed: count('FAILED'), skipped: count('SKIPPED'), results };
   }
 
+  /**
+   * One message for one Mautic contact, found by email. Only people with a customer record are messaged: the welcome
+   * campaign also holds cart leads and inquirers who never signed up, and they are not part of this sequence.
+   */
+  async sendForContact(params: { kind: OutreachKind; email: string }): Promise<OutreachResult> {
+    const customer = await this.prisma.customer.findFirst({
+      where: { email: { equals: params.email.trim(), mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (!customer) {
+      return { customerId: '', name: params.email, phone: null, outcome: 'SKIPPED', detail: 'Not a customer' };
+    }
+    const out = await this.send({ kind: params.kind, customerIds: [customer.id], triggeredBy: 'mautic' });
+    return out.results[0];
+  }
+
   history(query: { skip?: number; take?: number }) {
     return paginate(
       (args) =>

@@ -16,6 +16,8 @@ export class MauticService {
   private readonly clientId = process.env.MAUTIC_CLIENT_ID || '';
   private readonly clientSecret = process.env.MAUTIC_CLIENT_SECRET || '';
   private readonly campaignId = process.env.MAUTIC_CAMPAIGN_ID || '';
+  /** The WhatsApp onboarding campaign. Unset means signups are not enrolled in it. */
+  private readonly whatsappCampaignId = process.env.MAUTIC_WHATSAPP_CAMPAIGN_ID || '';
   private readonly tag = 'dripemporium-store';
 
   private token: { value: string; expiresAt: number } | null = null;
@@ -80,7 +82,7 @@ export class MauticService {
    * person is a known contact, on the campaign" regardless of which path
    * got them there.
    */
-  private async syncContact(params: { email: string; firstName?: string; lastName?: string; phone?: string }) {
+  private async syncContact(params: { email: string; firstName?: string; lastName?: string; phone?: string; whatsappOnboarding?: boolean }) {
     if (!this.configured) return;
     const email = params.email.trim().toLowerCase();
     if (!email) return;
@@ -99,13 +101,20 @@ export class MauticService {
     if (!response) return;
     const body = (await response.json().catch(() => null)) as { contact?: { id?: number } } | null;
     const contactId = body?.contact?.id;
-    if (!contactId || !this.campaignId) return;
+    if (!contactId) return;
 
-    await this.request(`/api/campaigns/${this.campaignId}/contact/${contactId}/add`, { method: 'POST' });
+    if (this.campaignId) {
+      await this.request(`/api/campaigns/${this.campaignId}/contact/${contactId}/add`, { method: 'POST' });
+    }
+    // Only a brand-new signup starts the WhatsApp sequence (app, group, rating). Orders, cart leads and inquiries go
+    // through here too, and an existing customer must not be started on it again.
+    if (params.whatsappOnboarding && this.whatsappCampaignId) {
+      await this.request(`/api/campaigns/${this.whatsappCampaignId}/contact/${contactId}/add`, { method: 'POST' });
+    }
   }
 
   async syncSignup(params: { email: string; firstName?: string; lastName?: string; phone?: string }) {
-    void this.syncContact(params);
+    void this.syncContact({ ...params, whatsappOnboarding: true });
   }
 
   async syncOrder(params: { email?: string | null; firstName?: string; lastName?: string; phone?: string | null }) {

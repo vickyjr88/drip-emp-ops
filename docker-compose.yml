@@ -92,6 +92,8 @@ x-backend-environment: &backend-environment
   MAUTIC_CLIENT_ID: ${MAUTIC_CLIENT_ID:-}
   MAUTIC_CLIENT_SECRET: ${MAUTIC_CLIENT_SECRET:-}
   MAUTIC_CAMPAIGN_ID: ${MAUTIC_CAMPAIGN_ID:-}
+  MAUTIC_WHATSAPP_CAMPAIGN_ID: ${MAUTIC_WHATSAPP_CAMPAIGN_ID:-}
+  OUTREACH_HOOK_SECRET: ${OUTREACH_HOOK_SECRET:-}
 
 x-backend-healthcheck: &backend-healthcheck
   test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/health || exit 1"]

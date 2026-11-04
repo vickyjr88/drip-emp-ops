@@ -43,3 +43,41 @@ A message whose link is blank cannot be sent; the screen says so.
 
 Uses the same `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_ACCESS_TOKEN` as the daily report. Apply the migration
 `20261104120000_add_whatsapp_outreach` when deploying.
+
+## Automatic sequence for new signups (Mautic)
+
+Mautic campaign **8, "Drip Emporium Store - WhatsApp onboarding"** sends the same three messages to new signups on a timeline:
+
+| Step | When | Message |
+|---|---|---|
+| 1 | straight away | Download the app (`APP`) |
+| 2 | 2 days after step 1 | Join the WhatsApp group (`GROUP`) |
+| 3 | 3 days after step 2 | Rate us on Google (`REVIEW`) |
+
+Each step is a Mautic "Send a webhook" action that posts `{kind, email}` to `https://api.dripemporium.store/whatsapp-outreach/hook`
+with the shared secret in the `X-Outreach-Secret` header. The backend finds the customer by email and sends through the same code
+as the portal screen, so the once-per-person rule and the log apply here too.
+
+- **Only new signups.** The campaign's source segment is an empty one ("enrolled by the app"). `MauticService.syncSignup` adds a
+  new customer to the campaign when `MAUTIC_WHATSAPP_CAMPAIGN_ID` is set. Orders, cart leads and inquiries never enrol anyone, and
+  the 128 customers from before go through the portal screen instead.
+- **Only customers.** A contact with no customer record is skipped ("Not a customer").
+- **Responses.** Sent or deliberately skipped: `200`. A failed send: `502`, so Mautic marks the step failed and retries it later;
+  that also covers a template still in review. A wrong or missing secret: `401`. With `OUTREACH_HOOK_SECRET` unset the endpoint is off (`503`).
+- **Shared secret.** `OUTREACH_HOOK_SECRET` in the server `.env` must equal the `X-Outreach-Secret` header value stored in the three
+  campaign steps. To rotate it, change it in both places (edit each step in the campaign builder).
+
+### Going live
+
+1. The three templates are **Approved** and the group and review links are set in Site content > Footer.
+2. The backend with the hook is deployed (it reads `OUTREACH_HOOK_SECRET`, already in the server `.env`).
+3. Set `MAUTIC_WHATSAPP_CAMPAIGN_ID=8` in the server `.env` and restart the backend. New signups are then enrolled.
+
+To stop it, blank `MAUTIC_WHATSAPP_CAMPAIGN_ID` (no new enrolments) or unpublish the campaign in Mautic (pauses everyone in it).
+
+### Mautic API caveats found while building it
+
+- The campaigns API does not save the source segment (`lists`) on this Mautic version. It was linked with one row in
+  `campaign_leadlist_xref` (campaign 8, segment 7). Campaign 6 is linked the same way.
+- A campaign's canvas must connect the `lists` node to the first step, or every later API edit is refused as "orphaned events".
+- The Mautic API sits behind a firewall that refuses Python's default user agent; send a normal `User-Agent`.

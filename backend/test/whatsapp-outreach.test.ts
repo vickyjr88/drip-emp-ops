@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DEFAULT_APP_URL, greetingName, safeUrl, templateFor } from '../src/whatsapp-outreach/whatsapp-outreach.kinds';
 import { WhatsAppOutreachService } from '../src/whatsapp-outreach/whatsapp-outreach.service';
+import { WhatsAppOutreachController } from '../src/whatsapp-outreach/whatsapp-outreach.controller';
 
 test('the greeting uses a real first name and otherwise says "there"', () => {
   assert.equal(greetingName('wanjiku'), 'Wanjiku');
@@ -112,4 +113,54 @@ test('status says which links are ready', async () => {
   const { service } = harness([], [], { community: { whatsappGroupUrl: 'https://chat.whatsapp.com/g' } });
   const status = await service.status();
   assert.deepEqual(status.kinds.map((k) => [k.kind, k.linkReady]), [['APP', true], ['GROUP', true], ['REVIEW', false]]);
+});
+
+/** The Mautic webhook, with the service stood in by a fake that returns whatever the test wants. */
+function hookHarness(outcome: 'SENT' | 'SKIPPED' | 'FAILED', detail?: string) {
+  const calls: any[] = [];
+  const service: any = { sendForContact: async (p: any) => { calls.push(p); return { customerId: 'x', name: 'n', phone: null, outcome, detail }; } };
+  return { controller: new WhatsAppOutreachController(service), calls };
+}
+
+test('the webhook is off until a secret is configured', async () => {
+  delete process.env.OUTREACH_HOOK_SECRET;
+  const { controller, calls } = hookHarness('SENT');
+  await assert.rejects(() => controller.hook({ kind: 'APP', email: 'a@b.co' }, 'anything'), /not enabled/);
+  assert.equal(calls.length, 0);
+});
+
+test('the webhook refuses a missing or wrong secret and sends nothing', async () => {
+  process.env.OUTREACH_HOOK_SECRET = 's3cret-value';
+  const { controller, calls } = hookHarness('SENT');
+  await assert.rejects(() => controller.hook({ kind: 'APP', email: 'a@b.co' }, undefined), /Unauthorized/);
+  await assert.rejects(() => controller.hook({ kind: 'APP', email: 'a@b.co' }, 's3cret-valuX'), /Unauthorized/);
+  await assert.rejects(() => controller.hook({ kind: 'APP', email: 'a@b.co' }, 's3cret'), /Unauthorized/);
+  assert.equal(calls.length, 0);
+});
+
+test('the webhook sends for a correct secret and passes the message and email through', async () => {
+  process.env.OUTREACH_HOOK_SECRET = 's3cret-value';
+  const { controller, calls } = hookHarness('SENT');
+  assert.deepEqual(await controller.hook({ kind: 'GROUP', email: 'a@b.co' }, 's3cret-value'), { outcome: 'SENT', detail: undefined });
+  assert.deepEqual(calls, [{ kind: 'GROUP', email: 'a@b.co' }]);
+});
+
+test('a skip answers normally but a failed send answers an error so Mautic retries', async () => {
+  process.env.OUTREACH_HOOK_SECRET = 's3cret-value';
+  const skipped = hookHarness('SKIPPED', 'Already sent');
+  assert.deepEqual(await skipped.controller.hook({ kind: 'APP', email: 'a@b.co' }, 's3cret-value'), { outcome: 'SKIPPED', detail: 'Already sent' });
+  const failed = hookHarness('FAILED', 'Template not approved');
+  await assert.rejects(() => failed.controller.hook({ kind: 'APP', email: 'a@b.co' }, 's3cret-value'), /Template not approved/);
+  delete process.env.OUTREACH_HOOK_SECRET;
+});
+
+test('a contact who is not a customer is skipped without a send', async () => {
+  const { service, calls } = harness([ann]);
+  (service as any).prisma.customer.findFirst = async ({ where }: any) => (where.email.equals === 'ann@x.co' ? { id: 'a' } : null);
+  const stranger = await service.sendForContact({ kind: 'APP', email: 'nobody@x.co' });
+  assert.deepEqual([stranger.outcome, stranger.detail], ['SKIPPED', 'Not a customer']);
+  assert.equal(calls.length, 0);
+  const known = await service.sendForContact({ kind: 'APP', email: ' ann@x.co ' });
+  assert.equal(known.outcome, 'SENT');
+  assert.equal(calls.length, 1);
 });
