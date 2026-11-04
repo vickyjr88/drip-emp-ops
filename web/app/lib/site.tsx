@@ -26,6 +26,17 @@ export const SITE_DESCRIPTION =
   'and Puma at Dubai Merchants Mall, Ronald Ngala Street, with delivery across Kenya.';
 
 /** The shop floor, as quoted in the footer, structured data and /llms.txt. */
+/**
+ * The Android app on Google Play. `placement` is added as the install referrer, so Play Console shows which
+ * spot on the site (header, home, footer, menu) brought each install.
+ */
+export const APP_STORE_URL = 'https://play.google.com/store/apps/details?id=com.dripemporium.app';
+
+export function appDownloadUrl(placement: string): string {
+  const referrer = `utm_source=dripemporium.store&utm_medium=website&utm_campaign=${placement}`;
+  return `${APP_STORE_URL}&referrer=${encodeURIComponent(referrer)}`;
+}
+
 export const STORE_ADDRESS = 'Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD';
 export const STORE_HOURS = 'Every day, 08:00 to 20:00';
 

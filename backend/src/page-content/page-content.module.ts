@@ -7,5 +7,6 @@ import { PageContentController } from './page-content.controller';
   imports: [PrismaModule],
   controllers: [PageContentController],
   providers: [PageContentService],
+  exports: [PageContentService],
 })
 export class PageContentModule {}

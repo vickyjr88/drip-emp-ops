@@ -17,6 +17,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AppDownloadLink } from './components/app-download';
 import { EliteLayout } from './components/elite-layout';
 import { ProductCard } from './components/product-card';
 import { PageContentDocument, contentValue, fetchPageContent } from './lib/page-content';
@@ -168,6 +169,16 @@ export default function HomeClient() {
                 Ask on WhatsApp
               </a>
             </div>
+          </div>
+        </section>
+
+        <section className="de-app-band" aria-label="Get the Drip Emporium app">
+          <div className="lp-container de-app-band-inner">
+            <div>
+              <h2>Shop faster in the Drip Emporium app</h2>
+              <p>Track your order, save your favourites and see new arrivals first.</p>
+            </div>
+            <AppDownloadLink placement="home" variant="band" />
           </div>
         </section>
 

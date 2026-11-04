@@ -12915,3 +12915,181 @@ img {
   background: #25d366;
   color: #0b2e18;
 }
+
+/* --- Get the app (Google Play) ------------------------------------------ */
+
+.lp-app-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-weight: 700;
+  line-height: 1.1;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.lp-app-link:focus-visible {
+  outline: 3px solid #fbbc05;
+  outline-offset: 2px;
+}
+
+/* Header: a filled pill beside the basket, at every width. */
+.lp-app-link.is-header {
+  min-height: 38px;
+  padding: 0 14px;
+  margin-inline: 4px;
+  border-radius: 999px;
+  background: #0b8a4a;
+  color: #fff;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.lp-app-link.is-header:hover {
+  background: #097a41;
+}
+
+.lp-app-link-short {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .lp-app-link.is-header {
+    padding: 0 11px;
+    margin-inline: 0;
+    gap: 6px;
+  }
+
+  .lp-app-link-long {
+    display: none;
+  }
+
+  .lp-app-link-short {
+    display: inline;
+  }
+
+  /* The pill is one more item in a header that was already full on a 375px phone; take the room back from the
+     gaps and the icon boxes so the basket, the pill and the menu button all fit. */
+  .lp-header-inner {
+    gap: 8px;
+  }
+
+  .lp-header-actions {
+    gap: 0;
+  }
+
+  .lp-header-actions .lp-icon-link {
+    width: 38px;
+  }
+
+  /* The brand wraps onto two lines; these must not be the ones that give. */
+  .lp-header-actions,
+  .lp-menu-toggle {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  /* 1.4rem leaves the menu button hard against the screen edge once the pill is in the header. */
+  .lp-brand {
+    font-size: 1.22rem;
+  }
+}
+
+/* Mobile menu: the first thing under the links. */
+.lp-menu-panel-app {
+  margin: 18px 0 12px;
+}
+
+.lp-app-link.is-menu,
+.lp-app-link.is-band {
+  min-height: 52px;
+  padding: 8px 22px 8px 16px;
+  border-radius: 12px;
+  background: #0b8a4a;
+  color: #fff;
+}
+
+.lp-app-link.is-menu {
+  width: 100%;
+  justify-content: center;
+}
+
+.lp-app-link-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.lp-app-link-text small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.lp-app-link-text strong {
+  font-size: 1.15rem;
+}
+
+/* Home band: directly under the hero. */
+.de-app-band {
+  background: var(--de-royal, #06166e);
+  color: #fff;
+  padding: 26px 0;
+}
+
+.de-app-band-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px 32px;
+  flex-wrap: wrap;
+}
+
+.de-app-band-inner h2 {
+  margin: 0;
+  font-family: 'Libre Caslon Text', serif;
+  font-size: clamp(1.25rem, 2.6vw, 1.6rem);
+  color: #fff;
+}
+
+.de-app-band-inner p {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.lp-app-link.is-band {
+  flex-shrink: 0;
+  background: #fff;
+  color: #0b5f36;
+}
+
+.lp-app-link.is-band:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .lp-app-link.is-band {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Footer: a button, like the Google and WhatsApp ones beside it. */
+.lp-footer a.lp-app-link.is-footer {
+  min-height: 44px;
+  padding: 10px 20px;
+  margin: 6px 0 0;
+  border: 1px solid #0b8a4a;
+  border-radius: 999px;
+  background: #0b8a4a;
+  color: #fff;
+}
+
+.lp-footer a.lp-app-link.is-footer:hover,
+.lp-footer a.lp-app-link.is-footer:focus-visible {
+  background: #fff;
+  color: #0b5f36;
+}

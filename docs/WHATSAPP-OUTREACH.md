@@ -24,10 +24,10 @@ closing sentences. Other names can be set with `WHATSAPP_TEMPLATE_APP`, `WHATSAP
 | Message | Link |
 |---|---|
 | App | `APP_DOWNLOAD_URL`, default the Play Store listing `com.dripemporium.app` |
-| Group | Site content > Footer > Google reviews and WhatsApp group > *WhatsApp group invite link* |
+| Group | Site content > Footer > Google reviews and WhatsApp group > *WhatsApp group invite link* (until edited there, the built-in default in `page-content.defaults.ts`, which is what the live footer shows) |
 | Rating | the same section > *Google profile / review link* |
 
-A message whose link is blank cannot be sent; the screen says so.
+These are read the way the website reads them, with the defaults filling anything not yet edited, so the messages carry the same links the footer shows. A message whose link is blank in both places cannot be sent; the screen says so.
 
 ## Behaviour
 
@@ -81,3 +81,11 @@ To stop it, blank `MAUTIC_WHATSAPP_CAMPAIGN_ID` (no new enrolments) or unpublish
   `campaign_leadlist_xref` (campaign 8, segment 7). Campaign 6 is linked the same way.
 - A campaign's canvas must connect the `lists` node to the first step, or every later API edit is refused as "orphaned events".
 - The Mautic API sits behind a firewall that refuses Python's default user agent; send a normal `User-Agent`.
+
+## "Get the app" link on the website
+
+The storefront links to the Google Play listing in four places, all from one component (`web/app/components/app-download.tsx`) and one
+address (`APP_STORE_URL` in `web/app/lib/site.tsx`): a green **Get the app** pill in the header (at every width, "App" on small phones),
+a **Google Play** button at the top of the mobile menu, a full-width band directly under the home page hero, and the first button in the
+footer strip. Each link carries a Play install referrer (`utm_campaign=header|menu|home|footer`), so Play Console shows which spot
+brought each install. To change the address, edit `APP_STORE_URL`; it is not in the CMS.

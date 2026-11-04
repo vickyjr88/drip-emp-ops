@@ -36,7 +36,6 @@ function harness(customers: Row[], sentBefore: string[] = [], footer: any = { co
   const created: any[] = [];
   const calls: { to: string; params: string[]; template?: string }[] = [];
   const prisma: any = {
-    pageContent: { findUnique: async () => (footer ? { content: footer } : null) },
     customer: { findMany: async ({ where }: any) => customers.filter((c) => where.id.in.includes(c.id)) },
     whatsappOutreach: {
       findMany: async () => sentBefore.map((customerId) => ({ customerId })),
@@ -51,7 +50,9 @@ function harness(customers: Row[], sentBefore: string[] = [], footer: any = { co
       return to.endsWith('99999999') ? { delivered: false, error: 'Recipient not on WhatsApp' } : { delivered: true, messageId: `wamid.${to}` };
     },
   };
-  return { service: new WhatsAppOutreachService(prisma, whatsapp), created, calls };
+  // Stands in for PageContentService, which returns stored content already layered over the defaults.
+  const pages: any = { findOne: async () => ({ content: footer ?? {} }) };
+  return { service: new WhatsAppOutreachService(prisma, whatsapp, pages), created, calls };
 }
 
 const ann: Row = { id: 'a', firstName: 'ann', lastName: 'W', phone: '0722111222', isActive: true };

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsAppService } from '../daily-report/whatsapp.service';
+import { PageContentService } from '../page-content/page-content.service';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
 import {
   DEFAULT_APP_URL,
@@ -37,12 +38,17 @@ export class WhatsAppOutreachService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsAppService,
+    private readonly pages: PageContentService,
   ) {}
 
-  /** The link each message carries. The group and review links are the ones edited under Site content > Footer. */
+  /**
+   * The link each message carries. The group and review links are the ones edited under Site content > Footer. They are
+   * read the way the website reads them, with the built-in defaults filling anything not yet edited: the live footer
+   * shows the default links, so the messages must carry the same ones.
+   */
   private async links(): Promise<Record<OutreachKind, string | null>> {
-    const footer = await this.prisma.pageContent.findUnique({ where: { slug: 'footer' } });
-    const community = ((footer?.content as any)?.community ?? {}) as Record<string, unknown>;
+    const footer = await this.pages.findOne('footer');
+    const community = ((footer.content as any)?.community ?? {}) as Record<string, unknown>;
     return {
       APP: safeUrl(process.env.APP_DOWNLOAD_URL) ?? DEFAULT_APP_URL,
       GROUP: safeUrl(community.whatsappGroupUrl),

@@ -14,6 +14,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { AppDownloadLink } from './app-download';
 import { DEFAULT_NAV_LINKS, NavLink, navKeyForHref } from './site-header';
 
 /**
@@ -111,6 +112,10 @@ export function MobileNav({
               );
             })}
           </nav>
+
+          <div className="lp-menu-panel-app">
+            <AppDownloadLink placement="menu" variant="menu" onClick={() => setOpen(false)} />
+          </div>
 
           <Link
             href={ctaHref}

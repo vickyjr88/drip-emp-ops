@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { PageContentDocument, contentValue, fetchPageContent } from '../lib/page-content';
+import { AppDownloadLink } from './app-download';
 import { MobileNav } from './mobile-nav';
 
 export type NavLink = { label: string; href: string };
@@ -115,6 +116,9 @@ export function SiteHeader({ active }: { active: string }) {
               <span className="lp-cart-count" aria-hidden="true">{cart.count}</span>
             ) : null}
           </Link>
+
+          {/* Visible at every width, as the basket is: most visitors are on a phone, and an app is a phone thing. */}
+          <AppDownloadLink placement="header" variant="header" />
 
           <Link className="lp-button lp-button-primary lp-header-cta" href={ctaHref}>
             {ctaLabel}

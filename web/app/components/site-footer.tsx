@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AppDownloadLink } from './app-download';
 import { PageContentDocument, contentValue, fetchPageContent } from '../lib/page-content';
 
 type FooterLink = { label: string; href: string };
@@ -97,13 +98,12 @@ const GoogleG = (
 );
 
 /**
- * Two asks of customers, set from the CMS "footer" document: rate the shop on Google (with the rating
- * as it stands) and join the WhatsApp group. Each half is hidden while its address is blank.
+ * Three asks of customers: get the app (always shown), and, set from the CMS "footer" document, rate the shop on
+ * Google (with the rating as it stands) and join the WhatsApp group. Those two are hidden while their address is blank.
  */
 function CommunityStrip({ content }: { content: PageContentDocument | null }) {
   const googleUrl = safeHref(contentValue(content, 'community.googleProfileUrl', ''));
   const whatsappUrl = safeHref(contentValue(content, 'community.whatsappGroupUrl', ''));
-  if (!googleUrl && !whatsappUrl) return null;
 
   const rating = Number.parseFloat(contentValue(content, 'community.googleRating', ''));
   const count = Number.parseInt(contentValue(content, 'community.googleReviewCount', ''), 10);
@@ -112,6 +112,10 @@ function CommunityStrip({ content }: { content: PageContentDocument | null }) {
 
   return (
     <div className="lp-footer-community">
+      <div className="lp-footer-community-item">
+        <h4>Shop faster in our app</h4>
+        <AppDownloadLink placement="footer" variant="footer" />
+      </div>
       {googleUrl ? (
         <div className="lp-footer-community-item">
           <h4>{contentValue(content, 'community.googleHeading', 'Bought from us? Tell others how it went')}</h4>
