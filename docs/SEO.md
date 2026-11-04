@@ -33,7 +33,7 @@ the searches people actually type: a brand or model plus "price in Kenya" / "Nai
 (`web/app/lib/collections.ts`), so the price range, sizes and "n of m on the shelf" in the opening paragraph and FAQ are always current.
 Each page has a direct answer first, the product grid, a visible FAQ marked up as `FAQPage` (the markup repeats exactly what is shown),
 `CollectionPage` + `BreadcrumbList`, and links to related brands, models and categories. They are in the sitemap and `/llms.txt`, linked
-from the footer and from each product's brand name.
+from the footer (their own **Popular Brands** column, editable under Site content > Footer > Popular brands links, where more brands or models can be added) and from each product's brand name.
 
 - A brand page is indexed from 3 products, a model page from 2; smaller ones exist but are `noindex, follow`.
 - **Adding a model page:** add an entry to `SERIES` in `lib/collections.ts` (a slug, a display name, a regex matched against product names,

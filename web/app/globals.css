@@ -1371,7 +1371,8 @@ img {
 
 .lp-footer-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  /* Brand, quick links, shop, popular brands, contact. */
+  grid-template-columns: 1.6fr 1fr 1fr 1fr 1fr;
   gap: 34px;
 }
 
@@ -13097,4 +13098,16 @@ img {
 .lp-footer a.lp-footer-cta svg {
   flex-shrink: 0;
   display: block;
+}
+
+/* Five footer columns are too tight below a wide laptop: the brand takes its own row and the four link columns share the
+   next, until the grid collapses to one column. */
+@media (min-width: 1061px) and (max-width: 1240px) {
+  .lp-footer-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .lp-footer-grid > .lp-footer-brand {
+    grid-column: 1 / -1;
+  }
 }

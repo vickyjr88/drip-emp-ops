@@ -17,8 +17,11 @@ type FooterLink = { label: string; href: string };
  * does not shift beyond the text itself.
  */
 
-/** Brand and model landing pages worth a link from every page (see lib/collections.ts). */
-const POPULAR_LINKS = [
+/**
+ * Brand and model landing pages worth a link from every page (see lib/collections.ts). Shown in their own "Popular"
+ * column, editable in the CMS (footer > popular); this is what shows until someone edits it.
+ */
+const DEFAULT_POPULAR_LINKS: FooterLink[] = [
   { label: 'Nike', href: '/shop/brand/nike' },
   { label: 'Adidas', href: '/shop/brand/adidas' },
   { label: 'New Balance', href: '/shop/brand/new-balance' },
@@ -173,6 +176,9 @@ export function SiteFooter() {
   const servicesHeading = contentValue(content, 'services.heading', 'Shop');
   const serviceLinks = contentValue<FooterLink[]>(content, 'services.items', DEFAULT_SERVICE_LINKS);
 
+  const popularHeading = contentValue(content, 'popular.heading', 'Popular Brands');
+  const popularLinks = contentValue<FooterLink[]>(content, 'popular.items', DEFAULT_POPULAR_LINKS);
+
   const contactHeading = contentValue(content, 'contact.heading', 'Contact Us');
   const email = contentValue(content, 'contact.email', 'hello@dripemporium.store');
   const phone = contentValue(content, 'contact.phone', '+254 113 206 481');
@@ -248,13 +254,20 @@ export function SiteFooter() {
                 {link.label}
               </Link>
             ))}
-            {/* Brand and model pages: a sitewide route in for the searches people actually type. */}
-            {POPULAR_LINKS.map((link) => (
-              <Link key={link.href} href={link.href}>
-                {link.label}
-              </Link>
-            ))}
           </section>
+
+          {/* Brand and model pages: a sitewide route in for the searches people actually type. Their own column, so
+              adding brands lengthens this one instead of stretching the Shop column. */}
+          {popularLinks.length > 0 ? (
+            <section>
+              <h4>{popularHeading}</h4>
+              {popularLinks.map((link, index) => (
+                <Link key={`${link.href}-${index}`} href={link.href || '/shop'}>
+                  {link.label}
+                </Link>
+              ))}
+            </section>
+          ) : null}
 
           <section>
             <h4>{contactHeading}</h4>

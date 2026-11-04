@@ -360,6 +360,18 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
         { label: 'Officials', href: '/shop?category=officials' },
       ],
     },
+    // Brand and model landing pages (see web/app/lib/collections.ts): their own footer column.
+    popular: {
+      heading: 'Popular Brands',
+      items: [
+        { label: 'Nike', href: '/shop/brand/nike' },
+        { label: 'Adidas', href: '/shop/brand/adidas' },
+        { label: 'New Balance', href: '/shop/brand/new-balance' },
+        { label: 'Air Force 1', href: '/shop/collection/air-force-1' },
+        { label: 'Air Max', href: '/shop/collection/air-max' },
+        { label: 'Jordan 4', href: '/shop/collection/jordan-4' },
+      ],
+    },
     contact: {
       heading: 'Contact Us',
       email: 'hello@dripemporium.store',

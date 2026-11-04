@@ -584,6 +584,24 @@ export const PAGE_SCHEMAS: PageSchema[] = [
         },
       },
       {
+        key: 'footer-popular-heading',
+        title: 'Popular brands column heading',
+        fields: [{ path: 'popular.heading', label: 'Heading', type: 'text' }],
+      },
+      {
+        key: 'footer-popular',
+        title: 'Popular brands links',
+        description:
+          'Brand and model pages, in their own footer column. Brands are /shop/brand/<name> (for example /shop/brand/puma) and models /shop/collection/<name>. Clear the list to hide the column.',
+        repeatable: {
+          path: 'popular.items',
+          label: 'Link',
+          fields: LINK_FIELDS,
+          blank: { label: '', href: '' },
+          addLabel: 'Add brand or model',
+        },
+      },
+      {
         key: 'footer-contact',
         title: 'Contact column',
         description: 'The email and phone become mailto: and tel: links automatically.',
