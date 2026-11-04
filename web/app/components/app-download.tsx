@@ -19,21 +19,25 @@ export function AppDownloadLink({
   placement,
   variant,
   onClick,
+  label = 'Get the app on Google Play',
 }: {
   placement: string;
   variant: Variant;
   onClick?: () => void;
+  /** Footer button text, editable from the CMS. */
+  label?: string;
 }) {
   return (
     <a
-      className={`lp-app-link is-${variant}`}
+      // In the footer it is one of the strip's buttons, so it takes their exact styling.
+      className={variant === 'footer' ? 'lp-footer-cta is-app' : `lp-app-link is-${variant}`}
       href={appDownloadUrl(placement)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Get the Drip Emporium app on Google Play"
       onClick={onClick}
     >
-      <PlayIcon size={variant === 'header' ? 16 : 20} />
+      <PlayIcon size={variant === 'header' ? 16 : variant === 'footer' ? 18 : 20} />
       {variant === 'header' ? (
         <>
           <span className="lp-app-link-long">Get the app</span>
@@ -45,7 +49,7 @@ export function AppDownloadLink({
           <strong>Google Play</strong>
         </span>
       ) : (
-        <span>Get the app on Google Play</span>
+        <span>{label}</span>
       )}
     </a>
   );

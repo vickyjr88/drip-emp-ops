@@ -86,6 +86,7 @@ To stop it, blank `MAUTIC_WHATSAPP_CAMPAIGN_ID` (no new enrolments) or unpublish
 
 The storefront links to the Google Play listing in four places, all from one component (`web/app/components/app-download.tsx`) and one
 address (`APP_STORE_URL` in `web/app/lib/site.tsx`): a green **Get the app** pill in the header (at every width, "App" on small phones),
-a **Google Play** button at the top of the mobile menu, a full-width band directly under the home page hero, and the first button in the
-footer strip. Each link carries a Play install referrer (`utm_campaign=header|menu|home|footer`), so Play Console shows which spot
+a **Google Play** button at the top of the mobile menu, a full-width band directly under the home page hero, and the first item in the
+footer strip (heading, one line of text and a button, like the Google and WhatsApp items beside it; its wording is editable under
+Site content > Footer > App, Google reviews and WhatsApp group). Each link carries a Play install referrer (`utm_campaign=header|menu|home|footer`), so Play Console shows which spot
 brought each install. To change the address, edit `APP_STORE_URL`; it is not in the CMS.

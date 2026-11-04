@@ -113,8 +113,9 @@ function CommunityStrip({ content }: { content: PageContentDocument | null }) {
   return (
     <div className="lp-footer-community">
       <div className="lp-footer-community-item">
-        <h4>Shop faster in our app</h4>
-        <AppDownloadLink placement="footer" variant="footer" />
+        <h4>{contentValue(content, 'community.appHeading', 'Shop faster in our app')}</h4>
+        <p className="lp-footer-note">{contentValue(content, 'community.appText', 'Track your order and see new arrivals first.')}</p>
+        <AppDownloadLink placement="footer" variant="footer" label={contentValue(content, 'community.appButtonLabel', 'Get the app on Google Play')} />
       </div>
       {googleUrl ? (
         <div className="lp-footer-community-item">
@@ -133,6 +134,7 @@ function CommunityStrip({ content }: { content: PageContentDocument | null }) {
       {whatsappUrl ? (
         <div className="lp-footer-community-item">
           <h4>{contentValue(content, 'community.whatsappHeading', 'Get new arrivals first')}</h4>
+          <p className="lp-footer-note">{contentValue(content, 'community.whatsappText', 'Be first to hear about new drops and offers.')}</p>
           <a className="lp-footer-cta is-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
               <path d="M12.04 2a9.9 9.9 0 0 0-8.5 14.95L2 22l5.2-1.5A9.9 9.9 0 1 0 12.04 2Zm5.8 14.1c-.25.7-1.45 1.33-2 1.4-.5.07-1.13.1-1.82-.12a16.6 16.6 0 0 1-1.65-.6c-2.9-1.25-4.8-4.15-4.95-4.35-.15-.2-1.18-1.57-1.18-3 0-1.43.75-2.13 1.02-2.42.27-.3.58-.37.78-.37h.55c.18 0 .42-.07.65.5.25.58.83 2.02.9 2.17.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.32.38-.45.52-.15.15-.3.3-.13.6.17.3.77 1.27 1.65 2.05 1.13 1 2.08 1.3 2.38 1.45.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.27.1 1.7.8 2 .95.3.15.5.22.57.35.07.12.07.72-.18 1.4Z" />

@@ -625,10 +625,13 @@ export const PAGE_SCHEMAS: PageSchema[] = [
       },
       {
         key: 'footer-community',
-        title: 'Google reviews and WhatsApp group',
+        title: 'App, Google reviews and WhatsApp group',
         description:
-          'A strip at the top of every page footer asking customers to rate the shop on Google and to join the WhatsApp group. Each button is hidden while its address is blank. For the Google link, a direct "write a review" link works best: in Google Business Profile, open "Get more reviews" and paste the short link here.',
+          'A strip at the top of every page footer asking customers to get the app, rate the shop on Google and join the WhatsApp group. The Google and WhatsApp buttons are hidden while their address is blank; the app link is set in the site code. For the Google link, a direct "write a review" link works best: in Google Business Profile, open "Get more reviews" and paste the short link here.',
         fields: [
+          { path: 'community.appHeading', label: 'App heading', type: 'text' },
+          { path: 'community.appText', label: 'App line under the heading', type: 'text' },
+          { path: 'community.appButtonLabel', label: 'App button label', type: 'text' },
           { path: 'community.googleHeading', label: 'Google heading', type: 'text' },
           { path: 'community.googleProfileUrl', label: 'Google profile / review link', type: 'text' },
           {
@@ -645,6 +648,7 @@ export const PAGE_SCHEMAS: PageSchema[] = [
           },
           { path: 'community.googleButtonLabel', label: 'Google button label', type: 'text' },
           { path: 'community.whatsappHeading', label: 'WhatsApp heading', type: 'text' },
+          { path: 'community.whatsappText', label: 'WhatsApp line under the heading', type: 'text' },
           { path: 'community.whatsappGroupUrl', label: 'WhatsApp group invite link', type: 'text' },
           { path: 'community.whatsappButtonLabel', label: 'WhatsApp button label', type: 'text' },
         ],

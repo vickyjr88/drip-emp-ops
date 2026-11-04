@@ -13077,19 +13077,24 @@ img {
   }
 }
 
-/* Footer: a button, like the Google and WhatsApp ones beside it. */
-.lp-footer a.lp-app-link.is-footer {
-  min-height: 44px;
-  padding: 10px 20px;
-  margin: 6px 0 0;
-  border: 1px solid #0b8a4a;
-  border-radius: 999px;
-  background: #0b8a4a;
-  color: #fff;
+/* Footer: the app button is one of the strip's .lp-footer-cta buttons; only its accent differs. */
+.lp-footer a.lp-footer-cta.is-app {
+  border-color: #3ddc84;
 }
 
-.lp-footer a.lp-app-link.is-footer:hover,
-.lp-footer a.lp-app-link.is-footer:focus-visible {
-  background: #fff;
-  color: #0b5f36;
+.lp-footer a.lp-footer-cta.is-app:hover,
+.lp-footer a.lp-footer-cta.is-app:focus-visible {
+  background: #3ddc84;
+  color: #0b2b19;
+}
+
+/* The one line under each strip heading, level with the Google item's rating line. */
+.lp-footer p.lp-footer-note {
+  margin: 0 0 10px;
+}
+
+/* An icon beside text in a button: centred on the text, never squeezed. */
+.lp-footer a.lp-footer-cta svg {
+  flex-shrink: 0;
+  display: block;
 }
