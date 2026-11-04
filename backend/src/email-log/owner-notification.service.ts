@@ -4,7 +4,7 @@ import { escapeHtml, money } from './email-html.util';
 
 /// Reused beyond owner alerts -- also the destination for the daily
 /// operations report -- so it is named for that role, not this file's.
-const OWNER_EMAIL = process.env.OWNER_EMAIL || 'emporiumdrip@gmail.com';
+export const OWNER_EMAIL = process.env.OWNER_EMAIL || 'emporiumdrip@gmail.com';
 
 /** A plain `<dt>/<dd>` line, value escaped since every field here ultimately comes from a public form. */
 function row(label: string, value: string) {

@@ -68,6 +68,14 @@ x-backend-environment: &backend-environment
   CART_REMINDERS_ENABLED: ${CART_REMINDERS_ENABLED:-true}
   CART_REMINDER_DELAY_HOURS: ${CART_REMINDER_DELAY_HOURS:-24}
   OWNER_EMAIL: ${OWNER_EMAIL:-}
+  # Daily report (docs/DAILY-REPORT.md). Recipients are edited in the portal, not here.
+  DAILY_REPORT_CRON: ${DAILY_REPORT_CRON:-0 7 * * *}
+  DAILY_REPORT_TIMEZONE: ${DAILY_REPORT_TIMEZONE:-Africa/Nairobi}
+  # WhatsApp Business Cloud API. Off until both are set; email still goes out without them.
+  WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+  WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+  WHATSAPP_REPORT_TEMPLATE: ${WHATSAPP_REPORT_TEMPLATE:-daily_report}
+  WHATSAPP_TEMPLATE_LANG: ${WHATSAPP_TEMPLATE_LANG:-en}
   # Tells the Nairobi Gents storefront (shops-platform) when this catalogue changes; see docs/CATALOGUE-SYNC.md.
   # Off until both are set.
   CATALOGUE_SYNC_URL: ${CATALOGUE_SYNC_URL:-}
@@ -148,6 +156,7 @@ services:
       # Set false on replicas so only one instance runs the scheduler. The
       # standby slot below is the one this actually matters for now.
       REMINDERS_ENABLED: ${REMINDERS_ENABLED:-true}
+      DAILY_REPORT_ENABLED: ${DAILY_REPORT_ENABLED:-true}
     healthcheck: *backend-healthcheck
     depends_on: *backend-depends-on
     restart: unless-stopped
@@ -165,6 +174,7 @@ services:
       # deploy.sh brings this slot up alongside, not instead of, the active
       # one during a swap.
       REMINDERS_ENABLED: "false"
+      DAILY_REPORT_ENABLED: "false"
     healthcheck: *backend-healthcheck
     depends_on: *backend-depends-on
     profiles: ["standby"]

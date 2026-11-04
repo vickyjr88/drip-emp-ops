@@ -61,6 +61,7 @@ import { AssetTransferModule } from './asset-transfer/asset-transfer.module';
 import { FinancialReportsModule } from './financial-reports/financial-reports.module';
 import { PageContentModule } from './page-content/page-content.module';
 import { ReminderModule } from './reminders/reminder.module';
+import { DailyReportModule } from './daily-report/daily-report.module';
 import { AccountTransferModule } from './account-transfer/account-transfer.module';
 import { TaxRateModule } from './tax-rate/tax-rate.module';
 import { TaxRemittanceModule } from './tax-remittance/tax-remittance.module';
@@ -122,6 +123,7 @@ import { PdfModule } from './pdf/pdf.module';
     FinancialReportsModule,
     PageContentModule,
     ReminderModule,
+    DailyReportModule,
     AccountTransferModule,
     TaxRateModule,
     TaxRemittanceModule,

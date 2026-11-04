@@ -2148,3 +2148,34 @@ model ConsignmentPayment {
 
   @@index([consignmentId])
 }
+
+// --- Daily report ------------------------------------------------------------
+
+/// Who receives the 07:00 report. One row at most; with none, the report goes to OWNER_EMAIL only. Editing this
+/// takes effect on the next send, with no deploy.
+model DailyReportSetting {
+  id                 String   @id @default("singleton")
+  enabled            Boolean  @default(true)
+  emailRecipients    String[]
+  whatsappRecipients String[]
+  updatedBy          String   @default("system")
+  updatedAt          DateTime @updatedAt
+}
+
+/// One row per report day, channel and recipient. The unique key is what stops a report going out twice when the
+/// scheduler retries or two API replicas both fire.
+model DailyReportRun {
+  id         String   @id @default(uuid())
+  /// The day described, YYYY-MM-DD in Nairobi time.
+  reportDate String
+  channel    String
+  recipient  String
+  /// PENDING while being sent, then SENT, FAILED or SKIPPED.
+  status     String
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([reportDate, channel, recipient])
+  @@index([reportDate])
+}

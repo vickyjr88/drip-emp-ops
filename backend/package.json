@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:seed": "node prisma/seed.js",
-    "seed": "npm run prisma:seed"
+    "seed": "npm run prisma:seed",
+    "test:daily-report": "node --require ts-node/register/transpile-only --test test/daily-report.test.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",
