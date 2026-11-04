@@ -53,7 +53,7 @@ WhatsApp only allows a business to start a conversation with an **approved messa
 1. In Meta Business Suite > WhatsApp Manager, connect the sending number to a WhatsApp Business account.
 2. Create a template named `daily_report`, category **Utility**, language English, with this body (six variables):
 
-   > Daily report for {{1}} ({{2}}): {{3}} paid orders, {{4}} revenue, {{5}} vs the day before. {{6}} need attention. Full report is in your email.
+   > Daily report for {{1}} ({{2}}): {{3}} paid orders, {{4}} revenue, {{5}} vs the day before. To act on: {{6}}. Full report is in your email.
 
    Example values for the approval form: `Drip Emporium`, `Wed 4 Nov 2026`, `12`, `KES 54,000`, `+8%`, `3 items`. Approval usually takes minutes to a day.
 3. Create a System User token with `whatsapp_business_messaging` and set, in the server `.env`:

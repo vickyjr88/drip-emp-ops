@@ -143,7 +143,7 @@ const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 /**
  * The six values the approved template fills in. Template text (create it in WhatsApp Manager, category Utility):
  *
- *   Daily report for {{1}} ({{2}}): {{3}} paid orders, {{4}} revenue, {{5}} vs the day before. {{6}} need attention. Full report is in your email.
+ *   Daily report for {{1}} ({{2}}): {{3}} paid orders, {{4}} revenue, {{5}} vs the day before. To act on: {{6}}. Full report is in your email.
  */
 export function whatsappParams(r: DailyReport): string[] {
   const n = needsActionCount(r);
@@ -157,7 +157,7 @@ export function whatsappParams(r: DailyReport): string[] {
   ];
 }
 
-export function whatsappPreview(r: DailyReport, template = 'Daily report for {{1}} ({{2}}): {{3}} paid orders, {{4}} revenue, {{5}} vs the day before. {{6}} need attention. Full report is in your email.') {
+export function whatsappPreview(r: DailyReport, template = 'Daily report for {{1}} ({{2}}): {{3}} paid orders, {{4}} revenue, {{5}} vs the day before. To act on: {{6}}. Full report is in your email.') {
   const p = whatsappParams(r);
   return template.replace(/\{\{(\d)\}\}/g, (_, i) => p[Number(i) - 1] ?? '');
 }
