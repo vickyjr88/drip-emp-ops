@@ -45,6 +45,8 @@ export function ShopClient({
   initialSizes = [],
   lockedCategory,
   categoryCopy,
+  categoryHeading,
+  categoryLinks,
 }: {
   /** Server-rendered for the filters already in the URL, so a crawler (and a
    *  shopper's first paint) sees the real grid rather than an empty shell.
@@ -65,6 +67,10 @@ export function ShopClient({
    *  product cards themselves. Absent on plain /shop, which has no single
    *  category to write this copy about. */
   categoryCopy?: string;
+  /** The category's name as shoppers search for it ("Smart Casual Shoes"), shown as the page heading. */
+  categoryHeading?: string;
+  /** Related category pages, linked under the category copy. */
+  categoryLinks?: { label: string; href: string }[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -221,8 +227,8 @@ export function ShopClient({
     if (search) return `"${search}"`;
     if (isGrouped || !category) return 'All Products';
     const found = categories.find((item) => item.slug === category);
-    return found ? found.name : 'All Products';
-  }, [search, category, categories, isGrouped]);
+    return lockedCategory && categoryHeading ? categoryHeading : found ? found.name : 'All Products';
+  }, [search, category, categories, isGrouped, lockedCategory, categoryHeading]);
 
   return (
     <EliteLayout active="shop">
@@ -380,6 +386,17 @@ export function ShopClient({
         {categoryCopy ? (
           <section className="lp-container de-category-copy">
             <p>{categoryCopy}</p>
+            {categoryLinks?.length ? (
+              <p>
+                See also:{' '}
+                {categoryLinks.map((link, index) => (
+                  <span key={link.href}>
+                    {index > 0 ? ', ' : ''}
+                    <Link href={link.href}>{link.label}</Link>
+                  </span>
+                ))}
+              </p>
+            ) : null}
           </section>
         ) : null}
       </main>

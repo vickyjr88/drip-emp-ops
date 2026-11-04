@@ -5,31 +5,32 @@ import { ProductCard } from './product-card';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../lib/site';
 import { sharePreviewUrl, brandPreviewImage } from '../lib/preview-image';
 import {
-  collectionDescription, collectionFaqs, collectionHeading, collectionIntro, collectionPath, isIndexable,
+  collectionDescription, collectionFaqs, collectionHeading, collectionIntro, collectionPath, collectionTitle, isIndexable,
   type Collection,
 } from '../lib/collections';
 
 /** Title, description, canonical and share card for a brand or model page. */
 export async function collectionMetadata(collection: Collection): Promise<Metadata> {
   const heading = collectionHeading(collection);
+  const title = collectionTitle(collection);
   const description = collectionDescription(collection);
   const path = collectionPath(collection);
   const image = collection.products.find((p) => p.imageUrls[0])?.imageUrls[0] ?? (await brandPreviewImage());
 
   return {
-    title: heading,
+    title,
     description,
     alternates: { canonical: path },
     // A one- or two-product page is thin; it stays reachable (the product page links to it) but out of the index.
     ...(isIndexable(collection) ? {} : { robots: { index: false, follow: true } }),
     openGraph: {
-      title: `${heading} | ${SITE_NAME}`,
+      title: `${title} | ${SITE_NAME}`,
       description,
       ...(image ? { images: [{ url: sharePreviewUrl(image), width: 1200, height: 630, type: 'image/jpeg' }] } : {}),
     },
     twitter: {
       card: image ? 'summary_large_image' : 'summary',
-      title: `${heading} | ${SITE_NAME}`,
+      title: `${title} | ${SITE_NAME}`,
       description,
       ...(image ? { images: [sharePreviewUrl(image)] } : {}),
     },

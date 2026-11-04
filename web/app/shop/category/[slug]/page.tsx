@@ -5,6 +5,7 @@ import { JsonLd, SITE_NAME, absoluteUrl } from '../../../lib/site';
 import { fetchCategories, fetchFilters, fetchProducts } from '../../../lib/shop';
 import { brandPreviewImage, sharePreviewUrl } from '../../../lib/preview-image';
 import { ShopClient } from '../../shop-client';
+import { RELATED_CATEGORIES, categoryDescription, categoryWords } from '../../../lib/category-seo';
 
 // Rendered per request, matching /shop: a crawler's first paint should see
 // the real grid for this category, and stock/price are never stale.
@@ -28,7 +29,7 @@ const CATEGORY_COPY: Record<string, string> = {
   officials:
     'Smart, hard-wearing official shoes for the office or a formal occasion, in genuine leather stock at Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD. Whether you need a reliable everyday pair for work in Nairobi or something sharper for an event, our officials range is chosen for fit and durability rather than looking good only in the box. Visit the shop to try a pair on, or order online with countrywide delivery across Kenya.',
   'smart-casuals':
-    'Smart casual shoes that sit between formal and everyday wear -- the pair you reach for when a full official shoe is too much but sneakers are too little. Drip Emporium stocks genuine smart casuals at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD, with countrywide delivery if you are not in Nairobi. Come in and try a pair on, or message us on WhatsApp if you are after a specific size.',
+    'Smart casual shoes that sit between formal and everyday wear -- the pair you reach for when a full official shoe is too much but sneakers are too little. Drip Emporium stocks genuine smart casuals at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD, with countrywide delivery if you are not in Nairobi. Our Officials range includes moccasins and laced and laceless styles that suit a smart casual look, and many of our Casuals dress up easily too. Come in and try a pair on, or message us on WhatsApp if you are after a specific size.',
   'ladies-shoes':
     "Genuine women's shoes from Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD. Our ladies' range is stocked in real sizes, not just what looks good in a photo, and every pair can be tried on in the shop before you commit. Order online with countrywide delivery across Kenya, or message us on WhatsApp if the size or style you want is not currently listed -- we can often source it.",
   watches:
@@ -51,22 +52,22 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!category) return { title: 'Category not found', robots: { index: false, follow: true } };
 
   const shareImage = await brandPreviewImage();
-  const description = `Shop ${category.name} at Drip Emporium -- ${category.productCount} style${
-    category.productCount === 1 ? '' : 's'
-  } in stock. Nike, Adidas, Jordan and Puma, EUR 36-46, on Ronald Ngala Street, Nairobi.`;
+  const products = await fetchProducts({ category: category.slug });
+  const description = categoryDescription(category.slug, category.name, products);
+  const title = categoryWords(category.slug, category.name).title;
 
   return {
-    title: `${category.name} | Shop`,
+    title,
     description,
     alternates: { canonical: `/shop/category/${category.slug}` },
     openGraph: {
-      title: `${category.name} | ${SITE_NAME}`,
+      title: `${title} | ${SITE_NAME}`,
       description,
       ...(shareImage ? { images: [{ url: sharePreviewUrl(shareImage), width: 1200, height: 630, type: 'image/jpeg' }] } : {}),
     },
     twitter: {
       card: shareImage ? 'summary_large_image' : 'summary',
-      title: `${category.name} | ${SITE_NAME}`,
+      title: `${title} | ${SITE_NAME}`,
       description,
       ...(shareImage ? { images: [sharePreviewUrl(shareImage)] } : {}),
     },
@@ -93,7 +94,7 @@ export default async function ShopCategoryPage({ params }: { params: { slug: str
           itemListElement: [
             { '@type': 'ListItem', position: 1, name: 'Home', item: absoluteUrl('/') },
             { '@type': 'ListItem', position: 2, name: 'Shop', item: absoluteUrl('/shop') },
-            { '@type': 'ListItem', position: 3, name: category.name, item: absoluteUrl(`/shop/category/${category.slug}`) },
+            { '@type': 'ListItem', position: 3, name: categoryWords(category.slug, category.name).heading, item: absoluteUrl(`/shop/category/${category.slug}`) },
           ],
         }}
       />
@@ -106,6 +107,11 @@ export default async function ShopCategoryPage({ params }: { params: { slug: str
           initialBrands={initialFilters.brands}
           initialSizes={initialFilters.sizes}
           categoryCopy={CATEGORY_COPY[category.slug] || DEFAULT_CATEGORY_COPY(category.name)}
+          categoryHeading={categoryWords(category.slug, category.name).heading}
+          categoryLinks={(RELATED_CATEGORIES[category.slug] ?? [])
+            .map((slug) => categories.find((item) => item.slug === slug))
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+            .map((item) => ({ label: categoryWords(item.slug, item.name).heading, href: `/shop/category/${item.slug}` }))}
         />
       </Suspense>
     </>

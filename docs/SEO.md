@@ -41,6 +41,22 @@ from the footer and from each product's brand name.
 - **Luxury names are excluded** (`NO_BRAND_PAGE`: Rolex, Hublot, Patek Philippe, Seiko, Versace, Dior, ...). Some catalogue items are described as
   "styled after" such a brand; a page titled "Rolex watches in Nairobi" with a price of a few thousand shillings would mislead searchers.
 
+## Titles written for the searches people actually make
+
+Added 2026-11-04 from Search Console queries ("smart casual shoes", "bagolee watch", "how much is a adidas samba", "dunks shoes", "drip shop").
+
+- **Model pages** (`/shop/collection/...`) are titled "Adidas Samba Price in Kenya: From KSh 3,500", with the live starting price (`collectionTitle` in `lib/collections.ts`).
+  Their FAQ opens with "How much is the Adidas Samba in Kenya?" and a second question lists the styles and prices actually stocked. `alias` on a `SERIES`
+  entry sets the plural shoppers use ("Nike Dunks", "Adidas Sambas") for that second question.
+- **Category pages** use search wording instead of stockroom names (`lib/category-seo.ts`): "Smart Casual Shoes in Nairobi, Kenya", "Official Shoes...", "Casual Shoes...".
+  The description is built from the category's own products (count, starting price, brands with 3+ products), so watches no longer say "Nike, Adidas, Jordan and Puma".
+  Related categories are linked under the copy (`RELATED_CATEGORIES`).
+- **Product pages** are titled "<name> Price in Kenya: KSh X" and say whether the pair is on the shelf.
+- **Home** is titled "Drip Emporium | Official Sneaker & Streetwear Shop in Nairobi" and the description opens "The official Drip Emporium shop". The `ShoeStore` schema carries `alternateName`.
+- **Single-product brands** (e.g. Bagolee, one watch) have no indexable brand page by design (`MIN_BRAND_PRODUCTS`); the product page carries the search.
+- Blog: `smart-casual-shoes-guide` was retitled "Smart Casual Shoes in Kenya: What to Wear and When" and expanded (original kept in `docs/blog-drafts/`).
+  `are-premium-casual-shoes-worth-buying` is an unpublished draft.
+
 ## IndexNow (Bing and AI search)
 
 `scripts/indexnow.sh` posts every sitemap URL to IndexNow (Bing, Yandex, Seznam, Naver). Bing's index also feeds ChatGPT search and Copilot,

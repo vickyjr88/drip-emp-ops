@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { JsonLd, SITE_NAME, absoluteUrl, productFaqSchema } from '../../lib/site';
-import { fetchProduct, formatKes } from '../../lib/shop';
+import { fetchProduct, formatKes, priceLabel } from '../../lib/shop';
 import { sharePreviewUrl } from '../../lib/preview-image';
 import { ProductClient } from './product-client';
 
@@ -16,16 +16,21 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   // found" page as a result.
   if (!product) return { title: 'Product not found', robots: { index: false, follow: true } };
 
-  const description = `${product.name}${product.brand ? ` by ${product.brand}` : ''} — ${formatKes(product.priceFrom)}${
-    product.sizesInStock.length ? `. In stock: ${product.sizesInStock.join(', ')}.` : '.'
-  } Available at Drip Emporium, Ronald Ngala Street, Nairobi.`;
+  // Shoppers search "<product> price in Kenya"; the title says so and carries the price, and the description says
+  // what the pair is, whether it is on the shelf, and where to get it.
+  const price = priceLabel(product);
+  const description = `${product.name}${product.brand && !product.name.toLowerCase().includes(product.brand.toLowerCase()) ? ` by ${product.brand}` : ''}: ${price} in Kenya. ${
+    product.sizesInStock.length
+      ? `In stock in ${product.sizesInStock.join(', ')}.`
+      : 'Not on the shelf right now: message us on WhatsApp to order yours.'
+  } Buy at Drip Emporium, Dubai Merchants Mall, Ronald Ngala Street, Nairobi, or order with delivery across Kenya.`;
   // No fallback image for a product with none of its own: a card pointing at
   // a broken URL is worse than a card with no image, matching the fallback
   // rule preview-image.ts already applies to every other page.
   const shareImage = product.imageUrls[0];
 
   return {
-    title: product.name,
+    title: `${product.name} Price in Kenya: ${price}`,
     description,
     alternates: { canonical: `/shop/${product.slug}` },
     openGraph: {

@@ -22,8 +22,8 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3
 export const SITE_NAME = 'Drip Emporium';
 
 export const SITE_DESCRIPTION =
-  'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma in ' +
-  'EUR 36-46, on Ronald Ngala Street.';
+  'The official Drip Emporium shop: quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan ' +
+  'and Puma at Dubai Merchants Mall, Ronald Ngala Street, with delivery across Kenya.';
 
 /** The shop floor, as quoted in the footer, structured data and /llms.txt. */
 export const STORE_ADDRESS = 'Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD';
@@ -50,6 +50,7 @@ export function organizationSchema(socialUrls: string[] = []) {
     '@type': 'ShoeStore',
     '@id': `${SITE_URL}/#organization`,
     name: SITE_NAME,
+    alternateName: ['Drip Emporium Nairobi', 'Drip Emporium Kenya'],
     url: SITE_URL,
     description: SITE_DESCRIPTION,
     areaServed: {

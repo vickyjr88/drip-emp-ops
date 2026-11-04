@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     key: 'home',
     path: '/',
     description: SITE_DESCRIPTION,
-    shareTitle: `${SITE_NAME} | Quality Affordable Sneakers & Streetwear in Nairobi`,
+    shareTitle: `${SITE_NAME} | Official Sneaker & Streetwear Shop in Nairobi`,
     image: contentValue(content, 'hero.backgroundImage', ''),
   });
 }

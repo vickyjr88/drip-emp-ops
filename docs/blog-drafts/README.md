@@ -19,3 +19,10 @@ go to **Blog**, read and edit a draft, then press **Publish** (list row or edito
 - **Publish order:** the Ronald Ngala post links to the "buy sneakers online safely" post, so publish that one first or together with it, otherwise the link 404s. The other posts only link to articles that are already live.
 - **Cover images:** none set (the existing posts have none either). Without one, shared links use the brand banner.
 - After publishing, run `scripts/indexnow.sh` so Bing (and ChatGPT search) learn about them quickly, and submit the new URLs in Google Search Console.
+
+## Added 2026-11-04
+
+| Post | Status | Notes |
+|---|---|---|
+| `smart-casual-shoes-guide` | **Published, rewritten** | Retitled and expanded for "smart casual shoes". The previous text is `smart-casual-shoes-guide.original.html`; the new body is `smart-casual-shoes-guide.revised.html`. |
+| `are-premium-casual-shoes-worth-buying` | Draft (unpublished) | Targets "are premium casual footwear options worth buying". Contains one illustrative cost-per-wear example (labelled as an example) and says Drip Emporium's prices run about KSh 2,000 to 5,000 "at the time of writing": re-check before publishing. Body: `are-premium-casual-shoes-worth-buying.html`. |

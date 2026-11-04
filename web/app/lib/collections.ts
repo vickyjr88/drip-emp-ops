@@ -23,6 +23,8 @@ export type Collection = {
   products: ShopProduct[];
   /** A short factual line about the model (models only). */
   blurb?: string;
+  /** How shoppers say it in the plural ("Nike Dunks"), used where it reads more naturally than the model name. */
+  alias?: string;
 };
 
 export const slugify = (text: string) =>
@@ -38,7 +40,7 @@ export const slugify = (text: string) =>
  * thousand shillings would tell searchers they can buy the real thing for that. The products stay on the site under
  * their own names; they just do not get a page that trades on the brand.
  */
-const NO_BRAND_PAGE = new Set([
+export const NO_BRAND_PAGE = new Set([
   'rolex', 'hublot', 'patekphilippe', 'patek-philippe', 'seiko', 'omega', 'cartier', 'versace', 'dior', 'berluti',
   'gucci', 'prada', 'balenciaga', 'louis-vuitton', 'lv', 'fendi', 'burberry', 'chanel', 'hermes', 'off-white',
 ]);
@@ -47,18 +49,18 @@ const NO_BRAND_PAGE = new Set([
 export const MIN_BRAND_PRODUCTS = 3;
 export const MIN_MODEL_PRODUCTS = 2;
 
-type Series = { slug: string; name: string; match: RegExp; blurb: string };
+type Series = { slug: string; name: string; match: RegExp; blurb: string; /** How shoppers say it in the plural, for the "which … do you stock" question. */ alias?: string };
 
 // Matched against the product name. Only facts that are safe to state: the year a model first appeared.
 const SERIES: Series[] = [
   { slug: 'air-force-1', name: 'Nike Air Force 1', match: /air\s?force\s?1\b|airforce\s?1\b|\baf1\b/i, blurb: 'The Air Force 1 first appeared in 1982 and has stayed a streetwear staple ever since, in everything from all-white to custom colourways.' },
   { slug: 'air-max', name: 'Nike Air Max', match: /air\s?max/i, blurb: 'Nike introduced visible Air cushioning in the Air Max line in 1987; the 90, 95 and 97 are among its best-known shapes.' },
   { slug: 'jordan-4', name: 'Air Jordan 4', match: /jordan\s?4\b/i, blurb: 'The Air Jordan 4 was first released in 1989 and is recognisable by its mesh side panels and lace wings.' },
-  { slug: 'nike-dunk', name: 'Nike Dunk', match: /\bdunk/i, blurb: 'The Dunk started life as a basketball shoe in 1985 and became a skate and streetwear favourite.' },
+  { slug: 'nike-dunk', name: 'Nike Dunk', alias: 'Nike Dunks', match: /\bdunk/i, blurb: 'The Dunk started life as a basketball shoe in 1985 and became a skate and streetwear favourite.' },
   { slug: 'nike-tn', name: 'Nike Air Max TN (Tuned Air)', match: /\btn\b/i, blurb: 'The Air Max Plus, known as the TN for its Tuned Air units, arrived in 1998 with a wavy, layered upper.' },
   { slug: 'nike-shox', name: 'Nike Shox', match: /shox/i, blurb: 'Nike Shox put spring-like cushioning columns in the heel and launched in 2000.' },
   { slug: 'nocta-glide', name: 'Nike NOCTA Glide', match: /nocta/i, blurb: 'NOCTA is Nike\'s line with the artist Drake, launched in 2020; the Glide is its sculpted, futuristic runner.' },
-  { slug: 'adidas-samba', name: 'Adidas Samba', match: /samba/i, blurb: 'The Samba dates back to 1949, built as a football shoe for icy pitches, and keeps its slim profile and gum sole.' },
+  { slug: 'adidas-samba', name: 'Adidas Samba', alias: 'Adidas Sambas', match: /samba/i, blurb: 'The Samba dates back to 1949, built as a football shoe for icy pitches, and keeps its slim profile and gum sole.' },
   { slug: 'adidas-stan-smith', name: 'Adidas Stan Smith', match: /stan\s?smith/i, blurb: 'The Stan Smith is a minimalist tennis shoe, named after the player in 1971, with perforated stripes and a clean leather upper.' },
   { slug: 'adidas-campus', name: 'Adidas Campus', match: /campus/i, blurb: 'The Campus is a suede low-top from the 1970s with a retro basketball look.' },
 ];
@@ -94,7 +96,7 @@ export function buildCollections(products: ShopProduct[]): Collection[] {
 
   for (const series of SERIES) {
     const list = products.filter((p) => series.match.test(p.name));
-    if (list.length) collections.push({ kind: 'collection', slug: series.slug, name: series.name, noun: nounFor(list), products: list, blurb: series.blurb });
+    if (list.length) collections.push({ kind: 'collection', slug: series.slug, name: series.name, noun: nounFor(list), products: list, blurb: series.blurb, alias: series.alias });
   }
 
   return collections;
@@ -143,13 +145,23 @@ export function collectionHeading(c: Collection): string {
   return c.kind === 'brand' ? `${c.name} ${titleCase(c.noun)} in Nairobi, Kenya` : `${c.name} Price in Kenya`;
 }
 
+/**
+ * The search-result title. Models lead with the question shoppers type ("how much is the Adidas Samba") and carry the
+ * starting price, which is what makes a result get clicked; brands keep the heading.
+ */
+export function collectionTitle(c: Collection): string {
+  if (c.kind === 'brand') return collectionHeading(c);
+  const { minPrice } = collectionFacts(c);
+  return minPrice === null ? collectionHeading(c) : `${c.name} Price in Kenya: From ${formatKes(minPrice)}`;
+}
+
 const priceRange = (f: Facts) =>
   f.minPrice === null ? null : f.maxPrice !== null && f.maxPrice > f.minPrice ? `${formatKes(f.minPrice)} to ${formatKes(f.maxPrice)}` : formatKes(f.minPrice);
 
 export function collectionDescription(c: Collection): string {
   const f = collectionFacts(c);
   const price = priceRange(f);
-  const subject = c.kind === 'brand' ? `${c.name} ${c.noun}` : c.name;
+  const subject = c.kind === 'brand' ? `${c.name} ${c.noun}` : `${c.name} shoes`;
   return [
     `${subject}: ${f.count} style${f.count === 1 ? '' : 's'}${price ? ` from ${formatKes(f.minPrice!)}` : ''} at Drip Emporium, Dubai Merchants Mall, Ronald Ngala Street, Nairobi.`,
     f.sizeRange ? `Sizes ${f.sizeRange}.` : '',
@@ -181,9 +193,20 @@ export function collectionFaqs(c: Collection): Faq[] {
   const faqs: Faq[] = [];
 
   if (price) {
+    // Shoppers type "how much is the Adidas Samba" for a model and "how much are Nike sneakers" for a brand.
     faqs.push({
-      question: `How much are ${subject} in Kenya?`,
-      answer: `At Drip Emporium, ${subject} are priced from ${formatKes(f.minPrice!)}${f.maxPrice! > f.minPrice! ? ` up to ${formatKes(f.maxPrice!)}` : ''}, in Kenyan shillings, depending on the model. The prices on this page are live and change with the catalogue.`,
+      question: c.kind === 'collection' ? `How much is the ${c.name} in Kenya?` : `How much are ${subject} in Kenya?`,
+      answer: `At Drip Emporium, ${c.kind === 'collection' ? `the ${c.name} costs` : `${subject} cost`} from ${formatKes(f.minPrice!)}${f.maxPrice! > f.minPrice! ? ` up to ${formatKes(f.maxPrice!)}` : ''}, in Kenyan shillings, depending on the colourway. The prices on this page are live and change with the catalogue.`,
+    });
+  }
+  // Lists what is actually here, which is the other thing people ask once they have the price.
+  const named = c.products.slice(0, 8).map((p) => `${p.name} (${p.priceFrom === p.priceTo ? formatKes(p.priceFrom) : `from ${formatKes(p.priceFrom)}`})`);
+  if (named.length) {
+    faqs.push({
+      question: c.alias ? `Which ${c.alias} do you stock?` : `Which ${subject} styles do you stock?`,
+      answer: `${named.join(', ')}${c.products.length > named.length ? `, and ${c.products.length - named.length} more` : ''}. ${
+        f.inStockStyles > 0 ? `${f.inStockStyles} of ${f.count} ${f.count === 1 ? 'is' : 'are'} on the shelf in at least one size right now.` : 'None are on the shelf in every size right now; message us on WhatsApp and we will tell you how quickly we can get your size.'
+      }`,
     });
   }
   faqs.push({

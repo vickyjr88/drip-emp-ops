@@ -247,7 +247,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     home: {
       title: '',
       description:
-        'Quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall, Ronald Ngala Street.',
+        'The official Drip Emporium shop: quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall, Ronald Ngala Street, with delivery across Kenya.',
       shareTitle: 'Drip Emporium | Quality Affordable Sneakers & Streetwear',
     },
     // Key is "properties" rather than "shop" -- a naming leftover from before
