@@ -62,6 +62,7 @@ import { FinancialReportsModule } from './financial-reports/financial-reports.mo
 import { PageContentModule } from './page-content/page-content.module';
 import { ReminderModule } from './reminders/reminder.module';
 import { DailyReportModule } from './daily-report/daily-report.module';
+import { WhatsAppOutreachModule } from './whatsapp-outreach/whatsapp-outreach.module';
 import { AccountTransferModule } from './account-transfer/account-transfer.module';
 import { TaxRateModule } from './tax-rate/tax-rate.module';
 import { TaxRemittanceModule } from './tax-remittance/tax-remittance.module';
@@ -124,6 +125,7 @@ import { PdfModule } from './pdf/pdf.module';
     PageContentModule,
     ReminderModule,
     DailyReportModule,
+    WhatsAppOutreachModule,
     AccountTransferModule,
     TaxRateModule,
     TaxRemittanceModule,

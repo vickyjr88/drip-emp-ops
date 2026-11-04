@@ -1,0 +1,115 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { DEFAULT_APP_URL, greetingName, safeUrl, templateFor } from '../src/whatsapp-outreach/whatsapp-outreach.kinds';
+import { WhatsAppOutreachService } from '../src/whatsapp-outreach/whatsapp-outreach.service';
+
+test('the greeting uses a real first name and otherwise says "there"', () => {
+  assert.equal(greetingName('wanjiku'), 'Wanjiku');
+  assert.equal(greetingName('  JOHN  mwangi'), 'John');
+  assert.equal(greetingName(''), 'there');
+  assert.equal(greetingName(null), 'there');
+  assert.equal(greetingName('0722123456'), 'there');
+  assert.equal(greetingName('a@b.co'), 'there');
+});
+
+test('only web links are sent to customers', () => {
+  assert.equal(safeUrl('https://chat.whatsapp.com/abc'), 'https://chat.whatsapp.com/abc');
+  assert.equal(safeUrl('  https://g.page/r/xyz/review '), 'https://g.page/r/xyz/review');
+  assert.equal(safeUrl('javascript:alert(1)'), null);
+  assert.equal(safeUrl('not a url'), null);
+  assert.equal(safeUrl(''), null);
+  assert.equal(safeUrl(undefined), null);
+  assert.ok(safeUrl(DEFAULT_APP_URL));
+});
+
+test('template names have defaults and can be overridden', () => {
+  assert.equal(templateFor('APP'), 'drip_app_download');
+  assert.equal(templateFor('GROUP'), 'drip_join_group');
+  assert.equal(templateFor('REVIEW'), 'drip_rate_us');
+});
+
+type Row = { id: string; firstName: string; lastName: string; phone: string; isActive: boolean };
+
+/** The service with the database and Meta replaced by in-memory fakes. */
+function harness(customers: Row[], sentBefore: string[] = [], footer: any = { community: { whatsappGroupUrl: 'https://chat.whatsapp.com/g', googleProfileUrl: 'https://g.page/r/x/review' } }) {
+  const created: any[] = [];
+  const calls: { to: string; params: string[]; template?: string }[] = [];
+  const prisma: any = {
+    pageContent: { findUnique: async () => (footer ? { content: footer } : null) },
+    customer: { findMany: async ({ where }: any) => customers.filter((c) => where.id.in.includes(c.id)) },
+    whatsappOutreach: {
+      findMany: async () => sentBefore.map((customerId) => ({ customerId })),
+      create: async ({ data }: any) => created.push(data),
+    },
+  };
+  const whatsapp: any = {
+    isConfigured: true,
+    normalisePhone: (p: string) => (p.replace(/\D/g, '').length >= 9 ? `254${p.replace(/\D/g, '').slice(-9)}` : null),
+    sendTemplate: async (to: string, params: string[], template?: string) => {
+      calls.push({ to, params, template });
+      return to.endsWith('99999999') ? { delivered: false, error: 'Recipient not on WhatsApp' } : { delivered: true, messageId: `wamid.${to}` };
+    },
+  };
+  return { service: new WhatsAppOutreachService(prisma, whatsapp), created, calls };
+}
+
+const ann: Row = { id: 'a', firstName: 'ann', lastName: 'W', phone: '0722111222', isActive: true };
+const bob: Row = { id: 'b', firstName: 'Bob', lastName: 'K', phone: '0733222333', isActive: true };
+
+test('sending records each message and passes the first name and link to the template', async () => {
+  const { service, created, calls } = harness([ann, bob]);
+  const out = await service.send({ kind: 'GROUP', customerIds: ['a', 'b'], triggeredBy: 'staff@x' });
+  assert.equal(out.sent, 2);
+  assert.deepEqual(calls[0], { to: '254722111222', params: ['Ann', 'https://chat.whatsapp.com/g'], template: 'drip_join_group' });
+  assert.deepEqual(created.map((c) => [c.customerId, c.kind, c.status, c.triggeredBy]), [['a', 'GROUP', 'SENT', 'staff@x'], ['b', 'GROUP', 'SENT', 'staff@x']]);
+});
+
+test('someone who already got the message is skipped unless forced', async () => {
+  const first = harness([ann, bob], ['a']);
+  const out = await first.service.send({ kind: 'APP', customerIds: ['a', 'b'], triggeredBy: 's' });
+  assert.deepEqual(out.results.map((r) => [r.customerId, r.outcome]), [['a', 'SKIPPED'], ['b', 'SENT']]);
+  assert.equal(first.calls.length, 1);
+
+  const forced = harness([ann, bob], ['a']);
+  const again = await forced.service.send({ kind: 'APP', customerIds: ['a', 'b'], force: true, triggeredBy: 's' });
+  assert.equal(again.sent, 2);
+});
+
+test('a duplicate id in one request is sent once', async () => {
+  const { service, calls } = harness([ann]);
+  await service.send({ kind: 'APP', customerIds: ['a', 'a'], triggeredBy: 's' });
+  assert.equal(calls.length, 1);
+});
+
+test('a failed send is recorded and reported, not thrown', async () => {
+  const bad: Row = { id: 'z', firstName: 'Zed', lastName: 'Q', phone: '0799999999', isActive: true };
+  const { service, created } = harness([bad]);
+  const out = await service.send({ kind: 'APP', customerIds: ['z'], triggeredBy: 's' });
+  assert.equal(out.failed, 1);
+  assert.equal(created[0].status, 'FAILED');
+  assert.equal(created[0].error, 'Recipient not on WhatsApp');
+});
+
+test('inactive customers, unknown ids and unusable numbers are skipped without a send', async () => {
+  const gone: Row = { ...bob, id: 'g', isActive: false };
+  const nophone: Row = { ...bob, id: 'n', phone: '12' };
+  const { service, calls } = harness([gone, nophone]);
+  const out = await service.send({ kind: 'APP', customerIds: ['g', 'n', 'missing'], triggeredBy: 's' });
+  assert.equal(out.skipped, 3);
+  assert.equal(calls.length, 0);
+});
+
+test('a message with no link is refused before anything is sent', async () => {
+  const { service, calls } = harness([ann], [], { community: {} });
+  await assert.rejects(() => service.send({ kind: 'REVIEW', customerIds: ['a'], triggeredBy: 's' }), /no link/i);
+  assert.equal(calls.length, 0);
+  // The app link has a built-in default, so it never lacks one.
+  const ok = await harness([ann], [], null).service.send({ kind: 'APP', customerIds: ['a'], triggeredBy: 's' });
+  assert.equal(ok.sent, 1);
+});
+
+test('status says which links are ready', async () => {
+  const { service } = harness([], [], { community: { whatsappGroupUrl: 'https://chat.whatsapp.com/g' } });
+  const status = await service.status();
+  assert.deepEqual(status.kinds.map((k) => [k.kind, k.linkReady]), [['APP', true], ['GROUP', true], ['REVIEW', false]]);
+});

@@ -101,6 +101,7 @@ model Customer {
   receipts     Receipt[]
   orders       Order[]
   consignments Consignment[]
+  whatsappOutreach WhatsappOutreach[]
   cartLeads    CartLead[]
   /// Orders placed by someone else that this customer's referral code
   /// attributed. Distinct from `orders` (this customer's own purchases).
@@ -2178,4 +2179,25 @@ model DailyReportRun {
 
   @@unique([reportDate, channel, recipient])
   @@index([reportDate])
+}
+
+/// One row per WhatsApp marketing message sent from the portal's Outreach screen (app download, group invite, Google
+/// rating). `SENT` means Meta accepted it, not that the phone has received it.
+model WhatsappOutreach {
+  id          String    @id @default(uuid())
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  phone       String
+  /// APP, GROUP or REVIEW.
+  kind        String
+  template    String
+  /// SENT or FAILED.
+  status      String
+  messageId   String?
+  error       String?
+  triggeredBy String
+  createdAt   DateTime  @default(now())
+
+  @@index([customerId, kind])
+  @@index([createdAt])
 }

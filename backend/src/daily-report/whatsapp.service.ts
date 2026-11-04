@@ -43,7 +43,8 @@ export class WhatsAppService {
     return digits.length >= 11 && digits.length <= 15 ? digits : null;
   }
 
-  async sendTemplate(to: string, parameters: string[]): Promise<WhatsAppSendResult> {
+  /** `template` defaults to the daily report's; the outreach screen passes its own approved template names. */
+  async sendTemplate(to: string, parameters: string[], template: string = this.template): Promise<WhatsAppSendResult> {
     const phone = this.normalisePhone(to);
     if (!phone) return { delivered: false, error: `Unusable WhatsApp number "${to}"` };
     if (!this.isConfigured) return { delivered: false, error: 'WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN not configured' };
@@ -57,7 +58,7 @@ export class WhatsAppService {
           to: phone,
           type: 'template',
           template: {
-            name: this.template,
+            name: template,
             language: { code: this.language },
             components: [{ type: 'body', parameters: parameters.map((text) => ({ type: 'text', text })) }],
           },

@@ -10,5 +10,6 @@ import { WhatsAppService } from './whatsapp.service';
   imports: [PrismaModule, EmailLogModule],
   controllers: [DailyReportController],
   providers: [DailyReportService, DailyReportQueueService, WhatsAppService],
+  exports: [WhatsAppService],
 })
 export class DailyReportModule {}
