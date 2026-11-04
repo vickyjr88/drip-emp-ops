@@ -13,12 +13,13 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
+import { ImagePicker } from '../components/image-picker';
 import { PortalShell } from '../components/portal-shell';
 import { useErrorState, useFeedbackState, useNotifications } from '../components/notifications';
 import { usePortalDialog } from '../components/portal-dialog';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor,
-  hasPermission, loadProfile, roleLabelFor,
+  hasPermission, loadProfile, roleLabelFor, uploadMedia,
 } from '../accounting/lib';
 
 type BlogPost = {
@@ -62,6 +63,8 @@ export default function BlogPage() {
   const [form, setForm] = useState(BLANK);
   const [slugTouched, setSlugTouched] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
@@ -287,12 +290,44 @@ export default function BlogPage() {
                   </label>
                   <div className="portal-entity-grid-2">
                     <label>
-                      <span>Cover image URL</span>
+                      <span>Cover image</span>
                       <input
                         value={form.coverImageUrl}
-                        placeholder="https://..."
+                        placeholder="Image URL, or upload / choose below"
                         onChange={(event) => setForm((prev) => ({ ...prev, coverImageUrl: event.target.value }))}
                       />
+                      {form.coverImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={form.coverImageUrl} alt="" style={{ maxWidth: 220, maxHeight: 120, objectFit: 'cover', marginTop: 8 }} />
+                      ) : null}
+                      <span className="portal-action-row" style={{ marginTop: 8 }}>
+                        <label className="portal-inline-btn">
+                          {coverUploading ? 'Uploading...' : 'Upload image'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            disabled={coverUploading}
+                            onChange={async (event) => {
+                              const file = event.target.files?.[0];
+                              event.target.value = '';
+                              if (!file || !token) return;
+                              setCoverUploading(true);
+                              try {
+                                const uploaded = await uploadMedia(file, token);
+                                setForm((prev) => ({ ...prev, coverImageUrl: uploaded.url }));
+                              } catch (error) {
+                                setErrorMessage(error);
+                              } finally {
+                                setCoverUploading(false);
+                              }
+                            }}
+                          />
+                        </label>
+                        <button type="button" className="portal-inline-btn" onClick={() => setCoverPickerOpen(true)}>
+                          Choose existing
+                        </button>
+                      </span>
                     </label>
                     <label>
                       <span>Author</span>
@@ -302,6 +337,13 @@ export default function BlogPage() {
                       />
                     </label>
                   </div>
+                  <ImagePicker
+                    open={coverPickerOpen}
+                    token={token}
+                    title="Choose a cover image"
+                    onClose={() => setCoverPickerOpen(false)}
+                    onSelect={(urls) => setForm((prev) => ({ ...prev, coverImageUrl: urls[0] ?? prev.coverImageUrl }))}
+                  />
                   <div className="portal-inline-actions">
                     <button type="submit" className="portal-ghost-btn" disabled={saving}>
                       {saving ? 'Saving...' : 'Save Draft'}

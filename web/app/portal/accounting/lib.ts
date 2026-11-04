@@ -59,10 +59,18 @@ export async function downloadFile(path: string, token: string, fallbackFileName
   window.URL.revokeObjectURL(url);
 }
 
-export async function uploadMedia(file: File, token: string) {
+/**
+ * Uploads a file to the media store.
+ *
+ * `purpose: 'document'` is for receipts, invoices and scans attached to a record: they are stored the same way but are
+ * kept out of the image library, so they are never offered by an image picker or shown in the media manager. Anything
+ * else (product photos, page images, blog covers) is a library image.
+ */
+export async function uploadMedia(file: File, token: string, options: { purpose?: 'document' | 'library' } = {}) {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetch(`${API_BASE_URL}/media/upload`, {
+  const query = options.purpose === 'document' ? '?purpose=document' : '';
+  const response = await fetch(`${API_BASE_URL}/media/upload${query}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: formData,
@@ -70,7 +78,16 @@ export async function uploadMedia(file: File, token: string) {
   if (!response.ok) {
     throw new Error((await response.text()) || 'Upload failed');
   }
-  return (await response.json()) as { objectKey: string; url: string };
+  return (await response.json()) as {
+    id: string | null;
+    objectKey: string;
+    url: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    width: number | null;
+    height: number | null;
+  };
 }
 
 /**

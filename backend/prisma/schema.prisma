@@ -2201,3 +2201,29 @@ model WhatsappOutreach {
   @@index([customerId, kind])
   @@index([createdAt])
 }
+
+/// One row per stored image or file in the media library. The bytes live in the object store under `objectKey`; this row
+/// is what the library shows (name, size, dimensions).
+///
+/// Cropping an image REPLACES it: the file under `objectKey` is overwritten with the cropped picture, so the image keeps
+/// its address and everything already using it shows the cropped version. The picture as it was before each crop is
+/// kept in `versions` (objects under the `versions/` prefix, never listed as library images) so a crop can be undone.
+model MediaAsset {
+  id          String   @id @default(uuid())
+  objectKey   String   @unique
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  width       Int?
+  height      Int?
+  /// LIBRARY: offered by the image picker and the media manager. DOCUMENT: a receipt or scan attached to a record, kept out of both.
+  purpose     String   @default("LIBRARY")
+  /// Earlier versions of this image, newest last: [{ objectKey, contentType, sizeBytes, width, height, replacedAt, replacedBy }].
+  versions    Json?
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+  /// When the picture last changed (uploaded or cropped); used to bust browser caches of the unchanged address.
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([purpose, createdAt])
+}

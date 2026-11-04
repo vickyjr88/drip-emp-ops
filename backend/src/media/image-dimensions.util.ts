@@ -1,10 +1,9 @@
 /**
  * Reads pixel dimensions straight from an image file's header.
  *
- * Done by hand rather than with sharp/image-size because the CMS only needs
- * width and height for display, and sharp in particular pulls a native binary
- * into an Alpine image that currently builds without one. Unknown or corrupt
- * formats return null, and callers treat that as "dimensions unavailable"
+ * Done by hand rather than with sharp: for display, reading a few header bytes is all that is needed, and it works on
+ * the first 64 KB of an object without decoding it. (Cropping, which does need to decode images, uses sharp.) Unknown or
+ * corrupt formats return null, and callers treat that as "dimensions unavailable"
  * rather than an upload failure -- the file itself is still perfectly usable.
  */
 export type ImageDimensions = { width: number; height: number } | null;

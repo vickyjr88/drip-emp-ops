@@ -414,7 +414,7 @@ export default function AccountsPayablePage() {
     setUploading(true);
     setErrorMessage(null);
     try {
-      const uploaded = await uploadMedia(file, token);
+      const uploaded = await uploadMedia(file, token, { purpose: 'document' });
       await apiRequest(
         `/supplier-invoices/${invoiceId}/attachments`,
         { method: 'POST', body: JSON.stringify({ fileName: file.name, url: uploaded.url, objectKey: uploaded.objectKey, uploadedBy: profile?.email }) },

@@ -16,19 +16,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useErrorState } from '../components/notifications';
 import { apiRequest, uploadMedia } from '../accounting/lib';
+import { CropDialog } from './crop-dialog';
+import { usePortalDialog } from './portal-dialog';
+import { MediaItem, MediaLibraryPage, formatBytes, freshUrl, objectKeyOf } from './media-types';
 
-type LibraryImage = {
-  objectKey: string;
-  url: string;
-  sizeBytes: number;
-  uploadedAt: string;
-};
-
-type LibraryResponse = {
-  items: LibraryImage[];
-  nextCursor: string | null;
-  total: number;
-};
+/** The picker's own name for a library image: the same record the media manager shows. */
+type LibraryImage = MediaItem;
 
 type ImagePickerProps = {
   open: boolean;
@@ -46,27 +39,9 @@ type ImagePickerProps = {
   /** Already-used URLs, marked so the same image is not added twice. */
   usedUrls?: string[];
   title?: string;
+  /** Offer Crop and Square on each image (default). Both replace the image itself, everywhere it is used. */
+  allowCrop?: boolean;
 };
-
-function formatBytes(bytes: number) {
-  if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/**
- * Compares a stored URL with a library URL.
- *
- * Stored values were written by whichever host the API answered on at the
- * time, so a saved "http://localhost:3100/media/x.jpg" and a freshly listed
- * one can differ by origin while naming the same object. The object key is the
- * part that actually identifies the image.
- */
-function objectKeyOf(url: string): string {
-  const match = /\/media\/([^/?#]+)/.exec(url || '');
-  return match ? match[1] : url;
-}
 
 export function ImagePicker({
   open,
@@ -77,14 +52,20 @@ export function ImagePicker({
   multiple = false,
   usedUrls = [],
   title = 'Choose an image',
+  allowCrop = true,
 }: ImagePickerProps) {
   const [images, setImages] = useState<LibraryImage[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const dialog = usePortalDialog();
   const [errorMessage, setErrorMessage] = useErrorState();
   const [chosen, setChosen] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [search, setSearch] = useState('');
+  const [cropping, setCropping] = useState<LibraryImage | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const safeUsedUrls = Array.isArray(usedUrls) ? usedUrls : [];
@@ -96,8 +77,10 @@ export function ImagePicker({
       setLoading(true);
       setErrorMessage(null);
       try {
-        const query = nextCursor ? `?limit=60&cursor=${encodeURIComponent(nextCursor)}` : '?limit=60';
-        const data = await apiRequest<LibraryResponse>(`/media/library${query}`, { method: 'GET' }, token);
+        const params = new URLSearchParams({ limit: '60' });
+        if (nextCursor) params.set('cursor', nextCursor);
+        if (search) params.set('search', search);
+        const data = await apiRequest<MediaLibraryPage>(`/media/library?${params}`, { method: 'GET' }, token);
         const nextItems = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? (data as unknown as LibraryImage[]) : [];
         setImages((prev) => (nextCursor ? [...(Array.isArray(prev) ? prev : []), ...nextItems] : nextItems));
         setCursor(data?.nextCursor || null);
@@ -108,14 +91,21 @@ export function ImagePicker({
         setLoading(false);
       }
     },
-    [token],
+    [token, search],
   );
+
+  // Typing waits a moment before searching, so each keystroke is not a request.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchText.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchText]);
 
   // Loaded on open rather than on mount: these pickers sit on forms that may
   // never open one, and listing the bucket has a cost.
   useEffect(() => {
     if (!open) return;
     setChosen([]);
+    setNotice(null);
     void loadPage();
   }, [open, loadPage]);
 
@@ -174,10 +164,17 @@ export function ImagePicker({
       for (const file of files) {
         const result = await uploadMedia(file, token);
         uploaded.push({
+          id: result.id ?? result.objectKey,
           objectKey: result.objectKey,
           url: result.url,
-          sizeBytes: file.size,
+          fileName: result.fileName,
+          contentType: result.contentType,
+          sizeBytes: result.sizeBytes ?? file.size,
+          width: result.width,
+          height: result.height,
           uploadedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          hasPreviousVersion: false,
         });
       }
       setImages((prev) => [...uploaded, ...prev]);
@@ -193,6 +190,40 @@ export function ImagePicker({
       setErrorMessage(error instanceof Error ? error.message : 'Could not upload the image.');
     } finally {
       setUploading(false);
+    }
+  }
+
+  /**
+   * Cropping replaces the image itself, so it stays in its place in the grid and keeps its address; it is then used
+   * straight away, which is what cropping from a picker means.
+   */
+  function onCropped(updated: LibraryImage) {
+    setCropping(null);
+    setImages((prev) => prev.map((image) => (image.id === updated.id ? updated : image)));
+    if (!multiple) {
+      emit([updated.url]);
+      onClose();
+      return;
+    }
+    setChosen((prev) => (prev.includes(updated.url) ? prev : [...prev, updated.url]));
+    setNotice('Image cropped and selected. Everywhere it is already used now shows the cropped picture.');
+  }
+
+  /** One click: the largest centred square. Confirmed first, because it changes the image wherever it is used. */
+  async function makeSquare(image: LibraryImage) {
+    if (!token) return;
+    const ok = await dialog.confirm({
+      title: 'Make this image square?',
+      message: 'It is cropped to a centred square and replaces the image everywhere it is used. You can restore the previous version from the Media library.',
+      confirmLabel: 'Make square',
+    });
+    if (!ok) return;
+    setErrorMessage(null);
+    try {
+      const updated = await apiRequest<LibraryImage>('/media/crop', { method: 'POST', body: JSON.stringify({ assetId: image.id, square: true }) }, token);
+      onCropped(updated);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not crop the image.');
     }
   }
 
@@ -225,11 +256,21 @@ export function ImagePicker({
           {total ? ` ${total} image${total === 1 ? '' : 's'} in the library.` : ''}
         </p>
 
+        <input
+          type="search"
+          className="portal-image-picker-search"
+          placeholder="Search by file name…"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          aria-label="Search images by file name"
+        />
+
         {errorMessage ? <div className="portal-card portal-error">{errorMessage}</div> : null}
+        {notice ? <div className="portal-card portal-success">{notice}</div> : null}
 
         {!loading && images.length === 0 ? (
           <div className="portal-empty-state">
-            Nothing uploaded yet. Upload an image and it becomes available here.
+            {search ? 'No image matches that name.' : 'Nothing uploaded yet. Upload an image and it becomes available here.'}
           </div>
         ) : (
           <div className="portal-image-picker-grid">
@@ -237,19 +278,43 @@ export function ImagePicker({
               const isUsed = used.has(image.objectKey);
               const isChosen = chosen.includes(image.url);
               return (
-                <button
-                  key={image.objectKey}
-                  type="button"
-                  className={`portal-image-picker-item${isChosen ? ' is-chosen' : ''}${
-                    isUsed ? ' is-used' : ''
-                  }`}
-                  onClick={() => toggle(image.url)}
-                  title={isUsed ? 'Already used here' : formatBytes(image.sizeBytes)}
-                >
-                  <img src={image.url} alt="" loading="lazy" />
-                  {isUsed ? <span className="portal-image-picker-tag">In use</span> : null}
-                  {isChosen ? <span className="portal-image-picker-tag is-chosen">Selected</span> : null}
-                </button>
+                <div key={image.objectKey} className="portal-image-picker-tile">
+                  <button
+                    type="button"
+                    className={`portal-image-picker-item${isChosen ? ' is-chosen' : ''}${
+                      isUsed ? ' is-used' : ''
+                    }`}
+                    onClick={() => toggle(image.url)}
+                    title={isUsed ? 'Already used here' : [image.fileName, formatBytes(image.sizeBytes)].filter(Boolean).join(' · ')}
+                  >
+                    <img src={freshUrl(image)} alt={image.fileName} loading="lazy" />
+                    {isUsed ? <span className="portal-image-picker-tag">In use</span> : null}
+                    {isChosen ? <span className="portal-image-picker-tag is-chosen">Selected</span> : null}
+                  </button>
+                  {image.hasPreviousVersion ? <span className="portal-image-picker-badge">Cropped</span> : null}
+                  {allowCrop ? (
+                    <span className="portal-image-picker-actions">
+                      <button
+                        type="button"
+                        className="portal-image-picker-crop"
+                        onClick={() => setCropping(image)}
+                        aria-label={`Crop ${image.fileName}`}
+                        title="Crop this image"
+                      >
+                        Crop
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-image-picker-crop"
+                        onClick={() => void makeSquare(image)}
+                        aria-label={`Make ${image.fileName} square`}
+                        title="Crop to a centred square in one click"
+                      >
+                        Square
+                      </button>
+                    </span>
+                  ) : null}
+                </div>
               );
             })}
           </div>
@@ -279,6 +344,7 @@ export function ImagePicker({
           ) : null}
         </div>
       </div>
+      {cropping ? <CropDialog image={cropping} token={token} onClose={() => setCropping(null)} onCropped={onCropped} /> : null}
     </div>
   );
 }

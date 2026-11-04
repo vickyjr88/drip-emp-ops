@@ -1,11 +1,14 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Logger,
   Get,
   Param,
   Post,
   Query,
+  Req,
+  Res,
   StreamableFile,
   UploadedFile,
   UseInterceptors,
@@ -13,6 +16,7 @@ import {
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Public } from '../auth/decorators/public.decorator';
+import { CropImageDto, RestoreImageDto } from './dto/crop-image.dto';
 import { MediaService } from './media.service';
 
 @ApiTags('media')
@@ -26,12 +30,36 @@ export class MediaController {
   @Post('upload')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file'))
-  async upload(@UploadedFile() file?: any) {
+  async upload(@UploadedFile() file?: any, @Query('purpose') purpose?: string, @Req() request?: any) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
-    return this.mediaService.uploadProjectAsset(file);
+    // "document" is for receipts and scans attached to a record: stored, but kept out of the image library.
+    return this.mediaService.uploadProjectAsset(file, {
+      purpose: purpose === 'document' ? 'DOCUMENT' : 'LIBRARY',
+      uploadedBy: request?.user?.email,
+    });
+  }
+
+  /**
+   * Crops an image in place: the picture under the same address is replaced by the cropped one, so everywhere it is
+   * used shows the cropped version and nothing breaks. The previous version is kept and can be restored.
+   */
+  @ApiBearerAuth()
+  @Post('crop')
+  async crop(@Body() dto: CropImageDto, @Req() request?: any) {
+    const selection = dto.square
+      ? ({ square: true } as const)
+      : { x: dto.x ?? NaN, y: dto.y ?? NaN, width: dto.width ?? NaN, height: dto.height ?? NaN };
+    return this.mediaService.cropAsset(dto.assetId, selection, request?.user?.email);
+  }
+
+  /** Undoes the most recent crop of an image. */
+  @ApiBearerAuth()
+  @Post('restore')
+  async restore(@Body() dto: RestoreImageDto) {
+    return this.mediaService.restoreAsset(dto.assetId);
   }
 
   /**
@@ -42,12 +70,13 @@ export class MediaController {
    */
   @ApiBearerAuth()
   @Get('library')
-  async library(@Query('limit') limit?: string, @Query('cursor') cursor?: string) {
+  async library(@Query('limit') limit?: string, @Query('cursor') cursor?: string, @Query('search') search?: string) {
     const parsed = Number(limit);
-    return this.mediaService.listImages(
-      Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 200) : 60,
-      cursor || undefined,
-    );
+    return this.mediaService.listLibrary({
+      limit: Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 200) : 60,
+      cursor: cursor || undefined,
+      search: search || undefined,
+    });
   }
 
   /**
@@ -62,8 +91,18 @@ export class MediaController {
 
   @Public()
   @Get(':objectKey')
-  async getObject(@Param('objectKey') objectKey: string) {
-    const asset = await this.mediaService.getObject(objectKey);
+  async getObject(@Param('objectKey') objectKey: string, @Req() request: any, @Res({ passthrough: true }) response: any) {
+    const asset = await this.mediaService.getObject(objectKey, request?.headers?.['if-none-match']);
+
+    // An image keeps its address when it is cropped, so caches must check back instead of holding the old picture for
+    // hours. `no-cache` still lets them keep a copy; the ETag turns the check into a cheap "not modified".
+    response.setHeader('Cache-Control', 'no-cache');
+    if (asset.etag) response.setHeader('ETag', `"${asset.etag}"`);
+    if (asset.lastModified) response.setHeader('Last-Modified', new Date(asset.lastModified).toUTCString());
+    if (asset.notModified) {
+      response.status(304);
+      return;
+    }
 
     const file = new StreamableFile(asset.stream, {
       type: asset.contentType,

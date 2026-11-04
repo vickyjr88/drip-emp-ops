@@ -245,7 +245,7 @@ export default function PettyCashPage() {
     setUploadingReceipt(true);
     setErrorMessage(null);
     try {
-      const uploaded = await uploadMedia(file, token);
+      const uploaded = await uploadMedia(file, token, { purpose: 'document' });
       setVoucherReceiptUrl(uploaded.url);
       setFeedback('Receipt uploaded.');
     } catch (error) {
