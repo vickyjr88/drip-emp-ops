@@ -80,3 +80,46 @@ export class PrintStatusDto {
   @IsIn(['AWAITING_REVIEW', 'APPROVED', 'PRINTED', 'READY']) status!: 'AWAITING_REVIEW' | 'APPROVED' | 'PRINTED' | 'READY';
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
 }
+
+export class TemplateColourDto {
+  @ApiProperty() @IsString() @IsNotEmpty() label!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() key?: string;
+  @ApiProperty({ example: '#1b2a49' }) @IsString() hex!: string;
+  @ApiProperty({ description: 'Front photo, an address on this site\'s media library.' }) @IsString() front!: string;
+  @ApiProperty() @IsString() back!: string;
+}
+
+export class TemplateProductDto {
+  @ApiProperty({ example: 1500 }) @IsNumber() @Min(0) priceKes!: number;
+  @ApiProperty({ type: [String], example: ['S', 'M', 'L', 'XL'] }) @IsArray() @ArrayMinSize(1) sizes!: string[];
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isDropShip?: boolean;
+}
+
+export class CreateTemplateDto {
+  @ApiProperty() @IsString() @IsNotEmpty() name!: string;
+  @ApiProperty({ enum: ['JERSEY', 'TSHIRT'] }) @IsIn(['JERSEY', 'TSHIRT']) kind!: 'JERSEY' | 'TSHIRT';
+  @ApiPropertyOptional({ description: 'Width divided by height of the photos.' }) @IsOptional() @IsNumber() aspect?: number;
+  @ApiProperty({ description: '{ frontCentre?, backName?, backNumber? }, each { x, y, w, h } as 0 to 1 fractions of the photo.' }) areas!: Record<string, unknown>;
+  @ApiProperty({ type: [TemplateColourDto] }) @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => TemplateColourDto) colours!: TemplateColourDto[];
+  @ApiPropertyOptional({ description: 'Also create the shirt that is sold on this template.' })
+  @IsOptional() @ValidateNested() @Type(() => TemplateProductDto) product?: TemplateProductDto;
+}
+
+export class UpdateTemplateDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() aspect?: number;
+  @ApiPropertyOptional() @IsOptional() areas?: Record<string, unknown>;
+  @ApiPropertyOptional({ type: [TemplateColourDto] }) @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => TemplateColourDto) colours?: TemplateColourDto[];
+  @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;
+}
+
+export class HideTemplateDto {
+  @ApiProperty() @IsBoolean() hidden!: boolean;
+}
+
+export class BulkClubsDto {
+  @ApiProperty({ enum: ['activate-with-kits', 'deactivate-without-kits', 'activate-all', 'deactivate-all'] })
+  @IsIn(['activate-with-kits', 'deactivate-without-kits', 'activate-all', 'deactivate-all'])
+  action!: 'activate-with-kits' | 'deactivate-without-kits' | 'activate-all' | 'deactivate-all';
+}

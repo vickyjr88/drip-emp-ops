@@ -10,9 +10,9 @@
 
 
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { SHAPES, VIEWBOX, areasFor, patternBands, type KitColors, type KitPattern, type PrintArea } from './kit-geometry';
+import { SHAPES, VIEWBOX, areasFor, areasFromFractions, patternBands, photoBox, type KitColors, type KitPattern, type PrintArea } from './kit-geometry';
 
-export { VIEWBOX, areasFor };
+export { VIEWBOX, areasFor, areasFromFractions };
 export type { KitColors, KitPattern, PrintArea };
 
 export type DesignItem = {
@@ -86,8 +86,10 @@ export type KitShirtProps = {
   name?: DesignSpec['name'];
   number?: DesignSpec['number'];
   items?: DesignItem[];
-  /** A licensed photo that replaces the drawn shirt. */
+  /** A photo that replaces the drawn shirt. */
   photo?: string | null;
+  /** Width divided by height of the photo, so it is fitted rather than stretched. */
+  photoAspect?: number | null;
   /** Print areas to place the overlay by, in the shirt drawing's own units; defaults to the template's. */
   areas?: Record<string, PrintArea>;
   selectedItemId?: string | null;
@@ -98,7 +100,7 @@ export type KitShirtProps = {
 };
 
 export function KitShirt({
-  templateKey, colors, side = 'front', name, number, items = [], photo, areas, selectedItemId, onItemPointerDown, className, title, svgRef,
+  templateKey, colors, side = 'front', name, number, items = [], photo, photoAspect, areas, selectedItemId, onItemPointerDown, className, title, svgRef,
 }: KitShirtProps) {
   const shape = SHAPES[templateKey] ?? SHAPES['jersey-short'];
   const uid = `ks-${templateKey}-${side}-${colors.primary.slice(1)}${colors.secondary.slice(1)}${colors.pattern}`;
@@ -120,7 +122,10 @@ export function KitShirt({
     >
       {title ? <title>{title}</title> : null}
       {photo ? (
-        <image href={photo} x={0} y={0} width={VIEWBOX.w} height={VIEWBOX.h} preserveAspectRatio="xMidYMid meet" />
+        (() => {
+          const box = photoBox(photoAspect ?? VIEWBOX.w / VIEWBOX.h);
+          return <image href={photo} x={box.x} y={box.y} width={box.w} height={box.h} preserveAspectRatio="none" />;
+        })()
       ) : (
         <>
           <defs>

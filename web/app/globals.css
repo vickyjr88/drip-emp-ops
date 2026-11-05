@@ -13557,3 +13557,26 @@ img {
 
 .kp-stack { display: grid; gap: 14px; align-content: start; }
 .kp-stack > .portal-card { margin: 0; }
+
+.kp-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.kp-filter input { flex: 1 1 220px; padding: 9px 10px; border: 1px solid var(--eef-border, #ccc); font: inherit; }
+.kp-filter select { padding: 9px 10px; border: 1px solid var(--eef-border, #ccc); font: inherit; background: #fff; }
+.kp-templates { display: grid; gap: 14px; margin-top: 14px; }
+.kp-template { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 14px; align-items: center; padding-top: 14px; border-top: 1px solid var(--eef-border, #ddd); }
+.kp-template.is-off { opacity: 0.6; }
+.kp-template img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #ececea; }
+.kp-template h3 { margin: 0 0 2px; font-size: 1rem; }
+.kp-colour { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--eef-border, #ddd); }
+.kp-colour input[type='text'], .kp-colour input:not([type]) { padding: 8px 10px; border: 1px solid var(--eef-border, #ccc); font: inherit; width: 140px; }
+.kp-colour input[type='color'] { width: 44px; height: 38px; padding: 2px; border: 1px solid var(--eef-border, #ccc); background: #fff; }
+.kp-photo { width: 96px; height: 96px; border: 1px dashed #999; background: #f4f4f2; padding: 0; cursor: pointer; display: grid; place-items: center; font-size: 12px; color: #666; overflow: hidden; }
+.kp-photo img { width: 100%; height: 100%; object-fit: contain; }
+.ae-label { margin: 8px 0; font-size: 0.85rem; color: #666; }
+.ae-stage { position: relative; display: inline-block; max-width: 420px; width: 100%; background: #ececea; touch-action: none; user-select: none; }
+.ae-stage img { display: block; width: 100%; height: auto; pointer-events: none; }
+.ae-box { position: absolute; border: 2px solid #2438a8; background: rgba(36, 56, 168, 0.18); cursor: move; touch-action: none; }
+.ae-handle { position: absolute; width: 16px; height: 16px; background: #fff; border: 2px solid #2438a8; border-radius: 3px; transform: translate(-50%, -50%); touch-action: none; }
+.ae-handle.is-nw { left: 0; top: 0; cursor: nwse-resize; } .ae-handle.is-n { left: 50%; top: 0; cursor: ns-resize; }
+.ae-handle.is-ne { left: 100%; top: 0; cursor: nesw-resize; } .ae-handle.is-e { left: 100%; top: 50%; cursor: ew-resize; }
+.ae-handle.is-se { left: 100%; top: 100%; cursor: nwse-resize; } .ae-handle.is-s { left: 50%; top: 100%; cursor: ns-resize; }
+.ae-handle.is-sw { left: 0; top: 100%; cursor: nesw-resize; } .ae-handle.is-w { left: 0; top: 50%; cursor: ew-resize; }

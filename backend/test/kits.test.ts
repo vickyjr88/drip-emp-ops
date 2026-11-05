@@ -67,7 +67,7 @@ test('a design is refused when the shirt does not allow it', () => {
   const item = { id: 'a', kind: 'artwork', side: 'front', artworkUrl: ART, x: 0.5, y: 0.5, scale: 0.5, rotation: 0 };
   assert.throws(() => cleanDesign({ ...base, items: [item] }, rules), /cannot be added/);
   assert.throws(() => cleanDesign({ ...base, templateKey: 'tee-crew' }, rules), /different shirt/);
-  assert.throws(() => cleanDesign({ ...base, templateKey: 'nope' }, rules), /Unknown shirt/);
+  assert.throws(() => cleanDesign({ ...base, templateKey: 'nope' }, rules), /different shirt/);
   assert.throws(() => cleanDesign({ ...base, v: 2 }, rules), /supported format/);
 });
 
@@ -158,6 +158,7 @@ async function setup() {
   await prisma.orderLine.deleteMany({ where: { variant: { OR: [{ sku: { startsWith: 'KTEST' } }, { product: { line: 'KIT' } }] } } });
   await prisma.order.deleteMany({ where: { lines: { none: {} }, OR: [{ customerEmail: 'ktest-buyer@example.com' }, { createdBy: 'storefront' }] } });
   await prisma.kitDesign.deleteMany();
+  await prisma.kitClub.updateMany({ data: { isActive: false } });
   await prisma.product.deleteMany({ where: { OR: [{ sku: { startsWith: 'KTEST' } }, { line: 'KIT' }] } });
   await service.ensureSeed();
   return { prisma, storefront, service, flag, pageContent, uploaded };
@@ -253,7 +254,9 @@ db('clubs are seeded once and searching understands nicknames', async () => {
   const withKits = (await service.clubs()).map((c) => c.slug);
   assert.ok(withKits.includes('tottenham-hotspur') && withKits.includes('manchester-united'), 'clubs with a kit on sale are listed');
   assert.equal(withKits.includes('barcelona'), false, 'a club with no kit on sale is not');
-  assert.ok((await service.clubs({ all: true })).length >= 40);
+  // Clubs start switched off; the two that now have a shirt on sale were switched on when it was created.
+  assert.deepEqual((await service.clubs({ all: true })).map((c) => c.slug).sort(), ['manchester-united', 'tottenham-hotspur']);
+  assert.ok((await service.adminClubs()).length >= 40);
   await prisma.$disconnect();
 });
 
@@ -406,4 +409,108 @@ test('sizes sort S, M, L, XL, XXL, 3XL, not alphabetically', async () => {
   const { bySizeOrder } = await import('../src/kits/kits.service');
   const sizes = ['XL', '3XL', 'M', 'L', 'S', 'XXL', 'Kids'].map((size) => ({ size, name: size }));
   assert.deepEqual(sizes.sort(bySizeOrder).map((s) => s.size), ['S', 'M', 'L', 'XL', 'XXL', '3XL', 'Kids']);
+});
+
+// ---------------------------------------------------------------------------
+// Clubs are switched on by staff; templates are uploaded by staff
+// ---------------------------------------------------------------------------
+
+db('clubs start switched off, a club is switched on when it gets a shirt, and bulk actions work', async () => {
+  const { prisma, service } = await setup();
+  assert.equal(await prisma.kitClub.count({ where: { isActive: true } }), 0, 'every starter club is off until staff switch it on');
+  assert.deepEqual(await service.clubs({ all: true }), [], 'so the design center offers no club yet');
+
+  await service.adminCreate({ name: 'KTest Everton Home', kind: 'JERSEY', clubSlug: 'everton', edition: 'HOME', templateKey: 'jersey-short', skuPrefix: 'KTEST-EVE', sizes: [{ size: 'M', priceKes: 3000 }] } as any);
+  assert.deepEqual((await service.clubs({ all: true })).map((c) => c.slug), ['everton']);
+  await service.adminUpdateClub('chelsea', { isActive: true });
+
+  // Chelsea is on but has no shirt: "deactivate without kits" switches it off and leaves Everton alone.
+  const off = await service.adminBulkClubs('deactivate-without-kits');
+  assert.equal(off.changed, 1);
+  assert.deepEqual((await service.clubs({ all: true })).map((c) => c.slug), ['everton']);
+  // "activate with kits" is a no-op here (Everton is already on) and never touches clubs without a shirt.
+  assert.equal((await service.adminBulkClubs('activate-with-kits')).changed, 0);
+  assert.ok((await service.adminBulkClubs('activate-all')).changed >= 40);
+  assert.equal((await service.adminBulkClubs('deactivate-all')).clubs.every((c: any) => !c.isActive), true);
+  await prisma.$disconnect();
+});
+
+const photo = (n: string) => `https://api.test/media/${n}.png`;
+const goodAreas = { frontCentre: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, backNumber: { x: 0.25, y: 0.2, w: 0.5, h: 0.55 } };
+const colourSet = [
+  { label: 'Navy', hex: '#1b2a49', front: photo('navy-front'), back: photo('navy-back') },
+  { label: 'Sand', hex: '#d9c9a8', front: photo('sand-front'), back: photo('sand-back') },
+];
+
+db('staff can upload a shirt template, sell on it, and a design on it is priced and printed like any other', async () => {
+  const { prisma, service } = await setup();
+  await prisma.kitTemplate.deleteMany();
+  const template = await service.adminCreateTemplate({
+    name: 'Boxy Tee', kind: 'TSHIRT', aspect: 0.9, areas: goodAreas, colours: colourSet,
+    product: { priceKes: 1800, sizes: ['M', 'L'], isDropShip: true },
+  } as any);
+  assert.equal(template.key, 'custom-boxy-tee');
+
+  // It is offered to shoppers, with its colours, photos and areas.
+  const config = await service.config();
+  const offered = config.templates.find((t: any) => t.key === 'custom-boxy-tee') as any;
+  assert.deepEqual([offered.custom, offered.kind, offered.aspect, offered.colours.map((c: any) => c.label)], [true, 'TSHIRT', 0.9, ['Navy', 'Sand']]);
+
+  // The shirt sold on it shows the template's photo and areas, and can be personalised.
+  const kit = (await service.list({ kind: 'TSHIRT' })).find((p) => p.kit.templateKey === 'custom-boxy-tee')!;
+  assert.equal(kit.kit.photoFront, photo('navy-front'));
+  assert.equal(kit.kit.photoAspect, 0.9);
+  assert.deepEqual(kit.kit.printAreas, goodAreas);
+  assert.equal(kit.kit.allowArtwork, true);
+
+  const item = { id: 'a', kind: 'text', side: 'front', text: 'Hello', fontKey: 'heavy', color: '#ffffff', x: 0.5, y: 0.5, scale: 0.6, rotation: 0 };
+  const saved = await service.saveDesign(kit.slug, { v: 1, templateKey: 'custom-boxy-tee', colors: { primary: '#1b2a49', secondary: '#1b2a49', trim: '#1b2a49', pattern: 'solid', sleeves: 'primary' }, colorLabel: 'Navy <b>', items: [item] });
+  assert.equal(saved.feeKes, DEFAULT_PRINT_PRICING.textFeeKes);
+  assert.equal(saved.spec.colorLabel, 'Navy b', 'the colour name is cleaned of markup');
+  assert.match((await import('../src/kits/kit-design')).describeDesign(saved.spec), /Shirt colour Navy/);
+
+  // A design made for a different shirt is refused.
+  await assert.rejects(() => service.saveDesign(kit.slug, { v: 1, templateKey: 'tee-crew', colors, items: [] }), /different shirt/);
+  await prisma.$disconnect();
+});
+
+db('a template needs real photos, sensible areas and at least one colour; one in use cannot be deleted', async () => {
+  const { prisma, service } = await setup();
+  await prisma.kitTemplate.deleteMany();
+  const make = (over: any) => service.adminCreateTemplate({ name: 'Bad Tee', kind: 'TSHIRT', areas: goodAreas, colours: colourSet, ...over } as any);
+  await assert.rejects(() => make({ colours: [] }), /at least one colour/i);
+  await assert.rejects(() => make({ colours: [{ ...colourSet[0], front: 'https://evil.example/x.png' }] }), /front photo/i);
+  await assert.rejects(() => make({ colours: [{ ...colourSet[0], hex: 'navy' }] }), /choose its colour/i);
+  await assert.rejects(() => make({ colours: [colourSet[0], colourSet[0]] }), /both called/i);
+  await assert.rejects(() => make({ areas: { frontCentre: goodAreas.frontCentre } }), /back print area/i);
+  await assert.rejects(() => make({ areas: { ...goodAreas, frontCentre: { x: 0.8, y: 0.2, w: 0.5, h: 0.5 } } }), /inside the photo/i);
+  await assert.rejects(() => make({ kind: 'JERSEY', areas: goodAreas }), /name area/i);
+  assert.equal(await prisma.kitTemplate.count(), 0, 'nothing is half-created');
+
+  // If the shirt to sell cannot be made, the template is not left behind.
+  await assert.rejects(() => make({ product: { priceKes: 1000, sizes: [] } }), /./);
+  assert.equal(await prisma.kitTemplate.count(), 0);
+
+  const t = await make({ name: 'Used Tee', product: { priceKes: 1000, sizes: ['M'] } });
+  await assert.rejects(() => service.adminDeleteTemplate(t.id), /uses this template|use this template/);
+  await service.adminUpdateTemplate(t.id, { isActive: false });
+  assert.equal((await service.config()).templates.some((x: any) => x.key === t.key), false, 'a switched-off template is not offered');
+  await assert.rejects(() => service.adminCreate({ name: 'x', kind: 'JERSEY', templateKey: t.key, skuPrefix: 'KTEST-WRONG', sizes: [{ size: 'M', priceKes: 1 }] } as any), /for a T-shirt/);
+  await prisma.$disconnect();
+});
+
+db('hiding a drawn template removes it from the design center and can be undone', async () => {
+  const { prisma, service, flag } = await setup();
+  await prisma.kitSettings.deleteMany();
+  assert.equal((await service.config()).templates.some((t: any) => t.key === 'tee-oversized'), true);
+  await service.adminSetBuiltInHidden('tee-oversized', true);
+  assert.equal((await service.config()).templates.some((t: any) => t.key === 'tee-oversized'), false);
+  assert.equal((await service.adminTemplates()).builtIn.find((t) => t.key === 'tee-oversized')!.hidden, true);
+  // Switching the line on or off does not forget which templates are hidden.
+  await flag.set(true, 'x');
+  assert.equal((await service.config()).templates.some((t: any) => t.key === 'tee-oversized'), false);
+  await service.adminSetBuiltInHidden('tee-oversized', false);
+  assert.equal((await service.config()).templates.some((t: any) => t.key === 'tee-oversized'), true);
+  await assert.rejects(() => service.adminSetBuiltInHidden('nope', true), /No such built-in/);
+  await prisma.$disconnect();
 });

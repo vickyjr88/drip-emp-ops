@@ -23,7 +23,10 @@ export type KitInfo = {
   allowArtwork: boolean;
   photoFront: string | null;
   photoBack: string | null;
+  /** Fractions (0 to 1) of the photo, not drawing units. */
   printAreas: Record<string, PrintArea> | null;
+  photoAspect: number | null;
+  templateCustom: boolean;
   fontKeys: string[];
 };
 
@@ -42,7 +45,17 @@ export type KitClub = {
 };
 
 export type KitFont = { key: string; label: string; family: string; weight: number };
-export type KitTemplate = { key: string; label: string; kind: 'JERSEY' | 'TSHIRT' };
+export type KitTemplateColour = { key: string; label: string; hex: string; front: string; back: string };
+/** A drawn shirt (custom false) or one staff uploaded photos for (custom true, with its colours and print areas). */
+export type KitTemplate = {
+  key: string;
+  label: string;
+  kind: 'JERSEY' | 'TSHIRT';
+  custom: boolean;
+  aspect?: number;
+  areas?: Record<string, PrintArea>;
+  colours?: KitTemplateColour[];
+};
 
 export type KitConfig = {
   enabled: boolean;

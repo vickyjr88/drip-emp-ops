@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
-  KIT_FONT_KEYS, KIT_PATTERNS, KIT_TEMPLATE_KEYS, KitColors, PrintPricing,
+  KIT_FONT_KEYS, KIT_PATTERNS, KitColors, PrintPricing,
 } from './kit-catalogue';
 
 /**
@@ -32,6 +32,8 @@ export type DesignSpec = {
   templateKey: string;
   productSlug?: string;
   colors: KitColors;
+  /** The shirt colour as staff know it ("Navy"), so the print shop picks the right blank. */
+  colorLabel?: string;
   name?: { text: string; fontKey: string; color: string };
   number?: { value: string; fontKey: string; color: string };
   items: DesignItem[];
@@ -141,14 +143,15 @@ export type KitRules = { allowName: boolean; allowNumber: boolean; allowArtwork:
 /** Checks a design against the rules for the kit it is for and returns the cleaned copy that is stored and printed. */
 export function cleanDesign(raw: any, rules: KitRules): DesignSpec {
   if (!raw || typeof raw !== 'object' || raw.v !== 1) fail('This design is not in a supported format.');
-  if (!KIT_TEMPLATE_KEYS.includes(raw.templateKey)) fail('Unknown shirt template.');
-  if (raw.templateKey !== rules.templateKey) fail('This design was made for a different shirt.');
+  // The template must be the one the shirt was made on. Whether that template exists is checked when the kit is created.
+  if (typeof raw.templateKey !== 'string' || raw.templateKey !== rules.templateKey) fail('This design was made for a different shirt.');
 
   const spec: DesignSpec = {
     v: 1,
     templateKey: raw.templateKey,
     ...(raw.productSlug ? { productSlug: String(raw.productSlug).slice(0, 120) } : {}),
     colors: cleanColors(raw.colors),
+    ...(raw.colorLabel ? { colorLabel: String(raw.colorLabel).replace(/[^\p{L}\p{N} '&/().-]/gu, '').trim().slice(0, 30) } : {}),
     items: [],
   };
 
@@ -186,6 +189,7 @@ export function printFee(spec: DesignSpec, pricing: PrintPricing): number {
 /** What staff see in the print queue, in words. */
 export function describeDesign(spec: DesignSpec): string {
   const parts: string[] = [];
+  if (spec.colorLabel) parts.push(`Shirt colour ${spec.colorLabel}`);
   if (spec.name) parts.push(`Name "${spec.name.text}" (${spec.name.fontKey})`);
   if (spec.number) parts.push(`Number ${spec.number.value} (${spec.number.fontKey})`);
   for (const item of spec.items) {

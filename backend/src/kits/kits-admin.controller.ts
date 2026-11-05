@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { KitsService } from './kits.service';
-import { CreateKitDto, PrintStatusDto, UpdateClubDto, UpdateKitDto } from './dto/kits.dto';
+import { BulkClubsDto, CreateKitDto, CreateTemplateDto, HideTemplateDto, PrintStatusDto, UpdateClubDto, UpdateKitDto, UpdateTemplateDto } from './dto/kits.dto';
 import { IsBoolean } from 'class-validator';
 
 class SwitchDto {
@@ -50,6 +50,32 @@ export class KitsAdminController {
   @Patch('clubs/:slug')
   @Permissions(buildPermissionKey('Product', 'update'))
   updateClub(@Param('slug') slug: string, @Body() dto: UpdateClubDto) { return this.service.adminUpdateClub(slug, dto); }
+
+  // Declared before 'clubs/:slug' so "bulk" is not read as a club.
+  @Post('clubs/bulk')
+  @Permissions(buildPermissionKey('Product', 'update'))
+  bulkClubs(@Body() dto: BulkClubsDto) { return this.service.adminBulkClubs(dto.action); }
+
+  @Get('templates')
+  @Permissions(buildPermissionKey('Product', 'read'))
+  templates() { return this.service.adminTemplates(); }
+
+  // Before 'templates/:id' so "builtin" is not read as an id.
+  @Put('templates/builtin/:key')
+  @Permissions(buildPermissionKey('Product', 'update'))
+  hideBuiltIn(@Param('key') key: string, @Body() dto: HideTemplateDto) { return this.service.adminSetBuiltInHidden(key, dto.hidden); }
+
+  @Post('templates')
+  @Permissions(buildPermissionKey('Product', 'create'))
+  createTemplate(@Body() dto: CreateTemplateDto) { return this.service.adminCreateTemplate(dto); }
+
+  @Patch('templates/:id')
+  @Permissions(buildPermissionKey('Product', 'update'))
+  updateTemplate(@Param('id') id: string, @Body() dto: UpdateTemplateDto) { return this.service.adminUpdateTemplate(id, dto); }
+
+  @Delete('templates/:id')
+  @Permissions(buildPermissionKey('Product', 'delete'))
+  deleteTemplate(@Param('id') id: string) { return this.service.adminDeleteTemplate(id); }
 
   @Get('print-queue')
   @Permissions(buildPermissionKey('Order', 'read'))

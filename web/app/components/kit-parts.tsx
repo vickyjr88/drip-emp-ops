@@ -6,7 +6,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { KitShirt } from './kit-shirt';
+import { KitShirt, areasFor, areasFromFractions } from './kit-shirt';
 import { formatKes, priceLabel } from '../lib/shop';
 import {
   EDITION_LABELS, LEAGUES, clubPath, designLink, kitPath, leaguePath, type KitClub, type KitProduct,
@@ -23,7 +23,9 @@ export function KitArt({ product, side = 'front', className }: { product: KitPro
       colors={kit.colors}
       side={side}
       photo={photo}
-      areas={kit.printAreas ?? undefined}
+      photoAspect={kit.photoAspect}
+      // Areas marked on a photo are fractions of it; a drawn shirt uses its own.
+      areas={photo ? areasFromFractions(kit.printAreas, kit.photoAspect, kit.kind) : areasFor(kit.templateKey)}
       title={`${product.name}, ${side} view`}
     />
   );

@@ -156,3 +156,21 @@ test('the drawn-shirt PNG source is valid SVG for every shape and pattern', () =
     }
   }
 });
+
+test('a photo is fitted, never stretched, and areas marked on it land in the same place on the shirt drawing', async () => {
+  const { photoBox, areasFromFractions, areasFor } = await import('../../web/app/components/kit-geometry');
+  // The drawing is 400 x 440. A square photo is fitted to its width and centred; a tall one to its height.
+  assert.deepEqual(photoBox(1), { x: 0, y: 20, w: 400, h: 400 });
+  const tall = photoBox(0.5);
+  assert.deepEqual([tall.x, tall.y, tall.h], [90, 0, 440]);
+  assert.equal(Math.round(tall.w), 220);
+  assert.deepEqual(photoBox(400 / 440), { x: 0, y: 0, w: 400, h: 440 }, 'a photo already the drawing\'s shape fills it');
+  assert.deepEqual(photoBox(NaN), photoBox(400 / 440), 'a missing shape falls back to the drawing\'s');
+
+  // An area marked over the middle of a square photo is the middle of the fitted photo, whatever its pixel size.
+  const areas = areasFromFractions({ backNumber: { x: 0.25, y: 0.25, w: 0.5, h: 0.5 } }, 1, 'TSHIRT');
+  assert.deepEqual(areas.backNumber, { x: 100, y: 120, w: 200, h: 200 });
+  // Areas not marked fall back to the drawn shirt's own, so nothing is left without a place.
+  assert.deepEqual(areas.frontCentre, areasFor('tee-crew').frontCentre);
+  assert.deepEqual(areasFromFractions(null, 1, 'JERSEY').backName, areasFor('jersey-short').backName);
+});

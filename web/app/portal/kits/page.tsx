@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ImagePicker } from '../components/image-picker';
+import { TemplatesTab, type TemplatesData } from './templates-tab';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
@@ -37,7 +38,7 @@ const TEMPLATES: Record<'JERSEY' | 'TSHIRT', Array<[string, string]>> = {
 const ALL_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
 const STEPS: Array<[string, string]> = [['AWAITING_REVIEW', 'Awaiting review'], ['APPROVED', 'Approved'], ['PRINTED', 'Printed'], ['READY', 'Ready']];
 
-type Tab = 'queue' | 'kits' | 'clubs';
+type Tab = 'queue' | 'kits' | 'templates' | 'clubs';
 
 export default function KitsPortalPage() {
   const dialog = usePortalDialog();
@@ -49,6 +50,10 @@ export default function KitsPortalPage() {
   const [tab, setTab] = useState<Tab>('queue');
   const [kits, setKits] = useState<Kit[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [templates, setTemplates] = useState<TemplatesData | null>(null);
+  const [clubSearch, setClubSearch] = useState('');
+  const [clubLeague, setClubLeague] = useState('');
+  const [clubShow, setClubShow] = useState<'all' | 'active' | 'kits'>('all');
   const [queue, setQueue] = useState<QueueRow[]>([]);
   const [queueFilter, setQueueFilter] = useState('');
   const [errorMessage, setErrorMessage] = useErrorState();
@@ -59,13 +64,14 @@ export default function KitsPortalPage() {
 
   const loadAll = useCallback(async (authToken: string) => {
     try {
-      const [s, k, c, q] = await Promise.all([
+      const [s, k, c, q, t] = await Promise.all([
         apiRequest<Status>('/kits/admin/status', { method: 'GET' }, authToken),
         apiRequest<Kit[]>('/kits/admin/products', { method: 'GET' }, authToken),
         apiRequest<Club[]>('/kits/admin/clubs', { method: 'GET' }, authToken),
         apiRequest<QueueRow[]>(`/kits/admin/print-queue${queueFilter ? `?status=${queueFilter}` : ''}`, { method: 'GET' }, authToken).catch(() => [] as QueueRow[]),
+        apiRequest<TemplatesData>('/kits/admin/templates', { method: 'GET' }, authToken).catch(() => null),
       ]);
-      setStatus(s); setKits(k); setClubs(c); setQueue(q);
+      setStatus(s); setKits(k); setClubs(c); setQueue(q); setTemplates(t);
     } catch (error) {
       setErrorMessage(error);
     }
@@ -112,6 +118,14 @@ export default function KitsPortalPage() {
     if (!token) return;
     try {
       await apiRequest(`/kits/admin/clubs/${slug}`, { method: 'PATCH', body: JSON.stringify(body) }, token);
+      await loadAll(token);
+    } catch (error) { setErrorMessage(error); }
+  }
+  async function bulkClubs(action: string) {
+    if (!token) return;
+    try {
+      const result = await apiRequest<{ changed: number }>('/kits/admin/clubs/bulk', { method: 'POST', body: JSON.stringify({ action }) }, token);
+      setFeedback(result.changed ? `${result.changed} club${result.changed === 1 ? '' : 's'} updated.` : 'Nothing to change.');
       await loadAll(token);
     } catch (error) { setErrorMessage(error); }
   }
@@ -176,7 +190,7 @@ export default function KitsPortalPage() {
             </article>
 
             <div className="kp-tabs" role="tablist">
-              {([['queue', `Print queue${waiting ? ` (${waiting})` : ''}`], ['kits', `Kits (${kits.length})`], ['clubs', `Clubs (${clubs.length})`]] as Array<[Tab, string]>).map(([key, label]) => (
+              {([['queue', `Print queue${waiting ? ` (${waiting})` : ''}`], ['kits', `Kits (${kits.length})`], ['templates', `Shirt templates${templates ? ` (${templates.custom.length})` : ''}`], ['clubs', `Clubs (${clubs.filter((c) => c.isActive).length} on)`]] as Array<[Tab, string]>).map(([key, label]) => (
                 <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-on' : ''} onClick={() => setTab(key)}>{label}</button>
               ))}
             </div>
@@ -213,23 +227,48 @@ export default function KitsPortalPage() {
               </article>
             ) : null}
 
-            {tab === 'kits' ? <KitsTab token={token} kits={kits} clubs={clubs} onChanged={() => void loadAll(token)} patchKit={patchKit} setError={setErrorMessage} setFeedback={setFeedback} /> : null}
+            {tab === 'kits' ? <KitsTab token={token} kits={kits} clubs={clubs} templates={templates} onChanged={() => void loadAll(token)} patchKit={patchKit} setError={setErrorMessage} setFeedback={setFeedback} /> : null}
 
-            {tab === 'clubs' ? (
-              <article className="portal-card">
-                <h2 style={{ marginTop: 0 }}>Clubs and teams</h2>
-                <p className="portal-muted">Switch clubs on or off for the new season. A club that is off is not offered in the design center and has no page. Existing kits keep working.</p>
-                <div className="kp-clubs">
-                  {clubs.map((club) => (
-                    <label key={club.slug} className={club.isActive ? '' : 'is-off'}>
-                      <input type="checkbox" checked={club.isActive} onChange={(e) => void patchClub(club.slug, { isActive: e.target.checked })} />
-                      <span>{club.name}</span>
-                      <small>{club.league.replace('_', ' ')}{club.kitCount ? ` · ${club.kitCount} kit${club.kitCount === 1 ? '' : 's'}` : ''}</small>
-                    </label>
-                  ))}
-                </div>
-              </article>
-            ) : null}
+            {tab === 'templates' ? <TemplatesTab token={token} data={templates} onChanged={() => void loadAll(token)} setError={setErrorMessage} setFeedback={setFeedback} /> : null}
+
+            {tab === 'clubs' ? (() => {
+              const q = clubSearch.trim().toLowerCase();
+              const shown = clubs.filter((c) =>
+                (!q || c.name.toLowerCase().includes(q)) &&
+                (!clubLeague || c.league === clubLeague) &&
+                (clubShow === 'all' || (clubShow === 'active' ? c.isActive : c.kitCount > 0)));
+              const leagues = Array.from(new Set(clubs.map((c) => c.league)));
+              return (
+                <article className="portal-card">
+                  <h2 style={{ marginTop: 0 }}>Clubs and teams</h2>
+                  <p className="portal-muted" style={{ maxWidth: '66ch' }}>
+                    Only clubs that are switched <strong>on</strong> appear in the design center and have a page. Every club starts off: switch on the ones whose
+                    shirts you sell. A club is switched on automatically when you add a shirt for it.
+                  </p>
+                  <div className="portal-action-row" style={{ marginBottom: 10 }}>
+                    <button type="button" className="portal-primary-btn" onClick={() => void bulkClubs('activate-with-kits')}>Switch on clubs that have shirts</button>
+                    <button type="button" className="portal-ghost-btn" onClick={() => void bulkClubs('deactivate-without-kits')}>Switch off clubs without shirts</button>
+                    <button type="button" className="portal-ghost-btn" onClick={() => { if (window.confirm('Switch off every club?')) void bulkClubs('deactivate-all'); }}>Switch all off</button>
+                    <button type="button" className="portal-ghost-btn" onClick={() => { if (window.confirm('Switch on all clubs, including ones you have no shirts for?')) void bulkClubs('activate-all'); }}>Switch all on</button>
+                  </div>
+                  <div className="kp-filter">
+                    <input type="search" placeholder="Search clubs…" value={clubSearch} onChange={(e) => setClubSearch(e.target.value)} aria-label="Search clubs" />
+                    <select value={clubLeague} onChange={(e) => setClubLeague(e.target.value)} aria-label="League"><option value="">All leagues</option>{leagues.map((l) => <option key={l} value={l}>{l.replace('_', ' ')}</option>)}</select>
+                    <select value={clubShow} onChange={(e) => setClubShow(e.target.value as 'all' | 'active' | 'kits')} aria-label="Show"><option value="all">All clubs</option><option value="active">Switched on</option><option value="kits">Have shirts</option></select>
+                  </div>
+                  <p className="portal-muted">{shown.length} of {clubs.length} clubs</p>
+                  <div className="kp-clubs">
+                    {shown.map((club) => (
+                      <label key={club.slug} className={club.isActive ? '' : 'is-off'}>
+                        <input type="checkbox" checked={club.isActive} onChange={(e) => void patchClub(club.slug, { isActive: e.target.checked })} />
+                        <span>{club.name}</span>
+                        <small>{club.league.replace('_', ' ')}{club.kitCount ? ` · ${club.kitCount} shirt${club.kitCount === 1 ? '' : 's'}` : ' · no shirts yet'}</small>
+                      </label>
+                    ))}
+                  </div>
+                </article>
+              );
+            })() : null}
             </div>
           </PortalShell>
         </section>
@@ -238,8 +277,8 @@ export default function KitsPortalPage() {
   );
 }
 
-function KitsTab({ token, kits, clubs, onChanged, patchKit, setError, setFeedback }: {
-  token: string; kits: Kit[]; clubs: Club[]; onChanged: () => void;
+function KitsTab({ token, kits, clubs, templates, onChanged, patchKit, setError, setFeedback }: {
+  token: string; kits: Kit[]; clubs: Club[]; templates: TemplatesData | null; onChanged: () => void;
   patchKit: (id: string, body: Record<string, unknown>) => Promise<void>;
   setError: (e: unknown) => void; setFeedback: (m: string) => void;
 }) {
@@ -257,7 +296,11 @@ function KitsTab({ token, kits, clubs, onChanged, patchKit, setError, setFeedbac
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setTemplateKey(TEMPLATES[kind][0][0]); if (kind === 'TSHIRT') { setClubSlug(''); setEdition('NONE'); } else setEdition('HOME'); }, [kind]);
+  // The shapes on offer: the drawn ones that are not hidden, then the templates staff uploaded.
+  const shapes: Array<[string, string]> = templates
+    ? [...templates.builtIn.filter((t) => t.kind === kind && !t.hidden).map((t) => [t.key, t.label] as [string, string]), ...templates.custom.filter((t) => t.kind === kind && t.isActive).map((t) => [t.key, t.name] as [string, string])]
+    : TEMPLATES[kind];
+  useEffect(() => { setTemplateKey((shapes[0] ?? TEMPLATES[kind][0])[0]); if (kind === 'TSHIRT') { setClubSlug(''); setEdition('NONE'); } else setEdition('HOME'); }, [kind]);
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -293,7 +336,7 @@ function KitsTab({ token, kits, clubs, onChanged, patchKit, setError, setFeedbac
               <label>Season<input value={season} onChange={(e) => setSeason(e.target.value)} placeholder="2025/26" /></label>
             </>
           ) : null}
-          <label>Shirt shape<select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>{TEMPLATES[kind].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+          <label>Shirt shape<select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>{shapes.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
           <label>Price per shirt, before printing (KES)<input required type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} /></label>
           <fieldset><legend>Sizes</legend>{ALL_SIZES.map((s) => <label key={s} className="kp-inline"><input type="checkbox" checked={sizes.includes(s)} onChange={(e) => setSizes((cur) => e.target.checked ? [...cur, s] : cur.filter((x) => x !== s))} />{s}</label>)}</fieldset>
           <label className="kp-inline"><input type="checkbox" checked={dropShip} onChange={(e) => setDropShip(e.target.checked)} />Sourced from the supplier for each order (untick if you hold stock)</label>

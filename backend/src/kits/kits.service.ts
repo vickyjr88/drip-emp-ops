@@ -12,7 +12,8 @@ import {
   PrintPricing, TEE_PALETTE, editionsFor, fontKeysFor,
 } from './kit-catalogue';
 import { DesignSpec, cleanDesign, describeDesign, isPersonalised, printFee } from './kit-design';
-import { CreateKitDto, UpdateClubDto, UpdateKitDto } from './dto/kits.dto';
+import { BulkClubsDto, CreateKitDto, CreateTemplateDto, UpdateClubDto, UpdateKitDto, UpdateTemplateDto } from './dto/kits.dto';
+import { cleanAreas, cleanAspect, cleanColours, templateKeyFor, type TemplateAreas, type TemplateColour } from './kit-template';
 import { KitsFlagService } from './kits.flag';
 
 const KITS_CATEGORY_SLUG = 'kits';
@@ -105,6 +106,8 @@ export class KitsService implements OnModuleInit {
             third: editions.third as unknown as Prisma.InputJsonValue,
             fontKeys: fontKeysFor(index),
             sortOrder: index,
+            // Off until staff activate the clubs whose shirts they sell (Portal > Kits > Clubs).
+            isActive: false,
           };
         }),
         skipDuplicates: true,
@@ -121,13 +124,33 @@ export class KitsService implements OnModuleInit {
     return parsePrintPricing((await this.pageContent.findOne('kits')).content);
   }
 
+  private async hiddenTemplateKeys(): Promise<string[]> {
+    const row = await this.prisma.kitSettings.findUnique({ where: { id: 'kits' } }).catch(() => null);
+    return row?.hiddenTemplates ?? [];
+  }
+
+  private async customTemplates() {
+    return this.prisma.kitTemplate.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
+  }
+
+  /** Templates offered to shoppers: the drawn ones staff have not hidden, then the uploaded ones that are switched on. */
+  private async offeredTemplates() {
+    const [hidden, custom] = await Promise.all([this.hiddenTemplateKeys(), this.customTemplates()]);
+    return [
+      ...KIT_TEMPLATES.filter((t) => !hidden.includes(t.key)).map((t) => ({ key: t.key, label: t.label, kind: t.kind, custom: false as const })),
+      ...custom
+        .filter((t) => t.isActive)
+        .map((t) => ({ key: t.key, label: t.name, kind: t.kind, custom: true as const, aspect: t.aspect, areas: t.areas as unknown as TemplateAreas, colours: t.colours as unknown as TemplateColour[] })),
+    ];
+  }
+
   async config() {
-    const [content, enabled] = await Promise.all([this.pageContent.findOne('kits'), this.flag.isEnabled()]);
+    const [content, enabled, templates] = await Promise.all([this.pageContent.findOne('kits'), this.flag.isEnabled(), this.offeredTemplates()]);
     const c = content.content;
     return {
       enabled,
       fonts: KIT_FONTS.map(({ key, label, family, fontsource, weight }) => ({ key, label, family, fontsource, weight })),
-      templates: KIT_TEMPLATES,
+      templates,
       patterns: KIT_PATTERNS,
       teePalette: TEE_PALETTE,
       viewBox: KIT_VIEWBOX,
@@ -156,9 +179,13 @@ export class KitsService implements OnModuleInit {
 
   private async shapeKits(rows: KitProductRow[], user?: { priceTier?: PriceTier }) {
     const shaped = await this.storefront.shapeProducts(rows, user);
+    const templates = new Map((await this.customTemplates()).map((t) => [t.key, t]));
     return shaped.map((product, i) => {
       const row = rows[i];
       const kit = row.kit!;
+      // A kit on an uploaded template shows that template's photos (first colour) unless the kit has photos of its own.
+      const template = templates.get(kit.templateKey);
+      const firstColour = (template?.colours as unknown as TemplateColour[] | undefined)?.[0];
       return {
         ...product,
         variants: [...product.variants].sort(bySizeOrder),
@@ -172,9 +199,12 @@ export class KitsService implements OnModuleInit {
           allowName: kit.allowName,
           allowNumber: kit.allowNumber,
           allowArtwork: kit.allowArtwork,
-          photoFront: kit.photoFront,
-          photoBack: kit.photoBack,
-          printAreas: kit.printAreas,
+          photoFront: kit.photoFront ?? firstColour?.front ?? null,
+          photoBack: kit.photoBack ?? firstColour?.back ?? null,
+          // Fractions of the photo (0 to 1), with the photo's shape, so they can be placed whatever size the photo is.
+          printAreas: kit.printAreas ?? (template ? template.areas : null),
+          photoAspect: template?.aspect ?? null,
+          templateCustom: Boolean(template),
           fontKeys: kit.club?.fontKeys ?? [],
         },
       };
@@ -421,10 +451,12 @@ export class KitsService implements OnModuleInit {
     return club.id;
   }
 
-  private assertTemplate(kind: 'JERSEY' | 'TSHIRT', templateKey: string) {
-    const template = KIT_TEMPLATES.find((t) => t.key === templateKey);
-    if (!template || !KIT_TEMPLATE_KEYS.includes(templateKey)) throw new BadRequestException('Unknown shirt template.');
-    if (template.kind !== kind) throw new BadRequestException(`That template is for a ${template.kind === 'JERSEY' ? 'jersey' : 'T-shirt'}.`);
+  private async assertTemplate(kind: 'JERSEY' | 'TSHIRT', templateKey: string) {
+    const drawn = KIT_TEMPLATES.find((t) => t.key === templateKey);
+    const uploaded = drawn ? null : await this.prisma.kitTemplate.findUnique({ where: { key: templateKey } });
+    const found = drawn ?? uploaded;
+    if (!found) throw new BadRequestException('Unknown shirt template.');
+    if (found.kind !== kind) throw new BadRequestException(`That template is for a ${found.kind === 'JERSEY' ? 'jersey' : 'T-shirt'}.`);
   }
 
   private async uniqueSlug(base: string, ignoreId?: string) {
@@ -438,8 +470,11 @@ export class KitsService implements OnModuleInit {
   }
 
   async adminCreate(dto: CreateKitDto) {
-    this.assertTemplate(dto.kind, dto.templateKey);
+    if (!dto.sizes?.length) throw new BadRequestException('Add at least one size.');
+    await this.assertTemplate(dto.kind, dto.templateKey);
     const clubId = await this.clubIdFor(dto.clubSlug);
+    // A club that has a shirt on sale is switched on: that is the point of activating clubs.
+    if (clubId) await this.prisma.kitClub.updateMany({ where: { id: clubId, isActive: false }, data: { isActive: true } });
     const category = await this.prisma.productCategory.findUnique({ where: { slug: KITS_CATEGORY_SLUG } });
     const prefix = (dto.skuPrefix || slugify(dto.name)).toUpperCase().replace(/-+/g, '-').slice(0, 40);
     const images = dto.imageUrls?.filter(Boolean) ?? [];
@@ -498,7 +533,7 @@ export class KitsService implements OnModuleInit {
   async adminUpdate(id: string, dto: UpdateKitDto) {
     const row = await this.prisma.product.findFirst({ where: { id, line: 'KIT' }, include: { kit: true } });
     if (!row?.kit) throw new NotFoundException('Kit not found');
-    if (dto.templateKey) this.assertTemplate(row.kit.kind, dto.templateKey);
+    if (dto.templateKey) await this.assertTemplate(row.kit.kind, dto.templateKey);
     const clubId = dto.clubSlug === undefined ? undefined : await this.clubIdFor(dto.clubSlug);
     const images = dto.imageUrls?.filter(Boolean);
 
@@ -593,5 +628,111 @@ export class KitsService implements OnModuleInit {
     const line = await this.prisma.orderLine.findUnique({ where: { id: lineId } });
     if (!line || !line.designId) throw new NotFoundException('That order line has no design.');
     return this.prisma.orderLine.update({ where: { id: lineId }, data: { printStatus: status, ...(notes !== undefined ? { printNotes: notes } : {}) } });
+  }
+
+  // -------------------------------------------------------------------------
+  // Shirt templates (staff)
+  // -------------------------------------------------------------------------
+
+  async adminTemplates() {
+    const [hidden, custom, kits] = await Promise.all([
+      this.hiddenTemplateKeys(),
+      this.customTemplates(),
+      this.prisma.kitProduct.findMany({ select: { templateKey: true } }),
+    ]);
+    const uses = (key: string) => kits.filter((k) => k.templateKey === key).length;
+    return {
+      builtIn: KIT_TEMPLATES.map((t) => ({ key: t.key, label: t.label, kind: t.kind, hidden: hidden.includes(t.key), kitCount: uses(t.key) })),
+      custom: custom.map((t) => ({ ...t, kitCount: uses(t.key) })),
+    };
+  }
+
+  async adminSetBuiltInHidden(key: string, hidden: boolean) {
+    if (!KIT_TEMPLATES.some((t) => t.key === key)) throw new NotFoundException('No such built-in template');
+    const current = await this.hiddenTemplateKeys();
+    const next = hidden ? Array.from(new Set([...current, key])) : current.filter((k) => k !== key);
+    await this.prisma.kitSettings.upsert({ where: { id: 'kits' }, update: { hiddenTemplates: next }, create: { id: 'kits', enabled: false, hiddenTemplates: next } });
+    return this.adminTemplates();
+  }
+
+  async adminCreateTemplate(dto: CreateTemplateDto) {
+    const colours = cleanColours(dto.colours);
+    const areas = cleanAreas(dto.areas, dto.kind);
+    const taken = new Set([...KIT_TEMPLATE_KEYS, ...(await this.prisma.kitTemplate.findMany({ select: { key: true } })).map((t) => t.key)]);
+    const key = templateKeyFor(dto.name, taken);
+    const count = await this.prisma.kitTemplate.count();
+    const template = await this.prisma.kitTemplate.create({
+      data: {
+        key,
+        name: dto.name.trim().slice(0, 60),
+        kind: dto.kind,
+        aspect: cleanAspect(dto.aspect),
+        areas: areas as unknown as Prisma.InputJsonValue,
+        colours: colours as unknown as Prisma.InputJsonValue,
+        sortOrder: count,
+      },
+    });
+    if (dto.product) {
+      // The shirt that is sold on this template, so the design center can take orders on it straight away.
+      try {
+        await this.adminCreate({
+          name: `Custom ${template.name}`,
+          kind: dto.kind,
+          templateKey: template.key,
+          skuPrefix: `CUSTOM-${key.replace(/^custom-/, '')}`,
+          imageUrls: [colours[0].front],
+          colors: { primary: colours[0].hex, secondary: colours[0].hex, trim: colours[0].hex, pattern: 'solid', sleeves: 'primary' },
+          sizes: dto.product.sizes.map((size) => ({ size, priceKes: dto.product!.priceKes, isDropShip: dto.product!.isDropShip ?? true })),
+        } as CreateKitDto);
+      } catch (error) {
+        await this.prisma.kitTemplate.delete({ where: { id: template.id } }).catch(() => undefined);
+        throw error;
+      }
+    }
+    return template;
+  }
+
+  async adminUpdateTemplate(id: string, dto: UpdateTemplateDto) {
+    const row = await this.prisma.kitTemplate.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Template not found');
+    return this.prisma.kitTemplate.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim().slice(0, 60) } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.aspect !== undefined ? { aspect: cleanAspect(dto.aspect) } : {}),
+        ...(dto.areas !== undefined ? { areas: cleanAreas(dto.areas, row.kind) as unknown as Prisma.InputJsonValue } : {}),
+        ...(dto.colours !== undefined ? { colours: cleanColours(dto.colours) as unknown as Prisma.InputJsonValue } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+    });
+  }
+
+  /** A template still used by a shirt cannot be deleted: switch it off instead, so existing orders and designs keep working. */
+  async adminDeleteTemplate(id: string) {
+    const row = await this.prisma.kitTemplate.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Template not found');
+    const used = await this.prisma.kitProduct.count({ where: { templateKey: row.key } });
+    if (used) throw new BadRequestException(`${used} shirt${used === 1 ? ' uses' : 's use'} this template. Switch it off instead, or move those shirts to another template first.`);
+    await this.prisma.kitTemplate.delete({ where: { id } });
+    return { deleted: true };
+  }
+
+  // -------------------------------------------------------------------------
+  // Clubs in bulk (staff)
+  // -------------------------------------------------------------------------
+
+  /** Switch many clubs at once: the usual need is "only the clubs we sell". */
+  async adminBulkClubs(action: BulkClubsDto['action']) {
+    const withKits = { kits: { some: { product: { isActive: true } } } } as const;
+    const result =
+      action === 'activate-with-kits'
+        ? await this.prisma.kitClub.updateMany({ where: { isActive: false, ...withKits }, data: { isActive: true } })
+        : action === 'deactivate-without-kits'
+          ? await this.prisma.kitClub.updateMany({ where: { isActive: true, NOT: withKits }, data: { isActive: false } })
+          : action === 'activate-all'
+            ? await this.prisma.kitClub.updateMany({ where: { isActive: false }, data: { isActive: true } })
+            : await this.prisma.kitClub.updateMany({ where: { isActive: true }, data: { isActive: false } });
+    return { changed: result.count, clubs: await this.adminClubs() };
   }
 }

@@ -11,7 +11,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { KitShirt, areasFor, type DesignItem, type DesignSpec, type KitColors } from '../components/kit-shirt';
+import { KitShirt, areasFor, areasFromFractions, type DesignItem, type DesignSpec, type KitColors } from '../components/kit-shirt';
 import { useCart } from '../lib/cart';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
 import { formatKes } from '../lib/shop';
@@ -29,8 +29,6 @@ const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').re
 
 type Mode = 'JERSEY' | 'TSHIRT';
 type Edition = 'HOME' | 'AWAY' | 'THIRD';
-const JERSEY_TEMPLATES = ['jersey-short', 'jersey-long', 'jersey-retro'];
-const TEE_TEMPLATES = ['tee-crew', 'tee-vneck', 'tee-oversized'];
 
 export type DesignInitial = {
   kit?: string;
@@ -69,12 +67,19 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
   const [mode, setMode] = useState<Mode>(startMode);
   const [clubSlug, setClubSlug] = useState(startClub);
   const [edition, setEdition] = useState<Edition>(startEdition);
-  const [jerseyTemplate, setJerseyTemplate] = useState(startMode === 'JERSEY' && startTemplate ? startTemplate : 'jersey-short');
-  const [teeTemplate, setTeeTemplate] = useState(startMode === 'TSHIRT' && startTemplate ? startTemplate : 'tee-crew');
-  const [teeColour, setTeeColour] = useState(() => {
-    const hex = savedSpec?.colors.primary ?? startKit?.kit.colors.primary;
-    return config.teePalette.find((c) => c.hex.toLowerCase() === hex?.toLowerCase())?.key ?? config.teePalette[0]?.key ?? 'white';
-  });
+  // The shirts offered: the templates staff have not hidden, narrowed to those a shirt is actually set up on (so a shopper
+  // is not offered a shape that cannot be ordered). If none is set up yet, all are shown so the design can still be tried.
+  const offered = (kind: Mode) => {
+    const all = config.templates.filter((t) => t.kind === kind);
+    const withShirt = all.filter((t) => kits.some((k) => k.kit.templateKey === t.key));
+    return withShirt.length ? withShirt : all;
+  };
+  const jerseyOptions = offered('JERSEY');
+  const teeOptions = offered('TSHIRT');
+  const [jerseyTemplate, setJerseyTemplate] = useState(startMode === 'JERSEY' && startTemplate ? startTemplate : jerseyOptions[0]?.key ?? 'jersey-short');
+  const [teeTemplate, setTeeTemplate] = useState(startMode === 'TSHIRT' && startTemplate ? startTemplate : teeOptions[0]?.key ?? 'tee-crew');
+  const startHex = (savedSpec?.colors.primary ?? startKit?.kit.colors.primary)?.toLowerCase();
+  const [colourPick, setColourPick] = useState('');
   const [nameText, setNameText] = useState(savedSpec?.name?.text ?? '');
   const [numberText, setNumberText] = useState(savedSpec?.number?.value ?? '');
   const [fontKey, setFontKey] = useState<string>(savedSpec?.name?.fontKey ?? savedSpec?.number?.fontKey ?? '');
@@ -92,31 +97,37 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
   // --- the shirt being designed ----------------------------------------------------------------------------------
   const club = clubs.find((c) => c.slug === clubSlug);
   const templateKey = mode === 'JERSEY' ? jerseyTemplate : teeTemplate;
+  // A template staff uploaded photos for: its colours replace the drawn shirt's, and its photos are what is shown.
+  const customTpl = config.templates.find((t) => t.key === templateKey && t.custom && t.colours?.length) ?? null;
+  const colourOptions: Array<{ key: string; label: string; hex: string; front?: string; back?: string }> = customTpl ? customTpl.colours! : config.teePalette;
+  const colourChoice = colourOptions.find((c) => c.key === colourPick) ?? colourOptions.find((c) => c.hex.toLowerCase() === startHex) ?? colourOptions[0];
+  const plainColours = (hex: string): KitColors => ({ primary: hex, secondary: hex, trim: shade(hex, isLight(hex) ? -0.18 : 0.14), pattern: 'solid', sleeves: 'primary' });
   const colours: KitColors = useMemo(() => {
+    if (customTpl && colourChoice) return plainColours(colourChoice.hex);
     if (mode === 'JERSEY') return (club ? (edition === 'AWAY' ? club.away : edition === 'THIRD' ? club.third : club.home) : { primary: '#d9d9d6', secondary: '#111111', trim: '#111111', pattern: 'solid', sleeves: 'primary' }) as KitColors;
-    const hex = config.teePalette.find((c) => c.key === teeColour)?.hex ?? '#f5f5f2';
-    return { primary: hex, secondary: hex, trim: shade(hex, isLight(hex) ? -0.18 : 0.14), pattern: 'solid', sleeves: 'primary' };
-  }, [mode, club, edition, teeColour, config.teePalette]);
+    return plainColours(colourChoice?.hex ?? '#f5f5f2');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, club, edition, customTpl, colourChoice?.hex]);
+  const colorLabel = customTpl || mode === 'TSHIRT' ? colourChoice?.label : club ? `${club.name} ${EDITION_LABELS[edition].toLowerCase()}` : undefined;
 
   // The kit product that prices, stocks and ships this design: a ready-made shirt for this club and edition if there is
   // one, otherwise the generic custom jersey or T-shirt.
   const product = useMemo(() => {
-    const ofKind = kits.filter((k) => k.kit.kind === mode);
+    // Only a shirt made on the template being designed can take the order: the server refuses a design on a different one.
+    const onTemplate = kits.filter((k) => k.kit.kind === mode && k.kit.templateKey === templateKey);
     if (mode === 'JERSEY') {
       return (
-        ofKind.find((k) => k.kit.club?.slug === clubSlug && k.kit.edition === edition && k.kit.templateKey === templateKey) ??
-        ofKind.find((k) => k.kit.club?.slug === clubSlug && k.kit.edition === edition) ??
-        ofKind.find((k) => !k.kit.club && k.kit.templateKey === templateKey) ??
-        ofKind.find((k) => !k.kit.club) ??
+        onTemplate.find((k) => k.kit.club?.slug === clubSlug && k.kit.edition === edition) ??
+        onTemplate.find((k) => !k.kit.club) ??
         null
       );
     }
-    return ofKind.find((k) => k.kit.templateKey === templateKey) ?? ofKind[0] ?? null;
+    return onTemplate[0] ?? null;
   }, [kits, mode, clubSlug, edition, templateKey]);
 
-  const allowName = product?.kit.allowName ?? false;
-  const allowNumber = product?.kit.allowNumber ?? false;
-  const allowArtwork = product?.kit.allowArtwork ?? false;
+  const allowName = product ? product.kit.allowName : mode === 'JERSEY';
+  const allowNumber = product ? product.kit.allowNumber : mode === 'JERSEY';
+  const allowArtwork = product ? product.kit.allowArtwork : mode === 'TSHIRT';
 
   useEffect(() => {
     const keep = product?.variants.find((v) => v.id === variantId);
@@ -143,6 +154,7 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
     templateKey,
     ...(product ? { productSlug: product.slug } : {}),
     colors: colours,
+    ...(colorLabel ? { colorLabel } : {}),
     ...(nameOn ? { name: { text: nameText.replace(/\s+/g, ' ').trim().toUpperCase(), fontKey: activeFont, color: activeColour } } : {}),
     ...(numberOn ? { number: { value: String(Number(numberText.trim())), fontKey: activeFont, color: activeColour } } : {}),
     items: allowArtwork ? items : [],
@@ -151,7 +163,13 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
   const fee = printFeeOf(spec, config.pricing);
   const variant = product?.variants.find((v) => v.id === variantId) ?? null;
   const unit = (variant?.priceKes ?? 0) + fee;
-  const areas = (product?.kit.printAreas as Record<string, { x: number; y: number; w: number; h: number }> | null) ?? areasFor(templateKey);
+  // Photos: the uploaded template's (for the chosen colour), else the shirt's own. Print areas marked on a photo are
+  // fractions of it, mapped through the photo's shape; a drawn shirt uses its own.
+  const photoFront = customTpl ? colourChoice?.front ?? null : product?.kit.photoFront ?? null;
+  const photoBack = customTpl ? colourChoice?.back ?? null : product?.kit.photoBack ?? null;
+  const photoAspect = customTpl?.aspect ?? product?.kit.photoAspect ?? null;
+  const fractionAreas = (customTpl?.areas ?? product?.kit.printAreas ?? null) as Record<string, { x: number; y: number; w: number; h: number }> | null;
+  const areas = photoFront || photoBack ? areasFromFractions(fractionAreas, photoAspect, mode) : areasFor(templateKey);
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const usedFonts = useMemo(
     () => Array.from(new Set([spec.name?.fontKey, spec.number?.fontKey, ...spec.items.map((i) => i.fontKey)].filter(Boolean) as string[])),
@@ -236,7 +254,7 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
   const whatsappMessage = [
     'Hello Drip Emporium, I would like a custom shirt:',
     '',
-    mode === 'JERSEY' ? `Shirt: ${club?.name ?? 'Jersey'} ${EDITION_LABELS[edition]} jersey` : `Shirt: ${config.templates.find((t) => t.key === templateKey)?.label ?? 'T-shirt'} (${config.teePalette.find((c) => c.key === teeColour)?.label})`,
+    mode === 'JERSEY' ? `Shirt: ${club?.name ?? 'Jersey'} ${EDITION_LABELS[edition]} jersey` : `Shirt: ${config.templates.find((t) => t.key === templateKey)?.label ?? 'T-shirt'} (${colourChoice?.label ?? ''})`,
     ...(personalised ? [`Print: ${summarise(spec)}`] : []),
     ...(variant ? [`Size: ${variant.size ?? variant.name}`] : []),
   ].join('\n');
@@ -315,10 +333,10 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
         <div className="dc-canvas">
           {/* Both sides are always drawn (one hidden) so the finished preview can be taken of each. */}
           <div className={side === 'front' ? 'dc-view' : 'dc-view is-hidden'}>
-            <KitShirt svgRef={frontRef} templateKey={templateKey} colors={colours} side="front" name={spec.name} number={spec.number} items={spec.items} areas={areas} photo={product?.kit.photoFront} selectedItemId={selectedId} onItemPointerDown={allowArtwork ? onItemPointerDown : undefined} title="Front of the shirt" />
+            <KitShirt svgRef={frontRef} templateKey={templateKey} colors={colours} side="front" name={spec.name} number={spec.number} items={spec.items} areas={areas} photo={photoFront} photoAspect={photoAspect} selectedItemId={selectedId} onItemPointerDown={allowArtwork ? onItemPointerDown : undefined} title="Front of the shirt" />
           </div>
           <div className={side === 'back' ? 'dc-view' : 'dc-view is-hidden'}>
-            <KitShirt svgRef={backRef} templateKey={templateKey} colors={colours} side="back" name={spec.name} number={spec.number} items={spec.items} areas={areas} photo={product?.kit.photoBack} selectedItemId={selectedId} onItemPointerDown={allowArtwork ? onItemPointerDown : undefined} title="Back of the shirt" />
+            <KitShirt svgRef={backRef} templateKey={templateKey} colors={colours} side="back" name={spec.name} number={spec.number} items={spec.items} areas={areas} photo={photoBack} photoAspect={photoAspect} selectedItemId={selectedId} onItemPointerDown={allowArtwork ? onItemPointerDown : undefined} title="Back of the shirt" />
           </div>
         </div>
         {mode === 'JERSEY' && side === 'back' && !spec.name && !spec.number ? <p className="dc-hint">Type a name or number to see it on the back.</p> : null}
@@ -346,27 +364,40 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
                   ))}
                 </select>
               </label>
-              <div className="dc-chips" role="group" aria-label="Kit">
-                {(['HOME', 'AWAY', 'THIRD'] as Edition[]).map((e) => (
-                  <button key={e} type="button" className={edition === e ? 'is-on' : ''} onClick={() => { setEdition(e); setTextColour(''); setAdded(null); }}>{EDITION_LABELS[e]}</button>
-                ))}
-              </div>
-              <div className="dc-chips" role="group" aria-label="Style">
-                {JERSEY_TEMPLATES.map((key) => (
-                  <button key={key} type="button" className={jerseyTemplate === key ? 'is-on' : ''} onClick={() => setJerseyTemplate(key)}>{config.templates.find((t) => t.key === key)?.label ?? key}</button>
-                ))}
-              </div>
+              {customTpl ? null : (
+                <div className="dc-chips" role="group" aria-label="Kit">
+                  {(['HOME', 'AWAY', 'THIRD'] as Edition[]).map((e) => (
+                    <button key={e} type="button" className={edition === e ? 'is-on' : ''} onClick={() => { setEdition(e); setTextColour(''); setAdded(null); }}>{EDITION_LABELS[e]}</button>
+                  ))}
+                </div>
+              )}
+              {jerseyOptions.length > 1 ? (
+                <div className="dc-chips" role="group" aria-label="Style">
+                  {jerseyOptions.map((t) => (
+                    <button key={t.key} type="button" className={jerseyTemplate === t.key ? 'is-on' : ''} onClick={() => { setJerseyTemplate(t.key); setColourPick(''); setTextColour(''); setAdded(null); }}>{t.label}</button>
+                  ))}
+                </div>
+              ) : null}
+              {customTpl ? (
+                <div className="dc-swatches" role="group" aria-label="Shirt colour">
+                  {colourOptions.map((c) => (
+                    <button key={c.key} type="button" className={colourChoice?.key === c.key ? 'is-on' : ''} style={{ background: c.hex }} onClick={() => { setColourPick(c.key); setTextColour(''); }} aria-label={c.label} title={c.label} />
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : (
             <>
-              <div className="dc-chips" role="group" aria-label="Style">
-                {TEE_TEMPLATES.map((key) => (
-                  <button key={key} type="button" className={teeTemplate === key ? 'is-on' : ''} onClick={() => setTeeTemplate(key)}>{config.templates.find((t) => t.key === key)?.label ?? key}</button>
-                ))}
-              </div>
+              {teeOptions.length > 1 ? (
+                <div className="dc-chips" role="group" aria-label="Style">
+                  {teeOptions.map((t) => (
+                    <button key={t.key} type="button" className={teeTemplate === t.key ? 'is-on' : ''} onClick={() => { setTeeTemplate(t.key); setColourPick(''); setTextColour(''); setAdded(null); }}>{t.label}</button>
+                  ))}
+                </div>
+              ) : null}
               <div className="dc-swatches" role="group" aria-label="Shirt colour">
-                {config.teePalette.map((c) => (
-                  <button key={c.key} type="button" className={teeColour === c.key ? 'is-on' : ''} style={{ background: c.hex }} onClick={() => { setTeeColour(c.key); setTextColour(''); }} aria-label={c.label} title={c.label} />
+                {colourOptions.map((c) => (
+                  <button key={c.key} type="button" className={colourChoice?.key === c.key ? 'is-on' : ''} style={{ background: c.hex }} onClick={() => { setColourPick(c.key); setTextColour(''); }} aria-label={c.label} title={c.label} />
                 ))}
               </div>
             </>
@@ -465,6 +496,7 @@ export function DesignCenter({ config, clubs, kits, initial }: { config: KitConf
 
         <section className="dc-step">
           <h2><span>{allowArtwork ? ((allowName || allowNumber) ? 4 : 3) : (allowName || allowNumber) ? 3 : 2}</span> Size and price</h2>
+          {!product ? <p className="dc-help">This shirt is not set up for online ordering yet. Send the design on WhatsApp and we will make it for you.</p> : null}
           {product ? (
             <>
               <div className="dc-chips" role="group" aria-label="Size">

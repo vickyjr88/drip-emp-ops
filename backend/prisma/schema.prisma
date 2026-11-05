@@ -2347,6 +2347,32 @@ model KitDesign {
 model KitSettings {
   id        String   @id
   enabled   Boolean  @default(false)
+  /// Keys of the built-in drawn shirts staff have hidden because they do not match what is sold. Hidden ones are not offered
+  /// in the design center and cannot be chosen for a new kit.
+  hiddenTemplates String[] @default([])
   updatedBy String?
   updatedAt DateTime @updatedAt
+}
+
+/// A shirt template staff upload: a photo of the front and back for each colour, with the print areas marked on the photo.
+/// It replaces the drawn shirts for the kits that use it (KitProduct.templateKey = this key), so the design center shows
+/// what is actually sold.
+model KitTemplate {
+  id        String   @id @default(uuid())
+  /// "custom-<name>", unique; what KitProduct.templateKey and a saved design refer to.
+  key       String   @unique
+  name      String
+  kind      KitKind
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  /// Width divided by height of the photos, so the print areas (fractions of the photo) land in the right place.
+  aspect    Float    @default(1)
+  /// { frontCentre, backName, backNumber }: each { x, y, w, h } as 0 to 1 fractions of the photo. Which are present depends on the kind.
+  areas     Json
+  /// [{ key, label, hex, front, back }]: one entry per colour the shirt is sold in.
+  colours   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
 }

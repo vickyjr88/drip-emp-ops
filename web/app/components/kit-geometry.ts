@@ -134,3 +134,29 @@ export function patternBands(pattern: KitPattern): Band[] {
 }
 
 export const SHAPE_KEYS = Object.keys(SHAPES);
+
+/**
+ * Where a photo sits inside the shirt drawing's 400 x 440 box when it is fitted (never stretched). Staff photos can be any
+ * shape; the print areas marked on them are fractions of the photo, so they are mapped through this box.
+ */
+export function photoBox(aspect: number): PrintArea {
+  const a = Number.isFinite(aspect) && aspect > 0 ? aspect : VIEWBOX.w / VIEWBOX.h;
+  if (a >= VIEWBOX.w / VIEWBOX.h) {
+    const h = VIEWBOX.w / a;
+    return { x: 0, y: (VIEWBOX.h - h) / 2, w: VIEWBOX.w, h };
+  }
+  const w = VIEWBOX.h * a;
+  return { x: (VIEWBOX.w - w) / 2, y: 0, w, h: VIEWBOX.h };
+}
+
+/** Print areas marked as fractions of a photo, as drawing units; any area not marked falls back to the drawn shirt's own. */
+export function areasFromFractions(fractions: Record<string, PrintArea> | null | undefined, aspect: number | null | undefined, kind: 'JERSEY' | 'TSHIRT'): Record<string, PrintArea> {
+  const base = kind === 'TSHIRT' ? TEE_AREAS : JERSEY_AREAS;
+  if (!fractions) return base;
+  const box = photoBox(aspect ?? VIEWBOX.w / VIEWBOX.h);
+  const out: Record<string, PrintArea> = { ...base };
+  for (const [name, f] of Object.entries(fractions)) {
+    if (f && typeof f.x === 'number') out[name] = { x: box.x + f.x * box.w, y: box.y + f.y * box.h, w: f.w * box.w, h: f.h * box.h };
+  }
+  return out;
+}
