@@ -13,5 +13,6 @@ import { StorefrontController } from './storefront.controller';
   ],
   controllers: [StorefrontController],
   providers: [StorefrontService],
+  exports: [StorefrontService],
 })
 export class StorefrontModule {}

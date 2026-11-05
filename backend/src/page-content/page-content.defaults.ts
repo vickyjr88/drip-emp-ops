@@ -22,7 +22,7 @@ export type ImageSlot = {
 // "footer" is not a page, but it is site-wide editable copy and fits the same
 // slug-keyed document model, so it rides along rather than needing its own
 // table and endpoints.
-export const PAGE_SLUGS = ['home', 'about', 'faq', 'contact', 'terms', 'privacy', 'header', 'footer', 'seo'] as const;
+export const PAGE_SLUGS = ['home', 'about', 'faq', 'contact', 'terms', 'privacy', 'header', 'footer', 'seo', 'kits'] as const;
 export type PageSlug = (typeof PAGE_SLUGS)[number];
 
 export const PAGE_LABELS: Record<PageSlug, string> = {
@@ -35,11 +35,13 @@ export const PAGE_LABELS: Record<PageSlug, string> = {
   header: 'Header',
   footer: 'Footer',
   seo: 'SEO',
+  kits: 'Kits and Design Center',
 };
 
 export const IMAGE_SLOTS: Record<PageSlug, ImageSlot[]> = {
   // FAQ is all prose; there is nothing on it an image would improve.
   faq: [],
+  kits: [],
   home: [
     {
       key: 'about.image',
@@ -106,6 +108,28 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
   // them whenever no question has been saved, so seeding them here as well
   // would be a second copy to keep in step with the first.
   faq: {},
+  // Kits and Design Center. Fees are typed as plain numbers of shillings (text, so staff can edit them like any other
+  // field); the server reads them with parsePrintPricing() and falls back to its own defaults for a blank or bad value.
+  kits: {
+    print: {
+      nameFee: '500',
+      numberFee: '300',
+      nameAndNumberFee: '700',
+      artworkFee: '800',
+      textFee: '400',
+    },
+    leadTime: 'Made to order. Allow 5 to 7 working days for printing, plus delivery.',
+    returnsNote: 'Personalised items are printed just for you, so they cannot be returned or exchanged unless they arrive faulty or misprinted.',
+    fanVersionNote: 'Fan-version shirts in club colours. Independent product, not endorsed by or affiliated with any club, league or kit maker.',
+    listing: {
+      heading: 'Football Jerseys & Custom T-Shirts in Nairobi',
+      intro: 'Fan-version football jerseys and custom printed T-shirts, delivered across Kenya. Pick a club or a plain tee, add your name and number or your own artwork, and see exactly how it will look before you order.',
+    },
+    designCenter: {
+      heading: 'Design your own jersey or T-shirt',
+      intro: 'Choose a shirt, add a name, number, text or artwork, swap the lettering style and preview it front and back.',
+    },
+  },
   home: {
     hero: {
       heading: 'Quality Affordable\nSneakers & Streetwear',

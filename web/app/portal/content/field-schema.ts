@@ -480,6 +480,53 @@ export const PAGE_SCHEMAS: PageSchema[] = [
   },
 
   {
+    slug: 'kits',
+    label: 'Kits and Design Center',
+    href: '/kits',
+    sections: [
+      {
+        key: 'kits-print',
+        title: 'Print fees',
+        description:
+          'What personalising a shirt costs, in shillings (numbers only). Added to the shirt\'s price at checkout; the shop recalculates it itself, so it cannot be changed from the browser. "Name and number together" is charged instead of the two separate fees when both are on the shirt.',
+        fields: [
+          { path: 'print.nameFee', label: 'Name (KES)', type: 'text' },
+          { path: 'print.numberFee', label: 'Number (KES)', type: 'text' },
+          { path: 'print.nameAndNumberFee', label: 'Name and number together (KES)', type: 'text', help: 'Bundle price. Set equal to name + number for no discount.' },
+          { path: 'print.artworkFee', label: 'Each artwork or image (KES)', type: 'text' },
+          { path: 'print.textFee', label: 'Each extra line of text (KES)', type: 'text' },
+        ],
+      },
+      {
+        key: 'kits-promises',
+        title: 'Lead time and returns',
+        description: 'Shown on kit pages, in the design center and at checkout. Change the quote whenever the print queue changes.',
+        fields: [
+          { path: 'leadTime', label: 'Printing lead time', type: 'textarea' },
+          { path: 'returnsNote', label: 'Returns on personalised items', type: 'textarea' },
+          { path: 'fanVersionNote', label: 'Fan-version notice', type: 'textarea', help: 'Appears under every kit. Keep it factual: these are not official club products.' },
+        ],
+      },
+      {
+        key: 'kits-listing',
+        title: 'Kits page',
+        fields: [
+          { path: 'listing.heading', label: 'Heading', type: 'text' },
+          { path: 'listing.intro', label: 'Introduction', type: 'textarea' },
+        ],
+      },
+      {
+        key: 'kits-design',
+        title: 'Design center page',
+        fields: [
+          { path: 'designCenter.heading', label: 'Heading', type: 'text' },
+          { path: 'designCenter.intro', label: 'Introduction', type: 'textarea' },
+        ],
+      },
+    ],
+  },
+
+  {
     slug: 'header',
     label: 'Header',
     // Site-wide, like the footer; the home page is a fair preview.

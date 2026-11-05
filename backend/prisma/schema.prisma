@@ -1377,11 +1377,17 @@ model Product {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  /// Which storefront this product belongs to. SHOP (the default, every existing row) is the shoe and general shop;
+  /// KIT is the jersey and T-shirt line with its own pages, design center and feed. The public shop endpoints only ever
+  /// read SHOP, so a kit cannot leak into the shop, its feeds, its sitemap or the Nairobi Gents sync.
+  line      ProductLine      @default(SHOP)
+  kit       KitProduct?
   variants  ProductVariant[]
   favorites Favorite[]
 
   @@index([categoryId])
   @@index([isFeatured])
+  @@index([line])
 }
 
 /// Self-nesting so "Footwear > Running" needs no second model.
@@ -1852,8 +1858,26 @@ model OrderLine {
   supplierInvoice   SupplierInvoice?            @relation(fields: [supplierInvoiceId], references: [id])
   supplierInvoiceId String?
 
+  /// A personalised kit: the saved design this line was bought with, and a frozen copy of what to print (name, number,
+  /// font, artwork) taken at checkout so later edits to fonts or templates never change what was ordered. The print
+  /// fee is already inside unitPrice; it is kept apart here only so staff and reports can see it.
+  design        KitDesign?   @relation(fields: [designId], references: [id])
+  designId      String?
+  customisation Json?
+  printFee      Decimal      @default(0)
+  printStatus   PrintStatus?
+  printNotes    String?
+
   @@index([orderId])
   @@index([fulfillmentStatus])
+  @@index([printStatus])
+}
+
+enum PrintStatus {
+  AWAITING_REVIEW
+  APPROVED
+  PRINTED
+  READY
 }
 
 enum OrderLineFulfillmentType {
@@ -2226,4 +2250,103 @@ model MediaAsset {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@index([purpose, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Kits and Design Center: the jersey and T-shirt line. See docs/DESIGN-CENTER.md.
+// ---------------------------------------------------------------------------
+
+enum ProductLine {
+  SHOP
+  KIT
+}
+
+enum KitKind {
+  JERSEY
+  TSHIRT
+}
+
+enum KitEdition {
+  HOME
+  AWAY
+  THIRD
+  RETRO
+  NONE
+}
+
+/// A club or national team. Its colours drive the generic (no crest, no sponsor) kit drawn in the design center.
+model KitClub {
+  id           String   @id @default(uuid())
+  slug         String   @unique
+  name         String
+  /// What shoppers type: "man u", "gunners", "spurs".
+  aliases      String[]
+  /// EPL, LA_LIGA, SERIE_A, BUNDESLIGA, LIGUE_1, NATIONAL, KENYA, OTHER.
+  league       String
+  /// { primary, secondary, trim, pattern, sleeves } for each edition; see backend/src/kits/kit-catalogue.ts.
+  home         Json
+  away         Json
+  third        Json
+  /// Keys of the look-alike fonts suggested for this club, the first being the default.
+  fontKeys     String[]
+  sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  kits KitProduct[]
+
+  @@index([league])
+}
+
+/// Kit-specific facts about a Product whose line is KIT. Price, sizes and stock stay on the normal variants.
+model KitProduct {
+  id           String     @id @default(uuid())
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    String     @unique
+  kind         KitKind
+  club         KitClub?   @relation(fields: [clubId], references: [id])
+  clubId       String?
+  season       String?
+  edition      KitEdition @default(NONE)
+  /// Which drawn shirt the design center uses: a key from kit-catalogue.ts (e.g. "jersey-short", "tee-crew").
+  templateKey  String
+  /// Colours for a plain T-shirt (a club kit takes its colours from the club and edition).
+  colors       Json?
+  /// Licensed photos that replace the drawn shirt, each with the print area marked on it.
+  photoFront   String?
+  photoBack    String?
+  printAreas   Json?
+  allowName    Boolean    @default(true)
+  allowNumber  Boolean    @default(true)
+  allowArtwork Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([clubId])
+}
+
+/// What a shopper made in the design center. Immutable once saved; an order line keeps its own frozen copy as well.
+model KitDesign {
+  id          String   @id @default(uuid())
+  /// Unguessable address for /design/<token>.
+  token       String   @unique
+  productSlug String?
+  spec        Json
+  previewUrl  String?
+  customerId  String?
+  createdAt   DateTime @default(now())
+
+  orderLines OrderLine[]
+
+  @@index([productSlug])
+}
+
+/// One row (id "kits"): whether the jersey and T-shirt line is switched on for the public site. Off until an admin turns it
+/// on in the portal (Kits > Switch). The KITS_ENABLED=false environment variable is an emergency override that forces it off.
+model KitSettings {
+  id        String   @id
+  enabled   Boolean  @default(false)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
 }

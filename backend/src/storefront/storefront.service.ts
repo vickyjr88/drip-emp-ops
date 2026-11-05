@@ -28,6 +28,13 @@ function googleProductCategory(categorySlug?: string | null): string {
 }
 
 /**
+ * Every public shop query is limited to the SHOP line. Jerseys and T-shirts (line KIT) have their own pages, design
+ * center and feed under /kits, and must never appear in the shop, its filters, its search, its feeds or the catalogue
+ * the Nairobi Gents shop copies from. Keep this on every product query in this file; the kits leak test checks it.
+ */
+export const SHOP_LINE = { line: 'SHOP' } as const satisfies Prisma.ProductWhereInput;
+
+/**
  * The public catalogue.
  *
  * Deliberately narrow: it returns retail prices and whether a size is in
@@ -251,7 +258,7 @@ export class StorefrontService {
       rows.map(async (row) => {
         const ids = (await this.descendantCategoryIds(row.slug)) ?? [row.id];
         const productCount = await this.prisma.product.count({
-          where: { isActive: true, categoryId: { in: ids } },
+          where: { ...SHOP_LINE, isActive: true, categoryId: { in: ids } },
         });
         return { name: row.name, slug: row.slug, productCount, isTopLevel: row.parentId === null };
       }),
@@ -270,6 +277,7 @@ export class StorefrontService {
         // categoryId: null still passes, same "opt out, not opt in" rule
         // as the size query and catalogCsv() above.
         where: {
+          ...SHOP_LINE,
           isActive: true,
           brand: { not: null },
           OR: [{ categoryId: null }, { category: { isActive: true } }],
@@ -292,7 +300,7 @@ export class StorefrontService {
         CROSS JOIN LATERAL jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) AS attr(key, value)
         JOIN "Product" p ON p.id = v."productId"
         LEFT JOIN "ProductCategory" c ON c.id = p."categoryId"
-        WHERE v."isActive" = true AND p."isActive" = true AND coalesce(c."isActive", true) = true
+        WHERE v."isActive" = true AND p."isActive" = true AND p."line" = 'SHOP' AND coalesce(c."isActive", true) = true
       `,
     ]);
 
@@ -343,7 +351,7 @@ export class StorefrontService {
       CROSS JOIN LATERAL unnest(
         string_to_array(lower(p.name) || ' ' || lower(coalesce(p.brand, '')), ' ')
       ) AS t(part)
-      WHERE p."isActive" = true AND coalesce(c."isActive", true) = true AND similarity(t.part, q.word) > 0.3
+      WHERE p."isActive" = true AND p."line" = 'SHOP' AND coalesce(c."isActive", true) = true AND similarity(t.part, q.word) > 0.3
     `;
     return rows.map((row) => row.id);
   }
@@ -368,7 +376,7 @@ export class StorefrontService {
       JOIN "Product" p ON p.id = v."productId"
       LEFT JOIN "ProductCategory" c ON c.id = p."categoryId"
       CROSS JOIN LATERAL jsonb_each_text(coalesce(v.attributes, '{}'::jsonb)) AS attr(key, value)
-      WHERE v."isActive" = true AND coalesce(c."isActive", true) = true AND attr.value = ${size}
+      WHERE v."isActive" = true AND p."line" = 'SHOP' AND coalesce(c."isActive", true) = true AND attr.value = ${size}
     `;
     return rows.map((row) => row.id);
   }
@@ -443,6 +451,7 @@ export class StorefrontService {
     const literalCount = words.length
       ? await this.prisma.product.count({
           where: {
+            ...SHOP_LINE,
             isActive: true,
             ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
             ...(query.brand ? { brand: { equals: query.brand, mode: 'insensitive' } } : {}),
@@ -455,6 +464,7 @@ export class StorefrontService {
       : [];
 
     const where: Prisma.ProductWhereInput = {
+      ...SHOP_LINE,
       isActive: true,
       // categoryIds already resolved (and tree-expanded) above; empty array
       // when the slug did not resolve, which correctly matches nothing.
@@ -535,7 +545,7 @@ export class StorefrontService {
   async featured(limit = 10, authedUser?: { priceTier?: PriceTier }) {
     const tier = this.tierOf(authedUser);
     const featuredProducts = await this.prisma.product.findMany({
-      where: { isActive: true, isFeatured: true },
+      where: { ...SHOP_LINE, isActive: true, isFeatured: true },
       include: {
         category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },
@@ -548,7 +558,7 @@ export class StorefrontService {
     let fillerProducts: (typeof featuredProducts)[number][] = [];
     if (remaining > 0) {
       const candidates = await this.prisma.product.findMany({
-        where: { isActive: true, isFeatured: false },
+        where: { ...SHOP_LINE, isActive: true, isFeatured: false },
         include: {
           category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
           variants: { orderBy: { name: 'asc' } },
@@ -609,7 +619,7 @@ export class StorefrontService {
       // started loading stock -- category.isActive: undefined lets an
       // uncategorised product through (no category to be inactive), the
       // same "opt out, not opt in" default as list()'s search branches.
-      where: { isActive: true, OR: [{ categoryId: null }, { category: { isActive: true } }] },
+      where: { ...SHOP_LINE, isActive: true, OR: [{ categoryId: null }, { category: { isActive: true } }] },
       include: {
         category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },
@@ -687,7 +697,7 @@ export class StorefrontService {
   async bySlug(slug: string, authedUser?: { priceTier?: PriceTier }) {
     const tier = this.tierOf(authedUser);
     const product = await this.prisma.product.findFirst({
-      where: { slug, isActive: true },
+      where: { ...SHOP_LINE, slug, isActive: true },
       include: {
         category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
         variants: { orderBy: { name: 'asc' } },
@@ -704,7 +714,7 @@ export class StorefrontService {
     // A few alternatives from the same category, so a sold-out size is not a
     // dead end.
     const related = await this.prisma.product.findMany({
-      where: { isActive: true, id: { not: product.id }, categoryId: product.categoryId },
+      where: { ...SHOP_LINE, isActive: true, id: { not: product.id }, categoryId: product.categoryId },
       include: { category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } }, variants: true },
       take: 5,
     });
@@ -717,6 +727,17 @@ export class StorefrontService {
       ...shaped,
       related: related.map((item) => this.shape(item, relatedStock, relatedOffers, tier)),
     };
+  }
+
+  /**
+   * Shapes products for another storefront line (the kits pages) the same way the shop does: the same prices, offers,
+   * stock-as-availability and tier rules, so a kit card and a shoe card never disagree about what a price means.
+   */
+  async shapeProducts(products: any[], authedUser?: { priceTier?: PriceTier }) {
+    const variantIds = products.flatMap((product) => product.variants.map((variant: any) => variant.id));
+    const [stock, offers] = await Promise.all([this.stockMap(variantIds), this.offerMap(variantIds)]);
+    const tier = this.tierOf(authedUser);
+    return products.map((product) => this.shape(product, stock, offers, tier));
   }
 
   /** Shops a customer can walk into. */
