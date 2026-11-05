@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize, IsArray, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Min, ValidateNested,
+  ArrayMinSize, IsArray, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min, ValidateNested,
 } from 'class-validator';
 import { CartLeadSource } from '@prisma/client';
 import { IsValidPhoneNumber } from '../../common/phone.util';
@@ -59,6 +59,9 @@ export class RecordCartLeadDto {
 
   @ApiPropertyOptional({ description: 'A paid-marketing campaign code, captured from a shared link. Mutually exclusive with referralCode in practice.' })
   @IsOptional() @IsString() campaignCode?: string;
+
+  @ApiPropertyOptional({ description: 'The browsing session (see StorefrontEvent).' })
+  @IsOptional() @IsString() @Matches(/^[A-Za-z0-9]{12,40}$/) sessionId?: string;
 }
 
 /**

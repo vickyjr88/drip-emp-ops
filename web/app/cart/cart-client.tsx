@@ -23,6 +23,7 @@ import { useCustomerAuth } from '../lib/customer-auth';
 import { fetchProduct, formatKes } from '../lib/shop';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
 import { readCapturedAttribution } from '../lib/use-capture-referral';
+import { getSessionId, recordEvent } from '../lib/first-party';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 /**
@@ -147,6 +148,7 @@ export function CartClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           source: 'ABANDONED_CART',
+          sessionId: getSessionId() ?? undefined,
           lines: cart.lines.map((line) => ({
             variantId: line.variantId,
             sku: line.sku,
@@ -237,6 +239,7 @@ export function CartClient() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         source: 'WHATSAPP_ORDER',
+        sessionId: getSessionId() ?? undefined,
         lines: leadLines(),
         customerName: `${form.firstName} ${form.lastName}`.trim() || undefined,
         customerPhone: form.phone.trim() || undefined,
@@ -302,6 +305,7 @@ export function CartClient() {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
+    recordEvent('BEGIN_CHECKOUT');
     try {
       const attribution = readCapturedAttribution();
       const response = await fetch(`${API}/checkout`, {
@@ -326,6 +330,7 @@ export function CartClient() {
           phone: form.phone,
           shippingAddress: deliver ? form.shippingAddress : undefined,
           password: wantAccount && form.password ? form.password : undefined,
+          sessionId: getSessionId() ?? undefined,
           referralCode: attribution?.type === 'reseller' ? attribution.code : undefined,
           campaignCode: attribution?.type === 'campaign' ? attribution.code : undefined,
         }),

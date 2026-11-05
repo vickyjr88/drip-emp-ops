@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../components/elite-layout';
 import { ProductSearch } from '../components/product-search';
+import { recordEvent } from '../lib/first-party';
 import { ProductCard } from '../components/product-card';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { useCaptureReferral } from '../lib/use-capture-referral';
@@ -189,6 +190,7 @@ export function ShopClient({
    */
   const submitSearch = useCallback(() => {
     const term = searchDraft.trim();
+    if (term) recordEvent('SEARCH', { detail: term });
     setParams({
       search: term,
       // Only touched when there is a term: unticking the box on an empty

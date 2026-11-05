@@ -90,6 +90,7 @@ export class CartLeadService {
         shipping: new Prisma.Decimal(shipping),
         total: new Prisma.Decimal(subtotal + shipping),
         message: dto.message,
+        sessionId: dto.sessionId ?? null,
         referredByCustomerId,
         attributedCampaignId,
       },
@@ -265,6 +266,7 @@ export class CartLeadService {
       subtotal: new Prisma.Decimal(subtotal),
       shipping: new Prisma.Decimal(shipping),
       total: new Prisma.Decimal(subtotal + shipping),
+      ...(dto.sessionId ? { sessionId: dto.sessionId } : {}),
       lastActivityAt: new Date(),
     };
 

@@ -1633,6 +1633,8 @@ model Order {
   storeId     String
   status      OrderStatus @default(PENDING)
   channel     String      @default("IN_STORE")
+  /// The shopper's browsing session (see StorefrontEvent), so a website order can be traced to the visit that produced it.
+  sessionId   String?
   /// Which price list this order was written against. A walk-in is RETAIL;
   /// a shop buying outright is RESELLER or WHOLESALE.
   priceTier   PriceTier   @default(RETAIL)
@@ -1666,6 +1668,7 @@ model Order {
   @@index([attributedCampaignId])
   @@index([storeId])
   @@index([status])
+  @@index([sessionId])
 }
 
 /// One row per landing on a reseller's shared link -- recorded once per
@@ -1951,6 +1954,8 @@ model CartLead {
   total    Decimal
   /// The exact WhatsApp message sent, when source is WHATSAPP_ORDER. Null for
   /// an abandoned cart, which was never sent anywhere.
+  /// The shopper's browsing session (see StorefrontEvent).
+  sessionId String?
   message String?
   /// Set once staff turn this into a real Order, so the lead stops showing as
   /// outstanding without deleting the trail that produced the sale.
@@ -2378,4 +2383,46 @@ model KitTemplate {
   updatedAt DateTime @updatedAt
 
   @@index([kind])
+}
+
+
+/// One thing a shopper did on the storefront: arrived, looked at a product, added to cart, began checkout, tapped
+/// WhatsApp, searched. First-party and anonymous: the sessionId is a random string made in the browser tab, with no name,
+/// phone or email. Orders and WhatsApp leads carry the same sessionId, which is how a sale is traced to its source.
+model StorefrontEvent {
+  id          String   @id @default(uuid())
+  sessionId   String
+  /// SESSION_START | VIEW_PRODUCT | ADD_TO_CART | BEGIN_CHECKOUT | WHATSAPP_CLICK | SEARCH
+  type        String
+  /// The product's slug, for product events.
+  productSlug String?
+  /// Where it happened: "product-page", "cart", "float" for a WhatsApp tap; the typed words for SEARCH.
+  detail      String?
+  /// SESSION_START only: where the visit came from, worked out once and kept with the session.
+  source      String?
+  medium      String?
+  campaign    String?
+  device      String?
+  landingPath String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@index([sessionId])
+}
+
+/// What the shop paid an ad platform on one day, entered by staff. Matched to visits by source name, so Insights can show
+/// cost per order and return on ad spend.
+model AdSpend {
+  id        String   @id @default(uuid())
+  /// The day the money was spent (no time of day).
+  day       DateTime @db.Date
+  /// The platform, as it reads in Insights: Facebook, Instagram, TikTok, Google...
+  source    String
+  campaign  String?
+  amountKes Decimal
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([day])
 }

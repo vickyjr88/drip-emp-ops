@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { PageContentDocument, contentValue, fetchPageContent } from './page-content';
 import { customerApi } from './customer-auth';
 import { readCapturedAttribution } from './use-capture-referral';
+import { productSlugOfPath, recordEvent } from './first-party';
 
 const DEFAULT_WHATSAPP = '254113206481';
 const DEFAULT_PHONE = '+254 113 206 481';
@@ -76,6 +77,8 @@ export function useEnquiryContact() {
  * which is the thing the visitor actually came for.
  */
 function recordWhatsAppClick(source: string) {
+  // Also noted in the shop's own visit record, against the product page the button was on when it has one.
+  recordEvent('WHATSAPP_CLICK', { detail: source, productSlug: productSlugOfPath(window.location.pathname) ?? undefined });
   const attribution = readCapturedAttribution();
   void customerApi('/cart-leads/whatsapp-click', {
     method: 'POST',

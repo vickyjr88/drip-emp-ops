@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize, IsArray, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Min, MinLength, ValidateNested,
+  ArrayMinSize, IsArray, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min, MinLength, ValidateNested,
 } from 'class-validator';
 import { IsValidPhoneNumber } from '../../common/phone.util';
 
@@ -83,6 +83,12 @@ export class CheckoutDto {
   @IsOptional()
   @IsString()
   campaignCode?: string;
+
+  @ApiPropertyOptional({ description: 'The browsing session (see StorefrontEvent): how an order is traced back to the visit and ad that brought the shopper.' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9]{12,40}$/)
+  sessionId?: string;
 }
 
 export class CustomerSignupDto {

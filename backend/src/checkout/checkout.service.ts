@@ -325,6 +325,7 @@ export class CheckoutService {
           customerId: customer.id,
           referredByCustomerId,
           attributedCampaignId,
+          sessionId: dto.sessionId ?? null,
           channel: 'WEBSITE',
           priceTier: tier,
           customerName: `${customer.firstName} ${customer.lastName}`.trim(),

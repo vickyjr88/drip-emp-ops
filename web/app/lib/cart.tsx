@@ -30,6 +30,8 @@ import {
   ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react';
 
+import { recordEvent } from './first-party';
+
 const STORAGE_KEY = 'de_cart_v1';
 
 export type CartLine = {
@@ -95,6 +97,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [lines, ready]);
 
   const add = useCallback((line: Omit<CartLine, 'id' | 'quantity'> & { id?: string }, quantity = 1) => {
+    recordEvent('ADD_TO_CART', { productSlug: line.productSlug });
     setLines((prev) => {
       // A real variant line still dedupes/merges by variantId, exactly as
       // before -- its id defaults to the variantId itself when the caller

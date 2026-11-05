@@ -16,6 +16,7 @@ import { Suspense, useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import posthog from 'posthog-js';
+import { productSlugOfPath, recordEvent } from '../lib/first-party';
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
@@ -108,12 +109,32 @@ function TikTokPixelPageview() {
   return null;
 }
 
+/**
+ * The shop's own record of visits: where each came from, which product pages were opened. Product pages are recognised by
+ * their address, so every page that shows a product (shoes, watches, kits) is covered without each one reporting itself.
+ */
+function FirstPartyTracker() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    recordEvent('SESSION_START');
+  }, []);
+
+  useEffect(() => {
+    const slug = productSlugOfPath(pathname || '');
+    if (slug) recordEvent('VIEW_PRODUCT', { productSlug: slug });
+  }, [pathname]);
+
+  return null;
+}
+
 export function StorefrontAnalytics() {
   const pathname = usePathname();
   if (pathname?.startsWith('/portal')) return null;
 
   return (
     <>
+      <FirstPartyTracker />
       {GA_MEASUREMENT_ID ? <GoogleAnalytics gaId={GA_MEASUREMENT_ID} /> : null}
       {META_PIXEL_ID ? (
         <>

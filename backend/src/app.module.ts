@@ -39,6 +39,7 @@ import { RoleModule } from './role/role.module';
 import { PermissionModule } from './permission/permission.module';
 import { MediaModule } from './media/media.module';
 import { KitsModule } from './kits/kits.module';
+import { InsightsModule } from './insights/insights.module';
 import { WatchesModule } from './watches/watches.module';
 import { CustomerDocumentModule } from './customer-document/customer-document.module';
 import { ChartOfAccountModule } from './chart-of-account/chart-of-account.module';
@@ -105,6 +106,7 @@ import { PdfModule } from './pdf/pdf.module';
     PermissionModule,
     MediaModule,
     KitsModule,
+    InsightsModule,
     WatchesModule,
     ChartOfAccountModule,
     LedgerModule,
