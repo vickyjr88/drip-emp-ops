@@ -16,7 +16,8 @@
     "test:daily-report": "node --require ts-node/register/transpile-only --test test/daily-report.test.ts",
     "test:whatsapp-outreach": "node --require ts-node/register/transpile-only --test test/whatsapp-outreach.test.ts",
     "test:media": "node --require ts-node/register/transpile-only --test test/media-library.test.ts",
-    "test:kits": "node --require ts-node/register/transpile-only --test test/kits.test.ts"
+    "test:kits": "node --require ts-node/register/transpile-only --test test/kits.test.ts",
+    "test:kits-seo": "node --require ts-node/register/transpile-only --test test/kits-seo.test.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",

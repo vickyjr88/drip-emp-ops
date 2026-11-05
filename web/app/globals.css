@@ -13519,9 +13519,13 @@ img {
 .kt-guides h2, .kt-guides h3 { margin: 0 0 4px; font-size: 1.1rem; }
 .kt-guides p { margin: 0; color: var(--lp-muted); line-height: 1.6; }
 
-.lp-footer-grid.has-kits { grid-template-columns: 1.6fr repeat(5, 1fr); }
-@media (max-width: 1180px) {
-  .lp-footer-grid.has-kits { grid-template-columns: repeat(3, 1fr); }
+/* With the Kits column there are six: it only applies on a wide screen, so it never fights the layouts below, which
+   collapse the grid (brand row plus four columns up to 1240px, one column from 1060px down). */
+@media (min-width: 1241px) {
+  .lp-footer-grid.has-kits { grid-template-columns: 1.6fr repeat(5, 1fr); }
+}
+@media (min-width: 1061px) and (max-width: 1240px) {
+  .lp-footer-grid.has-kits { grid-template-columns: repeat(5, 1fr); }
 }
 
 /* Kits portal */

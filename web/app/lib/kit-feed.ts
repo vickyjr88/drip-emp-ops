@@ -1,4 +1,3 @@
-import { SITE_URL } from './site';
 import { KitProduct, leagueByKey } from './kits';
 
 /**
@@ -50,7 +49,9 @@ export function colourName(hex: string): string {
   return best[0];
 }
 
-export function kitFeedRows(products: KitProduct[]): KitFeedRow[] {
+/** `siteUrl` is passed in (not imported) so this stays a plain module that tests can load. */
+export function kitFeedRows(products: KitProduct[], siteUrl: string): KitFeedRow[] {
+  const SITE_URL = siteUrl;
   const rows: KitFeedRow[] = [];
   for (const product of products) {
     const { kit } = product;

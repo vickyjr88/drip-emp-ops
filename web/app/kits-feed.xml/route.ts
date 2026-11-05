@@ -45,7 +45,7 @@ export async function GET() {
   const kits = await fetchKits();
   // The line is off (or has nothing): behave as if the feed does not exist rather than serve an empty catalogue.
   if (!kits.length) return new NextResponse('Not found', { status: 404 });
-  const items = kitFeedRows(kits).map(itemXml).join('');
+  const items = kitFeedRows(kits, SITE_URL).map(itemXml).join('');
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>

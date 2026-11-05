@@ -94,6 +94,8 @@ x-backend-environment: &backend-environment
   MAUTIC_CAMPAIGN_ID: ${MAUTIC_CAMPAIGN_ID:-}
   MAUTIC_WHATSAPP_CAMPAIGN_ID: ${MAUTIC_WHATSAPP_CAMPAIGN_ID:-}
   OUTREACH_HOOK_SECRET: ${OUTREACH_HOOK_SECRET:-}
+  # Emergency override for the Kits line: set to "false" to force it off whatever the portal switch says. Leave empty normally.
+  KITS_ENABLED: ${KITS_ENABLED:-}
 
 x-backend-healthcheck: &backend-healthcheck
   test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/health || exit 1"]

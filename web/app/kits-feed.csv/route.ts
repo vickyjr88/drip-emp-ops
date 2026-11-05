@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { SITE_URL } from '../lib/site';
 import { kitFeedRows } from '../lib/kit-feed';
 import { fetchKits, fetchKitsEnabled } from '../lib/kits';
 
@@ -15,7 +16,7 @@ export async function GET() {
   if (!kits.length) return new NextResponse('Not found', { status: 404 });
   const columns = ['id', 'item_group_id', 'title', 'description', 'availability', 'condition', 'price', 'link', 'image_link', 'brand', 'google_product_category', 'product_type', 'size', 'color', 'gender', 'age_group', 'custom_label_0', 'custom_label_1'];
   const lines = [columns.join(',')];
-  for (const r of kitFeedRows(kits)) {
+  for (const r of kitFeedRows(kits, SITE_URL)) {
     lines.push([r.id, r.itemGroupId, r.title, r.description, r.availability, r.condition, r.price, r.link, r.imageLink, r.brand, r.googleCategory, r.productType, r.size, r.color, r.gender, r.ageGroup, r.customLabel0, r.customLabel1].map(field).join(','));
   }
   return new NextResponse(lines.join('\r\n') + '\r\n', {

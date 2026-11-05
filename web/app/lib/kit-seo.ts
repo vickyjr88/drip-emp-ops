@@ -33,7 +33,11 @@ export type FaqItem = { question: string; answer: string };
 
 export function kitTitle(product: KitProduct): string {
   const price = kes(product.priceFrom);
-  return price ? `${product.name} Price in Kenya: ${price}` : `${product.name} in Kenya`;
+  const suffix = price ? ` Price in Kenya: ${price}` : ' in Kenya';
+  // Search results show about 60 characters. The "(Fan Version)" tag is dropped from the title when it would not fit; the
+  // description and the page itself always carry it.
+  const name = product.name.length + suffix.length > 66 ? product.name.replace(/\s*\(Fan Version\)/i, '') : product.name;
+  return `${name}${suffix}`;
 }
 
 export function kitDescription(product: KitProduct, config: KitConfig | null): string {
@@ -226,7 +230,7 @@ export function designTitle(config: KitConfig | null): string {
   return config?.designCenter.heading ? `${config.designCenter.heading}: Name, Number & Custom Print` : 'Custom Jersey & T-Shirt Maker: Add Your Name, Number or Design';
 }
 
-export const DESIGN_DESCRIPTION = 'Design a football jersey with your name and number, or a custom T-shirt with your own text or artwork. Choose the lettering style, preview front and back, and order in Kenya.';
+export const DESIGN_DESCRIPTION = 'Design a football jersey with your name and number, or a custom T-shirt with your own text or art. Pick the lettering, preview it and order in Kenya.';
 
 export function designFaqs(config: KitConfig | null): FaqItem[] {
   return [

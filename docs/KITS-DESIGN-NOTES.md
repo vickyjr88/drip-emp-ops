@@ -1,4 +1,6 @@
-# Kits and Design Center: design (draft for review, nothing built yet)
+# Kits and Design Center: design notes
+
+The original design, kept for its reasoning. **What was built, and how it differs, is in [KITS.md](KITS.md).**
 
 A second product line on Drip Emporium: jerseys and T-shirts a shopper can personalise (their name and number on a jersey,
 artwork or text on a T-shirt) and see on a shirt before buying. It has its own listing page, its own design center and its own

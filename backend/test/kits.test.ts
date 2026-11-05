@@ -137,7 +137,7 @@ test('the rate limiter lets a few through and then refuses until the window pass
 });
 
 // ---------------------------------------------------------------------------
-// Database tests: need KITS_TEST_DATABASE_URL (a scratch database with every migration applied)
+// Database tests: need KITS_TEST_DATABASE_URL (a SCRATCH database with every migration applied: these tests delete every kit in it)
 // ---------------------------------------------------------------------------
 
 const url = process.env.KITS_TEST_DATABASE_URL;
@@ -153,10 +153,12 @@ async function setup() {
   const media: any = { uploadProjectAsset: async (file: any) => { uploaded.push(file); return { url: 'https://api.test/media/0f8fad5b-d9cb-469f-a165-70867728950e.png' }; } };
   const service = new KitsService(prisma as any, storefront, pageContent, media, flag);
   // Orders from earlier runs hold the test variants, so they go first.
-  await prisma.orderLine.deleteMany({ where: { variant: { sku: { startsWith: 'KTEST' } } } });
-  await prisma.order.deleteMany({ where: { customerEmail: 'ktest-buyer@example.com', lines: { none: {} } } });
+  // The database is a scratch one (see above), so every kit from an earlier run, or a demo, is cleared too: the club and
+  // search assertions count kits.
+  await prisma.orderLine.deleteMany({ where: { variant: { OR: [{ sku: { startsWith: 'KTEST' } }, { product: { line: 'KIT' } }] } } });
+  await prisma.order.deleteMany({ where: { lines: { none: {} }, OR: [{ customerEmail: 'ktest-buyer@example.com' }, { createdBy: 'storefront' }] } });
   await prisma.kitDesign.deleteMany();
-  await prisma.product.deleteMany({ where: { sku: { startsWith: 'KTEST' } } });
+  await prisma.product.deleteMany({ where: { OR: [{ sku: { startsWith: 'KTEST' } }, { line: 'KIT' }] } });
   await service.ensureSeed();
   return { prisma, storefront, service, flag, pageContent, uploaded };
 }
@@ -192,6 +194,8 @@ db('a kit never appears anywhere on the shoe side (the leak test)', async () => 
   assert.equal((await storefront.featured(200)).some((p) => p.slug === kit.slug), false, 'featured rail');
   await assert.rejects(() => storefront.bySlug(kit.slug), /No product/);
   assert.equal((await storefront.categories()).some((c) => c.slug === 'kits'), false, 'the Kits category is not a shop category');
+  assert.equal((await prisma.productCategory.findUnique({ where: { slug: 'kits' } }))!.isActive, false, 'and it is created inactive, so /shop/category/kits is not a page');
+  assert.deepEqual(await storefront.list({ category: 'kits' }), [], 'a shop category query for it finds nothing');
   const filters = await storefront.filters();
   assert.equal(filters.sizes.includes('M'), false, 'the kit size is not a shop size filter');
   const csv = await storefront.catalogCsv();

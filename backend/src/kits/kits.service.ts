@@ -80,7 +80,9 @@ export class KitsService implements OnModuleInit {
     const category = await this.prisma.productCategory.upsert({
       where: { slug: KITS_CATEGORY_SLUG },
       update: {},
-      create: { name: 'Kits and T-shirts', slug: KITS_CATEGORY_SLUG, description: 'Jerseys and custom T-shirts', isActive: true },
+      // Inactive on purpose: it only exists to give kits their size picker. An inactive category is the shop's "not yet
+      // launched" state, so it never appears in the shop's category list and /shop/category/kits is not a page.
+      create: { name: 'Kits and T-shirts', slug: KITS_CATEGORY_SLUG, description: 'Jerseys and custom T-shirts', isActive: false },
     });
     const hasSize = await this.prisma.categoryAttribute.findFirst({ where: { categoryId: category.id, key: 'size' } });
     if (!hasSize) {
