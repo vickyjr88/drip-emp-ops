@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchKitsEnabled } from '../lib/kits';
+import { fetchWatchCount } from '../lib/watches';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AppDownloadLink } from './app-download';
@@ -163,6 +164,7 @@ const KIT_FOOTER_LINKS: FooterLink[] = [
 export function SiteFooter() {
   const [content, setContent] = useState<PageContentDocument | null>(null);
   const [kitsOn, setKitsOn] = useState(false);
+  const [watchesOn, setWatchesOn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +173,9 @@ export function SiteFooter() {
     });
     void fetchKitsEnabled().then((on) => {
       if (!cancelled) setKitsOn(on);
+    });
+    void fetchWatchCount().then((n) => {
+      if (!cancelled) setWatchesOn(n > 0);
     });
     return () => {
       cancelled = true;
@@ -188,7 +193,11 @@ export function SiteFooter() {
   const quickLinks = contentValue<FooterLink[]>(content, 'quickLinks.items', DEFAULT_QUICK_LINKS);
 
   const servicesHeading = contentValue(content, 'services.heading', 'Shop');
-  const serviceLinks = contentValue<FooterLink[]>(content, 'services.items', DEFAULT_SERVICE_LINKS);
+  const cmsServiceLinks = contentValue<FooterLink[]>(content, 'services.items', DEFAULT_SERVICE_LINKS);
+  // Watches are their own section now (not a shop category), so the link is added here once there are some.
+  const serviceLinks = watchesOn && !cmsServiceLinks.some((l) => (l.href || '').split(/[?#]/)[0] === '/watches')
+    ? [...cmsServiceLinks, { label: 'Watches', href: '/watches' }]
+    : cmsServiceLinks;
 
   const popularHeading = contentValue(content, 'popular.heading', 'Popular Brands');
   const popularLinks = contentValue<FooterLink[]>(content, 'popular.items', DEFAULT_POPULAR_LINKS);

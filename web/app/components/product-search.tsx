@@ -16,6 +16,10 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShopProduct, fetchProducts, formatKes } from '../lib/shop';
+import { fetchWatches, watchPath } from '../lib/watches';
+
+/** A search hit is a shoe-shop product or a watch; a watch's page is in the Watches section. */
+const hrefOf = (product: ShopProduct & { isWatch?: boolean }) => (product.isWatch ? watchPath(product.slug) : `/shop/${product.slug}`);
 
 /** Matches shown at once. More than this is a grid, which the page already has. */
 const MAX_RESULTS = 6;
@@ -62,10 +66,15 @@ export function ProductSearch({
     const requestId = ++latest.current;
     setLoading(true);
     const timer = setTimeout(() => {
-      void fetchProducts({ search: term, category: category || undefined }).then((rows) => {
+      // Watches are not part of the shop's catalogue, so they are searched alongside it (unless a shop category is chosen).
+      void Promise.all([
+        fetchProducts({ search: term, category: category || undefined }),
+        category ? Promise.resolve([]) : fetchWatches({ search: term }),
+      ]).then(([rows, watchRows]) => {
         // A slower earlier request must not overwrite a newer one's results.
         if (requestId !== latest.current) return;
-        setResults(Array.isArray(rows) ? rows.slice(0, MAX_RESULTS) : []);
+        const merged = [...(Array.isArray(rows) ? rows : []), ...watchRows.map((w) => ({ ...w, isWatch: true } as unknown as ShopProduct))];
+        setResults(merged.slice(0, MAX_RESULTS));
         setLoading(false);
       });
     }, DEBOUNCE_MS);
@@ -100,7 +109,7 @@ export function ProductSearch({
       // product, not a search.
       event.preventDefault();
       const picked = results[active];
-      if (picked) window.location.href = `/shop/${picked.slug}`;
+      if (picked) window.location.href = hrefOf(picked);
     }
   }, [showPanel, results, active]);
 
@@ -132,7 +141,7 @@ export function ProductSearch({
             return (
               <Link
                 key={product.id}
-                href={`/shop/${product.slug}`}
+                href={hrefOf(product)}
                 className={`de-search-result${index === active ? ' is-active' : ''}`}
                 role="option"
                 aria-selected={index === active}

@@ -186,7 +186,7 @@ export function CartClient() {
         continue;
       }
       const price = displayPrice(line.designToken ? null : line.variantId, line.priceKes);
-      lines.push(`- ${line.quantity} x ${line.name} (${line.size}) - ${formatKes(price * line.quantity)}`);
+      lines.push(`- ${line.quantity} x ${line.name}${line.size ? ` (${line.size})` : ''} - ${formatKes(price * line.quantity)}`);
       if (line.designToken) {
         // So the shop sees exactly what to print, and can open the design itself.
         if (line.designSummary) lines.push(`  Print: ${line.designSummary}`);
@@ -393,7 +393,7 @@ export function CartClient() {
                   </Link>
                   <div className="de-cart-detail">
                     <h2><Link href={line.designToken ? `/design/${line.designToken}` : line.path ?? `/shop/${line.productSlug}`}>{line.name}</Link></h2>
-                    <p className="de-cart-meta">{line.size} · {line.sku || 'size to be confirmed'}</p>
+                    <p className="de-cart-meta">{line.size ? `${line.size} · ` : ''}{line.sku || (line.size ? 'size to be confirmed' : '')}</p>
                     {line.designSummary ? <p className="de-cart-custom-note">Personalised: {line.designSummary}</p> : null}
                     {line.isCustomSize ? (
                       <p className="de-cart-custom-note">

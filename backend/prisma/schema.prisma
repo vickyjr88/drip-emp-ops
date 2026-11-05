@@ -1378,8 +1378,8 @@ model Product {
   updatedAt        DateTime         @updatedAt
 
   /// Which storefront this product belongs to. SHOP (the default, every existing row) is the shoe and general shop;
-  /// KIT is the jersey and T-shirt line with its own pages, design center and feed. The public shop endpoints only ever
-  /// read SHOP, so a kit cannot leak into the shop, its feeds, its sitemap or the Nairobi Gents sync.
+  /// KIT is the jersey and T-shirt line and WATCH the watches line, each with its own pages and feed. The public shop
+  /// endpoints only ever read SHOP, so neither can leak into the shop, its feeds, its sitemap or the Nairobi Gents sync.
   line      ProductLine      @default(SHOP)
   kit       KitProduct?
   variants  ProductVariant[]
@@ -2259,6 +2259,9 @@ model MediaAsset {
 enum ProductLine {
   SHOP
   KIT
+  /// Watches: their own pages, feed and staff screen, never mixed into the shoe shop. Filed here by the database itself
+  /// whenever a product is in the Watches category (see migration 20261108090100_watches_line_data).
+  WATCH
 }
 
 enum KitKind {

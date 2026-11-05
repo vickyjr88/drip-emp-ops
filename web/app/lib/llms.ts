@@ -15,6 +15,7 @@ import { fetchFaqs } from '../components/faq-page';
 import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME, STORE_ADDRESS, STORE_HOURS } from './site';
 import { clubPath, fetchClubs, fetchKitConfig, fetchKits, kitPath, leaguePath, LEAGUES } from './kits';
 import { KIT_GUIDES } from './kit-guides';
+import { fetchWatchBrands, fetchWatches, watchBrandPath, watchPath } from './watches';
 
 const oneLine = (text: string | null | undefined, max = 160) => {
   const clean = (text ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -119,6 +120,17 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
     lines.push('');
   }
 
+  // Watches: their own section, not part of the shop.
+  const [watches, watchBrands] = await Promise.all([fetchWatches(), fetchWatchBrands()]);
+  if (watches.length) {
+    const watchPrices = watches.map((w) => w.priceFrom).filter((n) => n > 0);
+    lines.push('## Watches', '');
+    lines.push(`- [All watches](${absoluteUrl('/watches')}): ${watches.length} watches${watchPrices.length ? ` from KSh ${Math.round(Math.min(...watchPrices)).toLocaleString('en-KE')}` : ''}. Watches have no size.`);
+    for (const brand of watchBrands) lines.push(`- [${brand.name} watches](${absoluteUrl(watchBrandPath(brand.slug))}): ${brand.count} ${brand.count === 1 ? 'model' : 'models'}`);
+    for (const watch of watches) lines.push(`- [${watch.name}](${absoluteUrl(watchPath(watch.slug))}): ${watch.priceFrom > 0 ? `KSh ${Math.round(watch.priceFrom).toLocaleString('en-KE')}` : 'price on request'}`);
+    lines.push('');
+  }
+
   const posts = blog.items ?? [];
   if (posts.length) {
     lines.push('## Guides', '');
@@ -143,6 +155,7 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
     '',
     `- [Sitemap](${absoluteUrl('/sitemap.xml')}): every product, category, guide and page`,
     `- [Product feed](${absoluteUrl('/product-feed.xml')}): structured product data with prices and availability`,
+    ...(watches.length ? [`- [Watches feed](${absoluteUrl('/watches-feed.xml')}): the same for watches`] : []),
     ...(kitConfig ? [`- [Kits feed](${absoluteUrl('/kits-feed.xml')}): the same for football jerseys and custom T-shirts`] : []),
     ...(full ? [] : [`- [Full version](${absoluteUrl('/llms-full.txt')}): this file plus every FAQ answer`]),
     '',

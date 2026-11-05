@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../../../lib/site';
 import { fetchCategories, fetchFilters, fetchProducts } from '../../../lib/shop';
@@ -75,6 +75,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function ShopCategoryPage({ params }: { params: { slug: string } }) {
+  // Watches are their own section now.
+  if (params.slug === 'watches') permanentRedirect('/watches');
   const categories = await fetchCategories();
   const category = categories.find((item) => item.slug === params.slug);
   if (!category) notFound();

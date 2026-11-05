@@ -3,6 +3,7 @@ import { SITE_URL } from './lib/site';
 import { buildCollections, collectionPath, isIndexable } from './lib/collections';
 import type { ShopProduct } from './lib/shop';
 import { KIT_GUIDES } from './lib/kit-guides';
+import { watchBrandPath, watchPath, type WatchBrand, type WatchProduct } from './lib/watches';
 import { LEAGUES, clubPath, fetchKitsEnabled, kitPath, leaguePath, type KitClub, type KitProduct } from './lib/kits';
 
 /**
@@ -99,9 +100,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ]
       : [];
 
+    // Watches have their own section; their addresses are listed here and no longer among the shop's products.
+    const [watchesResponse, watchBrandsResponse] = await Promise.all([
+      fetch(`${API_BASE_URL}/watches/products`, { next: { revalidate } }).catch(() => null),
+      fetch(`${API_BASE_URL}/watches/brands`, { next: { revalidate } }).catch(() => null),
+    ]);
+    const watches = watchesResponse?.ok ? ((await watchesResponse.json()) as WatchProduct[]) : [];
+    const watchBrands = watchBrandsResponse?.ok ? ((await watchBrandsResponse.json()) as WatchBrand[]) : [];
+    const watchesChanged = latest(watches.map((w) => w.updatedAt));
+    const watchRoutes: MetadataRoute.Sitemap = watches.length
+      ? [
+          { url: `${SITE_URL}/watches`, ...(watchesChanged ? { lastModified: watchesChanged } : {}), changeFrequency: 'daily', priority: 0.9 },
+          // A brand with a single watch is thin and noindex, so it is not listed.
+          ...watchBrands.filter((b) => b.count >= 2).map((b) => ({ url: `${SITE_URL}${watchBrandPath(b.slug)}`, ...(watchesChanged ? { lastModified: watchesChanged } : {}), changeFrequency: 'weekly' as const, priority: 0.7 })),
+          ...watches.map((w) => ({ url: `${SITE_URL}${watchPath(w.slug)}`, ...(w.updatedAt ? { lastModified: new Date(w.updatedAt) } : {}), changeFrequency: 'weekly' as const, priority: 0.8 })),
+        ]
+      : [];
+
     return [
       ...dated,
       ...kitRoutes,
+      ...watchRoutes,
       ...categories.map((category) => ({
         url: `${SITE_URL}/shop/category/${category.slug}`,
         ...(catalogueChanged ? { lastModified: catalogueChanged } : {}),

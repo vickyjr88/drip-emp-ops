@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { CollectionPage, collectionMetadata } from '../../../components/collection-page';
 import { buildCollections } from '../../../lib/collections';
 import { fetchProducts } from '../../../lib/shop';
+import { fetchWatchBrands, watchBrandPath } from '../../../lib/watches';
 
 // Built from the live catalogue on every request, so prices, sizes and stock counts in the copy are always current.
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,10 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export default async function Page({ params }: { params: { slug: string } }) {
   const { all, collection } = await load(params.slug);
-  if (!collection) notFound();
+  if (!collection) {
+    // A watch brand's page moved with its watches.
+    if ((await fetchWatchBrands()).some((b) => b.slug === params.slug)) permanentRedirect(watchBrandPath(params.slug));
+    notFound();
+  }
   return <CollectionPage collection={collection} all={all} />;
 }

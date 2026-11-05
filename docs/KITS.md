@@ -35,7 +35,7 @@ It starts **off** on first deploy (no settings row), and also if the database ca
 | Drawn-shirt PNG | `/kits/image/<slug>` (`?og=1` for 1200x630) | n/a |
 
 **Shoes are never mixed in.** Products carry a `line` (`SHOP` or `KIT`); every public shop query is limited to `SHOP`
-(`SHOP_LINE` in `backend/src/storefront/storefront.service.ts`), so a kit cannot reach the shop, its search, the four shoe feeds,
+(`SHOP_LINE` in `backend/src/storefront/storefront.service.ts`; watches are a third line, see [WATCHES.md](WATCHES.md)), so a kit cannot reach the shop, its search, the four shoe feeds,
 `llms.txt`'s shop section or the **Nairobi Gents sync** (which copies `/shop/products`). `backend/test/kits.test.ts` has a leak test
 that fails if a future change forgets the filter. Kits still use normal variants, so stock, orders, receipts and accounting work.
 

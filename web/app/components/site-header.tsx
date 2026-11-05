@@ -18,6 +18,7 @@ import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { PageContentDocument, contentValue, fetchPageContent } from '../lib/page-content';
 import { fetchKitsEnabled } from '../lib/kits';
+import { fetchWatchCount } from '../lib/watches';
 import { AppDownloadLink } from './app-download';
 import { MobileNav } from './mobile-nav';
 
@@ -45,6 +46,7 @@ export function navKeyForHref(href: string): string {
   if (path === '/') return 'search';
   if (path.startsWith('/shop')) return 'shop';
   if (path.startsWith('/kits') || path.startsWith('/design')) return 'kits';
+  if (path.startsWith('/watches')) return 'watches';
   if (path.startsWith('/about')) return 'profile';
   if (path.startsWith('/faq')) return 'faq';
   if (path.startsWith('/blog')) return 'blog';
@@ -62,10 +64,21 @@ export function withKitsLink(links: NavLink[], on: boolean): NavLink[] {
   return next;
 }
 
+/** Adds Watches after Shop (and Kits) when there are watches on sale, unless the CMS menu already links to it. */
+export function withWatchesLink(links: NavLink[], on: boolean): NavLink[] {
+  if (!on || links.some((link) => link.href.split(/[?#]/)[0].replace(/\/+$/, '') === '/watches')) return links;
+  const after = Math.max(links.findIndex((l) => navKeyForHref(l.href) === 'kits'), links.findIndex((l) => navKeyForHref(l.href) === 'shop'));
+  const next = [...links];
+  next.splice(after >= 0 ? after + 1 : next.length, 0, { label: 'Watches', href: '/watches' });
+  return next;
+}
+
 export function SiteHeader({ active }: { active: string }) {
   const [content, setContent] = useState<PageContentDocument | null>(null);
   // Whether the Kits line is switched on (an admin controls this in the portal). The link only exists while it is.
   const [kitsOn, setKitsOn] = useState(false);
+  // Whether there are watches on sale: the Watches link is only there when there is something behind it.
+  const [watchesOn, setWatchesOn] = useState(false);
   const cart = useCart();
   const auth = useCustomerAuth();
 
@@ -77,6 +90,9 @@ export function SiteHeader({ active }: { active: string }) {
     void fetchKitsEnabled().then((on) => {
       if (!cancelled) setKitsOn(on);
     });
+    void fetchWatchCount().then((n) => {
+      if (!cancelled) setWatchesOn(n > 0);
+    });
     return () => {
       cancelled = true;
     };
@@ -84,7 +100,7 @@ export function SiteHeader({ active }: { active: string }) {
 
   const wordmark = contentValue(content, 'brand.wordmark', 'Drip Emporium');
   const cmsLinks = contentValue<NavLink[]>(content, 'nav.items', DEFAULT_NAV_LINKS);
-  const navLinks = withKitsLink(cmsLinks, kitsOn);
+  const navLinks = withWatchesLink(withKitsLink(cmsLinks, kitsOn), watchesOn);
   const ctaLabel = contentValue(content, 'cta.label', 'Contact A Team');
   const ctaHref = contentValue(content, 'cta.href', '/contact');
 

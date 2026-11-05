@@ -11,6 +11,7 @@ export type PortalNavKey =
   | 'catalogue'
   | 'media'
   | 'kits'
+  | 'watches'
   | 'featuredProducts'
   | 'categories'
   | 'inventory'
@@ -44,6 +45,7 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
   { key: 'catalogue', href: '/portal/catalogue', label: 'Catalogue' },
   { key: 'media', href: '/portal/media', label: 'Media' },
   { key: 'kits', href: '/portal/kits', label: 'Kits' },
+  { key: 'watches', href: '/portal/watches', label: 'Watches' },
   { key: 'featuredProducts', href: '/portal/featured-products', label: 'Featured Products' },
   { key: 'categories', href: '/portal/categories', label: 'Categories' },
   { key: 'inventory', href: '/portal/inventory', label: 'Inventory' },
@@ -77,6 +79,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   catalogue: 'Catalogue',
   media: 'Media Library',
   kits: 'Kits and Design Center',
+  watches: 'Watches',
   featuredProducts: 'Featured Products',
   categories: 'Categories',
   inventory: 'Inventory',

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { JsonLd, SITE_NAME, absoluteUrl, productFaqSchema } from '../../lib/site';
 import { fetchProduct, formatKes, priceLabel } from '../../lib/shop';
+import { fetchWatch, watchPath } from '../../lib/watches';
 import { sharePreviewUrl } from '../../lib/preview-image';
 import { ProductClient } from './product-client';
 
@@ -49,7 +50,11 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export default async function ProductPage({ params }: { params: { slug: string } }) {
   const product = await fetchProduct(params.slug);
-  if (!product) notFound();
+  if (!product) {
+    // A watch used to be sold here. Its old address now leads, permanently, to its own page in the Watches section.
+    if (await fetchWatch(params.slug)) permanentRedirect(watchPath(params.slug));
+    notFound();
+  }
 
   return (
     <>
