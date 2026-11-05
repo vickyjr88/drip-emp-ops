@@ -397,3 +397,9 @@ db('a plain kit with no design is an ordinary order line', async () => {
   assert.deepEqual([line.designId, line.printStatus, Number(line.printFee)], [null, null, 0]);
   await prisma.$disconnect();
 });
+
+test('sizes sort S, M, L, XL, XXL, 3XL, not alphabetically', async () => {
+  const { bySizeOrder } = await import('../src/kits/kits.service');
+  const sizes = ['XL', '3XL', 'M', 'L', 'S', 'XXL', 'Kids'].map((size) => ({ size, name: size }));
+  assert.deepEqual(sizes.sort(bySizeOrder).map((s) => s.size), ['S', 'M', 'L', 'XL', 'XXL', '3XL', 'Kids']);
+});

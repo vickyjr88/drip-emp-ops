@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchKitsEnabled } from '../lib/kits';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AppDownloadLink } from './app-download';
@@ -150,13 +151,26 @@ function CommunityStrip({ content }: { content: PageContentDocument | null }) {
   );
 }
 
+/** Their own column, shown only while the Kits line is switched on, so the Shop column stays the length it was. */
+const KIT_FOOTER_LINKS: FooterLink[] = [
+  { label: 'Football Jerseys', href: '/kits' },
+  { label: 'Design Your Own', href: '/design' },
+  { label: 'Premier League Jerseys', href: '/kits/league/premier-league' },
+  { label: 'Custom T-Shirts', href: '/kits?kind=TSHIRT' },
+  { label: 'Jersey Guides', href: '/kits/guides' },
+];
+
 export function SiteFooter() {
   const [content, setContent] = useState<PageContentDocument | null>(null);
+  const [kitsOn, setKitsOn] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void fetchPageContent('footer').then((document) => {
       if (!cancelled) setContent(document);
+    });
+    void fetchKitsEnabled().then((on) => {
+      if (!cancelled) setKitsOn(on);
     });
     return () => {
       cancelled = true;
@@ -212,7 +226,7 @@ export function SiteFooter() {
     <footer className="lp-footer">
       <div className="lp-container">
         <CommunityStrip content={content} />
-        <div className="lp-footer-grid">
+        <div className={`lp-footer-grid${kitsOn ? ' has-kits' : ''}`}>
           <section className="lp-footer-brand">
             <h3>{brandHeading}</h3>
             <p>{brandDescription}</p>
@@ -263,6 +277,17 @@ export function SiteFooter() {
               <h4>{popularHeading}</h4>
               {popularLinks.map((link, index) => (
                 <Link key={`${link.href}-${index}`} href={link.href || '/shop'}>
+                  {link.label}
+                </Link>
+              ))}
+            </section>
+          ) : null}
+
+          {kitsOn ? (
+            <section>
+              <h4>Kits</h4>
+              {KIT_FOOTER_LINKS.map((link) => (
+                <Link key={link.href} href={link.href}>
                   {link.label}
                 </Link>
               ))}

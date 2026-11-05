@@ -13,6 +13,8 @@ import { fetchCategories, fetchProducts } from './shop';
 import { buildCollections, collectionFacts, collectionHeading, collectionPath, isIndexable } from './collections';
 import { fetchFaqs } from '../components/faq-page';
 import { absoluteUrl, SITE_DESCRIPTION, SITE_NAME, STORE_ADDRESS, STORE_HOURS } from './site';
+import { clubPath, fetchClubs, fetchKitConfig, fetchKits, kitPath, leaguePath, LEAGUES } from './kits';
+import { KIT_GUIDES } from './kit-guides';
 
 const oneLine = (text: string | null | undefined, max = 160) => {
   const clean = (text ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -95,6 +97,28 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
     lines.push('');
   }
 
+  // The Kits line (jerseys and custom T-shirts), only while an admin has it switched on: both calls come back empty when off.
+  const [kitConfig, kits, kitClubs] = await Promise.all([fetchKitConfig(), fetchKits(), fetchClubs()]);
+  if (kitConfig) {
+    const kitPrices = kits.map((k) => k.priceFrom).filter((n) => n > 0);
+    lines.push('## Kits: football jerseys and custom T-shirts', '');
+    lines.push(`- Fan-version football jerseys in club colours and custom printed T-shirts. Not official club products: ${kitConfig.fanVersionNote}`);
+    lines.push(`- Personalisation: a name (up to 12 letters) and number (0 to 99) on the back of a jersey, with a choice of ten lettering styles; text or artwork on a T-shirt. Preview front and back before ordering.`);
+    lines.push(`- Print fees: name ${kitConfig.pricing.nameFeeKes} KES, number ${kitConfig.pricing.numberFeeKes} KES, name and number together ${kitConfig.pricing.nameAndNumberFeeKes} KES, each artwork ${kitConfig.pricing.artworkFeeKes} KES.`);
+    lines.push(`- Lead time: ${kitConfig.leadTime}`);
+    lines.push(`- Returns: ${kitConfig.returnsNote}`);
+    lines.push(`- [All kits](${absoluteUrl('/kits')}): ${kits.length} shirts${kitPrices.length ? ` from KSh ${Math.round(Math.min(...kitPrices)).toLocaleString('en-KE')}` : ''}`);
+    lines.push(`- [Design center](${absoluteUrl('/design')}): design a jersey or T-shirt with your own name, number, text or artwork`);
+    for (const league of LEAGUES) {
+      const inLeague = kitClubs.filter((c) => c.league === league.key);
+      if (inLeague.length) lines.push(`- [${league.name}](${absoluteUrl(leaguePath(league.slug))}): ${inLeague.map((c) => c.name).join(', ')}`);
+    }
+    for (const club of kitClubs) lines.push(`- [${club.name} jerseys](${absoluteUrl(clubPath(club.slug))}): ${club.kitCount} shirt${club.kitCount === 1 ? '' : 's'}`);
+    for (const kit of kits) lines.push(`- [${kit.name}](${absoluteUrl(kitPath(kit.slug))}): ${kit.priceFrom > 0 ? `from KSh ${Math.round(kit.priceFrom).toLocaleString('en-KE')}` : 'price on request'}`);
+    for (const guide of KIT_GUIDES) lines.push(`- [${guide.title}](${absoluteUrl(`/kits/guides/${guide.slug}`)}): ${oneLine(guide.description)}`);
+    lines.push('');
+  }
+
   const posts = blog.items ?? [];
   if (posts.length) {
     lines.push('## Guides', '');
@@ -119,6 +143,7 @@ export async function buildLlmsTxt({ full }: { full: boolean }): Promise<string>
     '',
     `- [Sitemap](${absoluteUrl('/sitemap.xml')}): every product, category, guide and page`,
     `- [Product feed](${absoluteUrl('/product-feed.xml')}): structured product data with prices and availability`,
+    ...(kitConfig ? [`- [Kits feed](${absoluteUrl('/kits-feed.xml')}): the same for football jerseys and custom T-shirts`] : []),
     ...(full ? [] : [`- [Full version](${absoluteUrl('/llms-full.txt')}): this file plus every FAQ answer`]),
     '',
   );

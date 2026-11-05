@@ -45,6 +45,12 @@ export type CartLine = {
   quantity: number;
   /** True only for a customer-typed size with no matching variant. */
   isCustomSize?: boolean;
+  /** A personalised shirt: the saved design (see /design). Its print fee is already inside priceKes. */
+  designToken?: string;
+  /** What is printed, in words, for the cart and the WhatsApp message. */
+  designSummary?: string;
+  /** Where the line's product page lives when it is not in the shop (the kits line). */
+  path?: string;
 };
 
 type CartValue = {

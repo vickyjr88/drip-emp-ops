@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react';
 import { useCart } from '../lib/cart';
 import { useCustomerAuth } from '../lib/customer-auth';
 import { PageContentDocument, contentValue, fetchPageContent } from '../lib/page-content';
+import { fetchKitsEnabled } from '../lib/kits';
 import { AppDownloadLink } from './app-download';
 import { MobileNav } from './mobile-nav';
 
@@ -43,6 +44,7 @@ export function navKeyForHref(href: string): string {
   const path = (href || '').split(/[?#]/)[0].replace(/\/+$/, '') || '/';
   if (path === '/') return 'search';
   if (path.startsWith('/shop')) return 'shop';
+  if (path.startsWith('/kits') || path.startsWith('/design')) return 'kits';
   if (path.startsWith('/about')) return 'profile';
   if (path.startsWith('/faq')) return 'faq';
   if (path.startsWith('/blog')) return 'blog';
@@ -51,8 +53,19 @@ export function navKeyForHref(href: string): string {
   return `path:${path}`;
 }
 
+/** Adds Kits after Shop while the line is on, unless the CMS menu already links to it. */
+export function withKitsLink(links: NavLink[], on: boolean): NavLink[] {
+  if (!on || links.some((link) => link.href.split(/[?#]/)[0].replace(/\/+$/, '') === '/kits')) return links;
+  const at = links.findIndex((link) => navKeyForHref(link.href) === 'shop');
+  const next = [...links];
+  next.splice(at >= 0 ? at + 1 : next.length, 0, { label: 'Kits', href: '/kits' });
+  return next;
+}
+
 export function SiteHeader({ active }: { active: string }) {
   const [content, setContent] = useState<PageContentDocument | null>(null);
+  // Whether the Kits line is switched on (an admin controls this in the portal). The link only exists while it is.
+  const [kitsOn, setKitsOn] = useState(false);
   const cart = useCart();
   const auth = useCustomerAuth();
 
@@ -61,13 +74,17 @@ export function SiteHeader({ active }: { active: string }) {
     void fetchPageContent('header').then((document) => {
       if (!cancelled) setContent(document);
     });
+    void fetchKitsEnabled().then((on) => {
+      if (!cancelled) setKitsOn(on);
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
   const wordmark = contentValue(content, 'brand.wordmark', 'Drip Emporium');
-  const navLinks = contentValue<NavLink[]>(content, 'nav.items', DEFAULT_NAV_LINKS);
+  const cmsLinks = contentValue<NavLink[]>(content, 'nav.items', DEFAULT_NAV_LINKS);
+  const navLinks = withKitsLink(cmsLinks, kitsOn);
   const ctaLabel = contentValue(content, 'cta.label', 'Contact A Team');
   const ctaHref = contentValue(content, 'cta.href', '/contact');
 

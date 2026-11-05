@@ -2,6 +2,8 @@ import type { MetadataRoute } from 'next';
 import { SITE_URL } from './lib/site';
 import { buildCollections, collectionPath, isIndexable } from './lib/collections';
 import type { ShopProduct } from './lib/shop';
+import { KIT_GUIDES } from './lib/kit-guides';
+import { LEAGUES, clubPath, fetchKitsEnabled, kitPath, leaguePath, type KitClub, type KitProduct } from './lib/kits';
 
 /**
  * Sitemap, including every active product and category.
@@ -18,9 +20,9 @@ const API_BASE_URL = (
   'http://localhost:3100'
 ).replace(/\/$/, '');
 
-// Revalidate hourly. The catalogue does not change minute to minute, and this
-// keeps a crawler hitting the sitemap from putting load on the API.
-export const revalidate = 3600;
+// Revalidate every five minutes. The catalogue does not change minute to minute, and this keeps a crawler hitting
+// the sitemap from putting load on the API; it is short enough that switching the Kits line off drops its URLs promptly.
+export const revalidate = 300;
 
 type Product = { slug: string; updatedAt?: string };
 
@@ -71,8 +73,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         : route,
     );
 
+    // The Kits line: present only while an admin has it switched on (the API answers 404 otherwise, which leaves these
+    // empty). Club and league pages are listed only when they have something to show.
+    // The live switch is asked first and never cached: a cached catalogue response would otherwise keep listing the
+    // line's URLs after an admin has turned it off.
+    const kitsOn = await fetchKitsEnabled();
+    const [kitsResponse, kitClubsResponse] = kitsOn
+      ? await Promise.all([
+          fetch(`${API_BASE_URL}/kits/products`, { next: { revalidate } }).catch(() => null),
+          fetch(`${API_BASE_URL}/kits/clubs`, { next: { revalidate } }).catch(() => null),
+        ])
+      : [null, null];
+    const kits = kitsResponse?.ok ? ((await kitsResponse.json()) as KitProduct[]) : [];
+    const kitClubs = kitClubsResponse?.ok ? ((await kitClubsResponse.json()) as KitClub[]) : [];
+    const kitsChanged = latest(kits.map((k) => k.updatedAt));
+    const kitRoutes: MetadataRoute.Sitemap = kitsResponse?.ok
+      ? [
+          { url: `${SITE_URL}/kits`, ...(kitsChanged ? { lastModified: kitsChanged } : {}), changeFrequency: 'daily', priority: 0.9 },
+          { url: `${SITE_URL}/design`, changeFrequency: 'monthly', priority: 0.8 },
+          ...LEAGUES.filter((l) => kitClubs.some((c) => c.league === l.key)).map((l) => ({ url: `${SITE_URL}${leaguePath(l.slug)}`, ...(kitsChanged ? { lastModified: kitsChanged } : {}), changeFrequency: 'weekly' as const, priority: 0.8 })),
+          ...kitClubs.filter((c) => c.kitCount > 0).map((c) => ({ url: `${SITE_URL}${clubPath(c.slug)}`, ...(kitsChanged ? { lastModified: kitsChanged } : {}), changeFrequency: 'weekly' as const, priority: 0.8 })),
+          ...kits.map((k) => ({ url: `${SITE_URL}${kitPath(k.slug)}`, ...(k.updatedAt ? { lastModified: new Date(k.updatedAt) } : {}), changeFrequency: 'weekly' as const, priority: 0.8 })),
+          ...KIT_GUIDES.map((g) => ({ url: `${SITE_URL}/kits/guides/${g.slug}`, lastModified: new Date(g.updated), changeFrequency: 'monthly' as const, priority: 0.6 })),
+          { url: `${SITE_URL}/kits/guides`, changeFrequency: 'monthly', priority: 0.6 },
+        ]
+      : [];
+
     return [
       ...dated,
+      ...kitRoutes,
       ...categories.map((category) => ({
         url: `${SITE_URL}/shop/category/${category.slug}`,
         ...(catalogueChanged ? { lastModified: catalogueChanged } : {}),

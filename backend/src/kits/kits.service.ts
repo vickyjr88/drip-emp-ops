@@ -17,6 +17,12 @@ import { KitsFlagService } from './kits.flag';
 
 const KITS_CATEGORY_SLUG = 'kits';
 const SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
+const SIZE_RANK: Record<string, number> = { XS: 0, S: 1, M: 2, L: 3, XL: 4, XXL: 5, '2XL': 5, '3XL': 6, XXXL: 6, '4XL': 7 };
+/** S, M, L, XL ... in that order; anything else (kids' sizes, numbers) keeps its place after them, alphabetically. */
+export const bySizeOrder = (a: { size: string | null; name: string }, b: { size: string | null; name: string }) => {
+  const rank = (v: { size: string | null; name: string }) => SIZE_RANK[(v.size ?? v.name).toUpperCase()] ?? 99;
+  return rank(a) - rank(b) || (a.size ?? a.name).localeCompare(b.size ?? b.name);
+};
 
 /** Reads a fee typed in the CMS: whole shillings, never negative; anything else falls back to the built-in default. */
 export function parsePrintPricing(content: any): PrintPricing {
@@ -153,6 +159,7 @@ export class KitsService implements OnModuleInit {
       const kit = row.kit!;
       return {
         ...product,
+        variants: [...product.variants].sort(bySizeOrder),
         kit: {
           kind: kit.kind,
           club: kit.club ? { slug: kit.club.slug, name: kit.club.name, league: kit.club.league } : null,
