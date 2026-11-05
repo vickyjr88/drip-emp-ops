@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { EliteLayout } from '../components/elite-layout';
 import { ClubDirectory, FanVersionNote, FaqList, KitCard } from '../components/kit-parts';
+import { KitShowcase } from '../components/kit-showcase';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../lib/site';
 import { sharePreviewUrl, brandPreviewImage } from '../lib/preview-image';
 import { DESIGN_PATH, LEAGUES, fetchClubs, fetchKitConfig, fetchKits, leaguePath } from '../lib/kits';
@@ -47,7 +48,8 @@ export default async function KitsPage({ searchParams }: { searchParams: Params 
     sort: first(searchParams.sort) || undefined,
     inStockOnly: first(searchParams.inStockOnly) || undefined,
   };
-  const [kits, all, clubs] = await Promise.all([fetchKits(query), fetchKits(), fetchClubs()]);
+  const [kits, all, clubRows] = await Promise.all([fetchKits(query), fetchKits(), fetchClubs(true)]);
+  const clubs = clubRows.filter((club) => club.kitCount > 0);
   const faqs = listingFaqs(config);
   const filtered = Object.values(query).some(Boolean);
   const sizes = Array.from(new Set(all.flatMap((k) => k.variants.map((v) => v.size).filter((s): s is string => Boolean(s)))));
@@ -58,6 +60,9 @@ export default async function KitsPage({ searchParams }: { searchParams: Params 
       <JsonLd data={itemListSchema(kits, absoluteUrl, listingTitle(config))} />
       <JsonLd data={faqSchema(faqs)} />
       <main className="lp-main-content kt-page">
+        {filtered ? null : (
+          <KitShowcase fanVersionNote={config.fanVersionNote} activeClubSlugs={clubRows.map((club) => club.slug)} />
+        )}
         <section className="lp-container kt-hero">
           <h1>{config.listing.heading}</h1>
           <p>{config.listing.intro}</p>
