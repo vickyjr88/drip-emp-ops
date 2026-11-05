@@ -152,6 +152,9 @@ async function setup() {
   const uploaded: any[] = [];
   const media: any = { uploadProjectAsset: async (file: any) => { uploaded.push(file); return { url: 'https://api.test/media/0f8fad5b-d9cb-469f-a165-70867728950e.png' }; } };
   const service = new KitsService(prisma as any, storefront, pageContent, media, flag);
+  // Orders from earlier runs hold the test variants, so they go first.
+  await prisma.orderLine.deleteMany({ where: { variant: { sku: { startsWith: 'KTEST' } } } });
+  await prisma.order.deleteMany({ where: { customerEmail: 'ktest-buyer@example.com', lines: { none: {} } } });
   await prisma.kitDesign.deleteMany();
   await prisma.product.deleteMany({ where: { sku: { startsWith: 'KTEST' } } });
   await service.ensureSeed();
@@ -314,5 +317,83 @@ db('staff can create, edit and switch off a kit, and sizes can be supplier-sourc
   assert.equal(edited!.name, 'KTest Plain Tee Black');
   assert.equal((await service.list({})).some((p) => p.slug === kit.slug), false, 'an inactive kit is not listed');
   await assert.rejects(() => service.bySlug(kit.slug), /No kit/);
+  await prisma.$disconnect();
+});
+
+// ---------------------------------------------------------------------------
+// Checkout with a personalised shirt
+// ---------------------------------------------------------------------------
+
+async function checkoutHarness() {
+  const ctx = await setup();
+  const { CheckoutService } = await import('../src/checkout/checkout.service');
+  const paystack: any = { configured: true, initialise: async (o: any) => ({ authorization_url: 'https://pay.test/x', reference: o.reference }) };
+  const inventory: any = { record: async () => undefined };
+  const stub: any = { notifySignup: () => undefined, syncSignup: () => undefined };
+  const checkout = new CheckoutService(ctx.prisma as any, inventory, stub, paystack, stub, stub, stub, stub, stub, stub, ctx.service);
+  await ctx.prisma.store.upsert({ where: { code: 'KTEST' }, update: { isActive: true }, create: { code: 'KTEST', name: 'KTest Store' } });
+  const buyer = { firstName: 'Test', lastName: 'Buyer', email: 'ktest-buyer@example.com', phone: '+254712345678' };
+  return { ...ctx, checkout, buyer };
+}
+
+db('checkout adds the print fee on the server and keeps a frozen copy for the print queue', async () => {
+  const { prisma, service, flag, checkout, buyer } = await checkoutHarness();
+  await flag.set(true, 'test');
+  const kit = await service.adminCreate({ name: 'KTest Checkout Jersey', kind: 'JERSEY', clubSlug: 'chelsea', edition: 'HOME', templateKey: 'jersey-short', skuPrefix: 'KTEST-CHK', sizes: [{ size: 'M', priceKes: 3000 }] } as any);
+  const variantId = kit.variants[0].id;
+  const saved = await service.saveDesign(kit.slug, { v: 1, templateKey: 'jersey-short', colors, name: { text: 'palmer', fontKey: 'tall', color: '#ffffff' }, number: { value: '20', fontKey: 'tall', color: '#ffffff' }, items: [] });
+  const fee = saved.feeKes;
+  assert.equal(fee, DEFAULT_PRINT_PRICING.nameAndNumberFeeKes);
+
+  // The request tries to name its own price; checkout does not look at it.
+  const out = await checkout.start({ ...buyer, lines: [{ variantId, quantity: 2, designToken: saved.token, priceKes: 1 } as any] } as any, 'https://shop.test');
+  assert.equal(out.total, (3000 + fee) * 2);
+
+  const order = await prisma.order.findUnique({ where: { orderNumber: out.orderNumber }, include: { lines: true } });
+  const line = order!.lines[0];
+  assert.equal(Number(line.unitPrice), 3000 + fee);
+  assert.equal(Number(line.listPrice), 3000 + fee, 'the fee is not a discount or a surcharge in the margin reports');
+  assert.equal(Number(line.discount), 0);
+  assert.equal(Number(line.printFee), fee * 2);
+  assert.equal(line.printStatus, 'AWAITING_REVIEW');
+  assert.equal((line.customisation as any).name.text, 'PALMER');
+  assert.match(line.description, /personalised/);
+
+  const queue = await service.printQueue();
+  const row = queue.find((r) => r.id === line.id)!;
+  assert.match(row.summary, /Name "PALMER"/);
+  assert.equal(row.orderNumber, out.orderNumber);
+  await service.setPrintStatus(line.id, 'APPROVED', 'checked');
+  assert.equal((await service.printQueue('APPROVED')).filter((r) => r.id === line.id).length, 1);
+  assert.equal((await service.printQueue('READY')).filter((r) => r.id === line.id).length, 0);
+  await prisma.$disconnect();
+});
+
+db('checkout refuses a design for another shirt, an unknown design, a non-kit item, or any design while the line is off', async () => {
+  const { prisma, service, flag, checkout, buyer } = await checkoutHarness();
+  await flag.set(true, 'test');
+  const one = await service.adminCreate({ name: 'KTest Shirt One', kind: 'JERSEY', templateKey: 'jersey-short', skuPrefix: 'KTEST-ONE', sizes: [{ size: 'M', priceKes: 3000 }] } as any);
+  const two = await service.adminCreate({ name: 'KTest Shirt Two', kind: 'JERSEY', templateKey: 'jersey-short', skuPrefix: 'KTEST-TWO', sizes: [{ size: 'M', priceKes: 3000 }] } as any);
+  const shoe = await makeShoe(prisma);
+  const shoeVariant = (await prisma.productVariant.findFirst({ where: { productId: shoe.id } }))!;
+  const design = await service.saveDesign(one.slug, { v: 1, templateKey: 'jersey-short', colors, name: { text: 'Saka', fontKey: 'tall', color: '#ffffff' } });
+  const go = (variantId: string, designToken: string) => checkout.start({ ...buyer, lines: [{ variantId, quantity: 1, designToken }] } as any, 'https://shop.test');
+
+  await assert.rejects(() => go(two.variants[0].id, design.token), /different shirt/);
+  await assert.rejects(() => go(one.variants[0].id, 'no-such-token'), /not found/);
+  await assert.rejects(() => go(shoeVariant.id, design.token), /cannot be personalised/);
+  await flag.set(false, 'test');
+  await assert.rejects(() => go(one.variants[0].id, design.token), /not available right now/);
+  await prisma.$disconnect();
+});
+
+db('a plain kit with no design is an ordinary order line', async () => {
+  const { prisma, service, flag, checkout, buyer } = await checkoutHarness();
+  await flag.set(true, 'test');
+  const kit = await service.adminCreate({ name: 'KTest Plain Buy', kind: 'TSHIRT', templateKey: 'tee-crew', skuPrefix: 'KTEST-PLN', sizes: [{ size: 'L', priceKes: 1500 }] } as any);
+  const out = await checkout.start({ ...buyer, lines: [{ variantId: kit.variants[0].id, quantity: 1 }] } as any, 'https://shop.test');
+  assert.equal(out.total, 1500);
+  const line = (await prisma.order.findUnique({ where: { orderNumber: out.orderNumber }, include: { lines: true } }))!.lines[0];
+  assert.deepEqual([line.designId, line.printStatus, Number(line.printFee)], [null, null, 0]);
   await prisma.$disconnect();
 });

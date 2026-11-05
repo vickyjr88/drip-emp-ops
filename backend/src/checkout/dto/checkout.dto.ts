@@ -15,6 +15,13 @@ export class CheckoutLineDto {
   @IsInt()
   @Min(1)
   quantity!: number;
+
+  @ApiPropertyOptional({
+    description: 'A personalised shirt: the token of the design saved in the design center. The print fee is added by the server, never taken from the request.',
+  })
+  @IsOptional()
+  @IsString()
+  designToken?: string;
 }
 
 export class CheckoutDto {

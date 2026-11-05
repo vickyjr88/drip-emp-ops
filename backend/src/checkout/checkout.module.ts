@@ -10,6 +10,7 @@ import { CampaignModule } from '../campaign/campaign.module';
 import { XConversionModule } from '../x-conversion/x-conversion.module';
 import { TikTokConversionModule } from '../tiktok-conversion/tiktok-conversion.module';
 import { MauticModule } from '../mautic/mautic.module';
+import { KitsModule } from '../kits/kits.module';
 import { CheckoutService } from './checkout.service';
 import { CheckoutController } from './checkout.controller';
 
@@ -28,6 +29,7 @@ import { CheckoutController } from './checkout.controller';
     XConversionModule,
     TikTokConversionModule,
     MauticModule,
+    KitsModule,
   ],
   controllers: [CheckoutController],
   providers: [CheckoutService],

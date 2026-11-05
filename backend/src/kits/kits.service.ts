@@ -304,6 +304,21 @@ export class KitsService implements OnModuleInit {
     return { token: design.token, feeKes: fee, personalised: isPersonalised(spec), spec };
   }
 
+  /**
+   * For checkout: the saved design for this shirt, re-validated under today's rules and priced under today's fees.
+   * Refused when the line is off, the design is for a different shirt, or it no longer passes the shirt's rules.
+   */
+  async designForCheckout(token: string, productId: string) {
+    if (!(await this.flag.isEnabled())) throw new BadRequestException('Personalised shirts are not available right now.');
+    const design = await this.prisma.kitDesign.findUnique({ where: { token } });
+    if (!design) throw new NotFoundException('That design was not found. Please design the shirt again.');
+    const product = await this.prisma.product.findFirst({ where: { id: productId, line: 'KIT', isActive: true }, include: { kit: true } });
+    if (!product?.kit) throw new BadRequestException('That item cannot be personalised.');
+    if (design.productSlug !== product.slug) throw new BadRequestException('That design was made for a different shirt.');
+    const spec = cleanDesign(design.spec, product.kit);
+    return { designId: design.id, spec, fee: printFee(spec, await this.pricing()) };
+  }
+
   async getDesign(token: string) {
     const design = await this.prisma.kitDesign.findUnique({ where: { token } });
     if (!design) throw new NotFoundException('That design was not found.');

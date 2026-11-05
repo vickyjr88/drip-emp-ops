@@ -11,6 +11,7 @@ import { CampaignService } from '../campaign/campaign.service';
 import { XConversionService } from '../x-conversion/x-conversion.service';
 import { TikTokConversionService } from '../tiktok-conversion/tiktok-conversion.service';
 import { MauticService } from '../mautic/mautic.service';
+import { KitsService } from '../kits/kits.service';
 import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
@@ -58,6 +59,7 @@ export class CheckoutService {
     private readonly xConversion: XConversionService,
     private readonly tiktokConversion: TikTokConversionService,
     private readonly mautic: MauticService,
+    private readonly kits: KitsService,
   ) {}
 
   /**
@@ -222,16 +224,31 @@ export class CheckoutService {
         if (seen === undefined || price < seen) offerByVariant.set(offerLine.variantId, price);
       }
 
-      const lines = dto.lines.map((line) => {
+      // A personalised shirt arrives with the token of a design saved in the design center. It is re-validated against
+      // the shirt it is for and priced here, from the stored design and the current fees: the request's own idea of
+      // the price is never read.
+      const designs = new Map<number, Awaited<ReturnType<KitsService['designForCheckout']>>>();
+      for (const [index, line] of dto.lines.entries()) {
+        if (!line.designToken) continue;
         const variant = byId.get(line.variantId);
         if (!variant) throw new NotFoundException(`That item is no longer available.`);
-        const listPrice = Number(variant.priceKes);
+        designs.set(index, await this.kits.designForCheckout(line.designToken, variant.productId));
+      }
+
+      const lines = dto.lines.map((line, index) => {
+        const variant = byId.get(line.variantId);
+        if (!variant) throw new NotFoundException(`That item is no longer available.`);
+        const design = designs.get(index);
+        // The print fee is added to both the price charged and the list price, so a personalised shirt does not read
+        // as a discount (or a surcharge) in the margin reports; printFee below records it for staff.
+        const printFeeEach = design?.fee ?? 0;
+        const listPrice = Number(variant.priceKes) + printFeeEach;
         // Offers are retail-only by design (see the Offer model's own doc
         // comment): a reseller's or wholesaler's tier price is never further
         // discounted, or bypassed, by a storefront-wide markdown meant for
         // retail shoppers. At RETAIL, an active offer still wins over list
         // price exactly as before this tier resolution existed.
-        const unitPrice = tier === 'RETAIL' ? (offerByVariant.get(variant.id) ?? listPrice) : priceForTier(variant, tier);
+        const unitPrice = (tier === 'RETAIL' ? (offerByVariant.get(variant.id) ?? Number(variant.priceKes)) : priceForTier(variant, tier)) + printFeeEach;
         // A drop-ship listing is never held on the shelf, so every order
         // against it is sourced from the supplier -- same rule as the till.
         // A normal listing that has run out gets the same treatment: there is
@@ -246,7 +263,7 @@ export class CheckoutService {
         sellableByVariant.set(variant.id, remaining - line.quantity);
         return {
           variantId: variant.id,
-          description: `${variant.product.name} — ${variant.name}`,
+          description: `${variant.product.name} — ${variant.name}${design ? ' (personalised)' : ''}`,
           quantity: line.quantity,
           unitPrice: new Prisma.Decimal(unitPrice),
           // Kept apart so the markdown is visible on the order and totals
@@ -259,6 +276,14 @@ export class CheckoutService {
           lineTotal: new Prisma.Decimal(unitPrice * line.quantity),
           fulfillmentType,
           fulfillmentStatus: fulfillmentType === 'SUPPLIER_ORDER' ? OrderLineFulfillmentStatus.AWAITING_SUPPLIER : null,
+          ...(design
+            ? {
+                designId: design.designId,
+                customisation: design.spec as unknown as Prisma.InputJsonValue,
+                printFee: new Prisma.Decimal(printFeeEach * line.quantity),
+                printStatus: 'AWAITING_REVIEW' as const,
+              }
+            : {}),
         };
       });
 
