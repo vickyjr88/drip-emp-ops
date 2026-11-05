@@ -13,8 +13,8 @@ import { SHAPES } from '../../web/app/components/kit-geometry';
 
 const config: any = {
   enabled: true,
-  pricing: { nameFeeKes: 500, numberFeeKes: 300, nameAndNumberFeeKes: 700, artworkFeeKes: 800, textFeeKes: 400 },
-  leadTime: 'Made to order. Allow 5 to 7 working days for printing, plus delivery.',
+  pricing: { nameFeeKes: 500, numberFeeKes: 300, nameAndNumberFeeKes: 700, artworkFeeKes: 700, textFeeKes: 400 },
+  leadTime: 'Made to order. Delivered in 1 to 3 days, including printing and sourcing the shirt if we do not have it in stock.',
   returnsNote: 'Personalised items are printed just for you, so they cannot be returned or exchanged unless they arrive faulty or misprinted.',
   fanVersionNote: 'Fan-version shirts in club colours. Independent product, not endorsed by or affiliated with any club, league or kit maker.',
   listing: { heading: 'Football Jerseys & Custom T-Shirts in Nairobi, Kenya', intro: '' },

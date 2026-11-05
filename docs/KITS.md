@@ -43,7 +43,7 @@ that fails if a future change forgets the filter. Kits still use normal variants
 
 1. **Site content > Kits and Design Center**: print fees (name, number, name and number together, artwork, extra text), the printing
    lead time, the returns wording, the fan-version notice and the page headings. All editable; the server recalculates every price
-   from these, so they cannot be changed from the browser. Defaults: name 500, number 300, bundle 700, artwork 800, text 400 KES.
+   from these, so they cannot be changed from the browser. Defaults (printing costs KSh 300 to 700): name 500, number 300, name and number together 700, artwork 700, extra text 400 KES. Lead time default: delivered in 1 to 3 days, including printing and sourcing a shirt that is not in stock.
 2. **Portal > Kits > Clubs**: 46 starter clubs and teams are loaded automatically (23 Premier League: the 2025/26 twenty plus three recently relegated; La Liga,
    Serie A, Bundesliga, Ligue 1, Harambee Stars, Gor Mahia, AFC Leopards, national teams). Switch clubs on or off for the season;
    `backend/src/kits/kit-catalogue.ts` holds their colours and nicknames.

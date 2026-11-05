@@ -77,7 +77,7 @@ export function kitFaqs(product: KitProduct, config: KitConfig | null): FaqItem[
   }
   faqs.push({
     question: 'How long does a personalised shirt take?',
-    answer: config?.leadTime || 'Personalised shirts are made to order. Allow 5 to 7 working days for printing, plus delivery.',
+    answer: config?.leadTime || 'Made to order. Delivered in 1 to 3 days, including printing and sourcing the shirt if we do not have it in stock.',
   });
   faqs.push({
     question: 'Can I return a personalised shirt?',
@@ -138,7 +138,7 @@ export function clubFaqs(club: { name: string }, kits: KitProduct[], config: Kit
     },
     {
       question: 'How long does printing take?',
-      answer: config?.leadTime || 'Personalised shirts are made to order. Allow 5 to 7 working days for printing, plus delivery.',
+      answer: config?.leadTime || 'Made to order. Delivered in 1 to 3 days, including printing and sourcing the shirt if we do not have it in stock.',
     },
     {
       question: `Do you deliver ${club.name} jerseys outside Nairobi?`,
@@ -221,7 +221,7 @@ export function listingFaqs(config: KitConfig | null): FaqItem[] {
     },
     {
       question: 'How long does a custom shirt take?',
-      answer: config?.leadTime || 'Personalised shirts are made to order. Allow 5 to 7 working days for printing, plus delivery.',
+      answer: config?.leadTime || 'Made to order. Delivered in 1 to 3 days, including printing and sourcing the shirt if we do not have it in stock.',
     },
   ];
 }

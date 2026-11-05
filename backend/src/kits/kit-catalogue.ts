@@ -217,6 +217,6 @@ export const DEFAULT_PRINT_PRICING: PrintPricing = {
   nameFeeKes: 500,
   numberFeeKes: 300,
   nameAndNumberFeeKes: 700,
-  artworkFeeKes: 800,
+  artworkFeeKes: 700,
   textFeeKes: 400,
 };
