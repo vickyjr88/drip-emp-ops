@@ -5,7 +5,7 @@ import { EliteLayout } from '../components/elite-layout';
 import { ClubDirectory, FanVersionNote, FaqList, KitCard } from '../components/kit-parts';
 import { KitShowcase } from '../components/kit-showcase';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../lib/site';
-import { sharePreviewUrl, brandPreviewImage } from '../lib/preview-image';
+import { sharePreviewUrl } from '../lib/preview-image';
 import { DESIGN_PATH, LEAGUES, fetchClubs, fetchKitConfig, fetchKits, leaguePath } from '../lib/kits';
 import {
   breadcrumbSchema, faqSchema, itemListSchema, listingDescription, listingFaqs, listingTitle,
@@ -24,7 +24,8 @@ export async function generateMetadata({ searchParams }: { searchParams: Params 
   const kits = await fetchKits();
   const title = listingTitle(config);
   const description = listingDescription(kits);
-  const image = kits.find((k) => k.imageUrls[0])?.imageUrls[0] ?? (await brandPreviewImage());
+  // The listing shares the jersey card, including when a product photo exists. Filtered views are noindex.
+  const image = absoluteUrl('/images/kits/link-preview.jpg');
   // A filtered grid is thin duplicate content: the canonical stays /kits and the view is kept out of the index.
   const filtered = VIEW_PARAMS.some((key) => Boolean(first(searchParams[key])));
   return {

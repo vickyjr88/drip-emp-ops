@@ -5,7 +5,12 @@ import { notFound } from 'next/navigation';
 import { JsonLd, SITE_NAME, absoluteUrl } from '../../lib/site';
 import { EliteLayout } from '../../components/elite-layout';
 import { fetchBlogPost, formatBlogDate, readingTime } from '../../lib/blog';
+import { blogCover } from '../../lib/blog-cover';
 import { brandPreviewImage, sharePreviewUrl } from '../../lib/preview-image';
+
+function shareSource(src: string) {
+  return /^https?:\/\//i.test(src) ? src : absoluteUrl(src);
+}
 
 // Rendered per request, matching /blog and /shop/[slug]: content should
 // appear without a rebuild, and this is the page a crawler most needs to
@@ -16,8 +21,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const post = await fetchBlogPost(params.slug);
   if (!post) return { title: 'Post not found', robots: { index: false, follow: true } };
 
-  // A post with no cover of its own previews with the brand banner rather than as a bare card.
-  const shareImage = post.coverImageUrl || (await brandPreviewImage());
+  // A portal upload wins. A picture shipped with the site is next. The brand banner is the last resort.
+  const cover = blogCover(post.slug, post.coverImageUrl);
+  const shareImage = cover ? shareSource(cover.src) : await brandPreviewImage();
 
   return {
     title: post.title,
@@ -41,6 +47,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 export default async function BlogPostPage({ params }: { params: { slug: string } }) {
   const post = await fetchBlogPost(params.slug);
   if (!post) notFound();
+  const cover = blogCover(post.slug, post.coverImageUrl);
 
   return (
     <>
@@ -66,7 +73,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           author: { '@type': 'Organization', name: post.author },
           publisher: { '@type': 'Organization', name: SITE_NAME, '@id': `${absoluteUrl('/')}#organization` },
           mainEntityOfPage: absoluteUrl(`/blog/${post.slug}`),
-          ...(post.coverImageUrl ? { image: post.coverImageUrl } : {}),
+          ...(cover ? { image: shareSource(cover.src) } : {}),
         }}
       />
       <EliteLayout active="none">
@@ -82,17 +89,26 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             </div>
           </section>
 
-          {post.coverImageUrl ? (
-            <section className="lp-container de-blog-cover">
+          {cover ? (
+            <figure className="lp-container de-blog-cover">
               <Image
-                src={post.coverImageUrl}
-                alt=""
+                src={cover.src}
+                alt={post.title}
                 fill
                 sizes="(max-width: 860px) 100vw, 820px"
                 style={{ objectFit: 'cover' }}
                 priority
               />
-            </section>
+              {cover.credit ? (
+                <figcaption className="de-blog-cover-credit">
+                  Photo by <a href={cover.credit.authorUrl}>{cover.credit.author}</a>
+                  {' · '}
+                  <a href={cover.credit.fileUrl}>Wikimedia Commons</a>
+                  {' · '}
+                  <a href={cover.credit.licenseUrl} rel="license">{cover.credit.license}</a>
+                </figcaption>
+              ) : null}
+            </figure>
           ) : null}
 
           <section className="lp-container lp-legal-body">

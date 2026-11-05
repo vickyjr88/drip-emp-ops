@@ -12738,8 +12738,20 @@ img {
 }
 
 .de-blog-card-media {
+  position: relative;
   aspect-ratio: 16 / 9;
   background: var(--de-100) center / cover no-repeat;
+}
+
+.de-blog-card-credit {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 0.04em;
 }
 
 .de-blog-card-body {
@@ -12781,6 +12793,23 @@ img {
   max-height: 420px;
   object-fit: cover;
   display: block;
+}
+
+.de-blog-cover-credit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 22px 14px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.62));
+  color: #fff;
+  font-size: 12.5px;
+  z-index: 1;
+}
+
+.de-blog-cover-credit a {
+  color: #fff;
 }
 
 /* Article body: sanitised staff-authored HTML, so headings/paragraphs/lists

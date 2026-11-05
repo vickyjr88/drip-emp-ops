@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { seoMetadata } from '../lib/page-metadata';
 import { EliteLayout } from '../components/elite-layout';
 import { fetchBlogPosts, formatBlogDate, readingTime } from '../lib/blog';
+import { blogCover } from '../lib/blog-cover';
 
 export async function generateMetadata(): Promise<Metadata> {
   return seoMetadata({
@@ -41,10 +42,14 @@ export default async function BlogIndexPage() {
               <p>Nothing published yet -- check back soon.</p>
             </div>
           ) : (
-            posts.map((post) => (
+            posts.map((post) => {
+              const cover = blogCover(post.slug, post.coverImageUrl);
+              return (
               <Link key={post.id} href={`/blog/${post.slug}`} className="de-blog-card">
-                {post.coverImageUrl ? (
-                  <div className="de-blog-card-media" style={{ backgroundImage: `url(${post.coverImageUrl})` }} />
+                {cover ? (
+                  <div className="de-blog-card-media" style={{ backgroundImage: `url(${cover.src})` }}>
+                    {cover.credit ? <span className="de-blog-card-credit">{cover.credit.license}</span> : null}
+                  </div>
                 ) : null}
                 <div className="de-blog-card-body">
                   <span className="de-blog-card-meta">
@@ -54,7 +59,8 @@ export default async function BlogIndexPage() {
                   <p>{post.excerpt}</p>
                 </div>
               </Link>
-            ))
+              );
+            })
           )}
         </section>
       </main>

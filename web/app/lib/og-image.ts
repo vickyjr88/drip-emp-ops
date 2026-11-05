@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import sharp from 'sharp';
 
 /**
@@ -18,6 +20,45 @@ const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
  * anyone make this server request arbitrary addresses, internal ones included. Only the site's own media host (the
  * API origin) plus anything listed in OG_IMAGE_EXTRA_HOSTS (comma-separated hostnames) is allowed.
  */
+function siteHost(): string | null {
+  try {
+    const raw = process.env.NEXT_PUBLIC_SITE_URL;
+    return raw ? new URL(raw).hostname.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Dev rewrites 127.0.0.1 to localhost inside the request. Those are the same machine, and only then. */
+function sameSiteHost(actual: string, expected: string): boolean {
+  const a = actual.toLowerCase();
+  const b = expected.toLowerCase();
+  if (a === b) return true;
+  const loopback = new Set(['localhost', '127.0.0.1', '::1']);
+  return loopback.has(a) && loopback.has(b);
+}
+
+/**
+ * A picture shipped with the storefront, under public/images. The share route otherwise only fetches the media
+ * host, so a file in public/ would be refused, and fetching this server's own origin from inside the container
+ * can stall. Same-site /images/ paths are read off disk instead. Anything else on the site host stays refused.
+ */
+function bundledImageFile(url: URL): string | null {
+  const host = siteHost();
+  if (!host || !sameSiteHost(url.hostname, host)) return null;
+  let pathname: string;
+  try { pathname = decodeURIComponent(url.pathname); } catch { return null; }
+  if (!pathname.startsWith('/images/')) return null;
+  const segments = pathname.split('/').slice(1);
+  if (segments.length < 2) return null;
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..' || segment.includes('\0'))) return null;
+  if (segments[0] !== 'images') return null;
+  const root = path.resolve(process.cwd(), 'public', 'images');
+  const file = path.resolve(root, ...segments.slice(1));
+  if (file !== root && !file.startsWith(root + path.sep)) return null;
+  return file;
+}
+
 function allowedHosts(): Set<string> {
   const hosts = new Set<string>();
   for (const value of [process.env.NEXT_PUBLIC_API_BASE_URL, process.env.NEXT_PUBLIC_MEDIA_BASE_URL]) {
@@ -76,8 +117,6 @@ export async function ogImageResponse(sourceUrl: string | null | undefined): Pro
   let url: URL;
   try { url = new URL(sourceUrl); } catch { return new Response('No image', { status: 404 }); }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return new Response('No image', { status: 404 });
-  // Not one of ours: never fetched here, and never redirected to either (an open redirect through our own domain).
-  if (!allowedHosts().has(url.hostname)) return new Response('Image host not allowed', { status: 400 });
 
   const key = url.toString();
   const hit = cache.get(key);
@@ -87,6 +126,23 @@ export async function ogImageResponse(sourceUrl: string | null | undefined): Pro
     'Cache-Control': 'public, max-age=3600, s-maxage=86400',
   };
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return new Response(new Uint8Array(hit.jpeg), { headers });
+
+  const bundled = bundledImageFile(url);
+  if (bundled) {
+    try {
+      const bytes = await readFile(bundled);
+      if (bytes.length > MAX_SOURCE_BYTES) return new Response('Image too large', { status: 400 });
+      const jpeg = await compose(bytes);
+      if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value as string);
+      cache.set(key, { at: Date.now(), jpeg });
+      return new Response(new Uint8Array(jpeg), { headers });
+    } catch {
+      return new Response('No image', { status: 404 });
+    }
+  }
+
+  // Not one of ours: never fetched here, and never redirected to either (an open redirect through our own domain).
+  if (!allowedHosts().has(url.hostname)) return new Response('Image host not allowed', { status: 400 });
 
   try {
     // redirect: 'error' -- an allowed host must not be able to bounce this fetch on to somewhere that isn't.

@@ -72,8 +72,10 @@ made previews fail intermittently.
 
 - Pages without a picture of their own (categories, blog posts with no cover, the FAQ, ...) use the home hero as the card.
 - The route only fetches pictures from the site's own media host (the API origin, plus `OG_IMAGE_EXTRA_HOSTS`, comma-separated, if ever
-  needed); any other address is refused. It fetches over `INTERNAL_API_BASE_URL`, not the public hostname, and falls back to
-  redirecting to the original if anything goes wrong, so a preview is never worse than before.
+  needed); any other address is refused. A same-site address under `/images/` is read from `public/images` on disk instead of
+  fetched, so a preview shipped with the storefront (the kits card, a blog cover) still becomes the 1200×630 JPEG. It fetches
+  media over `INTERNAL_API_BASE_URL`, not the public hostname, and falls back to redirecting to the original if a remote fetch
+  goes wrong, so a preview is never worse than before.
 - Platforms **cache previews**, failures included. After a fix, ask them to re-fetch: Facebook/Instagram/WhatsApp (Meta) use the
   Sharing Debugger (developers.facebook.com/tools/debug/ -> Scrape Again); for a single WhatsApp chat, share the link with
   `?v=2` on the end.
