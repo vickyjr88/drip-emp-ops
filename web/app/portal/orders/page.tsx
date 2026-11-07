@@ -16,6 +16,7 @@ import { PortalShell } from '../components/portal-shell';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { ListThumb } from '../components/list-thumb';
+import { FollowUp, FollowUpButton } from '../components/follow-up-button';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
@@ -52,11 +53,13 @@ type OrderLine = {
   variant?: { product?: { name: string; featuredImageUrl?: string | null; imageUrls?: string[] | null } | null } | null;
 };
 
+
 type Order = {
   id: string; orderNumber: string; status: string; channel: string;
   total: string | number; amountPaid: string | number; placedAt: string;
   customerName?: string | null; customerPhone?: string | null;
   store: Store; lines: OrderLine[];
+  followUp?: FollowUp | null;
   payments: Array<{ id: string; amount: string | number; method: string; reference?: string | null }>;
 };
 
@@ -67,7 +70,7 @@ type CartLeadLine = { variantId: string; sku: string; name: string; size: string
 type CartLead = {
   id: string; source: 'WHATSAPP_ORDER' | 'ABANDONED_CART'; status: 'NEW' | 'CONTACTED' | 'CONVERTED' | 'EXPIRED';
   customerName?: string | null; customerPhone?: string | null; customerEmail?: string | null;
-  lines: CartLeadLine[]; total: string | number; message?: string | null;
+  lines: CartLeadLine[]; total: string | number; message?: string | null; followUp?: FollowUp | null;
   lastActivityAt: string; createdAt: string;
   /** Resolved server-side from the first line's variantId -- the cart's own
    *  snapshot never stored an image, so this is looked up at read time. */
@@ -868,6 +871,7 @@ export default function OrdersPage() {
                           <Link href={`/portal/cart-leads/${lead.id}`} className="portal-inline-btn">
                             View
                           </Link>
+                          <FollowUpButton followUp={lead.followUp} onOpened={() => { if (lead.status === 'NEW') void onMarkContacted(lead); }} />
                           {canCreate ? (
                             <button type="button" className="portal-inline-btn" onClick={() => onStartOrderFromLead(lead)}>
                               Start Order
@@ -991,6 +995,7 @@ export default function OrdersPage() {
                           <Link href={`/portal/orders/${order.id}`} className="portal-inline-btn">
                             View
                           </Link>
+                          <FollowUpButton followUp={order.followUp} />
                           {canPay && order.balance > 0 ? (
                             <button type="button" className="portal-inline-btn"
                               onClick={() => setPayment({ orderId: order.id, amount: String(order.balance), method: 'MPESA', reference: '' })}>

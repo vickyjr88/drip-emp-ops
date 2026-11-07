@@ -3,6 +3,8 @@ import { CartLeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/pagination.util';
 import { withFirstLineImage, withLineImages } from '../common/cart-lead-image.util';
+import { buildFollowUp, FollowUp } from '../common/follow-up';
+import { storefrontOrigin } from '../common/storefront-origin';
 import { normalizePhoneNumber } from '../common/phone.util';
 import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import { CampaignService } from '../campaign/campaign.service';
@@ -12,6 +14,26 @@ import { MauticService } from '../mautic/mautic.service';
 import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
 import { CartReminderQueueService } from './cart-reminder-queue.service';
+
+/**
+ * The WhatsApp follow-up for a lead that is still open: what they left or asked about, with a link to each product.
+ * Null for a lead already converted or dismissed, and for one with no phone number to message.
+ */
+export function followUpFor(lead: {
+  source: string; status: string; customerName?: string | null; customerPhone?: string | null;
+  total: unknown; lines: unknown; customer?: { firstName: string; lastName: string; phone?: string | null } | null;
+}): FollowUp | null {
+  if (lead.status !== 'NEW' && lead.status !== 'CONTACTED') return null;
+  const lines = (lead.lines as Array<{ name: string; size?: string; quantity: number; priceKes: number; path?: string | null }>) ?? [];
+  return buildFollowUp({
+    kind: lead.source === 'WHATSAPP_ORDER' ? 'WHATSAPP_ORDER' : 'ABANDONED_CART',
+    name: lead.customerName || (lead.customer ? `${lead.customer.firstName} ${lead.customer.lastName}` : null),
+    phone: lead.customerPhone || lead.customer?.phone,
+    lines: lines.map((l) => ({ name: l.name, size: l.size, quantity: l.quantity, unitPrice: l.priceKes, path: l.path })),
+    total: Number(lead.total),
+    origin: storefrontOrigin(),
+  });
+}
 
 @Injectable()
 export class CartLeadService {
@@ -162,7 +184,8 @@ export class CartLeadService {
       take,
     );
 
-    return { ...page, items: await withFirstLineImage(this.prisma, page.items) };
+    const items = await withFirstLineImage(this.prisma, page.items);
+    return { ...page, items: items.map((lead) => ({ ...lead, followUp: followUpFor(lead) })) };
   }
 
   /**
@@ -179,7 +202,8 @@ export class CartLeadService {
       },
     });
     if (!lead) throw new NotFoundException(`Cart lead ${id} not found`);
-    return withLineImages(this.prisma, lead);
+    const detailed = await withLineImages(this.prisma, lead);
+    return { ...detailed, followUp: followUpFor({ ...detailed, customer: lead.customer }) };
   }
 
   async setStatus(id: string, status: CartLeadStatus) {

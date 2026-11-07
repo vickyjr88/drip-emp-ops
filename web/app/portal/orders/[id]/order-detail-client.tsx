@@ -15,6 +15,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
 import { ImageLightbox } from '../../components/image-lightbox';
+import { FollowUp, FollowUpButton, FollowUpPreview } from '../../components/follow-up-button';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, formatDateTime, formatMoney, hasPermission, loadProfile, roleLabelFor,
@@ -54,6 +55,7 @@ type Order = {
   customer?: { id: string; firstName: string; lastName: string; phone?: string | null; email?: string | null } | null;
   lines: OrderLine[];
   payments: Payment[];
+  followUp?: FollowUp | null;
 };
 
 type SupplierInvoiceOption = { id: string; invoiceNumber: string; supplier?: { name: string } };
@@ -417,10 +419,17 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                 Back to Orders
               </Link>
               <div className="portal-action-row">
+                <FollowUpButton followUp={order.followUp} />
                 <span className="portal-chip">{order.status}</span>
                 {isSourcing ? <span className="portal-chip is-danger">Sourcing</span> : null}
               </div>
             </div>
+            {order.followUp ? (
+              <article className="portal-card" style={{ marginBottom: 16 }}>
+                <strong>Follow up on WhatsApp</strong>
+                <FollowUpPreview followUp={order.followUp} />
+              </article>
+            ) : null}
 
             <div className="portal-stats-grid">
               <article className="portal-card portal-stat-card">

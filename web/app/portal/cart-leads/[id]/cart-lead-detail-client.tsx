@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
 import { ImageLightbox } from '../../components/image-lightbox';
+import { FollowUp, FollowUpButton, FollowUpPreview } from '../../components/follow-up-button';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, formatMoney,
@@ -42,6 +43,7 @@ type CartLead = {
   reminderSentAt?: string | null;
   customer?: { id: string; firstName: string; lastName: string; email?: string | null; phone?: string | null } | null;
   order?: { id: string; orderNumber: string } | null;
+  followUp?: FollowUp | null;
 };
 
 function statusLabel(status: CartLead['status']) {
@@ -248,6 +250,7 @@ export default function CartLeadDetailClient({ leadId }: { leadId: string }) {
 
                   {lead.status === 'NEW' || lead.status === 'CONTACTED' ? (
                     <div className="portal-action-row" style={{ marginTop: 16 }}>
+                      <FollowUpButton followUp={lead.followUp} onOpened={() => { if (lead.status === 'NEW') void onMarkContacted(); }} />
                       {lead.status === 'NEW' ? (
                         <button type="button" className="portal-inline-btn" onClick={() => void onMarkContacted()}>
                           Mark Contacted
@@ -260,6 +263,9 @@ export default function CartLeadDetailClient({ leadId }: { leadId: string }) {
                         Start Order From Cart
                       </Link>
                     </div>
+                  ) : null}
+                  {lead.status === 'NEW' || lead.status === 'CONTACTED' ? (
+                    lead.followUp ? <FollowUpPreview followUp={lead.followUp} /> : <p className="portal-muted" style={{ marginTop: 12 }}>No WhatsApp follow-up: this lead has no phone number we can message.</p>
                   ) : null}
                 </article>
 

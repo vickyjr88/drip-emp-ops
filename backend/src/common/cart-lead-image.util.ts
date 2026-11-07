@@ -1,4 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { productPath } from './follow-up';
 
 /**
  * A cart lead's line snapshot has no image of its own -- it's a stored copy
@@ -15,17 +16,21 @@ import { PrismaService } from '../prisma/prisma.service';
 export async function withFirstLineImage<T extends { lines: unknown }>(
   prisma: Pick<PrismaService, 'productVariant'>,
   leads: T[],
-): Promise<Array<T & { firstLineImageUrl: string | null }>> {
-  const firstVariantIds = leads
-    .map((lead) => (lead.lines as Array<{ variantId?: string }>)?.[0]?.variantId)
+): Promise<Array<Omit<T, 'lines'> & { lines: Array<Record<string, unknown> & { variantId?: string; path: string | null }>; firstLineImageUrl: string | null }>> {
+  // Every line's product is looked up, not just the first: the image is the first line's, but each line also gets the page
+  // its product lives at, so a follow-up message can link to everything in the cart.
+  const variantIds = leads
+    .flatMap((lead) => (lead.lines as Array<{ variantId?: string }>) ?? [])
+    .map((line) => line.variantId)
     .filter((id): id is string => Boolean(id));
 
-  const variants = firstVariantIds.length
+  const variants = variantIds.length
     ? await prisma.productVariant.findMany({
-        where: { id: { in: firstVariantIds } },
-        select: { id: true, product: { select: { featuredImageUrl: true, imageUrls: true } } },
+        where: { id: { in: variantIds } },
+        select: { id: true, product: { select: { slug: true, line: true, featuredImageUrl: true, imageUrls: true } } },
       })
     : [];
+  const pathByVariantId = new Map(variants.map((variant) => [variant.id, productPath(variant.product)]));
   const imageByVariantId = new Map(
     variants.map((variant) => {
       const imageUrls = Array.isArray(variant.product.imageUrls) ? (variant.product.imageUrls as string[]) : [];
@@ -34,8 +39,12 @@ export async function withFirstLineImage<T extends { lines: unknown }>(
   );
 
   return leads.map((lead) => {
-    const firstVariantId = (lead.lines as Array<{ variantId?: string }>)?.[0]?.variantId;
-    return { ...lead, firstLineImageUrl: (firstVariantId && imageByVariantId.get(firstVariantId)) || null };
+    const lines = ((lead.lines as Array<Record<string, unknown> & { variantId?: string }>) ?? []).map((line) => ({
+      ...line,
+      path: (line.variantId && pathByVariantId.get(line.variantId)) || null,
+    }));
+    const firstVariantId = lines[0]?.variantId;
+    return { ...lead, lines, firstLineImageUrl: (firstVariantId && imageByVariantId.get(firstVariantId)) || null };
   });
 }
 
@@ -48,14 +57,14 @@ export async function withFirstLineImage<T extends { lines: unknown }>(
 export async function withLineImages<T extends { lines: unknown }>(
   prisma: Pick<PrismaService, 'productVariant'>,
   lead: T,
-): Promise<T & { lines: Array<Record<string, unknown> & { imageUrl: string | null }> }> {
+): Promise<Omit<T, 'lines'> & { lines: Array<Record<string, unknown> & { imageUrl: string | null; path: string | null }> }> {
   const lines = (lead.lines as Array<Record<string, unknown> & { variantId?: string }>) || [];
   const variantIds = lines.map((line) => line.variantId).filter((id): id is string => Boolean(id));
 
   const variants = variantIds.length
     ? await prisma.productVariant.findMany({
         where: { id: { in: variantIds } },
-        select: { id: true, product: { select: { featuredImageUrl: true, imageUrls: true } } },
+        select: { id: true, product: { select: { slug: true, line: true, featuredImageUrl: true, imageUrls: true } } },
       })
     : [];
   const imageByVariantId = new Map(
@@ -64,9 +73,14 @@ export async function withLineImages<T extends { lines: unknown }>(
       return [variant.id, variant.product.featuredImageUrl || imageUrls[0] || null];
     }),
   );
+  const pathByVariantId = new Map(variants.map((variant) => [variant.id, productPath(variant.product)]));
 
   return {
     ...lead,
-    lines: lines.map((line) => ({ ...line, imageUrl: (line.variantId && imageByVariantId.get(line.variantId)) || null })),
+    lines: lines.map((line) => ({
+      ...line,
+      imageUrl: (line.variantId && imageByVariantId.get(line.variantId)) || null,
+      path: (line.variantId && pathByVariantId.get(line.variantId)) || null,
+    })),
   };
 }

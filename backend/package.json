@@ -20,7 +20,8 @@
     "test:kits-seo": "node --require ts-node/register/transpile-only --test test/kits-seo.test.ts",
     "test:watches": "node --require ts-node/register/transpile-only --test test/watches.test.ts",
     "test:watches-seo": "node --require ts-node/register/transpile-only --test test/watches-seo.test.ts",
-    "test:insights": "node --require ts-node/register/transpile-only --test test/insights.test.ts"
+    "test:insights": "node --require ts-node/register/transpile-only --test test/insights.test.ts",
+    "test:follow-up": "node --require ts-node/register/transpile-only --test test/follow-up.test.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",

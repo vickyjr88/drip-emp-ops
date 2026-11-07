@@ -11,10 +11,12 @@
  */
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ListThumb } from '../components/list-thumb';
+import { FollowUp, FollowUpButton, markLeadContacted } from '../components/follow-up-button';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { useErrorState } from '../components/notifications';
 import {
@@ -35,6 +37,7 @@ type CartLead = {
   lastActivityAt: string;
   createdAt: string;
   firstLineImageUrl?: string | null;
+  followUp?: FollowUp | null;
 };
 
 export default function CartLeadsPage() {
@@ -44,6 +47,7 @@ export default function CartLeadsPage() {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [sourceFilter, setSourceFilter] = useState('');
   const [errorMessage, setErrorMessage] = useErrorState();
+  const router = useRouter();
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -169,7 +173,19 @@ export default function CartLeadsPage() {
                   </div>
                 ) : (
                   pager.items.map((lead) => (
-                    <Link key={lead.id} href={`/portal/cart-leads/${lead.id}`} className="portal-record is-clickable">
+                    <div
+                      key={lead.id}
+                      className="portal-record is-clickable"
+                      role="link"
+                      tabIndex={0}
+                      onClick={() => router.push(`/portal/cart-leads/${lead.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          router.push(`/portal/cart-leads/${lead.id}`);
+                        }
+                      }}
+                    >
                       <div className="portal-list-row has-thumb">
                         <ListThumb sources={[lead.firstLineImageUrl]} label={lead.lines[0]?.name || lead.customerName || '?'} />
                         <div>
@@ -186,8 +202,19 @@ export default function CartLeadsPage() {
                           </p>
                           <p>{formatMoney(lead.total)}</p>
                         </div>
+                        {/* The row opens the lead; the follow-up button acts in place. */}
+                        {lead.followUp ? (
+                          <div className="portal-action-row" onClick={(event) => event.stopPropagation()}>
+                            <FollowUpButton
+                              followUp={lead.followUp}
+                              onOpened={() => {
+                                if (lead.status === 'NEW' && token) void markLeadContacted(token, lead.id).then((ok) => ok && pager.reload());
+                              }}
+                            />
+                          </div>
+                        ) : null}
                       </div>
-                    </Link>
+                    </div>
                   ))
                 )}
               </div>

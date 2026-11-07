@@ -12,6 +12,8 @@ import { OrderQueryDto } from './dto/order-query.dto';
 import { nextReference } from '../common/next-reference';
 import { paginate, searchOr, containsAny } from '../common/pagination.util';
 import { priceForTier } from '../common/price-for-tier';
+import { buildFollowUp, FollowUp, productPath } from '../common/follow-up';
+import { storefrontOrigin } from '../common/storefront-origin';
 
 const INCLUDE = {
   store: { select: { id: true, code: true, name: true } },
@@ -22,7 +24,7 @@ const INCLUDE = {
         select: {
           id: true, sku: true, name: true, costKes: true,
           product: {
-            select: { id: true, name: true, brand: true, featuredImageUrl: true, imageUrls: true },
+            select: { id: true, name: true, slug: true, line: true, brand: true, featuredImageUrl: true, imageUrls: true },
           },
         },
       },
@@ -55,6 +57,28 @@ const NEXT: Record<OrderStatus, OrderStatus[]> = {
   CANCELLED: [],
   REFUNDED: [],
 };
+
+type OrderForFollowUp = Prisma.OrderGetPayload<{ include: typeof INCLUDE }>;
+
+/** The WhatsApp follow-up for an order: its items with a link to each product, worded for where the order has got to. */
+function orderFollowUp(order: OrderForFollowUp): FollowUp | null {
+  return buildFollowUp({
+    kind: 'ORDER',
+    name: order.customerName || (order.customer ? `${order.customer.firstName} ${order.customer.lastName}` : null),
+    phone: order.customerPhone || order.customer?.phone,
+    lines: order.lines.map((line) => ({
+      name: line.description,
+      quantity: line.quantity,
+      unitPrice: Number(line.unitPrice),
+      path: line.variant?.product ? productPath(line.variant.product) : null,
+    })),
+    total: Number(order.total),
+    orderNumber: order.orderNumber,
+    orderStatus: order.status,
+    balance: Number(order.total) - Number(order.amountPaid),
+    origin: storefrontOrigin(),
+  });
+}
 
 @Injectable()
 export class OrderService {
@@ -214,18 +238,19 @@ export class OrderService {
       ...searchOr(search, (term) => containsAny(['orderNumber', 'customerName', 'customerPhone'], term)),
     };
     const orderBy: Prisma.OrderOrderByWithRelationInput[] = [{ placedAt: 'desc' }, { id: 'asc' }];
-    return paginate(
+    const page = await paginate(
       (args) => this.prisma.order.findMany({ where, include: INCLUDE, orderBy, ...args }),
       () => this.prisma.order.count({ where }),
       skip,
       take,
     );
+    return { ...page, items: page.items.map((order) => ({ ...order, followUp: orderFollowUp(order) })) };
   }
 
   async findOne(id: string) {
     const order = await this.prisma.order.findUnique({ where: { id }, include: INCLUDE });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
-    return { ...order, balance: Number(order.total) - Number(order.amountPaid) };
+    return { ...order, balance: Number(order.total) - Number(order.amountPaid), followUp: orderFollowUp(order) };
   }
 
   /** Moves an order along, refusing a jump the sequence does not allow. */
