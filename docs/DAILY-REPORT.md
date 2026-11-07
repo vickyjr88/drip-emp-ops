@@ -46,6 +46,14 @@ recipient) before it is sent. A retry after a partial failure sends only to the 
 **Missed run.** If the app was down at 07:00, it queues the report once it is back (after 08:00 Nairobi time) if nothing was recorded for yesterday.
 **Needs Redis.** Without `REDIS_URL` the schedule is off (the manual send still works).
 
+## Changing it in the portal
+
+Portal > **Daily Report** (needs the `daily-report-setting` permissions). It shows who gets the report on WhatsApp and by email,
+with add and remove, an on/off switch, **Preview yesterday's report** (nothing is sent), **Send now** (asks first, shows the
+result for each recipient, and offers "Send again anyway" if someone already had it), and the list of what was sent. Until a list
+is saved the server's defaults apply and the screen says so; saving replaces them. The scheduled 07:00 send still throws on a failure
+so the queue retries; **Send now** reports the failure instead of erroring.
+
 ## WhatsApp
 
 WhatsApp only allows a business to start a conversation with an **approved message template**, so this needs one-time setup:

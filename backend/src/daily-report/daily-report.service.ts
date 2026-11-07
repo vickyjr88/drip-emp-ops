@@ -272,7 +272,11 @@ export class DailyReportService {
   }
 
   /** Builds yesterday's (or `dateKey`'s) report and sends it to everyone in the settings. Safe to call twice. */
-  async deliver(dateKey: string = yesterdayKey(new Date()), opts: { force?: boolean } = {}): Promise<DeliveryResult> {
+  /**
+   * `throwOnFailure` (the default) is for the scheduled job, which must fail so the queue retries. A person pressing "send" in
+   * the portal passes false, so they get the result for each recipient instead of a bare server error.
+   */
+  async deliver(dateKey: string = yesterdayKey(new Date()), opts: { force?: boolean; throwOnFailure?: boolean } = {}): Promise<DeliveryResult> {
     const result: DeliveryResult = { dateKey, email: [], whatsapp: [] };
     const settings = await this.getSettings();
     if (!settings.enabled && !opts.force) {
@@ -314,7 +318,7 @@ export class DailyReportService {
     // A failed send is thrown after everything was attempted, so the queue retries it and the claim keeps the
     // recipients that already got it from receiving a second copy.
     const failed = [...result.email, ...result.whatsapp].filter((r) => r.status === 'FAILED');
-    if (failed.length && !opts.force) throw new Error(`Daily report ${dateKey}: ${failed.length} send(s) failed (${failed.map((f) => f.recipient).join(', ')})`);
+    if (failed.length && !opts.force && opts.throwOnFailure !== false) throw new Error(`Daily report ${dateKey}: ${failed.length} send(s) failed (${failed.map((f) => f.recipient).join(', ')})`);
     return result;
   }
 

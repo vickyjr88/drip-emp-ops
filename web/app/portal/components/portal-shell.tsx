@@ -29,6 +29,7 @@ export type PortalNavKey =
   | 'accounting'
   | 'analytics'
   | 'insights'
+  | 'dailyReport'
   | 'reminders'
   | 'content'
   | 'blog'
@@ -64,6 +65,7 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
   { key: 'accounting', href: '/portal/accounting', label: 'Accounting' },
   { key: 'analytics', href: '/portal/analytics', label: 'Analytics' },
   { key: 'insights', href: '/portal/insights', label: 'Insights' },
+  { key: 'dailyReport', href: '/portal/daily-report', label: 'Daily Report' },
   { key: 'reminders', href: '/portal/reminders', label: 'Reminders' },
   { key: 'content', href: '/portal/content', label: 'Site Content' },
   { key: 'blog', href: '/portal/blog', label: 'Blog' },
@@ -99,6 +101,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   accounting: 'Accounting',
   analytics: 'Analytics',
   insights: 'Insights',
+  dailyReport: 'Daily Report',
   reminders: 'Reminders',
   content: 'Site Content',
   blog: 'Blog',

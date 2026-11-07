@@ -42,7 +42,8 @@ export class DailyReportController {
   @Post('send')
   @Permissions(buildPermissionKey('DailyReportSetting', 'update'))
   send(@Query('date') date?: string, @Query('force') force?: string) {
-    return this.service.deliver(parseDate(date), { force: force === 'true' });
+    // Answers with who got it and who did not, rather than failing the request when one send fails.
+    return this.service.deliver(parseDate(date), { force: force === 'true', throwOnFailure: false });
   }
 
   @Get('runs')

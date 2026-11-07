@@ -155,3 +155,26 @@ test('until recipients are saved, the report goes to the owner on WhatsApp as we
   // Someone who cleared the list on purpose is not messaged behind their back.
   assert.deepEqual((await fake({ enabled: true, emailRecipients: [], whatsappRecipients: [] }).getSettings()).whatsappRecipients, []);
 });
+
+test('a scheduled send throws when a recipient fails so the queue retries; a person pressing send gets the result instead', async () => {
+  const { DailyReportService } = await import('../src/daily-report/daily-report.service');
+  const rows: any[] = [];
+  const prisma: any = {
+    dailyReportSetting: { findUnique: async () => ({ enabled: true, emailRecipients: ['o@example.com'], whatsappRecipients: [] }) },
+    dailyReportRun: {
+      create: async ({ data }: any) => { rows.push({ ...data }); return data; },
+      update: async ({ data }: any) => { Object.assign(rows[rows.length - 1], data); return data; },
+      findUnique: async () => null,
+    },
+    order: { findMany: async () => [] },
+    orderLine: { findMany: async () => [] },
+    stockLevel: { findMany: async () => [] },
+  };
+  const email: any = { send: async () => ({ delivered: false, error: 'provider down' }) };
+  const service = new DailyReportService(prisma, email, { isConfigured: true, templateName: 'daily_report', normalisePhone: (p: string) => p, sendTemplate: async () => ({ delivered: true }) } as any);
+  (service as any).build = async () => report();
+  await assert.rejects(() => service.deliver('2026-11-07'), /1 send\(s\) failed/);
+  rows.length = 0;
+  const result = await service.deliver('2026-11-07', { throwOnFailure: false });
+  assert.deepEqual(result.email.map((r) => [r.recipient, r.status, r.error]), [['o@example.com', 'FAILED', 'provider down']]);
+});
