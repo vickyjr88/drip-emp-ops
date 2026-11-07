@@ -145,3 +145,13 @@ test('WhatsApp numbers are normalised to country-code digits', () => {
   assert.equal(w.normalisePhone('722000111'), '254722000111');
   assert.equal(w.normalisePhone('abc'), null);
 });
+
+test('until recipients are saved, the report goes to the owner on WhatsApp as well as by email; a saved list replaces it', async () => {
+  const { DailyReportService, OWNER_WHATSAPP } = await import('../src/daily-report/daily-report.service');
+  const fake = (row: any) => new DailyReportService({ dailyReportSetting: { findUnique: async () => row } } as any, null as any, { isConfigured: true, templateName: 'daily_report' } as any);
+  assert.equal(OWNER_WHATSAPP, '254771114712');
+  assert.deepEqual((await fake(null).getSettings()).whatsappRecipients, ['254771114712']);
+  assert.deepEqual((await fake({ enabled: true, emailRecipients: [], whatsappRecipients: ['254700000001'] }).getSettings()).whatsappRecipients, ['254700000001']);
+  // Someone who cleared the list on purpose is not messaged behind their back.
+  assert.deepEqual((await fake({ enabled: true, emailRecipients: [], whatsappRecipients: [] }).getSettings()).whatsappRecipients, []);
+});

@@ -10,6 +10,8 @@ import { shiftDateKey, windowForDate, yesterdayKey } from './daily-report.window
 import type { ActionOrder, DailyReport } from './daily-report.types';
 
 const SHOP_NAME = process.env.DAILY_REPORT_SHOP_NAME || 'Drip Emporium';
+/** Where the report goes on WhatsApp until recipients are saved in settings, as OWNER_EMAIL does for the email. */
+export const OWNER_WHATSAPP = process.env.OWNER_WHATSAPP || '254771114712';
 const MAX_ORDER_ROWS = 15;
 const HOUR_MS = 3_600_000;
 /** A send that has been "pending" this long was abandoned by a crashed process and may be claimed again. */
@@ -43,7 +45,7 @@ export class DailyReportService {
     return {
       enabled: row?.enabled ?? true,
       emailRecipients: row ? row.emailRecipients : [OWNER_EMAIL],
-      whatsappRecipients: row ? row.whatsappRecipients : [],
+      whatsappRecipients: row ? row.whatsappRecipients : [OWNER_WHATSAPP],
       isCustomised: Boolean(row),
       whatsappConfigured: this.whatsapp.isConfigured,
       whatsappTemplate: this.whatsapp.templateName,

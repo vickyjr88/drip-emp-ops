@@ -58,7 +58,9 @@ WhatsApp only allows a business to start a conversation with an **approved messa
    Example values for the approval form: `Drip Emporium`, `Wed 4 Nov 2026`, `12`, `KES 54,000`, `+8%`, `3 items`. Approval usually takes minutes to a day.
 3. Create a System User token with `whatsapp_business_messaging` and set, in the server `.env`:
    `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN` (and `WHATSAPP_REPORT_TEMPLATE` / `WHATSAPP_TEMPLATE_LANG` if you named it differently).
-4. Add the numbers under `whatsappRecipients` and redeploy so the backend picks up the variables.
+4. Until recipients are saved in settings, the WhatsApp report goes to the owner's number, `OWNER_WHATSAPP` (default `254771114712`),
+   the way the email goes to `OWNER_EMAIL`. Saving a list in settings replaces it (an empty saved list means nobody). Redeploy so the
+   backend picks up the variables.
 
 Until 1-3 are done, WhatsApp recipients are recorded as `SKIPPED` and the email still goes out. Meta charges per template conversation; one a day per recipient is small.
 
