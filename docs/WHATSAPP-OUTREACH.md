@@ -1,7 +1,8 @@
 # WhatsApp outreach
 
-Portal > **WhatsApp Outreach** sends a customer one of three WhatsApp messages from the Drip Emporium business number:
-**download the app**, **join the WhatsApp group**, **rate us on Google**. Staff choose the message, tick the customers
+Portal > **WhatsApp Outreach** sends a customer one of six WhatsApp messages from the Drip Emporium business number:
+**download the app**, **join the WhatsApp group**, **rate us on Google** (these three use the customer's name and a link),
+and three fixed messages: **rate us on Google (full message)**, **our range of shoes**, **where to find us**. Staff choose the message, tick the customers
 (or "select everyone who has not received it"), and confirm. Nothing is sent automatically.
 
 ## Templates (create these in WhatsApp Manager)
@@ -18,6 +19,20 @@ the group or review address can change without another Meta review.
 
 Sample values for the review form: `Wanjiku`, and a real link. A variable cannot be the first or last thing in the body, hence the
 closing sentences. Other names can be set with `WHATSAPP_TEMPLATE_APP`, `WHATSAPP_TEMPLATE_GROUP`, `WHATSAPP_TEMPLATE_REVIEW`.
+
+### Fixed-text templates
+
+Three more templates are complete as approved: the link or number is inside the text, so they take **no variables**, use no
+name, and need nothing from Site content. They are sent with no parameters.
+
+| Template name | Screen label | Setting to rename it |
+|---|---|---|
+| `google_review` | Rate us on Google (full message) | `WHATSAPP_TEMPLATE_GOOGLE_REVIEW` |
+| `shoe_variety` | Our range of shoes | `WHATSAPP_TEMPLATE_SHOE_RANGE` |
+| `shop_location` | Where to find us | `WHATSAPP_TEMPLATE_LOCATION` |
+
+Like the others, each is recorded per customer and is not sent twice to the same person unless forced. These messages do not
+join the Mautic onboarding sequence below, which sends the first three only.
 
 ## Where the links come from
 

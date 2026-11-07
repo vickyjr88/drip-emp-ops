@@ -27,6 +27,9 @@ test('template names have defaults and can be overridden', () => {
   assert.equal(templateFor('APP'), 'drip_app_download');
   assert.equal(templateFor('GROUP'), 'drip_join_group');
   assert.equal(templateFor('REVIEW'), 'drip_rate_us');
+  assert.equal(templateFor('GOOGLE_REVIEW'), 'google_review');
+  assert.equal(templateFor('SHOE_RANGE'), 'shoe_variety');
+  assert.equal(templateFor('LOCATION'), 'shop_location');
 });
 
 type Row = { id: string; firstName: string; lastName: string; phone: string; isActive: boolean };
@@ -113,7 +116,22 @@ test('a message with no link is refused before anything is sent', async () => {
 test('status says which links are ready', async () => {
   const { service } = harness([], [], { community: { whatsappGroupUrl: 'https://chat.whatsapp.com/g' } });
   const status = await service.status();
-  assert.deepEqual(status.kinds.map((k) => [k.kind, k.linkReady]), [['APP', true], ['GROUP', true], ['REVIEW', false]]);
+  // The three fixed-text templates carry their own link or number, so they never wait on site content.
+  assert.deepEqual(status.kinds.map((k) => [k.kind, k.linkReady]), [['APP', true], ['GROUP', true], ['REVIEW', false], ['GOOGLE_REVIEW', true], ['SHOE_RANGE', true], ['LOCATION', true]]);
+});
+
+test('a fixed-text template is sent with no variables, needs no link, and is recorded and de-duplicated like the others', async () => {
+  const { service, calls, created } = harness([ann, bob], [], { community: {} });
+  const out = await service.send({ kind: 'LOCATION', customerIds: ['a', 'b'], triggeredBy: 's' });
+  assert.equal(out.sent, 2);
+  assert.deepEqual(calls.map((c) => [c.template, c.params]), [['shop_location', []], ['shop_location', []]]);
+  assert.deepEqual(created.map((c) => [c.kind, c.template]), [['LOCATION', 'shop_location'], ['LOCATION', 'shop_location']]);
+  for (const kind of ['GOOGLE_REVIEW', 'SHOE_RANGE'] as const) {
+    const again = await harness([ann], [], { community: {} }).service.send({ kind, customerIds: ['a'], triggeredBy: 's' });
+    assert.equal(again.sent, 1);
+  }
+  // Already sent: skipped unless forced.
+  assert.equal((await harness([ann], ['a'], { community: {} }).service.send({ kind: 'LOCATION', customerIds: ['a'], triggeredBy: 's' })).skipped, 1);
 });
 
 /** The Mautic webhook, with the service stood in by a fake that returns whatever the test wants. */

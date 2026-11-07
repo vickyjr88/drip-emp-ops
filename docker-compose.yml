@@ -79,6 +79,9 @@ x-backend-environment: &backend-environment
   WHATSAPP_TEMPLATE_APP: ${WHATSAPP_TEMPLATE_APP:-drip_app_download}
   WHATSAPP_TEMPLATE_GROUP: ${WHATSAPP_TEMPLATE_GROUP:-drip_join_group}
   WHATSAPP_TEMPLATE_REVIEW: ${WHATSAPP_TEMPLATE_REVIEW:-drip_rate_us}
+  WHATSAPP_TEMPLATE_GOOGLE_REVIEW: ${WHATSAPP_TEMPLATE_GOOGLE_REVIEW:-google_review}
+  WHATSAPP_TEMPLATE_SHOE_RANGE: ${WHATSAPP_TEMPLATE_SHOE_RANGE:-shoe_variety}
+  WHATSAPP_TEMPLATE_LOCATION: ${WHATSAPP_TEMPLATE_LOCATION:-shop_location}
   APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}
   # Tells the Nairobi Gents storefront (shops-platform) when this catalogue changes; see docs/CATALOGUE-SYNC.md.
   # Off until both are set.

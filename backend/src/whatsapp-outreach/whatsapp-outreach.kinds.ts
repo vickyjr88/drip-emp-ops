@@ -10,15 +10,29 @@
  *   drip_rate_us       Hi {{1}}, enjoying your Drip Emporium shoes? A quick rating on Google helps other shoppers find us: {{2}} Thank you!
  *
  * (A variable cannot be the first or last thing in a template body, hence the closing sentence.)
+ *
+ * Three more are fixed text with no variables: the link or number is written into the template itself, so nothing is
+ * filled in and the customer's name is not used.
+ *
+ *   google_review  Thank you for shopping with Drip Emporium ... leave us a rating and review on Google Maps ... (link in the text)
+ *   shoe_variety   We have a wide range of shoes including sneakers, casuals, officials, ladies and kids' shoes ... dripemporium.store
+ *   shop_location  At Drip Emporium we bring you quality affordable shoes ... Dubai Merchants Mall shop F53, along Ronald Ngala Street ...
  */
-export type OutreachKind = 'APP' | 'GROUP' | 'REVIEW';
+export type OutreachKind = 'APP' | 'GROUP' | 'REVIEW' | 'GOOGLE_REVIEW' | 'SHOE_RANGE' | 'LOCATION';
 
-export const OUTREACH_KINDS: OutreachKind[] = ['APP', 'GROUP', 'REVIEW'];
+export const OUTREACH_KINDS: OutreachKind[] = ['APP', 'GROUP', 'REVIEW', 'GOOGLE_REVIEW', 'SHOE_RANGE', 'LOCATION'];
+
+/** Templates whose text is complete as approved: they take no name and no link, so none is looked up or sent. */
+export const FIXED_TEXT_KINDS: OutreachKind[] = ['GOOGLE_REVIEW', 'SHOE_RANGE', 'LOCATION'];
+export const hasVariables = (kind: OutreachKind): boolean => !FIXED_TEXT_KINDS.includes(kind);
 
 export const KIND_LABELS: Record<OutreachKind, string> = {
   APP: 'Download the app',
   GROUP: 'Join the WhatsApp group',
   REVIEW: 'Rate us on Google',
+  GOOGLE_REVIEW: 'Rate us on Google (full message)',
+  SHOE_RANGE: 'Our range of shoes',
+  LOCATION: 'Where to find us',
 };
 
 export const DEFAULT_APP_URL = 'https://play.google.com/store/apps/details?id=com.dripemporium.app';
@@ -30,6 +44,9 @@ export const templateFor = (kind: OutreachKind): string =>
     APP: process.env.WHATSAPP_TEMPLATE_APP || 'drip_app_download',
     GROUP: process.env.WHATSAPP_TEMPLATE_GROUP || 'drip_join_group',
     REVIEW: process.env.WHATSAPP_TEMPLATE_REVIEW || 'drip_rate_us',
+    GOOGLE_REVIEW: process.env.WHATSAPP_TEMPLATE_GOOGLE_REVIEW || 'google_review',
+    SHOE_RANGE: process.env.WHATSAPP_TEMPLATE_SHOE_RANGE || 'shoe_variety',
+    LOCATION: process.env.WHATSAPP_TEMPLATE_LOCATION || 'shop_location',
   })[kind];
 
 /** Only web links are sent: whatever is stored in the site content is used in a message to a customer. */

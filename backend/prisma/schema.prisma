@@ -2217,7 +2217,7 @@ model WhatsappOutreach {
   customerId  String?
   customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   phone       String
-  /// APP, GROUP or REVIEW.
+  /// APP, GROUP, REVIEW, GOOGLE_REVIEW, SHOE_RANGE or LOCATION.
   kind        String
   template    String
   /// SENT or FAILED.

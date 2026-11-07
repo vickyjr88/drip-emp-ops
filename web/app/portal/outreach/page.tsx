@@ -17,8 +17,8 @@ import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
-type Kind = 'APP' | 'GROUP' | 'REVIEW';
-type KindStatus = { kind: Kind; label: string; template: string; link: string | null; linkReady: boolean };
+type Kind = 'APP' | 'GROUP' | 'REVIEW' | 'GOOGLE_REVIEW' | 'SHOE_RANGE' | 'LOCATION';
+type KindStatus = { kind: Kind; label: string; template: string; link: string | null; linkReady: boolean; fixedText?: boolean };
 type Status = { configured: boolean; kinds: KindStatus[] };
 type Recipient = {
   id: string; firstName: string; lastName: string; email: string; phone: string;
@@ -31,7 +31,7 @@ type HistoryRow = {
   triggeredBy: string; createdAt: string; customer?: { firstName: string; lastName: string } | null;
 };
 
-const SHORT: Record<Kind, string> = { APP: 'App', GROUP: 'Group', REVIEW: 'Rating' };
+const SHORT: Record<Kind, string> = { APP: 'App', GROUP: 'Group', REVIEW: 'Rating', GOOGLE_REVIEW: 'Review', SHOE_RANGE: 'Range', LOCATION: 'Location' };
 const BATCH = 25;
 
 export default function OutreachPage() {
@@ -222,7 +222,7 @@ export default function OutreachPage() {
                       <strong>{k.label}</strong>
                       <p className="portal-muted" style={{ margin: '2px 0 0' }}>
                         Template <code>{k.template}</code> ·{' '}
-                        {k.linkReady ? <>sends <a href={k.link ?? '#'} target="_blank" rel="noreferrer">{k.link}</a></> : (
+                        {k.fixedText ? <>fixed message, the same for everyone</> : k.linkReady ? <>sends <a href={k.link ?? '#'} target="_blank" rel="noreferrer">{k.link}</a></> : (
                           <span style={{ color: 'var(--danger, #b42318)' }}>
                             no link yet — add it under <Link href="/portal/content">Site content</Link> &gt; Footer
                           </span>

@@ -60,7 +60,8 @@ export class WhatsAppService {
           template: {
             name: template,
             language: { code: this.language },
-            components: [{ type: 'body', parameters: parameters.map((text) => ({ type: 'text', text })) }],
+            // A template with no variables takes no components at all.
+            ...(parameters.length ? { components: [{ type: 'body', parameters: parameters.map((text) => ({ type: 'text', text })) }] } : {}),
           },
         }),
         signal: AbortSignal.timeout(20_000),
