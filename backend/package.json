@@ -21,6 +21,7 @@
     "test:watches": "node --require ts-node/register/transpile-only --test test/watches.test.ts",
     "test:watches-seo": "node --require ts-node/register/transpile-only --test test/watches-seo.test.ts",
     "test:insights": "node --require ts-node/register/transpile-only --test test/insights.test.ts",
+    "test:scheduler-replicas": "node --require ts-node/register/transpile-only --test test/scheduler-replicas.test.ts",
     "test:follow-up": "node --require ts-node/register/transpile-only --test test/follow-up.test.ts"
   },
   "dependencies": {

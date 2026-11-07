@@ -164,8 +164,7 @@ services:
       - "${API_PORT:-3101}:3100"
     environment:
       <<: *backend-environment
-      # Set false on replicas so only one instance runs the scheduler. The
-      # standby slot below is the one this actually matters for now.
+      # Both slots run the schedulers (see backend2 below), so these two are the same on each.
       REMINDERS_ENABLED: ${REMINDERS_ENABLED:-true}
       DAILY_REPORT_ENABLED: ${DAILY_REPORT_ENABLED:-true}
     healthcheck: *backend-healthcheck
@@ -180,12 +179,13 @@ services:
       - "${API_PORT2:-3102}:3100"
     environment:
       <<: *backend-environment
-      # Never true for this slot: two schedulers double-sending reminder
-      # SMS/emails is the exact failure this flag exists to prevent, and
-      # deploy.sh brings this slot up alongside, not instead of, the active
-      # one during a swap.
-      REMINDERS_ENABLED: "false"
-      DAILY_REPORT_ENABLED: "false"
+      # The same as the primary slot, on purpose. These used to be hardcoded false here, which switched the daily report and
+      # the staff reminder sweep off whenever a deploy left this slot as the active one (which a rolling deploy does every
+      # other time): nothing was left to run them. Two slots running them is safe, because the work is a BullMQ job in
+      # Redis that one worker takes, and each send is also claimed in the database first (DailyReportRun, ReminderLog), so
+      # the brief overlap while a deploy swaps slots cannot send anything twice. test/scheduler-replicas.test.ts checks it.
+      REMINDERS_ENABLED: ${REMINDERS_ENABLED:-true}
+      DAILY_REPORT_ENABLED: ${DAILY_REPORT_ENABLED:-true}
     healthcheck: *backend-healthcheck
     depends_on: *backend-depends-on
     profiles: ["standby"]

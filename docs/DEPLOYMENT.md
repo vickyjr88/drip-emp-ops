@@ -273,9 +273,20 @@ editing `.env` and redeploying is enough.
 | `ADMIN_SEED_EMAIL` / `ADMIN_SEED_PASSWORD` | `admin@dripemporium.store` / `Admin@123` | The admin account bootstrapped on first start. **Change the password before the first deploy** — the default is in the sample and in this repo. |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `INQUIRY_FALLBACK_EMAIL` | blank | Transactional email. A blank key means inquiry emails are logged as FAILED rather than sent, which is a deliberate no-op rather than a crash. |
 | `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID` | blank / `sandbox` / blank | Africa's Talking, for reminder SMS. Blank key ⇒ SMS is skipped and logged rather than failing the run. |
-| `REMINDERS_ENABLED` | `true` | Set `false` on replicas so only one instance runs the scheduler. |
+| `REMINDERS_ENABLED` | `true` | Runs the reminder sweep. Both backend slots run it (see "Schedulers and the two slots" below); set `false` only to switch it off everywhere. |
 | `REMINDERS_CRON` | `0 8 * * *` | When the reminder sweep runs. |
 | `REMINDERS_TIMEZONE` | `Africa/Nairobi` | Timezone that cron is interpreted in. |
+
+### Schedulers and the two slots
+
+The daily report, the staff reminder sweep and the abandoned-cart reminder all run inside the backend, as BullMQ jobs in Redis.
+A job needs a worker running somewhere, so **both backend slots run the schedulers**. If only one did, a rolling deploy that
+left the other slot active would leave nothing to process them: that is what stopped the daily report after 4 Nov 2026.
+
+Running both is safe. A job is taken by one worker, the schedule is a single keyed job in Redis however many replicas register it,
+and each message is claimed in the database before it is sent (`DailyReportRun`, `ReminderLog`), so the overlap while a deploy
+swaps slots cannot send anything twice. `backend/test/scheduler-replicas.test.ts` runs two replicas against a real Redis and checks
+each tick is handled once. To switch a scheduler off, set its `*_ENABLED` to `false` in `.env`: it applies to both slots.
 
 ### Backups — read by `scripts/backup.sh`, not by Compose
 

@@ -89,7 +89,7 @@ actually sent survives.
 | Variable | Default | Notes |
 |---|---|---|
 | `REDIS_URL` | `redis://redis:6379` | Without it the API still boots; manual sends run inline and nothing is scheduled |
-| `REMINDERS_ENABLED` | `true` | Set `false` on replicas so only one instance schedules |
+| `REMINDERS_ENABLED` | `true` | Both backend slots run the scheduler; sends are claimed in `ReminderLog`, so it is safe. `false` switches it off everywhere |
 | `REMINDERS_CRON` | `0 8 * * *` | |
 | `REMINDERS_TIMEZONE` | `Africa/Nairobi` | |
 | `AT_API_KEY` | — | Blank means SMS is skipped and logged, never sent |

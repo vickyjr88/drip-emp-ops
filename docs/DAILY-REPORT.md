@@ -38,7 +38,7 @@ Permissions: `daily-report-setting.read` / `daily-report-setting.update` (genera
 | Preview without sending | `GET /daily-report/preview?date=2026-11-04` (default yesterday) |
 | Send now | `POST /daily-report/send?date=2026-11-04`. A day already sent is not sent again; add `&force=true` to send again |
 | What was sent | `GET /daily-report/runs` (status per day, channel and recipient) |
-| Schedule | `DAILY_REPORT_CRON` (default `0 7 * * *`), `DAILY_REPORT_TIMEZONE` (default `Africa/Nairobi`), `DAILY_REPORT_ENABLED` (false on `backend2`) |
+| Schedule | `DAILY_REPORT_CRON` (default `0 7 * * *`), `DAILY_REPORT_TIMEZONE` (default `Africa/Nairobi`), `DAILY_REPORT_ENABLED` (on for both slots; sends are claimed, so it is safe) |
 | Switch off | `{"enabled": false}` in settings |
 
 **No duplicates.** Redis holds a single repeatable job, and every message is claimed in `DailyReportRun` (unique per day, channel and
