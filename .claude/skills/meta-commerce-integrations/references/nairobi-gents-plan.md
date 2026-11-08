@@ -15,7 +15,17 @@ Verify this against the code before relying on it; it was written from a read of
 | Already there | | daily report (email + WhatsApp), follow-up links, funnel/ad spend/stock/buyers, domains, media library | extend, do not rebuild |
 | Missing | | WhatsApp webhook and delivery state, outreach and auto-subscription, comment replies, social posting, Status kit, Mautic | the work below |
 
-## Decisions to confirm with the user before building (ask in one go, recommend a default)
+## Decisions (answered by the user, 2026-11-08)
+
+1. Each shop uses **its own** WhatsApp number, Facebook Page and Threads account. Owner notices (daily report) may fall back to the platform sender; anything customers see uses the shop's own connection. **Yes.**
+2. Every feature is **off** for a shop until its owner connects and switches it on. **Yes.**
+3. **One Meta app per shop** (not one platform app). App id/secret are per-shop fields; webhooks (WhatsApp and Facebook Page) are per shop.
+4. **Mautic: skip** for Nairobi Gents.
+5. **Owners connect their own Meta accounts**, with an in-portal guide and test buttons.
+
+The list below is the original question set, kept for reference.
+
+## Questions that were asked
 
 1. **Whose Meta assets does a shop use?** Drip Emporium's WABA/number is currently used for Nairobi Gents' owner report. For customer-facing messages and posts each shop should have its own WABA/number, Page and Threads account. Default: owner notices may
    use the platform sender (`inheritPlatform`), everything customer-facing uses the shop's own connection and is off until connected.
