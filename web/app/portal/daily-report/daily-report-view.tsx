@@ -22,7 +22,9 @@ type Settings = {
   enabled: boolean; emailRecipients: string[]; whatsappRecipients: string[];
   isCustomised: boolean; whatsappConfigured: boolean; whatsappTemplate: string;
 };
-type Run = { id: string; reportDate: string; channel: 'EMAIL' | 'WHATSAPP'; recipient: string; status: 'SENT' | 'FAILED' | 'SKIPPED' | 'PENDING'; error?: string | null; updatedAt: string };
+type Run = { id: string; reportDate: string; channel: 'EMAIL' | 'WHATSAPP'; recipient: string; status: 'SENT' | 'FAILED' | 'SKIPPED' | 'PENDING'; error?: string | null; delivery?: string | null; deliveryError?: string | null; updatedAt: string };
+/** What WhatsApp reported about a message after accepting it. "Sent" alone only means WhatsApp took it. */
+const DELIVERY_LABEL: Record<string, string> = { sent: 'Reached WhatsApp', delivered: 'Delivered', read: 'Read', failed: 'Not delivered' };
 type Preview = { report: { label: string; shopName: string }; email: { subject: string }; whatsappParameters: string[] };
 type Delivery = { dateKey: string; skipped?: string; email: { recipient: string; status: string; error?: string }[]; whatsapp: { recipient: string; status: string; error?: string }[] };
 
@@ -293,7 +295,12 @@ export function DailyReportView() {
                               <td>{r.reportDate}</td>
                               <td>{r.channel === 'WHATSAPP' ? 'WhatsApp' : 'Email'}</td>
                               <td>{r.recipient}</td>
-                              <td><span className={STATUS_CLASS[r.status] ?? 'portal-chip'}>{r.status.charAt(0) + r.status.slice(1).toLowerCase()}</span>{r.error ? <span className="portal-muted"> {r.error}</span> : null}</td>
+                              <td>
+                                <span className={STATUS_CLASS[r.status] ?? 'portal-chip'}>{r.status.charAt(0) + r.status.slice(1).toLowerCase()}</span>
+                                {r.delivery ? <span className={`portal-chip ${r.delivery === 'failed' ? 'is-danger' : r.delivery === 'sent' ? 'is-muted' : 'is-success'}`} style={{ marginLeft: 6 }}>{DELIVERY_LABEL[r.delivery] ?? r.delivery}</span> : null}
+                                {r.error ? <span className="portal-muted"> {r.error}</span> : null}
+                                {r.deliveryError ? <span className="portal-muted"> {r.deliveryError}</span> : null}
+                              </td>
                               <td>{formatDateTime(r.updatedAt)}</td>
                             </tr>
                           ))}

@@ -264,10 +264,11 @@ export class DailyReportService {
     return taken.count === 1;
   }
 
-  private finish(reportDate: string, channel: string, recipient: string, status: 'SENT' | 'FAILED' | 'SKIPPED', error?: string) {
+  private finish(reportDate: string, channel: string, recipient: string, status: 'SENT' | 'FAILED' | 'SKIPPED', error?: string, messageId?: string) {
     return this.prisma.dailyReportRun.update({
       where: { reportDate_channel_recipient: { reportDate, channel, recipient } },
-      data: { status, error: error ?? null },
+      // The message id lets Meta's delivery report (delivered, read, failed) be matched back to this row.
+      data: { status, error: error ?? null, ...(messageId ? { messageId, delivery: null, deliveryError: null } : {}) },
     });
   }
 
@@ -311,7 +312,7 @@ export class DailyReportService {
         continue;
       }
       const sent = await this.whatsapp.sendTemplate(recipient, parameters);
-      await this.finish(dateKey, 'WHATSAPP', recipient, sent.delivered ? 'SENT' : 'FAILED', sent.error);
+      await this.finish(dateKey, 'WHATSAPP', recipient, sent.delivered ? 'SENT' : 'FAILED', sent.error, sent.messageId);
       result.whatsapp.push({ recipient, status: sent.delivered ? 'SENT' : 'FAILED', error: sent.error });
     }
 

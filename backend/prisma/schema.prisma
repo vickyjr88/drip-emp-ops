@@ -2203,11 +2203,16 @@ model DailyReportRun {
   /// PENDING while being sent, then SENT, FAILED or SKIPPED.
   status     String
   error      String?
+  /// WhatsApp only: Meta's id for the message, and the latest delivery report for it (sent, delivered, read or failed).
+  messageId     String?
+  delivery      String?
+  deliveryError String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@unique([reportDate, channel, recipient])
   @@index([reportDate])
+  @@index([messageId])
 }
 
 /// One row per WhatsApp marketing message sent from the portal's Outreach screen (app download, group invite, Google
@@ -2224,11 +2229,18 @@ model WhatsappOutreach {
   status      String
   messageId   String?
   error       String?
+  /// The latest delivery report Meta sent for messageId: sent, delivered, read or failed. Null until one arrives.
+  delivery      String?
+  deliveryError String?
+  /// Set when the message went to someone who messaged us (WhatsappContact) rather than to a customer.
+  contactId   String?
   triggeredBy String
   createdAt   DateTime  @default(now())
 
   @@index([customerId, kind])
   @@index([createdAt])
+  @@index([messageId])
+  @@index([phone, kind])
 }
 
 /// One row per stored image or file in the media library. The bytes live in the object store under `objectKey`; this row
@@ -2425,4 +2437,52 @@ model AdSpend {
   createdAt DateTime @default(now())
 
   @@index([day])
+}
+
+
+/// Someone who messaged the shop's WhatsApp number (most often from an ad). They are told they will get updates and can
+/// reply STOP; until they do they are put through the onboarding messages (see WhatsappSequenceService).
+model WhatsappContact {
+  id             String    @id @default(uuid())
+  /// Digits with the country code, as WhatsApp reports it: 254712345678.
+  phone          String    @unique
+  name           String?
+  /// Which ad brought them, when they came from a click-to-WhatsApp ad (Meta's referral details on the first message).
+  adSourceId     String?
+  adHeadline     String?
+  adClickId      String?
+  subscribed     Boolean   @default(true)
+  /// Why they are not subscribed: STOP (they replied STOP) or TRADE (a reseller, wholesaler or supplier, never messaged).
+  unsubscribedReason String?
+  subscribedAt   DateTime  @default(now())
+  unsubscribedAt DateTime?
+  /// When the "you will get updates, reply STOP to opt out" message was sent. Sent once.
+  noticeSentAt   DateTime?
+  /// Which onboarding message is next (0 = the app, 1 = the group, 2 = the rating; 3 = finished) and when it is due.
+  nextStep       Int       @default(0)
+  nextStepAt     DateTime?
+  failures       Int       @default(0)
+  firstMessageAt DateTime  @default(now())
+  lastMessageAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([subscribed, nextStepAt])
+  @@index([createdAt])
+}
+
+/// What Meta reported about a message we sent: sent, delivered, read, or failed with a reason.
+model WhatsappMessageStatus {
+  id         String   @id @default(uuid())
+  messageId  String
+  recipient  String
+  status     String
+  errorCode  String?
+  errorTitle String?
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([messageId, status])
+  @@index([messageId])
+  @@index([createdAt])
 }

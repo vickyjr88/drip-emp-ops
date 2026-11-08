@@ -44,6 +44,8 @@ function harness(customers: Row[], sentBefore: string[] = [], footer: any = { co
       findMany: async () => sentBefore.map((customerId) => ({ customerId })),
       create: async ({ data }: any) => created.push(data),
     },
+    // Nobody in these tests has replied STOP; that rule is tested against a real database in whatsapp-subscription.test.ts.
+    whatsappContact: { findFirst: async () => null },
   };
   const whatsapp: any = {
     isConfigured: true,

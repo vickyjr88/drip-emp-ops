@@ -97,6 +97,41 @@ To stop it, blank `MAUTIC_WHATSAPP_CAMPAIGN_ID` (no new enrolments) or unpublish
 - A campaign's canvas must connect the `lists` node to the first step, or every later API edit is refused as "orphaned events".
 - The Mautic API sits behind a firewall that refuses Python's default user agent; send a normal `User-Agent`.
 
+## People who message the shop (automatic)
+
+Advertising brings many people to the shop's WhatsApp number. The first time someone writes, the app replies (a normal message, allowed
+within 24 hours of theirs): *"Thanks for messaging Drip Emporium! You'll now receive updates on new arrivals and offers on this number.
+Reply STOP at any time to opt out."* They are then put through the same three messages as the Mautic campaign, one day after the
+notice and then 2 and 3 days apart (`WHATSAPP_SEQUENCE_DELAYS_HOURS=24,48,72`): the app, the group, the Google rating.
+
+- **STOP** (the whole message: "stop", "STOP.", "unsubscribe", "opt out", "end") unsubscribes them at once and sends a confirmation.
+  A sentence that merely contains the word is not an opt-out, and "cancel" is left out on purpose because people use it for orders.
+  From then on **nothing** reaches that number: not the sequence, not a batch picked on the Outreach screen. **START** brings them back.
+- **Not subscribed, only recorded:** a number that belongs to a reseller, a wholesaler or a supplier.
+- **Guards:** messages go out 08:00 to 20:00 Nairobi time only; never more than `WHATSAPP_DAILY_SEND_CAP` (default 200) template
+  messages a day, under Meta's 250 for an unverified business; nobody is put through the sequence until the notice has actually been
+  sent; a number that keeps failing is given up on after 5 tries. `WHATSAPP_AUTO_SUBSCRIBE=false` switches it off (STOP still works).
+- **Which ad:** a click-to-WhatsApp ad's details arrive with the first message and are stored (ad id, headline, click id).
+- **Delivery reports:** Meta's reports (delivered, read, failed with the reason) are stored and shown on Daily Report and in
+  "Recent messages". Until now a message Meta *accepted* was shown as sent whether or not it arrived.
+- **See and stop it:** Portal > WhatsApp Outreach > "People who messaged us", with a button to unsubscribe someone who asked another way.
+
+### Setting it up
+
+1. Set `WHATSAPP_WEBHOOK_SECRET` in the server `.env` to a long random string and deploy. Optionally set `WHATSAPP_APP_SECRET`.
+2. Subscribe the app to the WhatsApp account's messages, pointing at this server. With the same token, one call:
+
+   ```
+   POST https://graph.facebook.com/v21.0/<WABA id>/subscribed_apps
+   { "override_callback_uri": "https://api.dripemporium.store/whatsapp/webhook/<WHATSAPP_WEBHOOK_SECRET>", "verify_token": "<WHATSAPP_WEBHOOK_SECRET>" }
+   ```
+
+   Meta immediately calls the address to check it, so the app must already be deployed.
+3. Message the number from a phone: you should get the notice, and a row appears under "People who messaged us".
+
+The address contains the secret so that nobody else can post events here: a forged "message from 0712..." would otherwise make the shop
+message that number. Without the secret set the endpoint does not exist (404).
+
 ## "Get the app" link on the website
 
 The storefront links to the Google Play listing in four places, all from one component (`web/app/components/app-download.tsx`) and one

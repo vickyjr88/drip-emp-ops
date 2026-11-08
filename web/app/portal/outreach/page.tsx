@@ -28,8 +28,17 @@ type SendResult = { customerId: string; name: string; phone: string | null; outc
 type Totals = { sent: number; failed: number; skipped: number; problems: SendResult[] };
 type HistoryRow = {
   id: string; kind: Kind; template: string; phone: string; status: 'SENT' | 'FAILED'; error?: string | null;
+  delivery?: string | null; deliveryError?: string | null;
   triggeredBy: string; createdAt: string; customer?: { firstName: string; lastName: string } | null;
 };
+
+type ContactStats = { subscribed: number; stopped: number; trade: number; inSequence: number; finished: number; autoSubscribe: boolean };
+type Contact = {
+  id: string; phone: string; name: string | null; adHeadline: string | null; subscribed: boolean; unsubscribedReason: string | null;
+  nextStep: number; nextStepAt: string | null; lastMessageAt: string; noticeSentAt: string | null;
+};
+const STEP_LABEL = ['the app', 'the group', 'the rating request'];
+const DELIVERY_LABEL: Record<string, string> = { sent: 'Reached WhatsApp', delivered: 'Delivered', read: 'Read', failed: 'Not delivered' };
 
 const SHORT: Record<Kind, string> = { APP: 'App', GROUP: 'Group', REVIEW: 'Rating', GOOGLE_REVIEW: 'Review', SHOE_RANGE: 'Range', LOCATION: 'Location' };
 const BATCH = 25;
@@ -47,12 +56,23 @@ export default function OutreachPage() {
   const [sending, setSending] = useState<{ done: number; total: number } | null>(null);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [contactStats, setContactStats] = useState<ContactStats | null>(null);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
     setInitialized(true);
+  }, []);
+
+  const loadContacts = useCallback(async (authToken: string) => {
+    const [stats, page] = await Promise.all([
+      apiRequest<ContactStats>('/whatsapp-contacts/stats', { method: 'GET' }, authToken).catch(() => null),
+      apiRequest<ServerPage<Contact>>('/whatsapp-contacts?take=15', { method: 'GET' }, authToken).catch(() => null),
+    ]);
+    setContactStats(stats);
+    setContacts(page?.items ?? []);
   }, []);
 
   const loadHistory = useCallback(async (authToken: string) => {
@@ -70,12 +90,13 @@ export default function OutreachPage() {
       setProfile(me);
       setStatus(st);
       await loadHistory(authToken);
+      await loadContacts(authToken);
     } catch (error) {
       setErrorMessage(error);
     } finally {
       setLoading(false);
     }
-  }, [loadHistory, setErrorMessage]);
+  }, [loadHistory, loadContacts, setErrorMessage]);
 
   useEffect(() => {
     if (!initialized) return;
@@ -319,6 +340,51 @@ export default function OutreachPage() {
               </p>
             </article>
 
+            {contactStats ? (
+              <article className="portal-card">
+                <h2 style={{ margin: 0 }}>People who messaged us</h2>
+                <p className="portal-muted" style={{ margin: '4px 0 12px' }}>
+                  Anyone who writes to the shop&apos;s WhatsApp number is told they will receive updates and can reply STOP to opt out, then gets the
+                  app, group and rating messages a day or more apart, between 08:00 and 20:00. Resellers, wholesalers and suppliers are recorded but never messaged.
+                  {contactStats.autoSubscribe ? '' : ' Automatic subscription is switched off on this server.'}
+                </p>
+                <div className="portal-stat-grid" style={{ marginBottom: 12 }}>
+                  <div className="portal-stat"><span>Subscribed</span><h3>{contactStats.subscribed}</h3><span className="portal-stat-note">{contactStats.inSequence} still getting messages, {contactStats.finished} finished</span></div>
+                  <div className="portal-stat"><span>Replied STOP</span><h3>{contactStats.stopped}</h3></div>
+                  <div className="portal-stat"><span>Trade contacts</span><h3>{contactStats.trade}</h3><span className="portal-stat-note">Never messaged</span></div>
+                </div>
+                {contacts.length === 0 ? <div className="portal-empty-state">Nobody has messaged yet.</div> : (
+                  <div className="portal-table-wrap">
+                    <table className="portal-data-table">
+                      <thead><tr><th>Person</th><th>From ad</th><th>Status</th><th>Next message</th><th>Last wrote</th><th /></tr></thead>
+                      <tbody>
+                        {contacts.map((c) => (
+                          <tr key={c.id}>
+                            <td>{c.name || '—'}<div className="portal-muted">{c.phone}</div></td>
+                            <td>{c.adHeadline || '—'}</td>
+                            <td>
+                              {c.subscribed ? <span className="portal-chip is-success">Subscribed</span> : <span className="portal-chip is-muted">{c.unsubscribedReason === 'TRADE' ? 'Trade contact' : 'Replied STOP'}</span>}
+                              {c.subscribed && !c.noticeSentAt ? <span className="portal-chip is-danger" style={{ marginLeft: 6 }}>Not told yet</span> : null}
+                            </td>
+                            <td>{c.subscribed && c.nextStep < STEP_LABEL.length && c.nextStepAt ? `${STEP_LABEL[c.nextStep]}, ${formatDateTime(c.nextStepAt)}` : c.subscribed ? 'Finished' : '—'}</td>
+                            <td>{formatDateTime(c.lastMessageAt)}</td>
+                            <td>
+                              {c.subscribed && canSend ? (
+                                <button type="button" className="portal-inline-btn" onClick={async () => {
+                                  if (!token || !(await dialog.confirm({ title: 'Unsubscribe this person?', message: `${c.name || c.phone} will not get any more messages. Use this when they ask you another way.`, confirmLabel: 'Unsubscribe' }))) return;
+                                  try { await apiRequest(`/whatsapp-contacts/${c.id}/unsubscribe`, { method: 'POST' }, token); await loadContacts(token); } catch (error) { setErrorMessage(error); }
+                                }}>Unsubscribe</button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </article>
+            ) : null}
+
             <article className="portal-card">
               <h2 style={{ margin: 0 }}>Recent messages</h2>
               <div className="portal-list-stack" style={{ marginTop: 12 }}>
@@ -331,7 +397,10 @@ export default function OutreachPage() {
                         <strong>{h.customer ? `${h.customer.firstName} ${h.customer.lastName}`.trim() : h.phone}</strong>
                         <span className={`portal-chip ${h.status === 'SENT' ? 'is-success' : 'is-danger'}`} style={{ marginLeft: 8 }}>{h.status === 'SENT' ? 'Sent' : 'Failed'}</span>
                         <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>{SHORT[h.kind] ?? h.kind}</span>
-                        <p className="portal-muted">{h.phone} · {formatDateTime(h.createdAt)} · by {h.triggeredBy}{h.error ? ` · ${h.error}` : ''}</p>
+                        {h.delivery ? (
+                          <span className={`portal-chip ${h.delivery === 'failed' ? 'is-danger' : h.delivery === 'sent' ? 'is-muted' : 'is-success'}`} style={{ marginLeft: 8 }}>{DELIVERY_LABEL[h.delivery] ?? h.delivery}</span>
+                        ) : null}
+                        <p className="portal-muted">{h.phone} · {formatDateTime(h.createdAt)} · by {h.triggeredBy}{h.error ? ` · ${h.error}` : ''}{h.deliveryError ? ` · ${h.deliveryError}` : ''}</p>
                       </div>
                     </div>
                   </div>

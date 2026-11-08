@@ -43,6 +43,35 @@ export class WhatsAppService {
     return digits.length >= 11 && digits.length <= 15 ? digits : null;
   }
 
+  /**
+   * A plain message. WhatsApp only allows these within 24 hours of the person's own last message, which is the case for the
+   * replies this is used for (the "you will get updates" notice, STOP and START confirmations).
+   */
+  async sendText(to: string, body: string): Promise<WhatsAppSendResult> {
+    const phone = this.normalisePhone(to);
+    if (!phone) return { delivered: false, error: `Unusable WhatsApp number "${to}"` };
+    if (!this.isConfigured) return { delivered: false, error: 'WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN not configured' };
+    try {
+      const response = await fetch(`https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to: phone, type: 'text', text: { body, preview_url: false } }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const data = (await response.json().catch(() => ({}))) as any;
+      if (!response.ok) {
+        const message = data?.error?.message ?? `HTTP ${response.status}`;
+        this.logger.warn(`WhatsApp text to ${phone} failed: ${message}`);
+        return { delivered: false, error: message };
+      }
+      return { delivered: true, messageId: data?.messages?.[0]?.id };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`WhatsApp text to ${phone} threw: ${message}`);
+      return { delivered: false, error: message };
+    }
+  }
+
   /** `template` defaults to the daily report's; the outreach screen passes its own approved template names. */
   async sendTemplate(to: string, parameters: string[], template: string = this.template): Promise<WhatsAppSendResult> {
     const phone = this.normalisePhone(to);
