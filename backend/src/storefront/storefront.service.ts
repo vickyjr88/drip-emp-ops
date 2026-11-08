@@ -612,6 +612,46 @@ export class StorefrontService {
    *    not model either), so both are fixed to the least restrictive value
    *    Meta accepts ("unisex", "adult") rather than guessing per product.
    */
+  /**
+   * Products the marketing engine may post, in the shape the shop itself shows them: only what a shopper can see (active, in a
+   * live category), with at least one size in stock, a photo and a price, at the price a shopper pays today (a running offer
+   * included). Shoes and general goods only: watches and kits have their own pages and are not posted here.
+   */
+  async postableProducts() {
+    const products = await this.prisma.product.findMany({
+      where: { ...SHOP_LINE, isActive: true, OR: [{ categoryId: null }, { category: { isActive: true } }] },
+      include: {
+        category: { select: { name: true, slug: true, attributes: { select: { key: true, label: true } } } },
+        variants: { orderBy: { name: 'asc' } },
+      },
+    });
+    const variantIds = products.flatMap((product) => product.variants.map((variant) => variant.id));
+    const [stock, offers] = await Promise.all([this.stockMap(variantIds), this.offerMap(variantIds)]);
+    const out: Array<{
+      id: string; slug: string; name: string; brand: string | null; categoryName: string | null; imageUrl: string | null;
+      priceFrom: number; priceTo: number; offer: { price: number; was: number } | null; sizesInStock: string[]; stockUnits: number; createdAt: Date;
+    }> = [];
+    for (const product of products) {
+      const shaped = this.shape(product, stock, offers);
+      if (!shaped.anyInStock) continue;
+      const inStockVariants = shaped.variants.filter((v: any) => v.inStock);
+      const offered = inStockVariants.filter((v: any) => v.wasPriceKes !== null).sort((a: any, b: any) => a.priceKes - b.priceKes)[0];
+      const gallery: string[] = Array.isArray(product.imageUrls) ? (product.imageUrls as string[]) : [];
+      out.push({
+        id: product.id, slug: product.slug, name: product.name, brand: product.brand ?? null,
+        categoryName: product.category?.name ?? null,
+        imageUrl: product.featuredImageUrl || gallery[0] || null,
+        priceFrom: Math.min(...inStockVariants.map((v: any) => v.priceKes)),
+        priceTo: Math.max(...inStockVariants.map((v: any) => v.priceKes)),
+        offer: offered ? { price: offered.priceKes, was: offered.wasPriceKes } : null,
+        sizesInStock: shaped.sizesInStock,
+        stockUnits: product.variants.reduce((sum, v) => sum + (stock.get(v.id) ?? 0), 0),
+        createdAt: product.createdAt,
+      });
+    }
+    return out;
+  }
+
   async catalogCsv(): Promise<string> {
     const products = await this.prisma.product.findMany({
       // A product in a not-yet-launched category (Clothes, ahead of

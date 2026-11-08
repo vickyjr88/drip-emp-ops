@@ -2524,3 +2524,46 @@ model FacebookCommentReply {
   @@index([fromId, status])
   @@index([createdAt])
 }
+
+/// Switches and timing for the marketing engine that posts products to the Page on its own. One row, id "singleton".
+/// Off until staff turn it on: a post is public, so the engine never starts by itself on a fresh deploy.
+model SocialSetting {
+  id              String   @id @default("singleton")
+  facebookEnabled Boolean  @default(false)
+  /// When to post, Nairobi time, "HH:MM". Three a day by default; at most six.
+  times           String[] @default(["09:00", "13:00", "19:00"])
+  /// A product is not posted again to the same channel for this many days.
+  cooldownDays    Int      @default(30)
+  updatedBy       String   @default("system")
+  updatedAt       DateTime @updatedAt
+}
+
+/// One post the engine made (or tried to make) to one channel. slotKey is "2026-11-08@09:00" for a scheduled post, which with
+/// the channel is unique: that is what stops both backend slots posting the same slot twice.
+model SocialPost {
+  id         String    @id @default(uuid())
+  channel    String
+  slotKey    String
+  productId  String?
+  productName String?
+  productSlug String?
+  caption    String?
+  imageUrl   String?
+  /// PENDING (being posted), POSTED, RETRY (Facebook was unavailable, tried again shortly), FAILED or SKIPPED (nothing to post).
+  status     String    @default("PENDING")
+  detail     String?
+  attempts   Int       @default(0)
+  /// Facebook's id for the post, e.g. 405520572643076_122229878420494913.
+  externalId String?
+  scheduledFor DateTime?
+  postedAt   DateTime?
+  /// Who started it: "schedule" or a staff member (Post now).
+  triggeredBy String   @default("schedule")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([channel, slotKey])
+  @@index([channel, status, postedAt])
+  @@index([productId, channel, status])
+  @@index([createdAt])
+}

@@ -3,9 +3,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PageContentService } from '../page-content/page-content.service';
 import { paginate } from '../common/pagination.util';
+import { shopFacts } from './shop-facts';
 import { startOfNairobiDay } from '../whatsapp-outreach/whatsapp-subscription';
 import {
-  ALREADY_REPLIED_CODES, DEFAULT_PRIVATE_TEXT, DEFAULT_LOCATION, DEFAULT_PUBLIC_TEXT, DEFAULT_SITE_URL, FeedComment, fillTemplate, isReplyToComment,
+  ALREADY_REPLIED_CODES, DEFAULT_PRIVATE_TEXT, DEFAULT_PUBLIC_TEXT, FeedComment, fillTemplate, isReplyToComment,
   isTransientFacebookError, looksLikeSpam,
 } from './facebook-comments';
 
@@ -16,13 +17,6 @@ const REPLY_WINDOW_MS = 6 * DAY_MS;
 const MAX_ATTEMPTS = 3;
 const RETRY_AFTER_MS = 4 * 60_000;
 const STUCK_AFTER_MS = 10 * 60_000;
-
-/** The website address in the public reply: the setting, else the storefront's own address (never a local one), else the live site. */
-const siteUrl = () => {
-  const own = process.env.STOREFRONT_ORIGIN || '';
-  const candidate = process.env.FACEBOOK_REPLY_SITE_URL || (/localhost|127\.0\.0\.1/.test(own) ? '' : own) || DEFAULT_SITE_URL;
-  return candidate.replace(/\/+$/, '');
-};
 
 export const facebookRepliesEnabled = () => (process.env.FACEBOOK_COMMENT_REPLIES || 'true') !== 'false';
 
@@ -115,24 +109,9 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
   // --- the rules --------------------------------------------------------------------------------------------------------
 
   private async texts() {
-    let whatsapp = (process.env.FACEBOOK_REPLY_WHATSAPP || '').replace(/\D/g, '');
-    let page = process.env.FACEBOOK_PAGE_URL || '';
-    let location = process.env.FACEBOOK_REPLY_LOCATION || '';
-    if (!whatsapp || !page || !location) {
-      try {
-        const [header, footer] = await Promise.all([this.pages.findOne('header'), this.pages.findOne('footer')]);
-        if (!whatsapp) whatsapp = String((header.content as any)?.enquiries?.whatsapp ?? '').replace(/\D/g, '');
-        if (!page) page = String((footer.content as any)?.social?.facebook ?? '');
-        if (!location) location = String((footer.content as any)?.contact?.address ?? '').trim();
-      } catch (error) {
-        this.logger.warn(`Could not read the site content for the reply text: ${(error as Error).message}`);
-      }
-    }
+    const facts = await shopFacts(this.pages, this.pageId, this.logger);
     return {
-      whatsapp: whatsapp ? `https://wa.me/${whatsapp}` : '',
-      page: page || `https://www.facebook.com/${this.pageId}`,
-      site: siteUrl(),
-      location: location || DEFAULT_LOCATION,
+      ...facts,
       privateText: process.env.FACEBOOK_PRIVATE_REPLY_TEXT || DEFAULT_PRIVATE_TEXT,
       publicText: process.env.FACEBOOK_PUBLIC_REPLY_TEXT || DEFAULT_PUBLIC_TEXT,
       publicOn: (process.env.FACEBOOK_PUBLIC_REPLY || 'true') !== 'false',
