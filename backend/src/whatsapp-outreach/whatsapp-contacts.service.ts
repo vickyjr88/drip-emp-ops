@@ -5,7 +5,7 @@ import { WhatsAppService } from '../daily-report/whatsapp.service';
 import { paginate } from '../common/pagination.util';
 import {
   InboundMessage, DeliveryStatus, NOTICE_TEXT, RESUBSCRIBED_TEXT, STOPPED_TEXT, SEQUENCE,
-  classifyKeyword, pickDelivery, sequenceDelaysHours,
+  ACCOUNT_LEVEL_ERRORS, classifyKeyword, pickDelivery, sequenceDelaysHours,
 } from './whatsapp-subscription';
 
 const HOUR_MS = 3_600_000;
@@ -120,14 +120,41 @@ export class WhatsappContactsService {
 
     for (const model of ['dailyReportRun', 'whatsappOutreach'] as const) {
       const delegate: any = (this.prisma as any)[model];
-      const row = await delegate.findFirst({ where: { messageId: status.id }, select: { id: true, delivery: true } });
+      const row = await delegate.findFirst({ where: { messageId: status.id }, select: { id: true, delivery: true, ...(model === 'whatsappOutreach' ? { contactId: true, kind: true } : {}) } });
       if (!row) continue;
       const next = pickDelivery(row.delivery, status.status);
       await delegate.update({
         where: { id: row.id },
         data: { delivery: next, deliveryError: next === 'failed' ? [status.errorCode, status.errorTitle].filter(Boolean).join(': ').slice(0, 500) || null : null },
       });
+      if (model === 'whatsappOutreach' && next === 'failed' && row.delivery !== 'failed' && row.contactId) {
+        await this.reopenStep(row.contactId, row.kind, status.errorCode);
+      }
     }
+  }
+
+  /**
+   * The sequence moves on as soon as WhatsApp accepts a message, but acceptance is not arrival: the failure report comes later.
+   * When one of the onboarding messages is reported failed, the person goes back to that step so they are not left without it.
+   * A failure that is the account's fault (payment, a lock) is retried in six hours without counting against them; any other
+   * is retried in a day and counts, so a number that is not on WhatsApp is given up on after five.
+   */
+  async reopenStep(contactId: string, kind: string, errorCode: string | null) {
+    const index = SEQUENCE.indexOf(kind as (typeof SEQUENCE)[number]);
+    if (index < 0) return;
+    const contact = await this.prisma.whatsappContact.findUnique({ where: { id: contactId } });
+    // Only the step they were just moved past: if they have moved further on, that message is not what is owed.
+    if (!contact || !contact.subscribed || contact.nextStep !== index + 1) return;
+    const accountLevel = Boolean(errorCode && ACCOUNT_LEVEL_ERRORS.has(errorCode));
+    const failures = accountLevel ? contact.failures : contact.failures + 1;
+    await this.prisma.whatsappContact.update({
+      where: { id: contactId },
+      data: {
+        nextStep: index,
+        failures,
+        nextStepAt: failures >= 5 ? null : new Date(Date.now() + (accountLevel ? 6 : 24) * HOUR_MS),
+      },
+    });
   }
 
   async stats() {

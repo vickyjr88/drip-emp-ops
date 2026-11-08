@@ -102,7 +102,8 @@ async function world(opts: { sendText?: (to: string, body: string) => any; sendT
 }
 
 const HOUR = 3_600_000;
-const inWindow = () => { const d = new Date(); d.setUTCHours(8, 0, 0, 0); return d; }; // 11:00 Nairobi today
+// 11:00 Nairobi tomorrow: inside the send window, and after anything the test makes due "now", whatever the time of day it runs.
+const inWindow = () => { const d = new Date(); d.setUTCDate(d.getUTCDate() + 1); d.setUTCHours(8, 0, 0, 0); return d; };
 
 db('the first message from someone subscribes them: told once that updates are coming and how to stop, with the ad that brought them', async () => {
   const w = await world();
@@ -219,6 +220,8 @@ db('the sequence sends the app, group and rating messages in turn, once each, on
 
     // The daily cap holds the rest back.
     process.env.WHATSAPP_DAILY_SEND_CAP = '1';
+    // One message already sent "today" (the day the check runs on), so the cap of one is used up.
+    await w.prisma.whatsappOutreach.create({ data: { phone: `${PREFIX}00099`, kind: 'APP', template: 't', status: 'SENT', triggeredBy: 't', createdAt: new Date(inWindow().getTime() - HOUR) } });
     const other = `${PREFIX}00007`;
     await w.contacts.handleMessage(w.message(other, 'Hi'));
     await w.prisma.whatsappContact.update({ where: { phone: other }, data: { nextStepAt: new Date(Date.now() - 1000) } });
@@ -402,4 +405,54 @@ db('a message Meta accepted but later reported as failed does not count as recei
     await w.cleanup();
     await w.prisma.$disconnect();
   }
+});
+
+// --- accepted is not arrived: the sequence goes back a step ------------------------------------------------------------
+
+db('when WhatsApp later reports an onboarding message failed, the person goes back to that step: payment problems retry in 6 hours without counting against them, other failures in a day and count', async () => {
+  const w = await world();
+  try {
+    const status = (id: string, errorCode: string) => ({ id, status: 'failed', recipient: `${PREFIX}00301`, timestamp: new Date(), errorCode, errorTitle: 'x' });
+    const phone = `${PREFIX}00301`;
+    const contact = await w.prisma.whatsappContact.create({ data: { phone, name: 'P', noticeSentAt: new Date(), nextStep: 1, nextStepAt: new Date(Date.now() + 48 * HOUR) } });
+    const log = (id: string, kind = 'APP') => w.prisma.whatsappOutreach.create({ data: { phone, kind, template: 't', status: 'SENT', messageId: id, contactId: contact.id, triggeredBy: 'whatsapp-subscription' } });
+
+    // The app message was accepted (the sequence moved on to the group step), then reported failed for a payment reason.
+    await log('wamid.TESTSEQ1');
+    await w.contacts.recordStatus(status('wamid.TESTSEQ1', '131042'));
+    let c = await w.prisma.whatsappContact.findUniqueOrThrow({ where: { phone } });
+    assert.deepEqual([c.nextStep, c.failures], [0, 0]);
+    const sixHours = c.nextStepAt!.getTime() - Date.now();
+    assert.ok(sixHours > 5.9 * HOUR && sixHours < 6.1 * HOUR, `retry in ${sixHours}ms`);
+    assert.equal((await w.prisma.whatsappOutreach.findFirstOrThrow({ where: { messageId: 'wamid.TESTSEQ1' } })).delivery, 'failed');
+
+    // The same report again changes nothing more.
+    await w.contacts.recordStatus(status('wamid.TESTSEQ1', '131042'));
+    assert.equal((await w.prisma.whatsappContact.findUniqueOrThrow({ where: { phone } })).nextStep, 0);
+
+    // A failure about the person (not on WhatsApp) counts, and is retried tomorrow.
+    await w.prisma.whatsappContact.update({ where: { phone }, data: { nextStep: 1 } });
+    await log('wamid.TESTSEQ2');
+    await w.contacts.recordStatus(status('wamid.TESTSEQ2', '131026'));
+    c = await w.prisma.whatsappContact.findUniqueOrThrow({ where: { phone } });
+    assert.deepEqual([c.nextStep, c.failures], [0, 1]);
+    assert.ok(c.nextStepAt!.getTime() - Date.now() > 23 * HOUR);
+
+    // Five of those and they are given up on.
+    await w.prisma.whatsappContact.update({ where: { phone }, data: { nextStep: 1, failures: 4 } });
+    await log('wamid.TESTSEQ3');
+    await w.contacts.recordStatus(status('wamid.TESTSEQ3', '131026'));
+    c = await w.prisma.whatsappContact.findUniqueOrThrow({ where: { phone } });
+    assert.deepEqual([c.failures, c.nextStepAt], [5, null]);
+
+    // Someone who has moved on past that step, or replied STOP, is left alone.
+    await w.prisma.whatsappContact.update({ where: { phone }, data: { nextStep: 2, failures: 0, nextStepAt: new Date(Date.now() + HOUR) } });
+    await log('wamid.TESTSEQ4');
+    await w.contacts.recordStatus(status('wamid.TESTSEQ4', '131042'));
+    assert.equal((await w.prisma.whatsappContact.findUniqueOrThrow({ where: { phone } })).nextStep, 2);
+    await w.prisma.whatsappContact.update({ where: { phone }, data: { nextStep: 1, subscribed: false, unsubscribedReason: 'STOP', nextStepAt: null } });
+    await log('wamid.TESTSEQ5');
+    await w.contacts.recordStatus(status('wamid.TESTSEQ5', '131042'));
+    assert.equal((await w.prisma.whatsappContact.findUniqueOrThrow({ where: { phone } })).nextStepAt, null);
+  } finally { await w.cleanup(); await w.prisma.$disconnect(); }
 });

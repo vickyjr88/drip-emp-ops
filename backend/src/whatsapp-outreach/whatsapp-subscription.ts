@@ -131,6 +131,13 @@ export function sequenceDelaysHours(raw = process.env.WHATSAPP_SEQUENCE_DELAYS_H
   return parsed.length === SEQUENCE.length ? parsed : [24, 48, 72];
 }
 
+/**
+ * Failures that say something about the account, not the person: a payment problem, a locked account, a spam-rate limit.
+ * Retrying such a message against the person's patience is wrong (they did nothing), so it is retried later without counting
+ * against them.
+ */
+export const ACCOUNT_LEVEL_ERRORS = new Set(['131042', '131031', '131048']);
+
 const EAT_MS = 3 * 3_600_000;
 
 /** Marketing messages go out between 08:00 and 20:00 Nairobi time, never in the middle of the night. */
