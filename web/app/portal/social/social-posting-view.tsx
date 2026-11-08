@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The marketing engine: products posted to the Facebook Page on their own, at set times, three a day by default.
+ * The marketing engine: products posted to the Facebook Page and to Threads on their own, at set times, three a day by default.
  *
  * The server does the work (backend/src/social-posting). This screen is the control room: the switch, the times, what the next
  * post would look like, a button to post one now, and every post the engine has made, with a way to take one down. The engine is
@@ -19,15 +19,21 @@ import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
+type Channel = 'FACEBOOK' | 'THREADS';
+type ChannelStatus = { configured: boolean; enabled: boolean; nextPostAt: string | null; posted: number; failed: number; skipped: number; removed: number };
 type Status = {
-  allowed: boolean; configured: boolean; facebookEnabled: boolean; times: string[]; cooldownDays: number; updatedBy: string;
-  nextPostAt: string | null; today: { slotKey: string; status: string }[]; posted: number; failed: number; skipped: number; removed: number;
+  allowed: boolean; times: string[]; cooldownDays: number; updatedBy: string;
+  facebook: ChannelStatus; threads: ChannelStatus & { tokenExpiresAt: string | null; tokenError: string | null };
 };
 type Post = {
-  id: string; slotKey: string; productName: string | null; productSlug: string | null; caption: string | null; imageUrl: string | null;
-  status: string; detail: string | null; externalId: string | null; postedAt: string | null; triggeredBy: string; createdAt: string;
+  id: string; channel: Channel; slotKey: string; productName: string | null; productSlug: string | null; caption: string | null; imageUrl: string | null;
+  status: string; detail: string | null; externalId: string | null; permalink: string | null; postedAt: string | null; triggeredBy: string; createdAt: string;
 };
 type Preview = { product: { id: string; name: string; slug: string; imageUrl: string; brand: string | null } | null; caption: string | null };
+type Previews = { previews: Record<Channel, Preview> };
+
+const CHANNEL_LABEL: Record<Channel, string> = { FACEBOOK: 'Facebook Page', THREADS: 'Threads' };
+const CHANNEL_SHORT: Record<Channel, string> = { FACEBOOK: 'Facebook', THREADS: 'Threads' };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   POSTED: { label: 'Posted', cls: 'portal-chip is-success' },
@@ -53,7 +59,7 @@ export function SocialPostingView() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [times, setTimes] = useState<string[]>([]);
   const [draftTime, setDraftTime] = useState('');
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [preview, setPreview] = useState<Previews | null>(null);
   const [busy, setBusy] = useState<'save' | 'preview' | 'post' | 'toggle' | null>(null);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [feedback, setFeedback] = useFeedbackState();
@@ -115,7 +121,7 @@ export function SocialPostingView() {
   const canRemove = hasPermission(profile, 'social-post.delete');
   const timesChanged = Boolean(status) && JSON.stringify(times) !== JSON.stringify(status!.times);
 
-  async function save(patch: { facebookEnabled?: boolean; times?: string[] }, kind: 'save' | 'toggle', message: string) {
+  async function save(patch: { facebookEnabled?: boolean; threadsEnabled?: boolean; times?: string[] }, kind: 'save' | 'toggle', message: string) {
     setBusy(kind);
     try {
       const next = await apiRequest<Status>('/social-posting/settings', { method: 'PUT', body: JSON.stringify(patch) }, token!);
@@ -129,17 +135,17 @@ export function SocialPostingView() {
     }
   }
 
-  async function onToggle(on: boolean) {
+  async function onToggle(channel: Channel, on: boolean) {
     if (!status) return;
     if (on) {
       const ok = await dialog.confirm({
-        title: 'Start posting to the Page automatically?',
-        message: `From the next set time (${status.times.join(', ')} Nairobi time) a product that is in stock is posted to the Facebook Page with no one checking it first, up to ${status.times.length} a day. Every post is public. You can pause it here at any time and take a post down from the list below.`,
+        title: `Start posting to ${CHANNEL_LABEL[channel]} automatically?`,
+        message: `From the next set time (${status.times.join(', ')} Nairobi time) a product that is in stock is posted to ${CHANNEL_LABEL[channel]} with no one checking it first, up to ${status.times.length} a day. Every post is public. You can pause it here at any time and take a post down from the list below.`,
         confirmLabel: 'Start posting',
       });
       if (!ok) return;
     }
-    await save({ facebookEnabled: on }, 'toggle', on ? 'Automatic posting is on.' : 'Automatic posting is paused.');
+    await save(channel === 'FACEBOOK' ? { facebookEnabled: on } : { threadsEnabled: on }, 'toggle', `${CHANNEL_SHORT[channel]}: automatic posting is ${on ? 'on' : 'paused'}.`);
   }
 
   function addTime(e: FormEvent) {
@@ -154,7 +160,7 @@ export function SocialPostingView() {
   async function onPreview() {
     setBusy('preview');
     try {
-      setPreview(await apiRequest<Preview>('/social-posting/preview', { method: 'GET' }, token!));
+      setPreview(await apiRequest<Previews>('/social-posting/preview', { method: 'GET' }, token!));
     } catch (error) {
       setErrorMessage(errorText(error));
     } finally {
@@ -162,19 +168,20 @@ export function SocialPostingView() {
     }
   }
 
-  async function onPostNow() {
+  async function onPostNow(channel: Channel) {
+    const shown = preview?.previews?.[channel]?.product ?? null;
     const ok = await dialog.confirm({
-      title: 'Post to the Facebook Page now?',
-      message: preview?.product
-        ? `“${preview.product.name}” will be posted publicly right now, as shown in the preview.`
+      title: `Post to ${CHANNEL_LABEL[channel]} now?`,
+      message: shown
+        ? `“${shown.name}” will be posted publicly right now, as shown in the preview.`
         : 'The engine will choose the next product and post it publicly right now.',
       confirmLabel: 'Post now',
     });
     if (!ok) return;
     setBusy('post');
     try {
-      const result = await apiRequest<{ status: string; detail?: string | null; productName?: string | null }>('/social-posting/post-now', { method: 'POST', body: JSON.stringify(preview?.product ? { productId: preview.product.id } : {}) }, token!);
-      if (result.status === 'POSTED') setFeedback(`Posted${result.productName ? `: ${result.productName}` : ''}.`);
+      const result = await apiRequest<{ status: string; detail?: string | null; productName?: string | null }>('/social-posting/post-now', { method: 'POST', body: JSON.stringify({ channel, ...(shown ? { productId: shown.id } : {}) }) }, token!);
+      if (result.status === 'POSTED') setFeedback(`Posted to ${CHANNEL_SHORT[channel]}${result.productName ? `: ${result.productName}` : ''}.`);
       else setErrorMessage(`Not posted: ${result.detail || result.status}`);
       setPreview(null);
       await load(token!);
@@ -186,7 +193,7 @@ export function SocialPostingView() {
   }
 
   async function onRemove(post: Post) {
-    const ok = await dialog.confirm({ title: 'Take this post down?', message: `“${post.productName ?? 'This post'}” will be deleted from the Facebook Page, with its likes and comments.`, confirmLabel: 'Take down' });
+    const ok = await dialog.confirm({ title: 'Take this post down?', message: `“${post.productName ?? 'This post'}” will be deleted from ${CHANNEL_LABEL[post.channel] ?? 'its channel'}, with its likes and comments.`, confirmLabel: 'Take down' });
     if (!ok) return;
     try {
       const result = await apiRequest<{ removed: boolean; detail: string | null }>(`/social-posting/posts/${post.id}`, { method: 'DELETE' }, token!);
@@ -207,7 +214,7 @@ export function SocialPostingView() {
             tourIsAdmin={profile.role === 'ADMIN' || (profile.roles || []).some((r: { name: string }) => r.name === 'ADMIN')}
             active="social"
             pageTitle="Social Posting"
-            pageSubtitle="Products posted to the Facebook Page automatically."
+            pageSubtitle="Products posted to the Facebook Page and Threads automatically."
             email={profile.email}
             roleLabel={roleLabelFor(profile)}
             permissionCount={profile.permissions?.length || 0}
@@ -223,34 +230,57 @@ export function SocialPostingView() {
             ) : (
               <>
                 <article className="portal-card" style={{ marginBottom: 20 }}>
-                  <div className="portal-card-header-row">
-                    <h2 style={{ margin: 0 }}>Automatic posting</h2>
-                    <span className={status.facebookEnabled && status.allowed && status.configured ? 'portal-chip is-success' : 'portal-chip is-muted'}>
-                      {!status.configured ? 'Page not connected' : !status.allowed ? 'Switched off on the server' : status.facebookEnabled ? 'On' : 'Paused'}
-                    </span>
-                  </div>
+                  <h2 style={{ margin: 0 }}>Automatic posting</h2>
                   <p className="portal-muted">
-                    At each time below a product that is in stock, has a photo and has not been posted lately goes to the Facebook Page: the photo, price, sizes
-                    available, a link to the product, our WhatsApp and the shop&apos;s location. Visits from these links show as Facebook in Insights, and comments
-                    on them get the private Messenger reply. Nothing is checked by a person first, so it stays off until you turn it on.
+                    At each time below a product that is in stock, has a photo and has not been posted lately goes out: the photo, price, sizes
+                    available, a link to the product, our WhatsApp and the shop&apos;s location. Visits from these links show in Insights as Facebook or Threads, and comments
+                    on Facebook posts get the private Messenger reply. Nothing is checked by a person first, so each channel stays off until you turn it on.
                   </p>
-                  {!status.configured ? <p className="portal-error">The server has no Facebook Page connected (FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN).</p> : null}
                   {!status.allowed ? <p className="portal-error">Posting is switched off on the server (SOCIAL_POSTING=false), whatever is set here.</p> : null}
-                  {canEdit ? (
-                    <div className="portal-action-row">
-                      <button type="button" className={status.facebookEnabled ? 'portal-inline-btn' : 'portal-primary-btn'} disabled={busy === 'toggle' || !status.configured}
-                        onClick={() => void onToggle(!status.facebookEnabled)}>
-                        {busy === 'toggle' ? 'Saving…' : status.facebookEnabled ? 'Pause posting' : 'Start posting'}
-                      </button>
-                    </div>
-                  ) : null}
-                  {status.nextPostAt ? <p style={{ marginBottom: 0 }}>Next post: <strong>{formatDateTime(status.nextPostAt)}</strong></p> : null}
-                  <p className="portal-muted" style={{ marginBottom: 0 }}>
-                    {status.posted} posted, {status.failed} failed, {status.skipped} skipped{status.removed ? `, ${status.removed} taken down` : ''}. A product is not posted again for {status.cooldownDays} days.
-                  </p>
 
-                  <div style={{ marginTop: 16 }}>
-                    <strong>Times (Nairobi)</strong>
+                  {(['FACEBOOK', 'THREADS'] as Channel[]).map((channel) => {
+                    const c = channel === 'FACEBOOK' ? status.facebook : status.threads;
+                    const live = c.enabled && c.configured && status.allowed;
+                    return (
+                      <div key={channel} style={{ borderTop: '1px solid var(--eef-border)', paddingTop: 14, marginTop: 14 }}>
+                        <div className="portal-card-header-row">
+                          <strong>{CHANNEL_LABEL[channel]}</strong>
+                          <span className={live ? 'portal-chip is-success' : 'portal-chip is-muted'}>
+                            {!c.configured ? 'Not connected' : !status.allowed ? 'Switched off on the server' : c.enabled ? 'On' : 'Paused'}
+                          </span>
+                        </div>
+                        {!c.configured ? (
+                          <p className="portal-error" style={{ margin: '8px 0 0' }}>
+                            {channel === 'FACEBOOK'
+                              ? 'The server has no Facebook Page connected (FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN).'
+                              : 'The server has no Threads login (THREADS_ACCESS_TOKEN). See docs/SOCIAL-POSTING.md for how to get one.'}
+                          </p>
+                        ) : null}
+                        {channel === 'THREADS' && status.threads.configured ? (
+                          <p className="portal-muted" style={{ margin: '8px 0 0' }}>
+                            {status.threads.tokenExpiresAt ? `Threads login renews itself; good until ${formatDateTime(status.threads.tokenExpiresAt)}.` : 'Threads login: its end date is not known yet (checked every few minutes).'}
+                            {status.threads.tokenError ? ` ${status.threads.tokenError}` : ''}
+                          </p>
+                        ) : null}
+                        <p className="portal-muted" style={{ margin: '8px 0 0' }}>
+                          {c.posted} posted, {c.failed} failed, {c.skipped} skipped{c.removed ? `, ${c.removed} taken down` : ''}.
+                          {c.nextPostAt ? <> Next post: <strong>{formatDateTime(c.nextPostAt)}</strong>.</> : ''}
+                        </p>
+                        {canEdit ? (
+                          <div className="portal-action-row" style={{ marginTop: 10 }}>
+                            <button type="button" className={c.enabled ? 'portal-inline-btn' : 'portal-primary-btn'} disabled={busy === 'toggle' || !c.configured}
+                              onClick={() => void onToggle(channel, !c.enabled)}>
+                              {busy === 'toggle' ? 'Saving…' : c.enabled ? 'Pause posting' : 'Start posting'}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+
+                  <div style={{ marginTop: 18, borderTop: '1px solid var(--eef-border)', paddingTop: 14 }}>
+                    <strong>Times (Nairobi), the same for both</strong>
+                    <p className="portal-muted" style={{ margin: '2px 0 0' }}>A product is not posted again to the same channel for {status.cooldownDays} days.</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
                       {times.length === 0 ? <span className="portal-muted">None: nothing will be posted.</span> : times.map((t) => (
                         <span key={t} className="portal-chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -275,23 +305,36 @@ export function SocialPostingView() {
                 </article>
 
                 <article className="portal-card" style={{ marginBottom: 20 }}>
-                  <h2 style={{ marginTop: 0 }}>See the next post, or post now</h2>
+                  <h2 style={{ marginTop: 0 }}>See the next posts, or post now</h2>
                   <div className="portal-action-row">
-                    <button type="button" className="portal-inline-btn" disabled={busy === 'preview'} onClick={() => void onPreview()}>{busy === 'preview' ? 'Choosing…' : 'Preview the next post'}</button>
-                    {canPost ? <button type="button" className="portal-primary-btn" disabled={busy === 'post' || !status.configured || !status.allowed} onClick={() => void onPostNow()}>{busy === 'post' ? 'Posting…' : 'Post now'}</button> : null}
+                    <button type="button" className="portal-inline-btn" disabled={busy === 'preview'} onClick={() => void onPreview()}>{busy === 'preview' ? 'Choosing…' : 'Preview the next posts'}</button>
                   </div>
-                  {preview ? (
-                    preview.product ? (
-                      <div style={{ display: 'flex', gap: 16, marginTop: 16, flexWrap: 'wrap' }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={preview.product.imageUrl} alt={preview.product.name} style={{ width: 160, height: 160, objectFit: 'cover', borderRadius: 8 }} />
-                        <div style={{ flex: 1, minWidth: 240 }}>
-                          <p className="portal-muted" style={{ margin: 0 }}>This is what would be posted. Nothing has been posted yet.</p>
-                          <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: '8px 0 0', padding: 12, borderRadius: 8, background: 'rgba(0,0,0,0.04)', fontSize: 14 }}>{preview.caption}</pre>
-                        </div>
+                  {preview ? (['FACEBOOK', 'THREADS'] as Channel[]).map((channel) => {
+                    const p = preview.previews[channel];
+                    const c = channel === 'FACEBOOK' ? status.facebook : status.threads;
+                    return (
+                      <div key={channel} style={{ marginTop: 18 }}>
+                        <strong>{CHANNEL_LABEL[channel]}</strong>
+                        {p?.product ? (
+                          <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={p.product.imageUrl} alt={p.product.name} style={{ width: 160, height: 160, objectFit: 'cover', borderRadius: 8 }} />
+                            <div style={{ flex: 1, minWidth: 240 }}>
+                              <p className="portal-muted" style={{ margin: 0 }}>This is what would be posted. Nothing has been posted yet.</p>
+                              <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: '8px 0', padding: 12, borderRadius: 8, background: 'rgba(0,0,0,0.04)', fontSize: 14 }}>{p.caption}</pre>
+                              {canPost ? (
+                                <button type="button" className="portal-primary-btn" disabled={busy === 'post' || !c.configured || !status.allowed} onClick={() => void onPostNow(channel)}>
+                                  {busy === 'post' ? 'Posting…' : `Post to ${CHANNEL_SHORT[channel]} now`}
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : <p className="portal-muted" style={{ marginTop: 8 }}>No product is ready: none is in stock with a photo that has not been posted lately.</p>}
                       </div>
-                    ) : <p className="portal-muted" style={{ marginTop: 12 }}>No product is ready: none is in stock with a photo that has not been posted lately.</p>
-                  ) : null}
+                    );
+                  }) : (
+                    <p className="portal-muted" style={{ marginBottom: 0 }}>Preview first, then post exactly what you saw.</p>
+                  )}
                 </article>
 
                 <article className="portal-card">
@@ -305,13 +348,14 @@ export function SocialPostingView() {
                             {p.imageUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={p.imageUrl} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6 }} /> : null}
                             <div style={{ flex: 1 }}>
                               <strong>{p.productName ?? 'No product'}</strong>
+                              <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>{CHANNEL_SHORT[p.channel] ?? p.channel}</span>
                               <span className={s.cls} style={{ marginLeft: 8 }}>{s.label}</span>
                               <p className="portal-muted" style={{ margin: '2px 0 0' }}>
                                 {formatDateTime(p.postedAt ?? p.createdAt)} · {p.triggeredBy === 'schedule' ? 'scheduled' : `by ${p.triggeredBy}`}{p.detail ? ` · ${p.detail}` : ''}
                               </p>
                               {p.status === 'POSTED' && p.externalId ? (
                                 <p style={{ margin: '4px 0 0' }}>
-                                  <a href={facebookUrl(p.externalId)} target="_blank" rel="noreferrer">View on Facebook</a>
+                                  <a href={p.permalink || facebookUrl(p.externalId)} target="_blank" rel="noreferrer">View on {CHANNEL_SHORT[p.channel] ?? 'the channel'}</a>
                                   {canRemove ? <> · <button type="button" className="portal-inline-btn" onClick={() => void onRemove(p)}>Take down</button></> : null}
                                 </p>
                               ) : null}

@@ -2530,6 +2530,7 @@ model FacebookCommentReply {
 model SocialSetting {
   id              String   @id @default("singleton")
   facebookEnabled Boolean  @default(false)
+  threadsEnabled  Boolean  @default(false)
   /// When to post, Nairobi time, "HH:MM". Three a day by default; at most six.
   times           String[] @default(["09:00", "13:00", "19:00"])
   /// A product is not posted again to the same channel for this many days.
@@ -2553,8 +2554,10 @@ model SocialPost {
   status     String    @default("PENDING")
   detail     String?
   attempts   Int       @default(0)
-  /// Facebook's id for the post, e.g. 405520572643076_122229878420494913.
+  /// The channel's id for the post: Facebook's looks like 405520572643076_122229878420494913, Threads' is a number.
   externalId String?
+  /// A link to the post, when the channel gives one (Threads does; a Facebook post's is built from its id).
+  permalink  String?
   scheduledFor DateTime?
   postedAt   DateTime?
   /// Who started it: "schedule" or a staff member (Post now).
@@ -2566,4 +2569,18 @@ model SocialPost {
   @@index([channel, status, postedAt])
   @@index([productId, channel, status])
   @@index([createdAt])
+}
+
+/// The login a social channel posts with, when it expires and is renewed by the app itself: a Threads token lasts 60 days and is
+/// refreshed before then. Only the app's backend reads it. sourceHash is the hash of the token set in the server's .env, so
+/// putting a new token there replaces this row's instead of being ignored.
+model SocialCredential {
+  channel      String    @id
+  accessToken  String
+  userId       String?
+  expiresAt    DateTime?
+  refreshedAt  DateTime?
+  sourceHash   String?
+  error        String?
+  updatedAt    DateTime  @updatedAt
 }

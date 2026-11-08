@@ -1,11 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 
 export class UpdateSocialSettingsDto {
   @ApiPropertyOptional({ description: 'Post to the Facebook Page on the schedule' })
   @IsOptional()
   @IsBoolean()
   facebookEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Post to Threads on the schedule' })
+  @IsOptional()
+  @IsBoolean()
+  threadsEnabled?: boolean;
 
   @ApiPropertyOptional({ example: ['09:00', '13:00', '19:00'], description: 'Nairobi time, HH:MM, at most six' })
   @IsOptional()
@@ -28,4 +33,9 @@ export class PostNowDto {
   @IsOptional()
   @IsString()
   productId?: string;
+
+  @ApiPropertyOptional({ enum: ['FACEBOOK', 'THREADS'], description: 'Where to post. Defaults to the Facebook Page.' })
+  @IsOptional()
+  @IsIn(['FACEBOOK', 'THREADS'])
+  channel?: 'FACEBOOK' | 'THREADS';
 }

@@ -74,6 +74,39 @@ export function buildCaption(product: PostableProduct, ctx: PostContext, day: st
   return lines.filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** Threads allows 500 characters a post; a margin is left because emoji and links are counted generously. */
+export const THREADS_LIMIT = 480;
+const length = (text: string) => Array.from(text).length;
+
+/**
+ * The same post for Threads: shorter and plainer, always within its 500 characters. Name, price, the link and WhatsApp come first;
+ * when the text is too long the location goes, then the sizes, then the name is cut, so the link and the price are never lost.
+ */
+export function buildThreadsCaption(product: PostableProduct, ctx: PostContext, day: string): string {
+  const opener = OPENERS[hash(`${product.id}:${day}:threads`) % OPENERS.length];
+  const price = product.offer
+    ? `🔥 ${kes(product.offer.price)} (was ${kes(product.offer.was)})`
+    : product.priceFrom === product.priceTo || !product.priceTo ? `💰 ${kes(product.priceFrom)}` : `💰 From ${kes(product.priceFrom)}`;
+  const sizes = sizeLine(product.sizesInStock);
+  const link = `🛒 ${postLink(ctx.origin, product.slug, 'threads')}`;
+  const compose = (name: string, opts: { sizes: boolean; location: boolean; whatsapp: boolean }) =>
+    [opener, '', name, opts.sizes && sizes ? `${price} · 📏 ${sizes}` : price, '', link, opts.whatsapp && ctx.whatsapp ? `💬 ${ctx.whatsapp}` : null, opts.location && ctx.location ? `📍 ${ctx.location}` : null]
+      .filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  for (const opts of [
+    { sizes: true, location: true, whatsapp: true },
+    { sizes: true, location: false, whatsapp: true },
+    { sizes: false, location: false, whatsapp: true },
+    { sizes: false, location: false, whatsapp: false },
+  ]) {
+    const text = compose(product.name, opts);
+    if (length(text) <= THREADS_LIMIT) return text;
+  }
+  const bare = { sizes: false, location: false, whatsapp: false };
+  // Measured with a one-letter name: an empty one would collapse a blank line and read one character short.
+  const maxName = THREADS_LIMIT - length(compose('x', bare)) + 1;
+  return compose(`${Array.from(product.name).slice(0, Math.max(10, maxName - 1)).join('').trim()}…`, bare);
+}
+
 /** Whether a product is good enough to put on the brand's Page unattended. */
 export function isPostable(p: (Omit<Partial<PostableProduct>, 'imageUrl'> & { imageUrl?: string | null }) | null | undefined): p is PostableProduct {
   if (!p) return false;

@@ -38,11 +38,11 @@ export class SocialPostingController {
     return this.service.list({ skip: query.skip, take: query.take });
   }
 
-  /** Posts to the Page now: a real, public post. */
+  /** Posts to the Facebook Page or Threads now: a real, public post. */
   @Post('post-now')
   @Permissions(buildPermissionKey('SocialPost', 'create'))
   postNow(@Body() dto: PostNowDto, @Req() request: any) {
-    return this.service.postNow(request?.user?.email ?? 'unknown', dto.productId);
+    return this.service.postNow(request?.user?.email ?? 'unknown', dto.productId, dto.channel ?? 'FACEBOOK');
   }
 
   /** Takes a post down from the Page. */

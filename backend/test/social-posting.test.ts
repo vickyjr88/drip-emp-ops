@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { SocialPostingService } from '../src/social-posting/social-posting.service';
 import {
-  PostableProduct, buildCaption, cleanTimes, dueSlots, isPostable, nextSlot, pickProduct, postLink,
+  PostableProduct, THREADS_LIMIT, buildCaption, buildThreadsCaption, cleanTimes, dueSlots, isPostable, nextSlot, pickProduct, postLink,
 } from '../src/social-posting/social-post';
 
 const DAY = 86_400_000;
@@ -236,4 +236,175 @@ db('SOCIAL_POSTING=false stops the schedule and manual posts, and the preview sh
     assert.equal(w.calls.length, 0);
     assert.equal((await w.service.status()).allowed, false);
   } finally { await w.done(); }
+});
+
+// --- Threads --------------------------------------------------------------------------------------------------------------
+
+test('the Threads post fits 500 characters whatever the product: the location and sizes go first, then the name is cut, never the link or price', () => {
+  const short = buildThreadsCaption(product(), ctx, 'd');
+  assert.ok(Array.from(short).length <= THREADS_LIMIT);
+  assert.match(short, /utm_source=threads&utm_medium=social&utm_campaign=autopost/);
+  assert.match(short, /💰 KES 4,200 · 📏 40, 41, 42/);
+  assert.match(short, /📍 Dubai Merchants Mall/);
+
+  const long = buildThreadsCaption(product({ name: 'Nike Air Force 1 Low Retro Premium Limited Edition Triple White With Gum Sole And Reflective Detail '.repeat(5), sizesInStock: Array.from({ length: 14 }, (_, i) => String(36 + i)) }), { ...ctx, location: 'A very long address '.repeat(12) }, 'd');
+  assert.ok(Array.from(long).length <= THREADS_LIMIT, `${Array.from(long).length} characters`);
+  assert.match(long, /KES 4,200/);
+  assert.match(long, /\/shop\/nike-air-force-1\?utm_source=threads/);
+  assert.match(long, /…/);
+});
+
+type ThreadsCall = { method: string; path: string; body: any; query: URLSearchParams };
+
+async function threadsWorld(responder: (call: ThreadsCall) => { status: number; data: any } | null = () => null, products?: any[]) {
+  process.env.THREADS_ACCESS_TOKEN = 'threads-env-token';
+  process.env.THREADS_PUBLISH_WAIT_MS = '200';
+  process.env.THREADS_POLL_MS = '5';
+  const w = await world({ products });
+  const threadsCalls: ThreadsCall[] = [];
+  const outer = globalThis.fetch;
+  let seq = 0;
+  (globalThis as any).fetch = async (input: any, init: any) => {
+    const u = String(input);
+    if (!u.startsWith('https://graph.threads.net/v1.0/')) return outer(input, init);
+    const parsed = new URL(u);
+    const call: ThreadsCall = { method: init?.method ?? 'GET', path: parsed.pathname.replace('/v1.0/', ''), body: init?.body ? JSON.parse(init.body) : null, query: parsed.searchParams };
+    threadsCalls.push(call);
+    const fixed = responder(call);
+    let reply = fixed;
+    if (!reply) {
+      if (call.path === 'me') reply = { status: 200, data: { id: '9001', username: 'dripemporium' } };
+      else if (call.path === 'refresh_access_token') reply = { status: 200, data: { access_token: 'threads-renewed', token_type: 'bearer', expires_in: 5_184_000 } };
+      else if (call.path === '9001/threads') reply = { status: 200, data: { id: `c_${++seq}` } };
+      else if (/^c_\d+$/.test(call.path)) reply = { status: 200, data: { status: 'FINISHED' } };
+      else if (call.path === '9001/threads_publish') reply = { status: 200, data: { id: `t_${seq}` } };
+      else if (/^t_\d+$/.test(call.path) && call.method === 'GET') reply = { status: 200, data: { permalink: `https://www.threads.net/@dripemporium/post/${call.path}` } };
+      else if (/^t_\d+$/.test(call.path) && call.method === 'DELETE') reply = { status: 200, data: { success: true } };
+      else reply = { status: 404, data: { error: { code: 100, message: 'unknown' } } };
+    }
+    return new Response(JSON.stringify(reply.data), { status: reply.status, headers: { 'Content-Type': 'application/json' } });
+  };
+  const done = async () => { await w.prisma.socialCredential.deleteMany({}); await w.done(); delete process.env.THREADS_ACCESS_TOKEN; delete process.env.THREADS_PUBLISH_WAIT_MS; delete process.env.THREADS_POLL_MS; delete process.env.THREADS_USER_ID; };
+  return { ...w, threadsCalls, done };
+}
+
+db('a due slot posts to Threads: the item is made with the picture and text, published once Threads has it, and the link is kept', async () => {
+  const w = await threadsWorld();
+  try {
+    await w.service.updateSettings({ threadsEnabled: true }, 'test');
+    assert.equal((await w.service.tick(NINE)).posted, 1);
+    assert.equal(w.photos().length, 0); // Facebook is off: nothing goes there
+    const made = w.threadsCalls.find((c) => c.path === '9001/threads')!;
+    assert.equal(made.body.media_type, 'IMAGE');
+    assert.match(made.body.image_url, /^https:\/\//);
+    assert.match(made.body.text, /utm_source=threads/);
+    assert.equal(made.body.access_token, 'threads-renewed'); // the renewed login, once the app has renewed it
+    assert.ok(w.threadsCalls.every((c) => !c.path.includes('threads-env-token')));
+    const published = w.threadsCalls.find((c) => c.path === '9001/threads_publish')!;
+    assert.equal(published.body.creation_id, 'c_1');
+    const row = await w.prisma.socialPost.findFirstOrThrow({});
+    assert.deepEqual([row.channel, row.status, row.externalId, row.permalink], ['THREADS', 'POSTED', 't_1', 'https://www.threads.net/@dripemporium/post/t_1']);
+    assert.equal((await w.service.tick(NINE)).posted, 0); // the slot is taken
+  } finally { await w.done(); }
+});
+
+db('each channel is on or off by itself and keeps its own rotation; both on posts both', async () => {
+  const w = await threadsWorld();
+  try {
+    await w.service.updateSettings({ facebookEnabled: true, threadsEnabled: true }, 'test');
+    assert.equal((await w.service.tick(NINE)).posted, 2);
+    const rows = await w.prisma.socialPost.findMany({ orderBy: { channel: 'asc' } });
+    assert.deepEqual(rows.map((r) => [r.channel, r.slotKey, r.status]), [['FACEBOOK', '2026-11-08@09:00', 'POSTED'], ['THREADS', '2026-11-08@09:00', 'POSTED']]);
+    const status = await w.service.status();
+    assert.deepEqual([status.facebook.posted, status.threads.posted, status.facebook.enabled, status.threads.configured], [1, 1, true, true]);
+    await w.service.updateSettings({ facebookEnabled: false }, 'test');
+    await w.service.tick(new Date('2026-11-08T10:10:00Z')); // 13:10: only Threads is on
+    assert.equal((await w.prisma.socialPost.count({ where: { channel: 'FACEBOOK' } })), 1);
+    assert.equal((await w.prisma.socialPost.count({ where: { channel: 'THREADS' } })), 2);
+  } finally { await w.done(); }
+});
+
+db('Threads: a picture it cannot use fails at once, one it is slow to prepare is tried again, and a refusal is shown', async () => {
+  let state = 'ERROR';
+  const w = await threadsWorld((c) => (/^c_\d+$/.test(c.path) ? { status: 200, data: state === 'ERROR' ? { status: 'ERROR', error_message: 'Unsupported image' } : { status: state } } : null));
+  try {
+    await w.service.updateSettings({ threadsEnabled: true }, 'test');
+    assert.equal((await w.service.tick(NINE)).failed, 1);
+    let row = await w.prisma.socialPost.findFirstOrThrow({});
+    assert.deepEqual([row.status, row.detail], ['FAILED', 'Threads could not use the picture: Unsupported image']);
+    assert.equal(w.threadsCalls.filter((c) => c.path === '9001/threads_publish').length, 0);
+
+    await w.prisma.socialPost.deleteMany({});
+    state = 'IN_PROGRESS';
+    await w.service.tick(NINE);
+    row = await w.prisma.socialPost.findFirstOrThrow({});
+    assert.deepEqual([row.status, row.attempts], ['RETRY', 1]);
+    await w.prisma.socialPost.update({ where: { id: row.id }, data: { createdAt: NINE, updatedAt: NINE } });
+    state = 'FINISHED';
+    assert.equal((await w.service.tick(new Date(NINE.getTime() + 6 * 60_000))).posted, 1);
+    assert.equal((await w.prisma.socialPost.findFirstOrThrow({})).status, 'POSTED');
+  } finally { await w.done(); }
+
+  const refused = await threadsWorld((c) => (c.path === '9001/threads' ? { status: 400, data: { error: { code: 10, message: 'Application does not have permission for this action' } } } : null));
+  try {
+    await refused.service.updateSettings({ threadsEnabled: true }, 'test');
+    assert.equal((await refused.service.tick(NINE)).failed, 1);
+    assert.equal((await refused.prisma.socialPost.findFirstOrThrow({})).detail, '10: Application does not have permission for this action');
+  } finally { await refused.done(); }
+});
+
+db('the Threads login is renewed before it ends and kept; a new token in the server settings replaces the kept one', async () => {
+  const w = await threadsWorld();
+  try {
+    await w.service.maintainThreadsLogin(NINE);
+    let row = await w.prisma.socialCredential.findUniqueOrThrow({ where: { channel: 'THREADS' } });
+    assert.deepEqual([row.accessToken, row.userId, row.error], ['threads-renewed', '9001', null]);
+    assert.equal(row.expiresAt!.getTime(), NINE.getTime() + 5_184_000_000);
+    const refreshes = () => w.threadsCalls.filter((c) => c.path === 'refresh_access_token').length;
+    assert.equal(refreshes(), 1);
+
+    await w.service.maintainThreadsLogin(new Date(NINE.getTime() + 2 * 3_600_000)); // 59 days left: nothing to do
+    assert.equal(refreshes(), 1);
+    await w.service.maintainThreadsLogin(new Date(NINE.getTime() + 45 * 86_400_000)); // 15 days left: renewed
+    assert.equal(refreshes(), 2);
+
+    process.env.THREADS_ACCESS_TOKEN = 'a-brand-new-token';
+    (w.service as any).lastRenewTry = 0;
+    await w.service.maintainThreadsLogin(NINE);
+    assert.equal(w.threadsCalls.at(-1)!.query.get('access_token'), 'a-brand-new-token'); // not the kept one
+    row = await w.prisma.socialCredential.findUniqueOrThrow({ where: { channel: 'THREADS' } });
+    assert.equal(row.accessToken, 'threads-renewed');
+  } finally { await w.done(); }
+
+  const noRenew = await threadsWorld((c) => (c.path === 'refresh_access_token' ? { status: 400, data: { error: { code: 190, message: 'Token must be at least 24 hours old' } } } : null));
+  try {
+    await noRenew.service.maintainThreadsLogin(NINE);
+    const row = await noRenew.prisma.socialCredential.findUniqueOrThrow({ where: { channel: 'THREADS' } });
+    assert.deepEqual([row.accessToken, row.userId, row.expiresAt], ['threads-env-token', '9001', null]); // still usable
+    assert.match(row.error!, /Renewal: 190/);
+    await noRenew.service.updateSettings({ threadsEnabled: true }, 'test');
+    assert.equal((await noRenew.service.tick(NINE)).posted, 1); // posting does not depend on the renewal
+  } finally { await noRenew.done(); }
+});
+
+db('a Threads post can be taken down, and the screen says when the Threads login ends', async () => {
+  const w = await threadsWorld();
+  try {
+    const result: any = await w.service.postNow('staff@example.com', 'TP_3', 'THREADS');
+    assert.equal(result.status, 'POSTED');
+    const row = await w.prisma.socialPost.findFirstOrThrow({});
+    assert.equal(row.channel, 'THREADS');
+    assert.deepEqual(await w.service.remove(row.id), { removed: true, detail: null });
+    assert.equal(w.threadsCalls.at(-1)!.method, 'DELETE');
+    assert.equal((await w.prisma.socialPost.findUniqueOrThrow({ where: { id: row.id } })).status, 'REMOVED');
+    const status = await w.service.status();
+    assert.ok(status.threads.tokenExpiresAt);
+    assert.equal(status.threads.removed, 1);
+  } finally { await w.done(); }
+
+  const none = await world();
+  try {
+    assert.equal(((await none.service.postNow('x', undefined, 'THREADS')) as any).status, 'FAILED');
+    assert.equal((await none.service.status()).threads.configured, false);
+  } finally { await none.done(); }
 });

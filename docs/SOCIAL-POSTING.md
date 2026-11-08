@@ -1,7 +1,7 @@
-# Social posting: products posted to the Facebook Page automatically
+# Social posting: products posted to the Facebook Page and Threads automatically
 
 Portal > **Social Posting**. At set times each day (default **09:00, 13:00 and 19:00 Nairobi**, up to six) the engine picks a product and
-posts it to the Drip Emporium Facebook Page: the product photo with a caption of the name, price, sizes in stock, a link to the product,
+posts it to the Drip Emporium Facebook Page and to Threads (each switched on separately): the product photo with a caption of the name, price, sizes in stock, a link to the product,
 the WhatsApp link and the shop's location. It is **fully automatic**: no one approves a post first. Because every post is public it is
 **off until someone turns it on** on the screen.
 
@@ -53,9 +53,29 @@ open Portal > Social Posting, check **Preview the next post**, and press **Start
 | `SOCIAL_POSTING` | server `.env` | `true`; `false` stops all posting |
 | The WhatsApp link, location and website in the post | Site content (header enquiries WhatsApp, footer address), or `FACEBOOK_REPLY_WHATSAPP`, `FACEBOOK_REPLY_LOCATION`, `FACEBOOK_REPLY_SITE_URL` | as the comment replies use |
 
+## Threads
+
+Same product, same times, same rules, in its own rotation (a product is not repeated on Threads for 30 days, whatever Facebook posted). The text is
+shorter and plainer, always within Threads' 500 characters: name, price and sizes, the tagged link (`utm_source=threads`, so Insights shows Threads), WhatsApp
+and the location; if the text is too long the location goes first, then the sizes, then the name is cut. The link and the price are never dropped.
+A Threads post is a photo post: the app creates it, waits until Threads has fetched the picture, then publishes it and keeps the post's link.
+
+**Threads has its own login**, separate from the Facebook Page's. The Facebook tokens are refused by Threads ("Cannot parse access token"). To get one:
+1. Meta App Dashboard > the app > **Add use case** > **Access the Threads API**. Its permissions are `threads_basic` and `threads_content_publish`.
+2. App roles > Roles > add the shop's Threads account as a **Threads Tester**, and accept the invitation in the Threads app (Settings > Account > Website permissions > Invites).
+3. In the Threads use case settings, use the **User token generator** for that account and copy the token.
+4. Put it in the server `.env` as `THREADS_ACCESS_TOKEN` and deploy (migration `20261116090000_add_threads_posting`). The account id is found from the token
+   (`THREADS_USER_ID` is only needed to override it).
+5. Portal > Social Posting > Threads: **Preview the next posts**, then **Start posting**.
+
+The token lasts 60 days. The app keeps its own copy and **renews it itself** once it is within 20 days of ending (Threads only renews a long-lived token that is more
+than a day old); the screen shows when it ends. If it cannot be renewed the screen says why, and the current token keeps working until it ends. A new token put in
+`.env` replaces the app's copy. If the generator gives a short-lived token (about an hour), exchange it for a long-lived one first
+(`GET https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=<app secret>&access_token=<short token>`).
+
+Taking a Threads post down from the screen uses Threads' delete call; if Threads refuses it (it needs its delete permission), delete the post in the Threads app.
+
 ## Not built yet
 
-- **Threads.** The same posts to Threads need the Threads API added to the Meta app and the Threads account authorised once (Threads uses its own login,
-  with `threads_content_publish`); the engine is built around channels so it is an addition, not a rewrite.
 - **Instagram.** The token has `instagram_content_publish`; not connected here.
 - Several photos per post (only the first photo is used), and choosing by sales rather than stock.
