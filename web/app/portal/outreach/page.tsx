@@ -32,7 +32,7 @@ type HistoryRow = {
   triggeredBy: string; createdAt: string; customer?: { firstName: string; lastName: string } | null;
 };
 
-type ContactStats = { subscribed: number; stopped: number; trade: number; inSequence: number; finished: number; autoSubscribe: boolean };
+type ContactStats = { subscribed: number; stopped: number; trade: number; inSequence: number; finished: number; inMautic: number; mauticFailing: number; autoSubscribe: boolean };
 type Contact = {
   id: string; phone: string; name: string | null; adHeadline: string | null; subscribed: boolean; unsubscribedReason: string | null;
   nextStep: number; nextStepAt: string | null; lastMessageAt: string; noticeSentAt: string | null;
@@ -352,6 +352,7 @@ export default function OutreachPage() {
                   <div className="portal-stat"><span>Subscribed</span><h3>{contactStats.subscribed}</h3><span className="portal-stat-note">{contactStats.inSequence} still getting messages, {contactStats.finished} finished</span></div>
                   <div className="portal-stat"><span>Replied STOP</span><h3>{contactStats.stopped}</h3></div>
                   <div className="portal-stat"><span>Trade contacts</span><h3>{contactStats.trade}</h3><span className="portal-stat-note">Never messaged</span></div>
+                  <div className="portal-stat"><span>In Mautic</span><h3>{contactStats.inMautic}</h3><span className="portal-stat-note">{contactStats.mauticFailing ? `${contactStats.mauticFailing} could not be sent yet, retrying` : 'Tagged whatsapp-subscriber or whatsapp-unsubscribed'}</span></div>
                 </div>
                 {contacts.length === 0 ? <div className="portal-empty-state">Nobody has messaged yet.</div> : (
                   <div className="portal-table-wrap">

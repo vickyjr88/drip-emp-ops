@@ -74,6 +74,73 @@ export class MauticService {
     }
   }
 
+  /** Like request(), but hands back the status and the parsed body, so a caller can tell a missing contact (404) from an outage. */
+  private async call(path: string, init: RequestInit): Promise<{ status: number; body: any } | null> {
+    const token = await this.getAccessToken();
+    if (!token) return null;
+    try {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        ...init,
+        headers: { ...init.headers, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok && response.status !== 404) this.logger.warn(`Mautic API ${path} returned ${response.status}: ${JSON.stringify(body)?.slice(0, 300)}`);
+      return { status: response.status, body };
+    } catch (error) {
+      this.logger.warn(`Mautic API ${path} request failed: ${error instanceof Error ? error.message : error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Puts a person who messaged the shop on WhatsApp into Mautic, with tags that say whether they are subscribed. It does not
+   * enrol them in any campaign: the app sends their onboarding messages itself, and a campaign would send them twice.
+   *
+   * Which Mautic contact it is: the one already known (`contactId`); else the customer's, by email (Mautic merges on email);
+   * else one with the same mobile number; else a new contact with just the number and the name WhatsApp gave. A contact that
+   * already has a name keeps it: a WhatsApp profile name is whatever the person typed there.
+   */
+  async syncWhatsappContact(params: {
+    contactId?: number | null;
+    email?: string | null;
+    mobile: string;
+    name?: string | null;
+    addTags: string[];
+    removeTags: string[];
+  }): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+    if (!this.configured) return { ok: false, error: 'Mautic is not configured' };
+    const tags = [...params.addTags, ...params.removeTags.map((t) => `-${t}`)];
+    const idOf = (r: { body: any } | null) => Number(r?.body?.contact?.id) || null;
+    const fail = (r: { status: number; body: any } | null) => ({ ok: false as const, error: r ? `Mautic answered ${r.status}` : 'Mautic could not be reached' });
+
+    if (params.contactId) {
+      const edited = await this.call(`/api/contacts/${params.contactId}/edit`, { method: 'PATCH', body: JSON.stringify({ tags }) });
+      if (edited && edited.status < 300 && idOf(edited)) return { ok: true, id: idOf(edited)! };
+      // Deleted in Mautic since: fall through and find or make it again. Any other failure is not guessed around.
+      if (!edited || edited.status !== 404) return fail(edited);
+    }
+
+    if (params.email) {
+      const made = await this.call(`/api/contacts/new`, { method: 'POST', body: JSON.stringify({ email: params.email.trim().toLowerCase(), tags, overwriteWithBlank: false }) });
+      return made && made.status < 300 && idOf(made) ? { ok: true, id: idOf(made)! } : fail(made);
+    }
+
+    const found = await this.call(`/api/contacts?search=${encodeURIComponent(`mobile:${params.mobile}`)}&limit=1`, { method: 'GET' });
+    if (!found || found.status >= 300) return fail(found);
+    const existing = Object.values(found.body?.contacts ?? {})[0] as { id?: number } | undefined;
+    if (existing?.id) {
+      const edited = await this.call(`/api/contacts/${existing.id}/edit`, { method: 'PATCH', body: JSON.stringify({ tags }) });
+      return edited && edited.status < 300 ? { ok: true, id: existing.id } : fail(edited);
+    }
+
+    const [firstName, ...rest] = (params.name ?? '').trim().split(/\s+/).filter(Boolean);
+    const created = await this.call(`/api/contacts/new`, {
+      method: 'POST',
+      body: JSON.stringify({ mobile: params.mobile, ...(firstName ? { firstname: firstName } : {}), ...(rest.length ? { lastname: rest.join(' ') } : {}), tags: params.addTags, overwriteWithBlank: false }),
+    });
+    return created && created.status < 300 && idOf(created) ? { ok: true, id: idOf(created)! } : fail(created);
+  }
+
   /**
    * Creates or updates the contact by email (Mautic's own create-or-update
    * semantics for this endpoint), tags it, and enrolls it into the

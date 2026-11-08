@@ -158,14 +158,16 @@ export class WhatsappContactsService {
   }
 
   async stats() {
-    const [subscribed, stopped, trade, waiting, finished] = await Promise.all([
+    const [subscribed, stopped, trade, waiting, finished, inMautic, mauticFailing] = await Promise.all([
       this.prisma.whatsappContact.count({ where: { subscribed: true } }),
       this.prisma.whatsappContact.count({ where: { unsubscribedReason: 'STOP' } }),
       this.prisma.whatsappContact.count({ where: { unsubscribedReason: 'TRADE' } }),
       this.prisma.whatsappContact.count({ where: { subscribed: true, nextStep: { lt: SEQUENCE.length } } }),
       this.prisma.whatsappContact.count({ where: { subscribed: true, nextStep: { gte: SEQUENCE.length } } }),
+      this.prisma.whatsappContact.count({ where: { mauticContactId: { not: null } } }),
+      this.prisma.whatsappContact.count({ where: { mauticError: { not: null } } }),
     ]);
-    return { subscribed, stopped, trade, inSequence: waiting, finished, autoSubscribe: autoSubscribeEnabled() };
+    return { subscribed, stopped, trade, inSequence: waiting, finished, inMautic, mauticFailing, autoSubscribe: autoSubscribeEnabled() };
   }
 
   list(query: { skip?: number; take?: number; search?: string }) {

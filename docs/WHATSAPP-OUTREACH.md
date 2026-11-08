@@ -116,6 +116,30 @@ notice and then 2 and 3 days apart (`WHATSAPP_SEQUENCE_DELAYS_HOURS=24,48,72`): 
   "Recent messages". Until now a message Meta *accepted* was shown as sent whether or not it arrived.
 - **See and stop it:** Portal > WhatsApp Outreach > "People who messaged us", with a button to unsubscribe someone who asked another way.
 
+### Mautic
+
+Everyone in "People who messaged us" is also pushed into Mautic (`WhatsappMauticSyncService`, every ten minutes), so the same people can be
+reached by email or segmented there:
+
+| Tag | Meaning |
+|---|---|
+| `whatsapp-contact` | Wrote to the shop's WhatsApp number (everyone synced) |
+| `whatsapp-subscriber` | Subscribed (removed on STOP, back on START) |
+| `whatsapp-unsubscribed` | Replied STOP, or was unsubscribed in the portal |
+| `whatsapp-ad` | Their first message came from a click-to-WhatsApp ad |
+
+- **Which Mautic contact.** A customer with that number (matched on the last nine digits) is tagged on their own contact, found by email, and keeps
+  their name and details. Otherwise a contact with the same mobile number is reused, else a new one is made with the mobile number (`+254...`) and
+  the name WhatsApp gave. Nobody is enrolled in a campaign: the app sends the onboarding messages itself, and a campaign would send them twice.
+- **Resellers, wholesalers and suppliers** are not sent to Mautic.
+- **STOP is a tag, not a Mautic "do not contact".** Email marketing is a separate consent, so a WhatsApp STOP does not stop emails. Build WhatsApp
+  segments from `whatsapp-subscriber`; a segment of `whatsapp-unsubscribed` is the suppression list.
+- **How it stays current.** A contact is pushed when it is new or has changed since (`mauticSyncedAt` older than `updatedAt`), and only calls Mautic
+  when its tags changed. A Mautic outage only delays it; a failure is shown on the Outreach screen ("In Mautic") and retried after 15 minutes.
+  `MAUTIC_WHATSAPP_SYNC=false` switches it off. It needs the same `MAUTIC_BASE_URL` / `MAUTIC_CLIENT_ID` / `MAUTIC_CLIENT_SECRET` as the signup sync.
+- **Deploying it** adds five columns to `WhatsappContact` (migration `20261113090000_add_whatsapp_contact_mautic_sync`); the people who have already
+  messaged are pushed within about twelve minutes of the new backend starting.
+
 ### Setting it up
 
 1. Set `WHATSAPP_WEBHOOK_SECRET` in the server `.env` to a long random string and deploy. Optionally set `WHATSAPP_APP_SECRET`.

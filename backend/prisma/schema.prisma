@@ -2464,6 +2464,13 @@ model WhatsappContact {
   failures       Int       @default(0)
   firstMessageAt DateTime  @default(now())
   lastMessageAt  DateTime  @default(now())
+  /// The same person in Mautic. mauticSyncedAt equal to updatedAt means Mautic is up to date; a later updatedAt (or none)
+  /// means the row changed since and WhatsappMauticSyncService will push it. mauticTags is what Mautic was last told.
+  mauticContactId Int?
+  mauticSyncedAt  DateTime?
+  mauticTags      String?
+  mauticTriedAt   DateTime?
+  mauticError     String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

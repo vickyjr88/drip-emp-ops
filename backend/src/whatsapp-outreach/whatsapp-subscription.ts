@@ -151,3 +151,28 @@ export function startOfNairobiDay(now: Date): Date {
   const local = new Date(now.getTime() + EAT_MS);
   return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - EAT_MS);
 }
+
+
+/** The Mautic tags that say where a WhatsApp contact stands. Segments in Mautic are built from these. */
+export const MAUTIC_TAGS = {
+  contact: 'whatsapp-contact',
+  subscriber: 'whatsapp-subscriber',
+  unsubscribed: 'whatsapp-unsubscribed',
+  ad: 'whatsapp-ad',
+} as const;
+
+/**
+ * What Mautic should be told about a WhatsApp contact: tags to add and to remove, and a signature of them, so a contact whose
+ * tags have not changed is not sent again. Resellers, wholesalers and suppliers (TRADE) are not synced: they write to the
+ * shop for business and must not land in a marketing list. Null means "do not sync".
+ */
+export function mauticPlan(contact: { subscribed: boolean; unsubscribedReason: string | null; adSourceId: string | null }): { add: string[]; remove: string[]; signature: string } | null {
+  if (contact.unsubscribedReason === 'TRADE') return null;
+  const add: string[] = [MAUTIC_TAGS.contact, contact.subscribed ? MAUTIC_TAGS.subscriber : MAUTIC_TAGS.unsubscribed];
+  if (contact.adSourceId) add.push(MAUTIC_TAGS.ad);
+  const remove = [contact.subscribed ? MAUTIC_TAGS.unsubscribed : MAUTIC_TAGS.subscriber];
+  return { add, remove, signature: `+${add.join(',')}|-${remove.join(',')}` };
+}
+
+/** The number as Mautic's mobile field holds it: +254712345678. */
+export const mauticMobile = (phone: string) => `+${phone.replace(/\D/g, '')}`;
