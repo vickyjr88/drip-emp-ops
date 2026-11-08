@@ -32,6 +32,14 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * Manual WhatsApp outreach: staff pick customers and one of three approved templates, and this sends it through the
  * Cloud API. A customer who already received a given message is skipped unless the caller forces it.
  */
+/**
+ * A message counts as received when WhatsApp accepted it and has not reported that it failed. Accepted is not arrived: Meta
+ * accepts a message and later reports it undeliverable (a number not on WhatsApp, an account payment problem). Counting those
+ * as received would mean the person is never sent it again, however many times the cause is fixed. A message with no report
+ * yet counts as received, so it is not sent twice while the report is still on its way.
+ */
+export const RECEIVED: Prisma.WhatsappOutreachWhereInput = { status: 'SENT', OR: [{ delivery: null }, { delivery: { not: 'failed' } }] };
+
 @Injectable()
 export class WhatsAppOutreachService {
   private readonly logger = new Logger(WhatsAppOutreachService.name);
@@ -99,7 +107,7 @@ export class WhatsAppOutreachService {
 
     const sent = await this.prisma.whatsappOutreach.groupBy({
       by: ['customerId', 'kind'],
-      where: { customerId: { in: page.items.map((c) => c.id) }, status: 'SENT' },
+      where: { customerId: { in: page.items.map((c) => c.id) }, ...RECEIVED },
       _max: { createdAt: true },
     });
     const lastSent = new Map<string, Partial<Record<OutreachKind, Date>>>();
@@ -117,7 +125,7 @@ export class WhatsAppOutreachService {
     const where: Prisma.CustomerWhereInput = {
       isActive: true,
       phone: { not: '' },
-      whatsappOutreach: { none: { kind, status: 'SENT' } },
+      whatsappOutreach: { none: { kind, ...RECEIVED } },
       ...searchOr(search, (term) => containsAny(['firstName', 'lastName', 'email', 'phone'], term)),
     };
     const rows = await this.prisma.customer.findMany({
@@ -149,7 +157,7 @@ export class WhatsAppOutreachService {
       : new Set(
           (
             await this.prisma.whatsappOutreach.findMany({
-              where: { customerId: { in: ids }, kind: params.kind, status: 'SENT' },
+              where: { customerId: { in: ids }, kind: params.kind, ...RECEIVED },
               select: { customerId: true },
             })
           ).map((r) => r.customerId as string),
@@ -241,7 +249,7 @@ export class WhatsAppOutreachService {
     const phone = this.whatsapp.normalisePhone(params.phone);
     if (!phone) return { outcome: 'SKIPPED', detail: 'No usable phone number' };
     if (await this.repliedStop(phone)) return { outcome: 'SKIPPED', detail: 'Replied STOP' };
-    if (await this.prisma.whatsappOutreach.findFirst({ where: { phone, kind: params.kind, status: 'SENT' }, select: { id: true } })) {
+    if (await this.prisma.whatsappOutreach.findFirst({ where: { phone, kind: params.kind, ...RECEIVED }, select: { id: true } })) {
       return { outcome: 'SKIPPED', detail: 'Already sent' };
     }
     const link = hasVariables(params.kind) ? (await this.links())[params.kind] : null;

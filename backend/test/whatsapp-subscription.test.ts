@@ -373,3 +373,33 @@ db('the WhatsApp report counts chats, opt-outs, onboarding, delivery, failures, 
     await prisma.$disconnect();
   }
 });
+
+// --- accepted is not arrived ------------------------------------------------------------------------------------------
+
+db('a message Meta accepted but later reported as failed does not count as received: the person is offered it again', async () => {
+  const w = await world();
+  try {
+    const mk = (n: number) => w.prisma.customer.create({ data: { firstName: `Out${n}`, lastName: 'Reach', email: `wa-test-out${n}-${Date.now()}@example.test`, phone: `+${PREFIX}0020${n}` } });
+    const [failed, read, pending, never] = await Promise.all([mk(1), mk(2), mk(3), mk(4)]);
+    const log = (c: { id: string; phone: string }, delivery: string | null, i: number) => w.prisma.whatsappOutreach.create({ data: { customerId: c.id, phone: c.phone.replace('+', ''), kind: 'APP', template: 't', status: 'SENT', delivery, messageId: `wamid.TEST${i}`, triggeredBy: 't' } });
+    await log(failed, 'failed', 1); await log(read, 'read', 2); await log(pending, null, 3);
+
+    const ids = (await w.outreach.unsentIds('APP', 'Reach')).ids;
+    // Only the one whose message failed to arrive, and the one never sent to, are still owed it.
+    assert.deepEqual(new Set(ids), new Set([failed.id, never.id]));
+
+    const out = await w.outreach.send({ kind: 'APP', customerIds: [failed.id, read.id, pending.id], triggeredBy: 't' });
+    assert.deepEqual([out.sent, out.skipped], [1, 2]);
+    assert.equal(out.results.find((r) => r.customerId === failed.id)!.outcome, 'SENT');
+    assert.deepEqual(out.results.filter((r) => r.outcome === 'SKIPPED').map((r) => r.detail), ['Already sent', 'Already sent']);
+
+    // The same rule for a number that is not a customer.
+    assert.deepEqual(await w.outreach.sendToPhone({ kind: 'APP', phone: `${PREFIX}00205`, triggeredBy: 't' }), { outcome: 'SENT' });
+    await w.prisma.whatsappOutreach.updateMany({ where: { phone: `${PREFIX}00205` }, data: { delivery: 'failed' } });
+    assert.deepEqual(await w.outreach.sendToPhone({ kind: 'APP', phone: `${PREFIX}00205`, triggeredBy: 't' }), { outcome: 'SENT' });
+  } finally {
+    await w.prisma.customer.deleteMany({ where: { email: { startsWith: 'wa-test-out' } } });
+    await w.cleanup();
+    await w.prisma.$disconnect();
+  }
+});

@@ -46,7 +46,7 @@ These are read the way the website reads them, with the defaults filling anythin
 
 ## Behaviour
 
-- A customer who already **received** a message is skipped unless "Send again" is ticked. A failed attempt does not count, so it can be retried.
+- A customer who already **received** a message is skipped unless "Send again" is ticked. A failed attempt does not count, so it can be retried. Neither does a message Meta accepted and later **reported as failed** (a number not on WhatsApp, an account payment problem): they stay on the list for the next send once the cause is fixed. One with no report yet counts as received.
 - Inactive customers and customers with an unusable phone number are skipped.
 - Every attempt is recorded in `WhatsappOutreach` (who, which message, who sent it, the result) and listed under "Recent messages".
 - "Sent" means Meta accepted the message, not that the phone received it. A rejection (template not approved, number not on
