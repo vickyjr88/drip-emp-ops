@@ -82,7 +82,7 @@ export function InsightsView() {
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [days, setDays] = useState(30);
-  const [tab, setTab] = useState<'visits' | 'stock' | 'customers'>('visits');
+  const [tab, setTab] = useState<'visits' | 'whatsapp' | 'stock' | 'customers'>('visits');
 
   useEffect(() => {
     const saved = window.localStorage.getItem(TOKEN_KEY);
@@ -123,10 +123,11 @@ export function InsightsView() {
 
   const can = {
     visits: hasPermission(profile, 'marketing-campaign.read'),
+    whatsapp: hasPermission(profile, 'marketing-campaign.read'),
     stock: hasPermission(profile, 'journal-entry.read'),
     customers: hasPermission(profile, 'customer.read'),
   };
-  const tabs = ([['visits', 'Visits & ads'], ['stock', 'Products & stock'], ['customers', 'Customers']] as const).filter(([key]) => can[key]);
+  const tabs = ([['visits', 'Visits & ads'], ['whatsapp', 'WhatsApp'], ['stock', 'Products & stock'], ['customers', 'Customers']] as const).filter(([key]) => can[key]);
   const active = can[tab] ? tab : tabs[0]?.[0];
 
   return (
@@ -164,6 +165,7 @@ export function InsightsView() {
                   </label>
                 </div>
                 {active === 'visits' ? <VisitsTab token={token} profile={profile} from={from} to={to} /> : null}
+                {active === 'whatsapp' ? <WhatsappTab token={token} from={from} to={to} /> : null}
                 {active === 'stock' ? <StockTab token={token} from={from} to={to} /> : null}
                 {active === 'customers' ? <CustomersTab token={token} from={from} to={to} /> : null}
               </>
@@ -396,6 +398,118 @@ function AdSpendForm({ token, profile, from, to, onChanged }: { token: string; p
         </div>
       ) : null}
     </div>
+  );
+}
+
+type WhatsappReport = {
+  contacts: { total: number; newInPeriod: number; fromAds: number; subscribed: number; stopped: number; trade: number; notTold: number; stopRate: number; daily: Array<{ date: string; chats: number; fromAds: number }> };
+  onboarding: { waitingForApp: number; waitingForGroup: number; waitingForRating: number; finished: number; gaveUp: number };
+  messages: {
+    templates: Array<{ kind: string; sent: number; failedToSend: number; delivered: number; read: number; notDelivered: number; awaiting: number }>;
+    dailyReports: { sent: number; delivered: number; read: number; notDelivered: number; awaiting: number; failedToSend: number };
+    arrivedRate: number | null; checked: number; topFailures: Array<{ reason: string; count: number }>;
+  };
+  ads: Array<{ adSourceId: string | null; headline: string | null; chats: number; stopped: number; orders: number; revenueKes: number }>;
+  chatsToOrders: { chats: number; buyers: number; orders: number; revenueKes: number };
+};
+const KIND_NAME: Record<string, string> = { APP: 'Download the app', GROUP: 'Join the group', REVIEW: 'Rate us on Google', GOOGLE_REVIEW: 'Google review (full)', SHOE_RANGE: 'Our range of shoes', LOCATION: 'Where to find us' };
+
+/** WhatsApp: who messaged the shop and from which ad, who opted out, what was sent and whether it arrived, and which chats became orders. */
+function WhatsappTab({ token, from, to }: { token: string; from: string; to: string }) {
+  const w = useReport<WhatsappReport>(`/insights/whatsapp?from=${from}&to=${to}`, token);
+  if (w === undefined) return <article className="portal-card"><p className="portal-muted">Loading...</p></article>;
+  if (w === null) return <article className="portal-card portal-error">Could not load the WhatsApp report.</article>;
+
+  const c = w.contacts;
+  const notes: string[] = [];
+  if (c.notTold > 0) notes.push(`${c.notTold} subscribed ${c.notTold === 1 ? 'person has' : 'people have'} not been told yet that updates are coming, so no messages go to them until the notice is sent. It is sent the next time they write to you.`);
+  if (c.subscribed + c.stopped >= 20 && c.stopRate > 0.1) notes.push(`${rate(c.stopRate)} of people have replied STOP. Above about 10% the messages are putting people off, and blocks and reports lower the number's quality rating. Look at what is being sent and when.`);
+  if (w.messages.arrivedRate !== null && w.messages.checked >= 10 && w.messages.arrivedRate < 0.8) notes.push(`Only ${rate(w.messages.arrivedRate)} of messages that have a delivery report arrived. See the reasons below.`);
+  if (w.onboarding.gaveUp > 0) notes.push(`${w.onboarding.gaveUp} ${w.onboarding.gaveUp === 1 ? 'number was' : 'numbers were'} given up on after repeated failures (usually a number not on WhatsApp).`);
+
+  return (
+    <>
+      <article className="portal-card" style={{ marginBottom: 20 }}>
+        <h2 style={{ marginTop: 0 }}>Chats and subscribers</h2>
+        <p className="portal-muted" style={{ marginTop: 0 }}>People who messaged the shop&apos;s WhatsApp number in this period, and where everyone stands overall.</p>
+        <div className="portal-stat-grid">
+          <div className="portal-stat"><span>New chats</span><h3>{c.newInPeriod}</h3><span className="portal-stat-note">{c.fromAds} from an ad</span></div>
+          <div className="portal-stat"><span>Subscribed</span><h3>{c.subscribed}</h3><span className="portal-stat-note">of {c.total} who ever wrote</span></div>
+          <div className="portal-stat"><span>Replied STOP</span><h3>{c.stopped}</h3><span className="portal-stat-note">{rate(c.stopRate)} of those who could stay</span></div>
+          <div className="portal-stat"><span>Became buyers</span><h3>{w.chatsToOrders.buyers}</h3><span className="portal-stat-note">{w.chatsToOrders.orders} order{w.chatsToOrders.orders === 1 ? '' : 's'}, {kes(w.chatsToOrders.revenueKes)}</span></div>
+        </div>
+        {notes.length ? <ul style={{ margin: '12px 0 0', paddingLeft: 18 }}>{notes.map((n) => <li key={n}>{n}</li>)}</ul> : null}
+        <p className="portal-muted" style={{ fontSize: 13, marginBottom: 0 }}>
+          A chat counts as a buyer when the same phone number placed an order after its first message (in any spelling). Orders agreed under another number are not counted. {c.trade ? `${c.trade} trade contact${c.trade === 1 ? '' : 's'} (resellers, wholesalers, suppliers) are never messaged and not counted as chats to market to.` : ''}
+        </p>
+      </article>
+
+      <article className="portal-card" style={{ marginBottom: 20 }}>
+        <h2 style={{ marginTop: 0 }}>Which ads brought chats</h2>
+        {w.ads.length === 0 ? <p className="portal-muted">No chats in this period.</p> : (
+          <div className="portal-table-wrap">
+            <table className="portal-data-table">
+              <thead><tr><th>Ad</th><th>Chats</th><th>Replied STOP</th><th>Became orders</th><th>Sales</th></tr></thead>
+              <tbody>
+                {w.ads.map((a) => (
+                  <tr key={a.adSourceId ?? 'none'}>
+                    <td>{a.adSourceId ? <>{a.headline || 'Ad'} <span className="portal-muted">#{a.adSourceId}</span></> : <span className="portal-muted">Not from an ad</span>}</td>
+                    <td>{a.chats}</td><td>{a.stopped}</td><td>{a.orders}</td><td>{kes(a.revenueKes)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="portal-muted" style={{ fontSize: 13, marginBottom: 0 }}>Ads that open WhatsApp (click-to-WhatsApp) send their details with the first message. Tell the ad platform to send people to WhatsApp, and they appear here.</p>
+      </article>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginBottom: 20 }}>
+        <article className="portal-card">
+          <h2 style={{ marginTop: 0 }}>Where subscribers are in the messages</h2>
+          <div className="portal-table-wrap">
+            <table className="portal-data-table">
+              <tbody>
+                <tr><td>Waiting for the app message</td><td>{w.onboarding.waitingForApp}</td></tr>
+                <tr><td>Waiting for the group message</td><td>{w.onboarding.waitingForGroup}</td></tr>
+                <tr><td>Waiting for the rating request</td><td>{w.onboarding.waitingForRating}</td></tr>
+                <tr><td>Finished all three</td><td>{w.onboarding.finished}</td></tr>
+                <tr><td>Given up on (kept failing)</td><td>{w.onboarding.gaveUp}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+        <article className="portal-card">
+          <h2 style={{ marginTop: 0 }}>Why messages failed</h2>
+          {w.messages.topFailures.length === 0 ? <p className="portal-muted">No failures reported by WhatsApp in this period.</p> : (
+            <div className="portal-table-wrap">
+              <table className="portal-data-table">
+                <thead><tr><th>Reason WhatsApp gave</th><th>Messages</th></tr></thead>
+                <tbody>{w.messages.topFailures.map((f) => <tr key={f.reason}><td>{f.reason}</td><td>{f.count}</td></tr>)}</tbody>
+              </table>
+            </div>
+          )}
+        </article>
+      </div>
+
+      <article className="portal-card">
+        <h2 style={{ marginTop: 0 }}>What was sent, and did it arrive</h2>
+        <p className="portal-muted" style={{ marginTop: 0 }}>
+          {w.messages.arrivedRate === null ? 'No delivery reports yet.' : `${rate(w.messages.arrivedRate)} of the ${w.messages.checked} messages with a delivery report arrived.`} &ldquo;Waiting&rdquo; means WhatsApp accepted it and has not said yet.
+        </p>
+        <div className="portal-table-wrap">
+          <table className="portal-data-table">
+            <thead><tr><th>Message</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Not delivered</th><th>Waiting</th><th>Could not send</th></tr></thead>
+            <tbody>
+              {w.messages.templates.map((t) => (
+                <tr key={t.kind}><td>{KIND_NAME[t.kind] ?? t.kind}</td><td>{t.sent}</td><td>{t.delivered}</td><td>{t.read}</td><td>{t.notDelivered}</td><td>{t.awaiting}</td><td>{t.failedToSend}</td></tr>
+              ))}
+              <tr><td>Daily report</td><td>{w.messages.dailyReports.sent}</td><td>{w.messages.dailyReports.delivered}</td><td>{w.messages.dailyReports.read}</td><td>{w.messages.dailyReports.notDelivered}</td><td>{w.messages.dailyReports.awaiting}</td><td>{w.messages.dailyReports.failedToSend}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </>
   );
 }
 

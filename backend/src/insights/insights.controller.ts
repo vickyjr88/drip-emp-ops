@@ -6,6 +6,7 @@ import { AdSpendInput, AdSpendService } from './ad-spend.service';
 import { BuyersService } from './buyers.service';
 import { FunnelService } from './funnel.service';
 import { StockService } from './stock.service';
+import { WhatsappReportService } from './whatsapp-report.service';
 
 const DAY = 24 * 3600_000;
 
@@ -28,6 +29,7 @@ export class InsightsController {
     private adSpend: AdSpendService,
     private stockService: StockService,
     private buyersService: BuyersService,
+    private whatsappReport: WhatsappReportService,
   ) {}
 
   /** Visits to orders: the funnel by source and device, what ads return, and the products people look at. */
@@ -63,6 +65,14 @@ export class InsightsController {
   stock(@Query('from') from?: string, @Query('to') to?: string, @Query('deadDays') deadDays?: string) {
     const w = periodOf(from, to);
     return this.stockService.stock(w.start, w.end, clampDays(deadDays));
+  }
+
+  /** WhatsApp: who messaged, from which ad, who opted out, what was sent and arrived, and which chats became orders. */
+  @Get('whatsapp')
+  @Permissions(buildPermissionKey('MarketingCampaign', 'read'))
+  whatsapp(@Query('from') from?: string, @Query('to') to?: string) {
+    const w = periodOf(from, to);
+    return this.whatsappReport.report(w.start, w.end);
   }
 
   /** Who buys, who comes back, and who has gone quiet. */

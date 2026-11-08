@@ -303,3 +303,73 @@ db('the webhook address carries a secret: wrong or unset means no such endpoint,
     await w.cleanup(); await w.prisma.$disconnect();
   }
 });
+
+// --- the WhatsApp report -------------------------------------------------------------------------------------------
+
+import { WhatsappReportService } from '../src/insights/whatsapp-report.service';
+
+db('the WhatsApp report counts chats, opt-outs, onboarding, delivery, failures, and the chats that became orders (matched across phone spellings)', async () => {
+  const prisma = new PrismaClient({ datasources: { db: { url } } });
+  await prisma.$connect();
+  const cleanup = async () => {
+    await prisma.whatsappOutreach.deleteMany({ where: { phone: { startsWith: PREFIX } } });
+    await prisma.whatsappContact.deleteMany({ where: { phone: { startsWith: PREFIX } } });
+    await prisma.whatsappMessageStatus.deleteMany({ where: { messageId: { startsWith: 'wamid.TESTREP' } } });
+    await prisma.dailyReportRun.deleteMany({ where: { reportDate: '2099-01-02' } });
+    await prisma.order.deleteMany({ where: { orderNumber: { startsWith: 'WAREP' } } });
+    await prisma.store.deleteMany({ where: { code: 'WAREP' } });
+  };
+  await cleanup();
+  try {
+    const now = new Date();
+    const hourLater = new Date(now.getTime() + HOUR);
+    const mk = (n: number, over: any = {}) => prisma.whatsappContact.create({ data: { phone: `${PREFIX}0010${n}`, name: `P${n}`, noticeSentAt: now, ...over } });
+    await mk(1, { adSourceId: 'AD1', adHeadline: 'Puma Roma' });
+    await mk(2, { adSourceId: 'AD1', adHeadline: 'Puma Roma', subscribed: false, unsubscribedReason: 'STOP' });
+    await mk(3, { nextStep: 3 });
+    await mk(4, { subscribed: false, unsubscribedReason: 'TRADE' });
+    await mk(5, { adSourceId: 'AD2', adHeadline: 'Air Max', noticeSentAt: null });
+
+    const store = await prisma.store.create({ data: { code: 'WAREP', name: 'Report test' } });
+    const order = (n: number, phone: string, over: any = {}) => prisma.order.create({
+      data: { orderNumber: `WAREP-${n}`, storeId: store.id, customerPhone: phone, status: 'PAID', channel: 'WEBSITE', subtotal: 1, total: 1, placedAt: hourLater, ...over },
+    });
+    await order(1, '0799000101', { total: 5000 });                                   // 0xxx spelling, after the first message: counts
+    await order(2, `+${PREFIX}00103`, { total: 3000, status: 'PENDING' });           // +254 spelling: counts
+    await order(3, '0799000102', { total: 900, status: 'CANCELLED' });               // cancelled: never counts
+    await order(4, '0799000104', { total: 700, placedAt: new Date(now.getTime() - 24 * HOUR) }); // before they ever wrote: not theirs
+
+    const out = (kind: string, status: string, delivery: string | null, n: number) => prisma.whatsappOutreach.create({ data: { phone: `${PREFIX}0010${n}`, kind, template: 't', status, delivery, triggeredBy: 't', messageId: `wamid.TESTREP${kind}${n}` } });
+    await out('APP', 'SENT', 'read', 1); await out('APP', 'SENT', 'delivered', 3); await out('APP', 'SENT', null, 5);
+    await out('GROUP', 'SENT', 'failed', 1); await out('GROUP', 'FAILED', null, 2);
+    await prisma.dailyReportRun.create({ data: { reportDate: '2099-01-02', channel: 'WHATSAPP', recipient: `${PREFIX}00109`, status: 'SENT', delivery: 'read' } });
+    for (const id of ['wamid.TESTREP1', 'wamid.TESTREP2']) await prisma.whatsappMessageStatus.create({ data: { messageId: id, recipient: `${PREFIX}00101`, status: 'failed', errorCode: '131026', errorTitle: 'Message undeliverable', occurredAt: now } });
+
+    const r = await new WhatsappReportService(prisma as any).report(new Date(now.getTime() - 24 * HOUR), new Date(now.getTime() + 2 * HOUR));
+
+    const c = r.contacts;
+    assert.deepEqual([c.total, c.newInPeriod, c.fromAds, c.subscribed, c.stopped, c.trade, c.notTold], [5, 5, 3, 3, 1, 1, 1]);
+    assert.equal(c.stopRate, 0.25);
+    assert.equal(c.daily.reduce((n, d) => n + d.chats, 0), 5);
+    assert.deepEqual(r.onboarding, { waitingForApp: 2, waitingForGroup: 0, waitingForRating: 0, finished: 1, gaveUp: 0 });
+
+    const app = r.messages.templates.find((t) => t.kind === 'APP')!;
+    assert.deepEqual([app.sent, app.read, app.delivered, app.awaiting, app.notDelivered, app.failedToSend], [3, 1, 1, 1, 0, 0]);
+    const group = r.messages.templates.find((t) => t.kind === 'GROUP')!;
+    assert.deepEqual([group.sent, group.notDelivered, group.failedToSend], [1, 1, 1]);
+    assert.deepEqual([r.messages.dailyReports.sent, r.messages.dailyReports.read], [1, 1]);
+    // 4 messages have a delivery report; 3 of them arrived.
+    assert.deepEqual([r.messages.checked, r.messages.arrivedRate], [4, 0.75]);
+    assert.deepEqual(r.messages.topFailures, [{ reason: 'Message undeliverable', count: 2 }]);
+
+    const ad1 = r.ads.find((a) => a.adSourceId === 'AD1')!;
+    assert.deepEqual([ad1.headline, ad1.chats, ad1.stopped, ad1.orders, ad1.revenueKes], ['Puma Roma', 2, 1, 1, 5000]);
+    assert.deepEqual(r.ads.find((a) => a.adSourceId === 'AD2')!.chats, 1);
+    const organic = r.ads.find((a) => a.adSourceId === null)!;
+    assert.deepEqual([organic.chats, organic.orders, organic.revenueKes], [2, 1, 3000]);
+    assert.deepEqual(r.chatsToOrders, { chats: 5, buyers: 2, orders: 2, revenueKes: 8000 });
+  } finally {
+    await cleanup();
+    await prisma.$disconnect();
+  }
+});

@@ -30,6 +30,12 @@ an order staff create from a WhatsApp lead takes the visit from the lead. Cancel
   per order, sales per KES 1); products people look at against what sells; what people search for. Ad spend is entered here
   (`AdSpend`, one line per day and platform) and set against visits tagged as ads or carrying an ad click id.
   Campaign and reseller links (`?camp=`, `?ref=`) keep their own reporting under Campaigns.
+- **WhatsApp** (`GET /insights/whatsapp`, `marketing-campaign.read`): new chats and how many came from an ad, subscribed, replied STOP
+  (with the STOP rate), and how many became buyers; a table of which ads brought chats and which of those people went on to order
+  (matched by phone number, in any spelling, against orders placed after the first message); where subscribers are in the app,
+  group and rating messages; what was sent by message type and whether it arrived (delivered, read, not delivered, waiting, could not
+  send, from Meta's delivery reports); and the reasons Meta gave for failures. It warns when someone has not yet been told about the
+  subscription, when the STOP rate passes about 10%, and when under 80% of reported messages arrive.
 - **Products & stock** (shoes and watches; kits are printed to order and left out): stock at price and at cost; dead stock
   (on the shelf, not sold for 30 to 180 days, valued at cost where known); fast sellers with under two weeks of cover;
   out-of-stock products people still view or ask about on WhatsApp.
