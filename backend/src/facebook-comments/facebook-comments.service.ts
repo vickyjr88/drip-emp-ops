@@ -5,7 +5,7 @@ import { PageContentService } from '../page-content/page-content.service';
 import { paginate } from '../common/pagination.util';
 import { startOfNairobiDay } from '../whatsapp-outreach/whatsapp-subscription';
 import {
-  ALREADY_REPLIED_CODES, DEFAULT_PRIVATE_TEXT, DEFAULT_PUBLIC_TEXT, DEFAULT_SITE_URL, FeedComment, fillTemplate, isReplyToComment,
+  ALREADY_REPLIED_CODES, DEFAULT_PRIVATE_TEXT, DEFAULT_LOCATION, DEFAULT_PUBLIC_TEXT, DEFAULT_SITE_URL, FeedComment, fillTemplate, isReplyToComment,
   isTransientFacebookError, looksLikeSpam,
 } from './facebook-comments';
 
@@ -117,11 +117,13 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
   private async texts() {
     let whatsapp = (process.env.FACEBOOK_REPLY_WHATSAPP || '').replace(/\D/g, '');
     let page = process.env.FACEBOOK_PAGE_URL || '';
-    if (!whatsapp || !page) {
+    let location = process.env.FACEBOOK_REPLY_LOCATION || '';
+    if (!whatsapp || !page || !location) {
       try {
         const [header, footer] = await Promise.all([this.pages.findOne('header'), this.pages.findOne('footer')]);
         if (!whatsapp) whatsapp = String((header.content as any)?.enquiries?.whatsapp ?? '').replace(/\D/g, '');
         if (!page) page = String((footer.content as any)?.social?.facebook ?? '');
+        if (!location) location = String((footer.content as any)?.contact?.address ?? '').trim();
       } catch (error) {
         this.logger.warn(`Could not read the site content for the reply text: ${(error as Error).message}`);
       }
@@ -130,6 +132,7 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
       whatsapp: whatsapp ? `https://wa.me/${whatsapp}` : '',
       page: page || `https://www.facebook.com/${this.pageId}`,
       site: siteUrl(),
+      location: location || DEFAULT_LOCATION,
       privateText: process.env.FACEBOOK_PRIVATE_REPLY_TEXT || DEFAULT_PRIVATE_TEXT,
       publicText: process.env.FACEBOOK_PUBLIC_REPLY_TEXT || DEFAULT_PUBLIC_TEXT,
       publicOn: (process.env.FACEBOOK_PUBLIC_REPLY || 'true') !== 'false',
@@ -180,7 +183,7 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
   private async reply(id: string): Promise<'SENT' | 'RETRY' | 'FAILED' | 'SKIPPED'> {
     const row = await this.prisma.facebookCommentReply.findUniqueOrThrow({ where: { id } });
     const t = await this.texts();
-    const vars = { name: row.fromName, whatsapp: t.whatsapp, page: t.page, site: t.site };
+    const vars = { name: row.fromName, whatsapp: t.whatsapp, page: t.page, site: t.site, location: t.location };
     const attempts = row.attempts + 1;
 
     const sent = await this.privateReply(row.commentId, fillTemplate(t.privateText, vars));

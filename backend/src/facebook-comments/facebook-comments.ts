@@ -42,13 +42,14 @@ export const looksLikeSpam = (message: string | null) => Boolean(message && /(ht
 
 export const firstName = (name: string | null | undefined) => (name || '').trim().split(/\s+/)[0] || '';
 
-/** Fills {name}, {whatsapp}, {page} and {site} in a reply text. A missing name reads "there", and a missing link drops its sentence's link. */
-export function fillTemplate(template: string, vars: { name?: string | null; whatsapp?: string | null; page?: string | null; site?: string | null }): string {
+/** Fills {name}, {whatsapp}, {page}, {site} and {location} in a reply text. A missing name reads "there", and a missing link drops its sentence's link. */
+export function fillTemplate(template: string, vars: { name?: string | null; whatsapp?: string | null; page?: string | null; site?: string | null; location?: string | null }): string {
   return template
     .replace(/\{name\}/g, firstName(vars.name) || 'there')
     .replace(/\{whatsapp\}/g, vars.whatsapp || '')
     .replace(/\{page\}/g, vars.page || '')
     .replace(/\{site\}/g, vars.site || '')
+    .replace(/\{location\}/g, vars.location || '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
@@ -57,7 +58,8 @@ export function fillTemplate(template: string, vars: { name?: string | null; wha
 
 export const DEFAULT_PRIVATE_TEXT =
   "Hi {name}! 👋 Thanks for your interest in Drip Emporium. Reply here with the pair and your size and we'll confirm the price and delivery, or chat to us on WhatsApp: {whatsapp}\n\nFollow our page for new arrivals and offers: {page}";
-export const DEFAULT_PUBLIC_TEXT = "Thanks {name}! 📩 We've sent you a message with the details. Check your Messenger inbox (or Message requests). Shop online: {site}";
+export const DEFAULT_PUBLIC_TEXT = "Thanks {name}! 📩 We've sent you a message with the details. Check your Messenger inbox (or Message requests).\n\nShop online: {site}\n📍 Visit us: {location}";
+export const DEFAULT_LOCATION = 'Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi';
 export const DEFAULT_SITE_URL = 'https://dripemporium.store';
 
 /** Facebook errors that mean "try again later" rather than "this will never work": the service is down, rate limited, or the call timed out. */

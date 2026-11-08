@@ -32,7 +32,7 @@ test('replies to other comments and comments with links are recognised; the text
   assert.match(text, /https:\/\/wa\.me\/254113206481/);
   assert.match(text, /facebook\.com\/dripemporium$/);
   assert.match(fillTemplate('Hi {name}!', { name: null }), /^Hi there!$/);
-  assert.equal(fillTemplate('Shop: {site}', { site: 'https://dripemporium.store' }), 'Shop: https://dripemporium.store');
+  assert.equal(fillTemplate('Shop: {site} at {location}', { site: 'https://dripemporium.store', location: 'F53' }), 'Shop: https://dripemporium.store at F53');
   assert.equal(isTransientFacebookError(2, 500), true);
   assert.equal(isTransientFacebookError(4, 400), true);
   assert.equal(isTransientFacebookError(200, 403), false);
@@ -91,7 +91,7 @@ db('a comment gets one private reply to the commenter (with WhatsApp and the Pag
     assert.match(priv.body.message.text, /facebook\.com\/dripemporium/);
     assert.equal(pub.path, 'T_1/comments');
     assert.match(pub.body.message, /sent you a message/);
-    assert.match(pub.body.message, /Shop online: https:\/\/dripemporium\.store$/);
+    assert.match(pub.body.message, /Shop online: https:\/\/dripemporium\.store\n📍 Visit us: Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi$/);
     const r = await w.row('1');
     assert.deepEqual([r.status, r.recipientId, r.attempts, r.detail], ['SENT', 'PSID-1', 1, null]);
     assert.ok(r.privateMessageId && r.publicReplyId && r.repliedAt);
