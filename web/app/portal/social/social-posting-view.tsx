@@ -321,7 +321,7 @@ export function SocialPostingView() {
                             <img src={p.product.imageUrl} alt={p.product.name} style={{ width: 160, height: 160, objectFit: 'cover', borderRadius: 8 }} />
                             <div style={{ flex: 1, minWidth: 240 }}>
                               <p className="portal-muted" style={{ margin: 0 }}>This is what would be posted. Nothing has been posted yet.</p>
-                              <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: '8px 0', padding: 12, borderRadius: 8, background: 'rgba(0,0,0,0.04)', fontSize: 14 }}>{p.caption}</pre>
+                              <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontFamily: 'inherit', margin: '8px 0', padding: 12, borderRadius: 8, background: 'rgba(0,0,0,0.04)', fontSize: 14 }}>{p.caption}</pre>
                               {canPost ? (
                                 <button type="button" className="portal-primary-btn" disabled={busy === 'post' || !c.configured || !status.allowed} onClick={() => void onPostNow(channel)}>
                                   {busy === 'post' ? 'Posting…' : `Post to ${CHANNEL_SHORT[channel]} now`}

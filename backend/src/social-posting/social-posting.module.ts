@@ -4,10 +4,11 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { StorefrontModule } from '../storefront/storefront.module';
 import { SocialPostingController } from './social-posting.controller';
 import { SocialPostingService } from './social-posting.service';
+import { StatusKitService } from './status-kit.service';
 
 @Module({
   imports: [PrismaModule, PageContentModule, StorefrontModule],
   controllers: [SocialPostingController],
-  providers: [SocialPostingService],
+  providers: [SocialPostingService, StatusKitService],
 })
 export class SocialPostingModule {}

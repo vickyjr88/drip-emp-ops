@@ -410,7 +410,7 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
     const today = nairobiParts(now).day;
     const [counts, todays, login] = await Promise.all([
       this.prisma.socialPost.groupBy({ by: ['channel', 'status'], _count: true }),
-      this.prisma.socialPost.findMany({ where: { slotKey: { startsWith: today } }, select: { channel: true, slotKey: true, status: true } }),
+      this.prisma.socialPost.findMany({ where: { channel: { in: CHANNELS }, slotKey: { startsWith: today } }, select: { channel: true, slotKey: true, status: true } }),
       this.prisma.socialCredential.findUnique({ where: { channel: 'THREADS' } }),
     ]);
     const tally = (channel: Channel, status: string) => counts.find((c) => c.channel === channel && c.status === status)?._count ?? 0;
@@ -439,8 +439,8 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
 
   list(query: { skip?: number; take?: number }) {
     return paginate(
-      (args) => this.prisma.socialPost.findMany({ orderBy: { createdAt: 'desc' }, ...args }),
-      () => this.prisma.socialPost.count(),
+      (args) => this.prisma.socialPost.findMany({ where: { channel: { in: CHANNELS } }, orderBy: { createdAt: 'desc' }, ...args }),
+      () => this.prisma.socialPost.count({ where: { channel: { in: CHANNELS } } }),
       query.skip,
       query.take,
     );

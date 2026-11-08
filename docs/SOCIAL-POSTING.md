@@ -79,3 +79,23 @@ Taking a Threads post down from the screen uses Threads' delete call; if Threads
 
 - **Instagram.** The token has `instagram_content_publish`; not connected here.
 - Several photos per post (only the first photo is used), and choosing by sales rather than stock.
+
+## WhatsApp Status kit
+
+WhatsApp has **no way to post a Status automatically** (the Cloud API cannot; services that do it log into the shop's WhatsApp as a hidden linked device, which
+WhatsApp's terms forbid and can get the number banned, so they are not used). The Status kit makes the manual post a ten-second job.
+
+Portal > **WhatsApp Status**, meant for the phone that has the shop's WhatsApp:
+- Each day the server picks three products (`STATUS_KIT_COUNT`, up to eight) the way the Page posts are picked: in stock, with a photo, not shown lately. A
+  product marked posted is not offered again for 14 days at most (or the Social Posting repeat period, if shorter), a separate rotation from Facebook and Threads.
+- For each it makes a 1080x1920 picture: the shop name, the product photo, the name, the price (the offer, with the old price struck through, when there is one),
+  the sizes in stock in short form (`EUR 36–39, 41–44`), "Reply to this status to order", the website and the WhatsApp number. The text is drawn from the site's serif font,
+  which is built into the app, so it looks the same on any server.
+- Next to each picture is the text to go with it (name, price, sizes, "Reply to this status to order", and a product link tagged `utm_source=whatsapp&utm_campaign=status`,
+  so Insights shows visits from Status as WhatsApp).
+- **Share to WhatsApp** opens the phone's share sheet with the picture and the text; choose WhatsApp > **My status**. Where the browser cannot share files it downloads the picture instead.
+  **Download** and **Copy text** are there too. **Swap product** brings the next one in line; **Mark as posted** moves the product to the back.
+- The day's kit is made once and is the same for everyone who opens the screen. If a product sells out during the day, its card says so and its picture is no longer made.
+- People who reply to a Status arrive in the shop's WhatsApp chat.
+
+Pictures are made on request from the product photo (fetched by its address, within 20 seconds and 20 MB) and are not stored. Permissions: viewing uses SocialPost read, Swap and Mark as posted SocialPost update.

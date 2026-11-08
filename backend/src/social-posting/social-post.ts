@@ -33,9 +33,53 @@ const OPENERS = [
   'Straight from our shelf 💯',
 ];
 
-/** A product's own page, tagged so Insights counts the visit as Facebook, from the engine. */
-export function postLink(origin: string, slug: string, channel: 'facebook' | 'threads'): string {
-  return `${origin.replace(/\/+$/, '')}/shop/${slug}?utm_source=${channel}&utm_medium=social&utm_campaign=autopost`;
+/** A product's own page, tagged so Insights counts the visit as coming from that channel, by the engine (campaign `autopost`) or the Status kit (`status`). */
+export function postLink(origin: string, slug: string, channel: 'facebook' | 'threads' | 'whatsapp', campaign: 'autopost' | 'status' = 'autopost'): string {
+  return `${origin.replace(/\/+$/, '')}/shop/${slug}?utm_source=${channel}&utm_medium=social&utm_campaign=${campaign}`;
+}
+
+/**
+ * Sizes as short as they can be read: ["EUR 36","EUR 37","EUR 38","EUR 41"] -> "EUR 36–38, 41". Numbers that follow each other are a range, a shared
+ * prefix ("EUR ") is said once, and anything that is not a number (S, M, L) is kept as it is, in the order given.
+ */
+export function compactSizes(sizes: string[]): string {
+  const unique = [...new Set(sizes.map((s) => s.trim()).filter(Boolean))];
+  const parsed = unique.map((s) => /^(.*?)(\d+)$/.exec(s));
+  if (!unique.length) return '';
+  const prefix = parsed[0]?.[1] ?? '';
+  if (parsed.some((m) => !m || m[1] !== prefix)) return unique.join(', ');
+  const numbers = parsed.map((m) => Number(m![2])).sort((a, b) => a - b);
+  const runs: string[] = [];
+  for (let i = 0; i < numbers.length; ) {
+    let j = i;
+    while (j + 1 < numbers.length && numbers[j + 1] === numbers[j] + 1) j += 1;
+    runs.push(j > i ? `${numbers[i]}–${numbers[j]}` : String(numbers[i]));
+    i = j + 1;
+  }
+  return `${prefix}${runs.join(', ')}`;
+}
+
+/** Kenyan numbers as people write them: 254113206481 -> 0113 206 481. Anything else is returned as given. */
+export function formatKenyanPhone(digits: string): string {
+  const d = digits.replace(/\D/g, '');
+  const m = /^254(\d{3})(\d{3})(\d{3})$/.exec(d);
+  return m ? `0${m[1]} ${m[2]} ${m[3]}` : digits;
+}
+
+/** The text that goes with a Status: the details and a tagged link, short enough to read in a glance. Status replies reach the shop's chat, so it says to reply. */
+export function buildStatusCaption(product: PostableProduct, ctx: PostContext): string {
+  const price = product.offer
+    ? `🔥 ${kes(product.offer.price)} (was ${kes(product.offer.was)})`
+    : product.priceFrom === product.priceTo || !product.priceTo ? `💰 ${kes(product.priceFrom)}` : `💰 From ${kes(product.priceFrom)}`;
+  const sizes = compactSizes(product.sizesInStock);
+  return [
+    product.name,
+    price,
+    sizes ? `📏 ${sizes}` : null,
+    '',
+    '💬 Reply to this status to order',
+    `🛒 ${postLink(ctx.origin, product.slug, 'whatsapp', 'status')}`,
+  ].filter((l) => l !== null).join('\n');
 }
 
 /** Sizes in a short readable run: ["40","41","42"] -> "40, 41, 42". More than ten are cut so the post stays short. */

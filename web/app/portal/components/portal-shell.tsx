@@ -31,6 +31,7 @@ export type PortalNavKey =
   | 'insights'
   | 'dailyReport'
   | 'social'
+  | 'statusKit'
   | 'reminders'
   | 'content'
   | 'blog'
@@ -68,6 +69,7 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
   { key: 'insights', href: '/portal/insights', label: 'Insights' },
   { key: 'dailyReport', href: '/portal/daily-report', label: 'Daily Report' },
   { key: 'social', href: '/portal/social', label: 'Social Posting' },
+  { key: 'statusKit', href: '/portal/status-kit', label: 'WhatsApp Status' },
   { key: 'reminders', href: '/portal/reminders', label: 'Reminders' },
   { key: 'content', href: '/portal/content', label: 'Site Content' },
   { key: 'blog', href: '/portal/blog', label: 'Blog' },
@@ -105,6 +107,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   insights: 'Insights',
   dailyReport: 'Daily Report',
   social: 'Social Posting',
+  statusKit: 'WhatsApp Status',
   reminders: 'Reminders',
   content: 'Site Content',
   blog: 'Blog',
