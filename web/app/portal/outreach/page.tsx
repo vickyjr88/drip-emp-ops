@@ -37,6 +37,11 @@ type Contact = {
   id: string; phone: string; name: string | null; adHeadline: string | null; subscribed: boolean; unsubscribedReason: string | null;
   nextStep: number; nextStepAt: string | null; lastMessageAt: string; noticeSentAt: string | null;
 };
+type FacebookStatus = {
+  enabled: boolean; configured: boolean; webhookSecretSet: boolean; pageId: string | null; subscribed: boolean; subscriptionError: string | null;
+  sent: number; skipped: number; failed: number; waiting: number; sentToday: number; dailyCap: number;
+};
+type FacebookRow = { id: string; fromName: string | null; message: string | null; status: string; detail: string | null; createdAt: string };
 const STEP_LABEL = ['the app', 'the group', 'the rating request'];
 const DELIVERY_LABEL: Record<string, string> = { sent: 'Reached WhatsApp', delivered: 'Delivered', read: 'Read', failed: 'Not delivered' };
 
@@ -58,6 +63,8 @@ export default function OutreachPage() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [contactStats, setContactStats] = useState<ContactStats | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [facebook, setFacebook] = useState<FacebookStatus | null>(null);
+  const [facebookRows, setFacebookRows] = useState<FacebookRow[]>([]);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
@@ -73,6 +80,12 @@ export default function OutreachPage() {
     ]);
     setContactStats(stats);
     setContacts(page?.items ?? []);
+    const [fb, fbPage] = await Promise.all([
+      apiRequest<FacebookStatus>('/facebook-comments/status', { method: 'GET' }, authToken).catch(() => null),
+      apiRequest<ServerPage<FacebookRow>>('/facebook-comments?take=15', { method: 'GET' }, authToken).catch(() => null),
+    ]);
+    setFacebook(fb);
+    setFacebookRows(fbPage?.items ?? []);
   }, []);
 
   const loadHistory = useCallback(async (authToken: string) => {
@@ -381,6 +394,49 @@ export default function OutreachPage() {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </article>
+            ) : null}
+
+            {facebook ? (
+              <article className="portal-card">
+                <h2 style={{ margin: 0 }}>Facebook comments</h2>
+                <p className="portal-muted" style={{ margin: '4px 0 12px' }}>
+                  Everyone who comments on a Page post or ad gets one private message in Messenger (with our WhatsApp link and an invitation to follow the
+                  Page) and a short public reply. Facebook only allows this for people who comment, within 7 days; people who only react cannot be messaged.
+                  Staff answer their replies from the Page inbox in Meta Business Suite.
+                </p>
+                {!facebook.configured ? (
+                  <div className="portal-empty-state">Not set up yet: the server needs FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN (see docs/FACEBOOK-COMMENTS.md).</div>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 12px' }}>
+                      <span className={`portal-chip ${facebook.enabled ? 'is-success' : 'is-muted'}`}>{facebook.enabled ? 'On' : 'Switched off'}</span>
+                      <span className={`portal-chip ${facebook.subscribed ? 'is-success' : 'is-danger'}`} style={{ marginLeft: 8 }}>
+                        {facebook.subscribed ? 'Page is sending us comments' : 'Page is not sending us comments yet'}
+                      </span>
+                      {!facebook.webhookSecretSet ? <span className="portal-chip is-danger" style={{ marginLeft: 8 }}>Webhook secret not set</span> : null}
+                    </p>
+                    {!facebook.subscribed && facebook.subscriptionError ? <p className="portal-muted">{facebook.subscriptionError}</p> : null}
+                    <div className="portal-stat-grid" style={{ marginBottom: 12 }}>
+                      <div className="portal-stat"><span>Messaged</span><h3>{facebook.sent}</h3><span className="portal-stat-note">{facebook.sentToday} today of {facebook.dailyCap} allowed</span></div>
+                      <div className="portal-stat"><span>Skipped</span><h3>{facebook.skipped}</h3><span className="portal-stat-note">Links, replies to comments, repeat commenters</span></div>
+                      <div className="portal-stat"><span>Failed</span><h3>{facebook.failed}</h3>{facebook.waiting ? <span className="portal-stat-note">{facebook.waiting} waiting to retry</span> : null}</div>
+                    </div>
+                  </>
+                )}
+                {facebookRows.length === 0 ? <div className="portal-empty-state">No comments yet.</div> : (
+                  <div className="portal-list-stack">
+                    {facebookRows.map((r) => (
+                      <div key={r.id} className="portal-record">
+                        <strong>{r.fromName || 'Someone'}</strong>
+                        <span className={`portal-chip ${r.status === 'SENT' ? 'is-success' : r.status === 'FAILED' ? 'is-danger' : 'is-muted'}`} style={{ marginLeft: 8 }}>
+                          {r.status === 'SENT' ? 'Messaged' : r.status === 'FAILED' ? 'Failed' : r.status === 'SKIPPED' ? 'Skipped' : 'Waiting'}
+                        </span>
+                        <p className="portal-muted">{formatDateTime(r.createdAt)}{r.message ? ` · "${r.message.slice(0, 80)}"` : ''}{r.detail ? ` · ${r.detail}` : ''}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </article>

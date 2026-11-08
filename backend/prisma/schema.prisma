@@ -2493,3 +2493,34 @@ model WhatsappMessageStatus {
   @@index([messageId])
   @@index([createdAt])
 }
+
+/// A comment on one of the Page's posts or ads, and what the shop did about it: a private Messenger reply to the person
+/// (allowed once per comment, within 7 days) and a short public reply under it. One row per comment; commentId is what
+/// stops Meta delivering the same event twice from replying twice.
+model FacebookCommentReply {
+  id               String    @id @default(uuid())
+  commentId        String    @unique
+  postId           String?
+  pageId           String?
+  /// Facebook's id for the commenter and the name they commented under.
+  fromId           String?
+  fromName         String?
+  message          String?
+  commentedAt      DateTime?
+  /// PENDING (being sent), SENT, RETRY (Facebook was unavailable, tried again later), FAILED or SKIPPED.
+  status           String    @default("PENDING")
+  /// Why it was skipped or failed, in words.
+  detail           String?
+  attempts         Int       @default(0)
+  /// The commenter's id in Messenger and the message we sent them, from the private reply.
+  recipientId      String?
+  privateMessageId String?
+  publicReplyId    String?
+  repliedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status, updatedAt])
+  @@index([fromId, status])
+  @@index([createdAt])
+}
