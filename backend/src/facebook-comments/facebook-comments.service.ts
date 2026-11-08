@@ -5,7 +5,7 @@ import { PageContentService } from '../page-content/page-content.service';
 import { paginate } from '../common/pagination.util';
 import { startOfNairobiDay } from '../whatsapp-outreach/whatsapp-subscription';
 import {
-  ALREADY_REPLIED_CODES, DEFAULT_PRIVATE_TEXT, DEFAULT_PUBLIC_TEXT, FeedComment, fillTemplate, isReplyToComment,
+  ALREADY_REPLIED_CODES, DEFAULT_PRIVATE_TEXT, DEFAULT_PUBLIC_TEXT, DEFAULT_SITE_URL, FeedComment, fillTemplate, isReplyToComment,
   isTransientFacebookError, looksLikeSpam,
 } from './facebook-comments';
 
@@ -16,6 +16,13 @@ const REPLY_WINDOW_MS = 6 * DAY_MS;
 const MAX_ATTEMPTS = 3;
 const RETRY_AFTER_MS = 4 * 60_000;
 const STUCK_AFTER_MS = 10 * 60_000;
+
+/** The website address in the public reply: the setting, else the storefront's own address (never a local one), else the live site. */
+const siteUrl = () => {
+  const own = process.env.STOREFRONT_ORIGIN || '';
+  const candidate = process.env.FACEBOOK_REPLY_SITE_URL || (/localhost|127\.0\.0\.1/.test(own) ? '' : own) || DEFAULT_SITE_URL;
+  return candidate.replace(/\/+$/, '');
+};
 
 export const facebookRepliesEnabled = () => (process.env.FACEBOOK_COMMENT_REPLIES || 'true') !== 'false';
 
@@ -122,6 +129,7 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
     return {
       whatsapp: whatsapp ? `https://wa.me/${whatsapp}` : '',
       page: page || `https://www.facebook.com/${this.pageId}`,
+      site: siteUrl(),
       privateText: process.env.FACEBOOK_PRIVATE_REPLY_TEXT || DEFAULT_PRIVATE_TEXT,
       publicText: process.env.FACEBOOK_PUBLIC_REPLY_TEXT || DEFAULT_PUBLIC_TEXT,
       publicOn: (process.env.FACEBOOK_PUBLIC_REPLY || 'true') !== 'false',
@@ -172,7 +180,7 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
   private async reply(id: string): Promise<'SENT' | 'RETRY' | 'FAILED' | 'SKIPPED'> {
     const row = await this.prisma.facebookCommentReply.findUniqueOrThrow({ where: { id } });
     const t = await this.texts();
-    const vars = { name: row.fromName, whatsapp: t.whatsapp, page: t.page };
+    const vars = { name: row.fromName, whatsapp: t.whatsapp, page: t.page, site: t.site };
     const attempts = row.attempts + 1;
 
     const sent = await this.privateReply(row.commentId, fillTemplate(t.privateText, vars));

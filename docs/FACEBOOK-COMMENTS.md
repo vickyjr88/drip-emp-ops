@@ -11,7 +11,7 @@ when they answer, a normal conversation opens that staff handle from the Page in
    and we'll confirm the price and delivery, or chat to us on WhatsApp: https://wa.me/254113206481. Follow our page for new arrivals and
    offers: https://www.facebook.com/..."* (the WhatsApp link and the Page link are the ones in Site content, unless overridden).
 3. Only if that went, a public reply goes under the comment: *"Thanks Wanjiru! We've sent you a message with the details. Check your
-   Messenger inbox (or Message requests)."*
+   Messenger inbox (or Message requests). Shop online: https://dripemporium.store"*
 
 Not answered: the Page's own comments, replies to other comments (top-level only), comments containing a link (spam), a second comment
 from someone already messaged in the last 7 days, and anything beyond `FACEBOOK_REPLY_DAILY_CAP` (default 200) a day. A comment is answered
@@ -59,4 +59,5 @@ or failed, and the latest comments with the reason for each.
 | `FACEBOOK_REPLY_DAILY_CAP` | `200` | Private replies per day (Nairobi time) |
 | `FACEBOOK_REPLY_WHATSAPP` | Site content > enquiries WhatsApp number | The number in the WhatsApp link |
 | `FACEBOOK_PAGE_URL` | Site content > footer > Facebook, else facebook.com/<page id> | The Page link |
-| `FACEBOOK_PRIVATE_REPLY_TEXT`, `FACEBOOK_PUBLIC_REPLY_TEXT` | built in | The wording; `{name}`, `{whatsapp}` and `{page}` are filled in |
+| `FACEBOOK_REPLY_SITE_URL` | the storefront address (`STOREFRONT_ORIGIN`), else https://dripemporium.store | The website link in the public reply (`{site}`) |
+| `FACEBOOK_PRIVATE_REPLY_TEXT`, `FACEBOOK_PUBLIC_REPLY_TEXT` | built in | The wording; `{name}`, `{whatsapp}`, `{page}` and `{site}` are filled in |
