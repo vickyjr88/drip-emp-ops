@@ -4072,6 +4072,22 @@ img {
     text-decoration: underline;
   }
 
+  /* Small tables (a few columns, often inside a half-width card): sized to their container instead of the 920px the data
+     grids are built for, so they do not scroll sideways at laptop widths. Text wraps in the first column; the wrapper
+     still scrolls if a phone is too narrow for even this. */
+  .portal-data-table.is-compact {
+    min-width: 0;
+  }
+
+  .portal-data-table.is-compact th,
+  .portal-data-table.is-compact td {
+    padding: 10px 12px;
+  }
+
+  .portal-data-table.is-compact td:first-child {
+    overflow-wrap: anywhere;
+  }
+
   /* Column-reference tables: narrower than the data grids the base class is
      sized for, so they do not force a scrollbar on a laptop. */
   .portal-data-table.is-doc {

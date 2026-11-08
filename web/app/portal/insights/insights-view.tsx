@@ -234,7 +234,7 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
           <p className="portal-muted">Enter what you spend on ads below to see what each platform costs per order and what it brings back.</p>
         ) : (
           <div className="portal-table-wrap">
-            <table className="portal-data-table">
+            <table className="portal-data-table is-compact">
               <thead><tr><th>Platform</th><th>Spent</th><th>Visits</th><th>Cost per visit</th><th>WhatsApp taps</th><th>Orders</th><th>Cost per order</th><th>Sales</th><th>Sales per KES 1</th></tr></thead>
               <tbody>
                 {f.adReturn.map((a) => (
@@ -261,7 +261,7 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
           <article className="portal-card" style={{ marginBottom: 20 }}>
             <h2 style={{ marginTop: 0 }}>Where visits come from</h2>
             <div className="portal-table-wrap">
-              <table className="portal-data-table">
+              <table className="portal-data-table is-compact">
                 <thead><tr><th>Source</th><th>Kind</th><th>Visits</th><th>Opened a product</th><th>Added to cart</th><th>WhatsApp taps</th><th>Orders</th><th>Revenue</th><th>Visit to order</th></tr></thead>
                 <tbody>
                   {f.bySource.map((s) => (
@@ -284,7 +284,7 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
               <h2 style={{ marginTop: 0 }}>Products people look at</h2>
               {f.products.length === 0 ? <p className="portal-muted">No product views yet.</p> : (
                 <div className="portal-table-wrap">
-                  <table className="portal-data-table">
+                  <table className="portal-data-table is-compact">
                     <thead><tr><th>Product</th><th>Views</th><th>Carts</th><th>WhatsApp</th><th>Sold</th></tr></thead>
                     <tbody>
                       {f.products.slice(0, 10).map((p) => (
@@ -302,7 +302,7 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
               <h2 style={{ marginTop: 0 }}>What people search for</h2>
               {f.searches.length === 0 ? <p className="portal-muted">No searches yet.</p> : (
                 <div className="portal-table-wrap">
-                  <table className="portal-data-table">
+                  <table className="portal-data-table is-compact">
                     <thead><tr><th>Words</th><th>Searches</th></tr></thead>
                     <tbody>{f.searches.map((s) => <tr key={s.term}><td>{s.term}</td><td>{s.searches}</td></tr>)}</tbody>
                   </table>
@@ -310,7 +310,7 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
               )}
               <h3>Devices</h3>
               <div className="portal-table-wrap">
-                <table className="portal-data-table">
+                <table className="portal-data-table is-compact">
                   <thead><tr><th>Device</th><th>Visits</th><th>Orders or WhatsApp</th></tr></thead>
                   <tbody>{f.byDevice.map((d) => <tr key={d.device}><td>{d.device}</td><td>{d.sessions}</td><td>{pct(d.orders + d.tappedWhatsapp, d.sessions)}</td></tr>)}</tbody>
                 </table>
@@ -382,7 +382,7 @@ function AdSpendForm({ token, profile, from, to, onChanged }: { token: string; p
           {error ? <p className="portal-error" style={{ marginTop: 8 }}>{error}</p> : null}
           {entries.length ? (
             <div className="portal-table-wrap" style={{ marginTop: 12 }}>
-              <table className="portal-data-table">
+              <table className="portal-data-table is-compact">
                 <thead><tr><th>Day</th><th>Platform</th><th>Campaign</th><th>Spent</th><th></th></tr></thead>
                 <tbody>
                   {entries.map((en) => (
@@ -448,7 +448,7 @@ function WhatsappTab({ token, from, to }: { token: string; from: string; to: str
         <h2 style={{ marginTop: 0 }}>Which ads brought chats</h2>
         {w.ads.length === 0 ? <p className="portal-muted">No chats in this period.</p> : (
           <div className="portal-table-wrap">
-            <table className="portal-data-table">
+            <table className="portal-data-table is-compact">
               <thead><tr><th>Ad</th><th>Chats</th><th>Replied STOP</th><th>Became orders</th><th>Sales</th></tr></thead>
               <tbody>
                 {w.ads.map((a) => (
@@ -468,7 +468,7 @@ function WhatsappTab({ token, from, to }: { token: string; from: string; to: str
         <article className="portal-card">
           <h2 style={{ marginTop: 0 }}>Where subscribers are in the messages</h2>
           <div className="portal-table-wrap">
-            <table className="portal-data-table">
+            <table className="portal-data-table is-compact">
               <tbody>
                 <tr><td>Waiting for the app message</td><td>{w.onboarding.waitingForApp}</td></tr>
                 <tr><td>Waiting for the group message</td><td>{w.onboarding.waitingForGroup}</td></tr>
@@ -483,7 +483,7 @@ function WhatsappTab({ token, from, to }: { token: string; from: string; to: str
           <h2 style={{ marginTop: 0 }}>Why messages failed</h2>
           {w.messages.topFailures.length === 0 ? <p className="portal-muted">No failures reported by WhatsApp in this period.</p> : (
             <div className="portal-table-wrap">
-              <table className="portal-data-table">
+              <table className="portal-data-table is-compact">
                 <thead><tr><th>Reason WhatsApp gave</th><th>Messages</th></tr></thead>
                 <tbody>{w.messages.topFailures.map((f) => <tr key={f.reason}><td>{f.reason}</td><td>{f.count}</td></tr>)}</tbody>
               </table>
@@ -498,7 +498,7 @@ function WhatsappTab({ token, from, to }: { token: string; from: string; to: str
           {w.messages.arrivedRate === null ? 'No delivery reports yet.' : `${rate(w.messages.arrivedRate)} of the ${w.messages.checked} messages with a delivery report arrived.`} &ldquo;Waiting&rdquo; means WhatsApp accepted it and has not said yet.
         </p>
         <div className="portal-table-wrap">
-          <table className="portal-data-table">
+          <table className="portal-data-table is-compact">
             <thead><tr><th>Message</th><th>Sent</th><th>Delivered</th><th>Read</th><th>Not delivered</th><th>Waiting</th><th>Could not send</th></tr></thead>
             <tbody>
               {w.messages.templates.map((t) => (
@@ -545,7 +545,7 @@ function StockTab({ token, from, to }: { token: string; from: string; to: string
           <>
             <p><strong>{kes(s.deadStock.tiedUpKes)}</strong> is tied up in {s.deadStock.count} product{s.deadStock.count === 1 ? ' that has' : 's that have'} not sold in {s.deadDays} days. A discount, a bundle or an ad on these turns shelf space back into cash.</p>
             <div className="portal-table-wrap">
-              <table className="portal-data-table">
+              <table className="portal-data-table is-compact">
                 <thead><tr><th>Product</th><th>Units</th><th>Tied up</th><th>Last sold</th></tr></thead>
                 <tbody>
                   {s.deadStock.items.map((d) => (
@@ -567,7 +567,7 @@ function StockTab({ token, from, to }: { token: string; from: string; to: string
           <h2 style={{ marginTop: 0 }}>Running low on fast sellers</h2>
           {s.runningLow.length === 0 ? <p className="portal-muted">No steady seller is close to running out.</p> : (
             <div className="portal-table-wrap">
-              <table className="portal-data-table">
+              <table className="portal-data-table is-compact">
                 <thead><tr><th>Product</th><th>Left</th><th>Sold</th><th>Lasts about</th></tr></thead>
                 <tbody>{s.runningLow.map((r) => <tr key={r.slug}><td>{r.name}</td><td>{r.units}</td><td>{r.soldInPeriod}</td><td>{r.coverDays} days</td></tr>)}</tbody>
               </table>
@@ -579,7 +579,7 @@ function StockTab({ token, from, to }: { token: string; from: string; to: string
           {s.missedDemand.length === 0 ? <p className="portal-muted">No out-of-stock product is getting looks or messages.</p> : (
             <>
               <div className="portal-table-wrap">
-                <table className="portal-data-table">
+                <table className="portal-data-table is-compact">
                   <thead><tr><th>Product</th><th>Views</th><th>Carts</th><th>WhatsApp</th></tr></thead>
                   <tbody>{s.missedDemand.map((r) => <tr key={r.slug}><td>{r.name}</td><td>{r.views}</td><td>{r.carts}</td><td>{r.whatsapp}</td></tr>)}</tbody>
                 </table>
@@ -629,7 +629,7 @@ function CustomersTab({ token, from, to }: { token: string; from: string; to: st
           <>
             <p>{b.lapsedCount} buyer{b.lapsedCount === 1 ? ' has' : 's have'} not ordered in {b.lapseDays} days. Those who bought more than once are first. The link opens WhatsApp with a message ready; you press send.</p>
             <div className="portal-table-wrap">
-              <table className="portal-data-table">
+              <table className="portal-data-table is-compact">
                 <thead><tr><th>Buyer</th><th>Orders</th><th>Spent</th><th>Last order</th><th></th></tr></thead>
                 <tbody>
                   {b.lapsed.map((l) => (
