@@ -31,3 +31,7 @@ the shop's WhatsApp number and origin. Sections change the layout: watches and d
 ## Verify
 
 Look at the pictures (a long name, an offer, no sizes, thirty sizes), measure the displayed ratio in the browser (0.563), run the screen at 375 px, then try Share on a real phone after deploy (the share sheet cannot be tested in a desktop browser; it falls back to Download).
+
+## As ported to Nairobi Gents
+
+See "Phase 5 as built" in `nairobi-gents-plan.md`: per-shop theme colours with a contrast guarantee, section-aware option lines, text laid out before the photo is sized, a careful photo fetch, `STATUS` rows in `SocialPost`.

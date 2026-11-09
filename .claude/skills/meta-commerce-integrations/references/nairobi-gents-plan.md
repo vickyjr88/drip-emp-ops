@@ -52,7 +52,7 @@ The list below is the original question set, kept for reference.
 **Phase 4 — Social posting (Facebook, then Threads). DONE, committed in shops-platform as `cd31b0f` (after `72caaf2`, `55cf44e`, `60b0a5d`; none pushed when written).** Section-aware `postableProducts(shopId)`, per-shop settings/rows/rotation, the posting screen, Threads login renewal writing back to the shop's row.
 *Accept:* Preview matches what is posted; one Post now per channel looks right; Start posting is off by default; kill switch works; a slot posts once with two backend slots.
 
-**Phase 5 — Status kit.** Per-shop pictures with section-aware layout, phone screen.
+**Phase 5 — Status kit. DONE, committed in shops-platform as `c47f592` (after `cd31b0f`, `72caaf2`, `55cf44e`, `60b0a5d`; none pushed when written).** Per-shop pictures with section-aware layout, phone screen.
 *Accept:* pictures for a watch (no sizes), a phone (storage/colour), and a shirt (sizes) look right; measured 9:16 in the browser; Share tested on a real phone.
 
 **Phase 6 (only if asked) — Mautic sync, operator view across shops, a daily digest.**
@@ -133,4 +133,22 @@ The msa and nairobigents shop content is hand-curated: never run the feed sync (
 - **Lessons:** (1) when seeding for a browser check, a Threads account id must be digits and long (the validator rejects short ones); (2) seed through the services (`IntegrationsService.save`) so secrets are encrypted the real way;
   (3) a "Post now" with a fake token reaches the real Graph API and comes back as Meta's own error (190), which is a useful end-to-end check of the failure path without posting anything.
 - Not covered by tests (needs a real shop): an actual Facebook photo post and a real Threads publish; the first one should be a **Post now** after previewing, with the owner watching.
+
+## Phase 5 as built (read this before phase 6)
+
+- Code: `shops-platform/backend/src/social/` `status-kit.service.ts`, `status-kit.controller.ts` (`/portal/status-kit`; staff may use it, `PUT settings` is owner-only), `status-image.ts`, `status-palette.ts`, `photo-fetch.ts`, `brand-font.ts`;
+  `statusDetails` and `buildStatusCaption` in `social-post.ts`; screen `web/app/portal/status-kit/page.tsx`. Doc `shops-platform/docs/STATUS-KIT.md`. Migration `20261121090000_add_status_kit_count` (one column on `SocialSetting`). New dependency `opentype.js`.
+  21 integration-style checks in 19 tests + 51 unit tests.
+- **No new table and no Meta connection**: items are `SocialPost` rows with channel `STATUS` (`<day>#<n>`, READY then POSTED), unique per shop, so the same claim trick makes "two people open it at once" safe. Anything that lists or takes down posts
+  must now exclude `STATUS` (the Social posting list and `remove` were changed for this).
+- **Section-aware, by options not by section name**: `statusDetails(options)` gives sizes for shoes and clothes, storage then colour for a phone, nothing for a one-form watch, never `condition`, at most two lines.
+- **Per-shop colours**: `statusPalette(primary, accent)` = background is the primary colour mixed 82% with black (so any theme gives a dark picture), text colours are moved toward white until they reach 4.5:1 (tests include white, black, yellow and near-white themes).
+  One bundled font (Libre Caslon, OFL) for every shop; letting a shop choose a font is a possible later step.
+- **Bug the layout test caught in the drip-crm version too (not fixed there)**: with a two-line name, an offer and a sizes line the text ran past the call-to-action rule at y 1738. In Nairobi Gents the text block is laid out first
+  and the photo takes what is left (760 to 1080 px), tested for the worst case. A fractional photo height also made sharp throw, so the height is floored.
+- **Security point for multi-tenant**: the photo address is a shop owner's choice, so `fetchPhoto` refuses non-https, private/loopback/link-local/CGNAT/multicast addresses (including IPv4-in-IPv6) and checks every redirect (3 at most).
+  Known gap: DNS is resolved, checked and then fetched, so a rebinding DNS could answer differently the second time. drip-crm's version has no such check (single tenant, own photos).
+- **Screen bug found only in the browser**: a swapped item keeps its id but is a different product, so a picture cache keyed by id kept showing the old product's picture under the new name. Key pictures by id plus product, and
+  prove it by comparing the displayed picture's bytes with a fresh render.
+- A desktop browser cannot open the share sheet; `navigator.canShare({files})` is false there and the screen downloads the picture and says so. **Share to WhatsApp on a real phone is the one thing not tested**: do it once after deploy.
 
