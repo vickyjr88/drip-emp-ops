@@ -127,6 +127,11 @@ helper takes the resolved config as an argument (`new WhatsAppClient(cfg)`), so 
 - Signature check (`X-Hub-Signature-256`) uses **that shop's** app secret when set. Raw body must be preserved (`rawBody: true` is already on in `main.ts`).
 - Verification GET echoes `hub.challenge` only if the verify token equals the secret in the path.
 
+## As built in Nairobi Gents
+
+See "Phase 1 as built" in `nairobi-gents-plan.md`. Differences from the sketch above: the resolution cache is 30 s in memory per process (a change on one deploy slot reaches the other within 30 s);
+the secrets object is encrypted as one JSON string; the platform row exists only for WHATSAPP; `webhookKey` is the sha256 of a 24-byte hex secret.
+
 ## Everything that holds state needs the shop
 
 Add `shopId` to `WhatsappContact`, `WhatsappOutreach`, `WhatsappMessageStatus`, `FacebookCommentReply`, `SocialPost`, `SocialSetting`, and put it in

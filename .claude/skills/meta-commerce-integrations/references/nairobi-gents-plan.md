@@ -38,7 +38,7 @@ The list below is the original question set, kept for reference.
 
 ## Phases (each ends with a verified, committed state the user can push)
 
-**Phase 1 — Credential store (the requested change).** `ShopIntegration`, `PlatformIntegration`, `IntegrationConfigService`, owner Connections screen, operator Platform integrations page, audit rows, test-connection buttons, one-time import of existing
+**Phase 1 — Credential store (the requested change). DONE, committed in shops-platform as `60b0a5d` (not yet pushed/deployed when written).** `ShopIntegration`, `PlatformIntegration`, `IntegrationConfigService`, owner Connections screen, operator Platform integrations page, audit rows, test-connection buttons, one-time import of existing
 `WHATSAPP_*` env into the platform row, move the existing daily report's `WhatsAppService` to the resolved config, per-shop `enabled` replacing `DAILY_REPORT_SHOPS`, remove the variables, add the grep test.
 *Accept:* daily report still sends tomorrow; no integration `process.env` reads remain; shop A cannot see shop B; masked reads; secrets absent from responses and logs.
 
@@ -62,3 +62,23 @@ The list below is the original question set, kept for reference.
 Schema and migration first (the user's push runs `prisma migrate deploy`, so migrations must be additive and safe on live data); pure rules and tests; services; screens (browser-verified at desktop and 375 px); docs next to `docs/DAILY-REPORT.md`;
 a final check list for the user (what to deploy, what to click, what to rotate). Production data changes go through `ssh garime` psql in a transaction, dry-run with `ROLLBACK` first, back up affected rows, and only when the user has asked.
 The msa and nairobigents shop content is hand-curated: never run the feed sync (see the user's memory note).
+
+
+## Phase 1 as built (read this before phase 2)
+
+- Code: `shops-platform/backend/src/integrations/` (`integration-providers.ts` = the one definition of each provider's fields and validation; `integrations.service.ts` = storage, masking,
+  `resolve(shopId, provider, {allowPlatform})`, `test`, `rotateWebhookSecret`, `findByWebhookSecret`, `importFromEnvironment`; `whatsapp-client.ts` = `WhatsAppClient` for one resolved connection),
+  routes `/portal/integrations` (owner only) and `/admin/platform-settings/integrations/whatsapp`; screens `web/app/portal/integrations/page.tsx` and a card in `web/app/admin/settings/page.tsx`;
+  tables `ShopIntegration`, `PlatformIntegration` (migration `20261117090000_add_integration_credentials`); doc `shops-platform/docs/INTEGRATIONS.md`. 18 integration tests + unit tests, including a
+  test that fails the build if code other than `integrations/env-import.ts` reads a `WHATSAPP_/FACEBOOK_/THREADS_/META_/MAUTIC_/OUTREACH_` variable.
+- **Later phases must call `IntegrationsService.resolve(shopId, provider)` (no `allowPlatform`) for anything a customer sees**, and build their client from the result (`new WhatsAppClient({...})`). Only the daily report
+  (owner notices) passes `allowPlatform: true`. Add `shopId` to every new table and unique key.
+- Webhooks (phases 2 and 3) use the already-built `rotateWebhookSecret` / `findByWebhookSecret`: the controller is `@Public()` + `@NoShopScope()`, looks the shop up from the path secret, checks the event's
+  `phone_number_id` / page id against the connection's `externalId`, and verifies `X-Hub-Signature-256` with that shop's `appSecret`. The Connections screen has a `webhookConfigured` flag ready; add the address
+  display, a "Rotate" button and a "Connect" helper (WABA `subscribed_apps` with `override_callback_uri`; Page `subscribed_apps?subscribed_fields=feed`) when the webhook routes exist.
+- Operational config that is **not** an id or secret stays in the environment (`DAILY_REPORT_HOUR`, `DAILY_REPORT_ENABLED`, cron/timezones). `DAILY_REPORT_SHOPS` was removed: a shop is scheduled by saving its
+  Daily Report settings switched on.
+- The four `WHATSAPP_*` lines in `docker-compose.yml` are **transitional**: read once to copy the existing sender into the platform settings. After the first deploy shows it under Admin > Settings, delete them
+  from the server `.env` and the compose file in a follow-up commit.
+- Lessons from building it: list only the *missing* required fields in "cannot be switched on" messages; reused ids in tests collide with the one-shop-per-number rule, so clear connections between tests;
+  two backend slots import at once, so the import must treat a duplicate-key error as "someone else did it".
