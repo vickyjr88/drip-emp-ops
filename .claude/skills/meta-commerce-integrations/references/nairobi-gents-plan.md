@@ -49,7 +49,7 @@ The list below is the original question set, kept for reference.
 **Phase 3 — Facebook comment replies. DONE, committed in shops-platform as `72caaf2` (after phase 2 `55cf44e` and phase 1 `60b0a5d`; none pushed when written).** App-level Page callback routed by page id, per-shop texts and caps, card on the shop's Marketing screen.
 *Accept:* a comment from an app-role account gets a private reply (public reply or the reason on the card); the Page's own reply is ignored; duplicate event does nothing.
 
-**Phase 4 — Social posting (Facebook, then Threads).** Section-aware `postableProducts(shopId)`, per-shop settings/rows/rotation, the posting screen, Threads login renewal writing back to the shop's row.
+**Phase 4 — Social posting (Facebook, then Threads). DONE, committed in shops-platform as `cd31b0f` (after `72caaf2`, `55cf44e`, `60b0a5d`; none pushed when written).** Section-aware `postableProducts(shopId)`, per-shop settings/rows/rotation, the posting screen, Threads login renewal writing back to the shop's row.
 *Accept:* Preview matches what is posted; one Post now per channel looks right; Start posting is off by default; kill switch works; a slot posts once with two backend slots.
 
 **Phase 5 — Status kit.** Per-shop pictures with section-aware layout, phone screen.
@@ -118,3 +118,19 @@ The msa and nairobigents shop content is hand-curated: never run the feed sync (
 - **Lessons:** (1) when testing a webhook from a shell, do not generate ids with `$RANDOM` inside `$(...)`: older bash returns the same number in every subshell, so the "new" comments reused one id and were (correctly) dropped as
   duplicates, which looked like a bug; pass explicit unique ids. (2) a test counting rows by Page id across the whole shared test database also counts earlier tests' rows; scope counts to the shops in the test.
 - Phase 4 (posting) needs `pages_manage_posts` on the Page token and the Threads login; both live in the same connections. The "Test connection" for Facebook already reports whether comments reach the shop.
+
+## Phase 4 as built (read this before phase 5)
+
+- Code: `shops-platform/backend/src/social/` (pure `social-post.ts`: wording per section, `compactSizes`, `pickProduct`, slots; `postable-products.service.ts` = what a shop could post, at today's price, only options still in stock;
+  `social-posting.service.ts` = engine, claims, retries, Threads renewal, take-down; `social-posting.controller.ts` at `/portal/social`, owner only). Screen `web/app/portal/social/page.tsx`, nav entry "Social posting".
+  Doc `shops-platform/docs/SOCIAL.md`. Tables `SocialSetting` (one row per shop) and `SocialPost` (unique `shopId + channel + slotKey`), migration `20261120090000_add_social_posting`. 10 unit + 14 integration tests.
+- **Nothing was read from `process.env` for ids/secrets**, and the guard test (`integrations-no-env.spec.ts`) earned its keep: it failed on `THREADS_PUBLISH_WAIT_MS`/`THREADS_POLL_MS` (timing knobs, not secrets). They are now
+  `SOCIAL_PUBLISH_WAIT_MS` / `SOCIAL_POLL_MS`. Keep the guard blanket; rename rather than allow-list. The only environment name the engine uses is the operator kill switch `SOCIAL_POSTING=false`.
+- Each channel has its own on/off (`facebookEnabled`, `threadsEnabled`, default off) and the times (max six, default 09:00/13:00/19:00 Nairobi, same for both). Starting a channel asks for confirmation in the screen.
+- Threads token renewal writes the new token and `tokenExpiresAt` back to the shop's own THREADS connection through `IntegrationsService.updateStored` (new in this phase; it does not touch `updatedBy`/audit because it is the engine, not a person).
+- Rotation: never-posted first, then longest ago; cooldown 30 days; a small shop may repeat after a week; brand varied. Threads captions drop address, then WhatsApp, then options, then cut the name; price and link are never dropped.
+- The tick (every minute or so, on both slots) loops over shops with a saved, enabled setting; each shop is in its own try/catch; retry loop picks the oldest due rows across shops and re-resolves each shop's connection.
+- **Lessons:** (1) when seeding for a browser check, a Threads account id must be digits and long (the validator rejects short ones); (2) seed through the services (`IntegrationsService.save`) so secrets are encrypted the real way;
+  (3) a "Post now" with a fake token reaches the real Graph API and comes back as Meta's own error (190), which is a useful end-to-end check of the failure path without posting anything.
+- Not covered by tests (needs a real shop): an actual Facebook photo post and a real Threads publish; the first one should be a **Post now** after previewing, with the owner watching.
+
