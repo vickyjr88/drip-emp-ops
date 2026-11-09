@@ -39,6 +39,10 @@ Read first: `drip-crm/docs/WHATSAPP-OUTREACH.md` (behaviour as built), then `wha
 (stats, unsubscribe button) and delivery chips on "Recent messages" (Reached WhatsApp / Delivered / Read / Not delivered + reason). Insights has a WhatsApp tab (chats, ads, opt-outs, onboarding progress, delivery,
 failures, chats that became orders matched by last 9 digits).
 
+## As ported to Nairobi Gents
+
+See "Phase 2 as built" in `nairobi-gents-plan.md` for what differs (no TRADE, phone-keyed outreach over a derived customer list, per-shop template names, opt-in welcome series, a "Connect incoming messages" button).
+
 ## Port checklist
 
 Schema + migration → pure rules and tests (`classifyKeyword`, `parseWebhook`, `verifySignature`, `pickDelivery`, sequence delays, windows) → `WhatsAppClient` taking a resolved config → webhook controller (per-shop secret, 404) → contacts service

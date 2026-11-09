@@ -42,7 +42,7 @@ The list below is the original question set, kept for reference.
 `WHATSAPP_*` env into the platform row, move the existing daily report's `WhatsAppService` to the resolved config, per-shop `enabled` replacing `DAILY_REPORT_SHOPS`, remove the variables, add the grep test.
 *Accept:* daily report still sends tomorrow; no integration `process.env` reads remain; shop A cannot see shop B; masked reads; secrets absent from responses and logs.
 
-**Phase 2 — WhatsApp core.** Per-shop webhook (GET verify, POST receive, 404), status columns on `DailyReportRun`, `WhatsappMessageStatus`, delivery chips on the Daily Report screen. Then `WhatsappContact`, STOP/START, auto-subscription notice, the sequence
+**Phase 2 — WhatsApp core. DONE, committed in shops-platform as `55cf44e` (on top of phase 1 `60b0a5d`; neither pushed when written).** Per-shop webhook (GET verify, POST receive, 404), status columns on `DailyReportRun`, `WhatsappMessageStatus`, delivery chips on the Daily Report screen. Then `WhatsappContact`, STOP/START, auto-subscription notice, the sequence
 (with the shop's own templates), the outreach screen and the WhatsApp report in analytics. Template names and links per shop.
 *Accept:* STOP stops all; duplicate webhook sends one notice; a reported failure reopens a step; delivery shows on the report list; caps are per shop.
 
@@ -82,3 +82,22 @@ The msa and nairobigents shop content is hand-curated: never run the feed sync (
   from the server `.env` and the compose file in a follow-up commit.
 - Lessons from building it: list only the *missing* required fields in "cannot be switched on" messages; reused ids in tests collide with the one-shop-per-number rule, so clear connections between tests;
   two backend slots import at once, so the import must treat a duplicate-key error as "someone else did it".
+
+
+## Phase 2 as built (read this before phase 3)
+
+- Code: `shops-platform/backend/src/whatsapp/` (pure rules `whatsapp-subscription.ts`; `whatsapp-kinds.ts`; `whatsapp-connection.service.ts` = a shop's own ready client; contacts, outreach and sequence services;
+  `whatsapp-webhook.controller.ts`; `whatsapp.controller.ts` at `/portal/whatsapp`, owner only). Screens `web/app/portal/whatsapp/page.tsx` and the incoming-messages panel on Connections. Doc `shops-platform/docs/WHATSAPP.md`.
+  Migration `20261118090000_add_whatsapp_messaging`. 24 integration tests + 9 unit tests.
+- Differences from drip-crm, all deliberate: every method takes `shopId`; **no price tiers or suppliers in Nairobi Gents, so no TRADE class**; customers are a **derived list** (accounts plus guests keyed by email/phone,
+  `PortalCustomerService`), so outreach is keyed by the list's `key` and **deduped by normalised phone**, and `messageable()` was added to that service; **kinds are `GROUP, REVIEW, LOCATION, RANGE`** with template names in the
+  shop's WhatsApp settings (defaults `join_group`, `rate_us`; the fixed-text ones have none until named); the links come from the shop's Store info (`whatsappGroupUrl`, `googleReviewsUrl`); the welcome series is two steps
+  (24 h after the notice, 48 h after the first); **autoSubscribe defaults OFF** and is a toggle field (`input: 'toggle'`) in the provider definition; no Mautic.
+- The shop's **webhook secret is made by the "Connect incoming messages" button** (`connectWhatsappWebhook`): it rotates the secret, registers the address with the WABA (`subscribed_apps` + `override_callback_uri`), and returns
+  the address once. Meta refuses until the app's "messages" field is subscribed in the dashboard; the refusal text is passed on with the address for pasting by hand.
+- **Lessons from building it:** (1) a first message delivered twice at once makes two creates: catch the duplicate-key error and let the other request send the notice; (2) STOP must be recorded even when the shop has
+  switched WhatsApp off, so signature checking needs `appSecretFor` (reads the saved secret regardless of `enabled`) and the controller must not drop events for a disabled connection; (3) in tests, a shop with the welcome off records
+  nobody, so create the waiting contact directly; (4) set "due" times from the test's pretend `now`, not the real clock; (5) a step with no link or template must be advanced past, or the person is stuck failing it five times and never
+  gets the next message; (6) clearing connections between tests is mandatory (one number belongs to one shop).
+- Phase 3 (Facebook comments) reuses everything: `IntegrationsService.findByWebhookSecret('FACEBOOK', ...)`, `appSecretFor`, `rotateWebhookSecret`; add a `connectFacebookWebhook` helper (Page `subscribed_apps?subscribed_fields=feed`) beside
+  `connectWhatsappWebhook`, and the Facebook card's "Connect comments" button. The WhatsApp analytics tab was left for later; the ad each contact came from is already stored.
