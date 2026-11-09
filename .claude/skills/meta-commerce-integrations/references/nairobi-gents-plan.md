@@ -46,7 +46,7 @@ The list below is the original question set, kept for reference.
 (with the shop's own templates), the outreach screen and the WhatsApp report in analytics. Template names and links per shop.
 *Accept:* STOP stops all; duplicate webhook sends one notice; a reported failure reopens a step; delivery shows on the report list; caps are per shop.
 
-**Phase 3 — Facebook comment replies.** App-level Page callback routed by page id, per-shop texts and caps, card on the shop's Marketing screen.
+**Phase 3 — Facebook comment replies. DONE, committed in shops-platform as `72caaf2` (after phase 2 `55cf44e` and phase 1 `60b0a5d`; none pushed when written).** App-level Page callback routed by page id, per-shop texts and caps, card on the shop's Marketing screen.
 *Accept:* a comment from an app-role account gets a private reply (public reply or the reason on the card); the Page's own reply is ignored; duplicate event does nothing.
 
 **Phase 4 — Social posting (Facebook, then Threads).** Section-aware `postableProducts(shopId)`, per-shop settings/rows/rotation, the posting screen, Threads login renewal writing back to the shop's row.
@@ -101,3 +101,20 @@ The msa and nairobigents shop content is hand-curated: never run the feed sync (
   gets the next message; (6) clearing connections between tests is mandatory (one number belongs to one shop).
 - Phase 3 (Facebook comments) reuses everything: `IntegrationsService.findByWebhookSecret('FACEBOOK', ...)`, `appSecretFor`, `rotateWebhookSecret`; add a `connectFacebookWebhook` helper (Page `subscribed_apps?subscribed_fields=feed`) beside
   `connectWhatsappWebhook`, and the Facebook card's "Connect comments" button. The WhatsApp analytics tab was left for later; the ad each contact came from is already stored.
+
+
+## Phase 3 as built (read this before phase 4)
+
+- Code: `shops-platform/backend/src/facebook/` (pure `facebook-comments.ts`; `facebook-connection.service.ts` = a shop's Page, token, settings and the facts the wording is filled with; `facebook-comments.service.ts`;
+  `facebook-webhook.controller.ts`; `facebook.controller.ts` at `/portal/facebook`, owner only). Screens `web/app/portal/facebook/page.tsx` and the Facebook card on Connections. Doc `shops-platform/docs/FACEBOOK.md`.
+  Migration `20261119090000_add_facebook_comment_replies`. 17 integration tests + 8 unit tests.
+- **Per-shop apps made the webhook per shop**: `/facebook/webhook/<secret>` resolved with `findByWebhookSecret('FACEBOOK', ...)`, the event's page id checked against the connection's `externalId`, the signature checked with the
+  shop's own `appSecret`. "Connect comments" (`connectFacebookWebhook`) subscribes the Page to `feed` with the shop's Page token and returns the address **to paste into the shop's own Meta app** (Webhooks > Page); that app-level step
+  cannot be done with a token. `POST /portal/integrations/:provider/webhook` is now generic (WhatsApp or Facebook).
+- New provider-definition capability: `input: 'textarea'` (owner's own reply wording), alongside `toggle` and `number`. Settings: `commentReplies` (default OFF), `publicReply` (default on), `replyDailyCap` (200), `privateReplyText`, `publicReplyText`.
+- **Wording changes from drip-crm:** a new `{shop}` placeholder, the default text names the shop (no hard-coded brand), and **a line containing a placeholder the shop has no value for is dropped** (no "WhatsApp:" with nothing after it).
+  Facts come from the shop (`whatsappNumber`, `address`, `facebookUrl`, `storefrontOriginForShop`).
+- The retry loop runs across all shops (oldest 25 due rows), each row re-resolving its own shop's connection; a row whose shop has since switched replies off is skipped. The per-person "once a week" and the daily cap are per shop.
+- **Lessons:** (1) when testing a webhook from a shell, do not generate ids with `$RANDOM` inside `$(...)`: older bash returns the same number in every subshell, so the "new" comments reused one id and were (correctly) dropped as
+  duplicates, which looked like a bug; pass explicit unique ids. (2) a test counting rows by Page id across the whole shared test database also counts earlier tests' rows; scope counts to the shops in the test.
+- Phase 4 (posting) needs `pages_manage_posts` on the Page token and the Threads login; both live in the same connections. The "Test connection" for Facebook already reports whether comments reach the shop.

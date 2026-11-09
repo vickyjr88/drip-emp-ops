@@ -59,6 +59,7 @@ Mautic or customer name with it. Resellers, wholesalers and suppliers are never 
 - Fake Meta by stubbing `globalThis.fetch` and routing on the URL; return `Response` objects with the provider's real shapes and error bodies. Fake Mautic with a tiny `http.createServer` implementing token, search, create-by-email and edit.
 - Control time with `now` parameters; when a row's own `createdAt/updatedAt` matter, backdate them in the test. Clean up by key prefix, not by deleting tables, so a shared scratch database survives parallel suites.
 - Assert the dangerous things: nothing sent while off, nothing sent twice, nothing sent to STOP/TRADE, secrets absent from output, wrong secret 404, caps hold, sizes/captions within limits (a 500-character Threads limit test caught an off-by-one).
+- Testing webhooks from a shell: give every event an explicit unique id. `$RANDOM` inside `$(...)` repeats in older bash, so "new" events share an id and are (correctly) dropped as duplicates, which looks like a bug.
 - A test that "passes the first time" deserves a second look: add one deliberate failure case to see it fail.
 
 ## Verification protocol (use all three levels)

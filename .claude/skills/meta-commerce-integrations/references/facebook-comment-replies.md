@@ -27,6 +27,10 @@ The public reply failing (e.g. missing permission) never changes the row from SE
 `GET /facebook-comments/status` (configured, enabled, whether the Page is subscribed to `feed`, counts, today vs cap) and list. Portal card "Facebook comments" shows "Page is sending us comments" / "not yet", counts and the latest comments with reasons.
 Webhook route `/facebook/webhook/<secret>` (GET verify, POST receive; signature if the app secret is known).
 
+## As ported to Nairobi Gents
+
+See "Phase 3 as built" in `nairobi-gents-plan.md`: per-shop webhook (each shop has its own app), shop-aware wording that drops empty lines, textarea settings, off by default.
+
 ## Multi-tenant port
 
 One app-level callback, so the route resolves the shop from `entry[].id` (page id → FACEBOOK integration `externalId`). Per-shop caps, per-shop `shopId` in the unique key, per-shop texts. The token and page id come from the credential store;
