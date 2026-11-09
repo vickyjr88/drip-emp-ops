@@ -55,7 +55,7 @@ The list below is the original question set, kept for reference.
 **Phase 5 — Status kit. DONE, committed in shops-platform as `c47f592` (after `cd31b0f`, `72caaf2`, `55cf44e`, `60b0a5d`; none pushed when written).** Per-shop pictures with section-aware layout, phone screen.
 *Accept:* pictures for a watch (no sizes), a phone (storage/colour), and a shirt (sizes) look right; measured 9:16 in the browser; Share tested on a real phone.
 
-**Phase 6 (only if asked) — Mautic sync, operator view across shops, a daily digest.**
+**Phase 6 — operator view across shops and a daily digest. DONE, committed in shops-platform as `29ed2ba` (after `c47f592`, `cd31b0f`, `72caaf2`, `55cf44e`, `60b0a5d`; none pushed when written). Mautic stayed skipped (decision 4).**
 
 ## For each phase
 
@@ -151,4 +151,19 @@ The msa and nairobigents shop content is hand-curated: never run the feed sync (
 - **Screen bug found only in the browser**: a swapped item keeps its id but is a different product, so a picture cache keyed by id kept showing the old product's picture under the new name. Key pictures by id plus product, and
   prove it by comparing the displayed picture's bytes with a fresh render.
 - A desktop browser cannot open the share sheet; `navigator.canShare({files})` is false there and the screen downloads the picture and says so. **Share to WhatsApp on a real phone is the one thing not tested**: do it once after deploy.
+
+## Phase 6 as built (the plan's last phase)
+
+- Code: `shops-platform/backend/src/marketing/` (`marketing-health.ts` pure rules for "needs a person" and "uses any of it"; `marketing-summary.service.ts` with `forShops`/`forShop`/`overview`; `marketing.module.ts`). Wired into `daily-report/` (optional `messaging` on `DailyReport`,
+  `messagingSection` in the email only, **the approved WhatsApp template is untouched**) and `admin/` (`GET /admin/messaging?days=1|7`, a Health check). Screen `web/app/admin/messaging/page.tsx`. Doc `shops-platform/docs/MESSAGING-OVERVIEW.md`. **No migration.**
+  26 unit + 12 integration tests.
+- **Decision I made without asking (say so if it is wrong):** "daily digest" = a section in the owner's existing morning email, not a second message. The operator is not emailed; the signal is the page plus a Health warning. "Operator view" is read-only: editing a shop's
+  connection is left to the shop (Portal > Connections), reachable by the existing audited impersonation.
+- **One place decides "needs a person"** so the email and the operator page cannot disagree. Severity: problem = a saved error on a switched-on connection, a feature on with nothing connected, a Threads login ended, >=20% of >=5 WhatsApp messages failed, >=3 failed comment replies and at least half
+  of those tried, every post to a channel failed; warning = Threads login ending within 14 days, switched on but never tested, some posts failed, posting off on the server. A switched-off connection is never reported. Too few messages to judge are not reported.
+- **Accepted is not delivered** again: a send Meta accepted and later reported as `failed` counts as failed in the totals.
+- **Operator page as cards, not a table**, so it reads on a phone with no sideways scroll; one grouped read per table across all shops; never selects `secrets` or `webhookKey` (a test asserts the overview contains no token text).
+- The Health check is a **warning, never a failure**: one shop's setup is not a platform outage.
+- **Test-writing lesson:** the filter "only shops that need attention" cannot be proven on data where every shop has something to report; make one shop genuinely healthy first.
+- Not done, on purpose: an operator email/WhatsApp alert, and a per-shop "posting stalled" rule (posting on but nothing posted for N hours), which needs the schedule's due slots and was left out to avoid false alarms.
 
