@@ -6,8 +6,12 @@ export type FunnelRow = {
   sessions: number;
   viewedProduct: number;
   addedToCart: number;
+  /** Sessions that opened the cart page (cart and checkout form are one page). Tells carts never opened from carts opened and left. */
+  viewedCart: number;
   beganCheckout: number;
   tappedWhatsapp: number;
+  /** Sessions that tapped a phone number (any tel: link). */
+  tappedCall: number;
   /** Sessions that went on to a WhatsApp order message (the cart's own button, which records a lead). */
   whatsappOrders: number;
   orders: number;
@@ -51,8 +55,10 @@ export class FunnelService {
         SELECT e."sessionId",
           bool_or(e.type = 'VIEW_PRODUCT') AS viewed,
           bool_or(e.type = 'ADD_TO_CART') AS added,
+          bool_or(e.type = 'VIEW_CART') AS "viewedCart",
           bool_or(e.type = 'BEGIN_CHECKOUT') AS checkout,
-          bool_or(e.type = 'WHATSAPP_CLICK') AS whatsapp
+          bool_or(e.type = 'WHATSAPP_CLICK') AS whatsapp,
+          bool_or(e.type = 'CALL_CLICK') AS call
         FROM "StorefrontEvent" e JOIN s ON s."sessionId" = e."sessionId"
         GROUP BY e."sessionId"
       ), o AS (
@@ -68,8 +74,10 @@ export class FunnelService {
         count(*)::int AS sessions,
         count(*) FILTER (WHERE f.viewed)::int AS "viewedProduct",
         count(*) FILTER (WHERE f.added)::int AS "addedToCart",
+        count(*) FILTER (WHERE f."viewedCart")::int AS "viewedCart",
         count(*) FILTER (WHERE f.checkout)::int AS "beganCheckout",
         count(*) FILTER (WHERE f.whatsapp)::int AS "tappedWhatsapp",
+        count(*) FILTER (WHERE f.call)::int AS "tappedCall",
         count(*) FILTER (WHERE w."sessionId" IS NOT NULL)::int AS "whatsappOrders",
         COALESCE(sum(o.orders), 0)::int AS orders,
         COALESCE(sum(o.revenue), 0)::float AS "revenueKes"
@@ -80,10 +88,10 @@ export class FunnelService {
       GROUP BY s.source, s.medium, s.device
     `);
 
-    const blank = (): FunnelRow => ({ sessions: 0, viewedProduct: 0, addedToCart: 0, beganCheckout: 0, tappedWhatsapp: 0, whatsappOrders: 0, orders: 0, revenueKes: 0 });
+    const blank = (): FunnelRow => ({ sessions: 0, viewedProduct: 0, addedToCart: 0, viewedCart: 0, beganCheckout: 0, tappedWhatsapp: 0, tappedCall: 0, whatsappOrders: 0, orders: 0, revenueKes: 0 });
     const add = (target: FunnelRow, r: Record<string, unknown>) => {
       target.sessions += num(r.sessions); target.viewedProduct += num(r.viewedProduct); target.addedToCart += num(r.addedToCart);
-      target.beganCheckout += num(r.beganCheckout); target.tappedWhatsapp += num(r.tappedWhatsapp); target.whatsappOrders += num(r.whatsappOrders);
+      target.viewedCart += num(r.viewedCart); target.beganCheckout += num(r.beganCheckout); target.tappedWhatsapp += num(r.tappedWhatsapp); target.tappedCall += num(r.tappedCall); target.whatsappOrders += num(r.whatsappOrders);
       target.orders += num(r.orders); target.revenueKes += num(r.revenueKes);
     };
 

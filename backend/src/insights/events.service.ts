@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { classifyVisit, deviceOf, looksLikeBot } from './visit';
 
-export const EVENT_TYPES = ['SESSION_START', 'VIEW_PRODUCT', 'ADD_TO_CART', 'BEGIN_CHECKOUT', 'WHATSAPP_CLICK', 'SEARCH'] as const;
+export const EVENT_TYPES = ['SESSION_START', 'VIEW_PRODUCT', 'ADD_TO_CART', 'VIEW_CART', 'BEGIN_CHECKOUT', 'WHATSAPP_CLICK', 'CALL_CLICK', 'SEARCH'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const SESSION_ID = /^[A-Za-z0-9]{12,40}$/;

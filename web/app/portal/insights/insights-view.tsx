@@ -15,7 +15,7 @@ import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, hasPermission, loadProfile, roleLabelFor } from '../accounting/lib';
 
-type Row = { sessions: number; viewedProduct: number; addedToCart: number; beganCheckout: number; tappedWhatsapp: number; whatsappOrders: number; orders: number; revenueKes: number };
+type Row = { sessions: number; viewedProduct: number; addedToCart: number; viewedCart: number; beganCheckout: number; tappedWhatsapp: number; tappedCall: number; whatsappOrders: number; orders: number; revenueKes: number };
 type Funnel = {
   totals: Row;
   adReturn: Array<{ source: string; spendKes: number; visits: number; whatsappTaps: number; orders: number; revenueKes: number }>;
@@ -49,25 +49,33 @@ const errorText = (e: unknown) => {
 };
 
 /** What each stage of a visit lost, in words, so the screen says what to look at rather than leaving the reading to staff. */
+/** A visit that ended somewhere useful: an order, a WhatsApp tap or a call. */
+const reached = (r: Row) => r.orders + r.tappedWhatsapp + r.tappedCall;
+
 function funnelNotes(f: Funnel): string[] {
   const t = f.totals;
   if (t.sessions < 30) return [];
   const out: string[] = [];
   const left = 1 - t.viewedProduct / t.sessions;
   if (left > 0.6) out.push(`${(left * 100).toFixed(0)}% of visits leave without opening a single product. The first screen, the ad's promise and the page the ad lands on are worth a look.`);
-  if (t.viewedProduct >= 20 && t.addedToCart / t.viewedProduct < 0.05 && t.tappedWhatsapp / t.viewedProduct < 0.05) {
-    out.push(`Of ${t.viewedProduct} visits that opened a product, only ${t.addedToCart} added to cart and ${t.tappedWhatsapp} tapped WhatsApp. The product page is where people hesitate: price, sizes, delivery and trust.`);
+  if (t.viewedProduct >= 20 && t.addedToCart / t.viewedProduct < 0.05 && (t.tappedWhatsapp + t.tappedCall) / t.viewedProduct < 0.05) {
+    out.push(`Of ${t.viewedProduct} visits that opened a product, only ${t.addedToCart} added to cart, ${t.tappedWhatsapp} tapped WhatsApp and ${t.tappedCall} called. The product page is where people hesitate: price, sizes, delivery and trust.`);
   }
   if (t.addedToCart >= 10 && t.beganCheckout / t.addedToCart < 0.3) out.push(`${t.addedToCart - t.beganCheckout} of ${t.addedToCart} carts never reached checkout.`);
+  // Where the carts leak, once the cart page is being counted: never opened, or opened and left.
+  if (t.viewedCart > 0 || t.addedToCart >= 20) {
+    if (t.addedToCart >= 10 && t.viewedCart / t.addedToCart < 0.5) out.push(`Only ${t.viewedCart} of ${t.addedToCart} carts were ever opened. People add a pair and never go to the cart: the Checkout button after adding is the thing to look at.`);
+    else if (t.viewedCart >= 10 && t.beganCheckout / t.viewedCart < 0.3) out.push(`${t.viewedCart - t.beganCheckout} of ${t.viewedCart} people who opened the cart did not press Pay. The form, the price shown there, or the wish to ask first on WhatsApp is where they stop.`);
+  }
   const mobile = f.byDevice.find((d) => d.device === 'mobile');
   const desktop = f.byDevice.find((d) => d.device === 'desktop');
   if (mobile && desktop && mobile.sessions >= 30 && desktop.sessions >= 30) {
-    const m = (mobile.orders + mobile.tappedWhatsapp) / mobile.sessions;
-    const d = (desktop.orders + desktop.tappedWhatsapp) / desktop.sessions;
+    const m = reached(mobile) / mobile.sessions;
+    const d = reached(desktop) / desktop.sessions;
     if (m < d * 0.6) out.push(`Phones bring ${pct(mobile.sessions, t.sessions)} of visits but convert far worse than desktop. Check the phone experience first.`);
   }
-  const worst = f.bySource.find((s) => s.sessions >= 30 && s.orders === 0 && s.tappedWhatsapp === 0 && !['organic', 'none'].includes(s.medium));
-  if (worst) out.push(`${worst.source} (${worst.medium}) sent ${worst.sessions} visits and produced no orders and no WhatsApp taps.`);
+  const worst = f.bySource.find((s) => s.sessions >= 30 && reached(s) === 0 && !['organic', 'none'].includes(s.medium));
+  if (worst) out.push(`${worst.source} (${worst.medium}) sent ${worst.sessions} visits and produced no orders, no WhatsApp taps and no calls.`);
   return out;
 }
 
@@ -198,7 +206,8 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
   const t = f.totals;
   const steps = [
     { label: 'Visits', value: t.sessions }, { label: 'Opened a product', value: t.viewedProduct }, { label: 'Added to cart', value: t.addedToCart },
-    { label: 'Began checkout', value: t.beganCheckout }, { label: 'Tapped WhatsApp', value: t.tappedWhatsapp }, { label: 'Ordered', value: t.orders },
+    { label: 'Opened the cart', value: t.viewedCart }, { label: 'Began checkout', value: t.beganCheckout },
+    { label: 'Tapped WhatsApp', value: t.tappedWhatsapp }, { label: 'Tapped call', value: t.tappedCall }, { label: 'Ordered', value: t.orders },
   ];
   const notes = funnelNotes(f);
 
@@ -220,7 +229,7 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
               ))}
             </div>
             <p className="portal-muted" style={{ marginBottom: 0 }}>
-              Visit to order: <strong>{pct(t.orders, t.sessions)}</strong>. Visit to an order or a WhatsApp tap: <strong>{pct(t.orders + t.tappedWhatsapp, t.sessions)}</strong>.
+              Visit to order: <strong>{pct(t.orders, t.sessions)}</strong>. Visit to an order, a WhatsApp tap or a call: <strong>{pct(t.orders + t.tappedWhatsapp + t.tappedCall, t.sessions)}</strong>.
               {f.orders.placed > 0 ? ` ${f.orders.linkedToVisits} of the ${f.orders.placed} orders placed in this period can be traced to a visit; the rest were taken in store, by phone, or before tracking began.` : ''}
             </p>
             {notes.length ? <ul style={{ margin: '12px 0 0', paddingLeft: 18 }}>{notes.map((n) => <li key={n}>{n}</li>)}</ul> : null}
@@ -262,12 +271,12 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
             <h2 style={{ marginTop: 0 }}>Where visits come from</h2>
             <div className="portal-table-wrap">
               <table className="portal-data-table is-compact">
-                <thead><tr><th>Source</th><th>Kind</th><th>Visits</th><th>Opened a product</th><th>Added to cart</th><th>WhatsApp taps</th><th>Orders</th><th>Revenue</th><th>Visit to order</th></tr></thead>
+                <thead><tr><th>Source</th><th>Kind</th><th>Visits</th><th>Opened a product</th><th>Added to cart</th><th>WhatsApp taps</th><th>Calls</th><th>Orders</th><th>Revenue</th><th>Visit to order</th></tr></thead>
                 <tbody>
                   {f.bySource.map((s) => (
                     <tr key={`${s.source}|${s.medium}`}>
                       <td><strong>{s.source}</strong></td><td>{s.medium}</td><td>{s.sessions.toLocaleString('en-KE')}</td>
-                      <td>{pct(s.viewedProduct, s.sessions)}</td><td>{pct(s.addedToCart, s.sessions)}</td><td>{s.tappedWhatsapp}</td>
+                      <td>{pct(s.viewedProduct, s.sessions)}</td><td>{pct(s.addedToCart, s.sessions)}</td><td>{s.tappedWhatsapp}</td><td>{s.tappedCall}</td>
                       <td>{s.orders}</td><td>{kes(s.revenueKes)}</td><td>{pct(s.orders, s.sessions)}</td>
                     </tr>
                   ))}
@@ -311,8 +320,8 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
               <h3>Devices</h3>
               <div className="portal-table-wrap">
                 <table className="portal-data-table is-compact">
-                  <thead><tr><th>Device</th><th>Visits</th><th>Orders or WhatsApp</th></tr></thead>
-                  <tbody>{f.byDevice.map((d) => <tr key={d.device}><td>{d.device}</td><td>{d.sessions}</td><td>{pct(d.orders + d.tappedWhatsapp, d.sessions)}</td></tr>)}</tbody>
+                  <thead><tr><th>Device</th><th>Visits</th><th>Orders, WhatsApp or calls</th></tr></thead>
+                  <tbody>{f.byDevice.map((d) => <tr key={d.device}><td>{d.device}</td><td>{d.sessions}</td><td>{pct(reached(d), d.sessions)}</td></tr>)}</tbody>
                 </table>
               </div>
             </article>

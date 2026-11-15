@@ -14,14 +14,21 @@
  * now, and WhatsApp for the trade that already happens there — most of this
  * shop's customers message before they buy, and burying that behind a cart
  * would cost more than the cart gains.
+ *
+ * On a phone the buttons used to sit a screen below the price, so a visitor
+ * who had decided still had to scroll to act on it. A buy bar now stays at the
+ * bottom of the screen (Add to Cart, WhatsApp, Call) whenever the real buttons
+ * are out of view, and the reasons to trust the shop sit beside the price
+ * rather than under the buttons.
  */
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { ProductCard } from '../../components/product-card';
 import { ShareButton } from '../../components/share-button';
+import { PhoneIcon, WhatsAppIcon } from '../../components/contact-icons';
 import { FavoriteButton } from '../../components/favorite-button';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
@@ -40,6 +47,9 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
   const cart = useCart();
   const auth = useCustomerAuth();
   const [added, setAdded] = useState(false);
+  // The buy bar shows while the real buttons are out of view (below the fold on arrival, above it once scrolled past).
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const [barOn, setBarOn] = useState(false);
 
   // Every possible landing point for a shared referral link is this page --
   // ShareButton only ever links to a product page -- so capturing happens
@@ -109,6 +119,21 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id]);
 
+  useEffect(() => {
+    const element = actionsRef.current;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+    // The bottom margin is the bar's own height: it stays until the real buttons have risen clear of it, so they are never half behind it.
+    const observer = new IntersectionObserver(([entry]) => setBarOn(!entry.isIntersecting), { threshold: 0, rootMargin: '0px 0px -84px 0px' });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  // Lets the page's own floating buttons step aside while the buy bar holds the same actions (see globals.css).
+  useEffect(() => {
+    document.body.classList.toggle('has-buybar', barOn);
+    return () => document.body.classList.remove('has-buybar');
+  }, [barOn]);
+
   /**
    * The enquiry, as a message someone can act on without asking twice.
    *
@@ -165,6 +190,33 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
   }
 
   const message = buildEnquiry();
+
+  /** Adds the chosen size to the cart. The page's button and the buy bar's both do exactly this. */
+  function addChosen() {
+    if (!chosen) return;
+    const label = `${product.name} - ${chosen.size ?? chosen.name}`;
+    cart.add({
+      variantId: chosen.id,
+      productSlug: product.slug,
+      name: product.name,
+      // Falls back to the variant's own name for a sizeless
+      // product (a watch, a perfume) -- the cart line still
+      // needs some label, and that's what the name is for.
+      size: chosen.size ?? chosen.name,
+      sku: chosen.sku,
+      priceKes: chosen.priceKes,
+      imageUrl: product.imageUrls[0] || null,
+    });
+    trackMetaAddToCart({ contentId: product.id, contentName: label, value: chosen.priceKes });
+    trackXAddToCart({ contentId: product.id, contentName: label, value: chosen.priceKes });
+    trackTikTokAddToCart({ contentId: product.id, contentName: label, value: chosen.priceKes });
+    // Confirmed in place rather than by yanking the shopper to
+    // the cart: most people add a second pair.
+    setAdded(true);
+    window.setTimeout(() => setAdded(false), 2500);
+  }
+
+  const sizeless = !(product.variants.length > 1 || product.variants[0]?.size);
 
   return (
     <EliteLayout active="shop">
@@ -250,6 +302,14 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               </p>
             ) : null}
 
+            {/* The reasons to trust the shop, in a line beside the price (the full wording is below the buttons). Short enough that the
+                sizes stay on the first screen of a phone. */}
+            <ul className="de-trustchips" aria-label="Why buy here">
+              <li>Delivery across Kenya</li>
+              <li>M-Pesa or card</li>
+              <li>Try before you pay</li>
+            </ul>
+
             <div className="de-sizes">
               {/* A single sizeless variant (a watch, a perfume) has nothing
                   to pick, so the heading and grid are skipped entirely --
@@ -280,7 +340,10 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               ) : null}
               {chosen ? (
                 <p className="de-size-note">
-                  {chosen.size ?? chosen.name} · {chosen.sku} · {chosen.inStock ? 'in stock' : 'available to order'}
+                  {sizeless ? '' : `${chosen.size ?? chosen.name} · `}
+                  {chosen.inStock
+                    ? 'In stock, ready to try on at the shop'
+                    : 'Not on the shelf: we order it in for you (usual lead time applies)'}
                 </p>
               ) : (
                 <p className="de-size-note">
@@ -323,45 +386,12 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               ) : null}
             </div>
 
-            <div className="de-actions">
+            <div className="de-actions" ref={actionsRef}>
               <button
                 type="button"
                 className="lp-button lp-button-primary"
                 disabled={!chosen}
-                onClick={() => {
-                  if (!chosen) return;
-                  cart.add({
-                    variantId: chosen.id,
-                    productSlug: product.slug,
-                    name: product.name,
-                    // Falls back to the variant's own name for a sizeless
-                    // product (a watch, a perfume) -- the cart line still
-                    // needs some label, and that's what the name is for.
-                    size: chosen.size ?? chosen.name,
-                    sku: chosen.sku,
-                    priceKes: chosen.priceKes,
-                    imageUrl: product.imageUrls[0] || null,
-                  });
-                  trackMetaAddToCart({
-                    contentId: product.id,
-                    contentName: `${product.name} - ${chosen.size ?? chosen.name}`,
-                    value: chosen.priceKes,
-                  });
-                  trackXAddToCart({
-                    contentId: product.id,
-                    contentName: `${product.name} - ${chosen.size ?? chosen.name}`,
-                    value: chosen.priceKes,
-                  });
-                  trackTikTokAddToCart({
-                    contentId: product.id,
-                    contentName: `${product.name} - ${chosen.size ?? chosen.name}`,
-                    value: chosen.priceKes,
-                  });
-                  // Confirmed in place rather than by yanking the shopper to
-                  // the cart: most people add a second pair.
-                  setAdded(true);
-                  window.setTimeout(() => setAdded(false), 2500);
-                }}
+                onClick={addChosen}
               >
                 {added ? 'Added ✓' : chosen ? `Add ${chosen.size ?? chosen.name} to Cart` : 'Select a size'}
               </button>
@@ -383,16 +413,16 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
                 target="_blank"
                 rel="noreferrer"
               >
-                {chosen ? 'Or order on WhatsApp' : 'Ask about sizes on WhatsApp'}
+                {chosen ? 'Order on WhatsApp' : 'Ask about sizes on WhatsApp'}
               </a>
-              <a className="lp-button lp-button-ghost" href={enquiry.phoneHref}>
+              <a className="lp-button lp-button-ghost" href={enquiry.phoneHref} data-source="product-page">
                 Call {enquiry.phone}
               </a>
             </div>
 
-            {/* The three things a shopper checks before committing. */}
             <ul className="de-assurances">
               <li>{enquiry.deliveryNote}</li>
+              <li>Pay by M-Pesa or card online, or order on WhatsApp</li>
               <li>Try before you pay at either shop</li>
               <li>Open 08:00–20:00, Ronald Ngala Street</li>
             </ul>
@@ -412,6 +442,40 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               ))}
             </div>
           </section>
+        ) : null}
+
+        {/* Phones only (see globals.css). Same three actions as the buttons above, kept in reach while those are out of view. */}
+        {barOn ? (
+          <div className="de-buybar" role="region" aria-label="Buy this pair">
+            {added || cart.count > 0 ? (
+              <Link href="/cart" className="de-buybar-strip">
+                <span>{added ? 'Added to your cart ✓' : `${cart.count} item${cart.count === 1 ? '' : 's'} in your cart`}</span>
+                <strong>Checkout →</strong>
+              </Link>
+            ) : null}
+            <div className="de-buybar-row">
+              <div className="de-buybar-price">
+                <strong>{chosen ? formatKes(chosen.priceKes) : priceLabel(product)}</strong>
+                {chosen && !sizeless ? <span>Size {(chosen.size ?? chosen.name).replace('EUR ', '')}</span> : null}
+              </div>
+              <button type="button" className="de-buybar-add" disabled={!chosen} onClick={addChosen}>
+                {added ? 'Added ✓' : chosen ? 'Add to Cart' : 'Select a size'}
+              </button>
+              <a
+                className="de-buybar-icon de-buybar-wa"
+                href={enquiry.whatsappHref(message)}
+                onClick={() => enquiry.onWhatsAppClick('product-bar')}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Order on WhatsApp"
+              >
+                <WhatsAppIcon />
+              </a>
+              <a className="de-buybar-icon de-buybar-call" href={enquiry.phoneHref} data-source="product-bar" aria-label={`Call ${enquiry.phone}`}>
+                <PhoneIcon />
+              </a>
+            </div>
+          </div>
         ) : null}
       </main>
     </EliteLayout>

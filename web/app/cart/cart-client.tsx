@@ -24,6 +24,8 @@ import { fetchProduct, formatKes } from '../lib/shop';
 import { useEnquiryContact } from '../lib/use-enquiry-contact';
 import { readCapturedAttribution } from '../lib/use-capture-referral';
 import { getSessionId, recordEvent } from '../lib/first-party';
+import { trackInitiateCheckout as trackMetaCheckout } from '../lib/meta-pixel';
+import { trackInitiateCheckout as trackTikTokCheckout } from '../lib/tiktok-pixel';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 /**
@@ -128,6 +130,18 @@ export function CartClient() {
     0,
   );
   const total = subtotal + shipping;
+
+  // Opening the cart is the step between "added" and "pressed Pay": recording it shows whether carts are never opened or opened and left,
+  // and tells the ad platforms a shopper reached checkout. Once per visit to this page, and only for a cart with something in it.
+  const cartViewed = useRef(false);
+  useEffect(() => {
+    if (!cart.ready || cart.lines.length === 0 || cartViewed.current) return;
+    cartViewed.current = true;
+    recordEvent('VIEW_CART');
+    trackMetaCheckout({ value: subtotal, numItems: cart.count });
+    trackTikTokCheckout({ value: subtotal, numItems: cart.count });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart.ready, cart.lines.length]);
 
   /**
    * Marks this basket as a possible abandoned-cart lead once there is a way to
@@ -479,7 +493,7 @@ export function CartClient() {
                   onChange={(event) => setForm((p) => ({ ...p, lastName: event.target.value }))} />
               </label>
               <label>
-                <span>Email</span>
+                <span>Email <small className="de-field-hint">(for your receipt)</small></span>
                 <input type="email" value={form.email} required autoComplete="email"
                   onChange={(event) => setForm((p) => ({ ...p, email: event.target.value }))} />
               </label>
@@ -526,9 +540,15 @@ export function CartClient() {
                   <p>Card payment is not available right now. Send this order on WhatsApp and we will hold it for you.</p>
                 </div>
               ) : (
-                <button type="submit" className="lp-button lp-button-primary" disabled={submitting || online === null}>
-                  {submitting ? 'Taking you to payment…' : `Pay ${formatKes(total)}`}
-                </button>
+                <>
+                  <button type="submit" className="lp-button lp-button-primary" disabled={submitting || online === null}>
+                    {submitting ? 'Taking you to payment…' : `Pay ${formatKes(total)}`}
+                  </button>
+                  {/* Right under the button, where the hesitation is: how it is paid, that it is safe, and that no account is needed. */}
+                  <p className="de-checkout-secure">
+                    Pay by M-Pesa or card, secured by Paystack. No account needed.
+                  </p>
+                </>
               )}
 
               <button
@@ -540,14 +560,10 @@ export function CartClient() {
                 {online === false ? 'Send order on WhatsApp' : 'Order on WhatsApp instead'}
               </button>
 
-              {/* Promising Paystack while the card button is hidden would be
-                  a lie the buyer can see through. */}
               <p className="de-checkout-note">
-                {online === false
-                  ? 'We will confirm your order and payment on WhatsApp. '
-                  : 'Paid securely by card or M-Pesa through Paystack. '}
-                Collect at Dubai Merchants Mall shop F53, open 08:00 to
-                20:00.
+                {online === false ? 'We will confirm your order and payment on WhatsApp. ' : ''}
+                Collect at Dubai Merchants Mall shop F53, open 08:00 to 20:00, or ask for delivery above.
+                {' '}Questions? <a href={enquiry.phoneHref} data-source="cart">Call {enquiry.phone}</a>
               </p>
             </form>
           </aside>

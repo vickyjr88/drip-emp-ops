@@ -54,6 +54,20 @@ export function trackAddToCart(params: {
   });
 }
 
+/**
+ * A shopper reaches out: a WhatsApp tap or a call. This shop's sales mostly close in those conversations, so this is the event
+ * that tells Meta which ad clicks led somewhere. With only a few online payments a month, Purchase alone gives the ad
+ * system too little to learn from; Contact gives it dozens of real signals. `channel` is "whatsapp" or "call".
+ */
+export function trackContact(params: { channel: string; source?: string }) {
+  fire('Contact', { content_name: params.channel, content_category: params.source ?? 'site' });
+}
+
+/** A shopper opens the cart, which is also the checkout form. Fire once per visit to the page. */
+export function trackInitiateCheckout(params: { value: number; numItems: number; currency?: string }) {
+  fire('InitiateCheckout', { value: params.value, num_items: params.numItems, currency: params.currency || 'KES' });
+}
+
 /** An order is confirmed paid. Fire once per order -- see the guard in
  *  complete-client.tsx, since this page can be revisited/refreshed after
  *  the purchase already completed. */

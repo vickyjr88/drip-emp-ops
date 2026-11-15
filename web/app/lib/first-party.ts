@@ -12,7 +12,7 @@ const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').re
 const SESSION_KEY = 'de_sid';
 const STARTED_KEY = 'de_started';
 
-export type EventType = 'SESSION_START' | 'VIEW_PRODUCT' | 'ADD_TO_CART' | 'BEGIN_CHECKOUT' | 'WHATSAPP_CLICK' | 'SEARCH';
+export type EventType = 'SESSION_START' | 'VIEW_PRODUCT' | 'ADD_TO_CART' | 'VIEW_CART' | 'BEGIN_CHECKOUT' | 'WHATSAPP_CLICK' | 'CALL_CLICK' | 'SEARCH';
 
 /** The same shape the backend accepts (insights/events.service SESSION_ID): letters and digits, 12 to 40 of them. */
 function makeId(): string {

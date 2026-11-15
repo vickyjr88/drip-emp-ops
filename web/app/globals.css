@@ -11199,9 +11199,29 @@ img {
   color: #fff;
 }
 
+/* Beside the price, where the decision is made: three short reasons to trust the shop. */
+.de-trustchips {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--de-600);
+}
+
+.de-trustchips li::before {
+  content: '✓';
+  margin-right: 5px;
+  font-weight: 700;
+}
+
+/* The full wording, under the buttons. */
 .de-assurances {
-  margin: 24px 0 0;
-  padding: 18px 0 0;
+  margin: 22px 0 0;
+  padding: 16px 0 0;
   border-top: 1px solid var(--de-line);
   list-style: none;
   display: grid;
@@ -11215,6 +11235,148 @@ img {
   margin-right: 8px;
   color: var(--de-600);
   font-weight: 700;
+}
+
+/* Phones: the photo, name, price, reasons to trust and the first sizes should all be on the first screen, above the buy bar. */
+@media (max-width: 680px) {
+  .de-crumbs {
+    padding-block: 10px 0;
+  }
+
+  .de-product-main {
+    padding-block: 10px 10px;
+    gap: 16px;
+  }
+
+  .de-gallery-main {
+    aspect-ratio: 5 / 4;
+  }
+
+  .de-gallery-thumbs {
+    margin-top: 8px;
+  }
+
+  .de-sizes {
+    margin-top: 16px;
+    padding-top: 14px;
+  }
+}
+
+/* The buy bar: phones only. Holds Add to Cart, WhatsApp and Call while the page's own buttons are out of view. */
+.de-buybar {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .de-buybar {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    background: #fff;
+    border-top: 1px solid var(--de-line);
+    box-shadow: 0 -6px 24px rgba(2, 7, 33, 0.12);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .de-buybar-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    background: var(--de-100);
+    border-bottom: 1px solid var(--de-line);
+    color: var(--de-ink);
+    font-size: 0.85rem;
+    text-decoration: none;
+  }
+
+  .de-buybar-strip strong {
+    color: var(--de-royal);
+    white-space: nowrap;
+  }
+
+  .de-buybar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .de-buybar-price {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    max-width: 34%;
+    line-height: 1.15;
+  }
+
+  .de-buybar-price strong {
+    font-size: 1rem;
+    color: var(--de-ink);
+    white-space: nowrap;
+  }
+
+  .de-buybar-price span {
+    font-size: 0.72rem;
+    color: var(--de-muted);
+  }
+
+  .de-buybar-add {
+    flex: 1 1 auto;
+    min-height: 46px;
+    border: 0;
+    background: var(--de-royal);
+    color: #fff;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .de-buybar-add:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  .de-buybar-icon {
+    flex: 0 0 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .de-buybar-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .de-buybar-wa {
+    background: var(--de-go);
+    color: #fff;
+  }
+
+  .de-buybar-call {
+    background: #fff;
+    color: var(--de-royal);
+    border: 1.5px solid var(--de-royal);
+  }
+
+  /* Room for the bar at the very bottom of the page, and the floating buttons step aside: the bar carries the same actions. */
+  body.has-buybar {
+    padding-bottom: 112px;
+  }
+
+  body.has-buybar .lp-whatsapp-float,
+  body.has-buybar .lp-checkout-float {
+    display: none;
+  }
 }
 
 .de-product-copy {
@@ -12031,6 +12193,27 @@ img {
   margin: 4px 0 0;
   font-size: 12px;
   line-height: 1.5;
+  color: var(--de-muted);
+}
+
+.de-checkout-note a {
+  color: var(--de-royal);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Under the Pay button: how it is paid, that it is safe, that no account is needed. */
+.de-checkout-secure {
+  margin: -2px 0 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--de-600);
+  font-weight: 600;
+}
+
+.de-field-hint {
+  font-weight: 400;
   color: var(--de-muted);
 }
 

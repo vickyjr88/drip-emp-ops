@@ -34,6 +34,8 @@ test('what a browser may send: known events kept, the rest dropped, bad batches 
   const events = cleanEvents([{ type: 'VIEW_PRODUCT', productSlug: 'x' }, { type: 'DROP_TABLE' }, { type: 'SEARCH', detail: '  air max ' }]);
   assert.deepEqual(events.map((e) => e.type), ['VIEW_PRODUCT', 'SEARCH']);
   assert.equal(events[1].detail, 'air max');
+  // Call taps and cart views are recorded too: they are the conversions the funnel could not see before.
+  assert.deepEqual(cleanEvents([{ type: 'CALL_CLICK', detail: 'product-bar' }, { type: 'VIEW_CART' }]).map((e) => e.type), ['CALL_CLICK', 'VIEW_CART']);
   assert.throws(() => cleanEvents([]));
   assert.throws(() => cleanEvents(Array.from({ length: 11 }, () => ({ type: 'SEARCH' }))));
   assert.throws(() => cleanEvents('x'));

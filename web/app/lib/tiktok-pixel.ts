@@ -60,6 +60,16 @@ export function trackAddToCart(params: {
   });
 }
 
+/** A shopper reaches out by WhatsApp or by phone: the conversion most of this shop's sales start with. Mirrors meta-pixel.ts. */
+export function trackContact(params: { channel: string; source?: string }) {
+  fire('Contact', { description: `${params.channel}${params.source ? `:${params.source}` : ''}` });
+}
+
+/** A shopper opens the cart, which is also the checkout form. Fire once per visit to the page. */
+export function trackInitiateCheckout(params: { value: number; numItems: number; currency?: string }) {
+  fire('InitiateCheckout', { value: params.value, quantity: params.numItems, currency: params.currency || 'KES' });
+}
+
 /** An order is confirmed paid. Fire once per order -- see the guard in
  *  complete-client.tsx, since this page can be revisited/refreshed after
  *  the purchase already completed. */

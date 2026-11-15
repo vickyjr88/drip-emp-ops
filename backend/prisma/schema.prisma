@@ -2404,11 +2404,11 @@ model KitTemplate {
 model StorefrontEvent {
   id          String   @id @default(uuid())
   sessionId   String
-  /// SESSION_START | VIEW_PRODUCT | ADD_TO_CART | BEGIN_CHECKOUT | WHATSAPP_CLICK | SEARCH
+  /// SESSION_START | VIEW_PRODUCT | ADD_TO_CART | VIEW_CART | BEGIN_CHECKOUT | WHATSAPP_CLICK | CALL_CLICK | SEARCH
   type        String
   /// The product's slug, for product events.
   productSlug String?
-  /// Where it happened: "product-page", "cart", "float" for a WhatsApp tap; the typed words for SEARCH.
+  /// Where it happened: "product-page", "product-bar", "cart", "float" for a WhatsApp or call tap; the typed words for SEARCH.
   detail      String?
   /// SESSION_START only: where the visit came from, worked out once and kept with the session.
   source      String?

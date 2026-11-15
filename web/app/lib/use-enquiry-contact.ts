@@ -17,6 +17,8 @@ import { PageContentDocument, contentValue, fetchPageContent } from './page-cont
 import { customerApi } from './customer-auth';
 import { readCapturedAttribution } from './use-capture-referral';
 import { productSlugOfPath, recordEvent } from './first-party';
+import { trackContact as trackMetaContact } from './meta-pixel';
+import { trackContact as trackTikTokContact } from './tiktok-pixel';
 
 const DEFAULT_WHATSAPP = '254113206481';
 const DEFAULT_PHONE = '+254 113 206 481';
@@ -79,6 +81,9 @@ export function useEnquiryContact() {
 function recordWhatsAppClick(source: string) {
   // Also noted in the shop's own visit record, against the product page the button was on when it has one.
   recordEvent('WHATSAPP_CLICK', { detail: source, productSlug: productSlugOfPath(window.location.pathname) ?? undefined });
+  // Also told to the ad platforms as a Contact: this is where most of this shop's sales start, and they cannot see it otherwise.
+  trackMetaContact({ channel: 'whatsapp', source });
+  trackTikTokContact({ channel: 'whatsapp', source });
   const attribution = readCapturedAttribution();
   void customerApi('/cart-leads/whatsapp-click', {
     method: 'POST',

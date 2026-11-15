@@ -17,6 +17,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import posthog from 'posthog-js';
 import { productSlugOfPath, recordEvent } from '../lib/first-party';
+import { recordCallTap, telLinkOf } from '../lib/contact-taps';
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
@@ -124,6 +125,17 @@ function FirstPartyTracker() {
     const slug = productSlugOfPath(pathname || '');
     if (slug) recordEvent('VIEW_PRODUCT', { productSlug: slug });
   }, [pathname]);
+
+  // A tap on any phone number, wherever it sits: calls are a conversion the shop could not see before. Capturing, so a link that stops the
+  // event (or navigates in its own handler) is still counted.
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const tap = telLinkOf(event.target);
+      if (tap) recordCallTap(tap.source);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
 
   return null;
 }
