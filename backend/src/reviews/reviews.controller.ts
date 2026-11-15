@@ -6,6 +6,7 @@ import { Permissions } from '../auth/decorators/permissions.decorator';
 import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { makeRateLimiter } from '../insights/events.service';
 import { ReviewsService } from './reviews.service';
+import { ReviewRequestsService } from './review-requests.service';
 
 /** A person writes a few reviews in a sitting at most; a robot writes hundreds. Per address, per hour. In memory: it resets on a restart. */
 const allowWrite = makeRateLimiter(8, 60 * 60_000);
@@ -57,7 +58,7 @@ export class ReviewsPublicController {
 @ApiBearerAuth()
 @Controller('reviews')
 export class ReviewsAdminController {
-  constructor(private readonly reviews: ReviewsService) {}
+  constructor(private readonly reviews: ReviewsService, private readonly autoRequests: ReviewRequestsService) {}
 
   @Get()
   @Permissions(buildPermissionKey('ProductReview', 'read'))
@@ -71,6 +72,13 @@ export class ReviewsAdminController {
   @Permissions(buildPermissionKey('ProductReview', 'read'))
   counts() {
     return this.reviews.counts();
+  }
+
+  /** Whether the automatic review request is on, and what it waits for. */
+  @Get('auto-status')
+  @Permissions(buildPermissionKey('ProductReview', 'read'))
+  autoStatus() {
+    return this.autoRequests.status();
   }
 
   @Get('requests')

@@ -26,7 +26,9 @@ type Review = {
 type Page = { items: Review[]; total: number; page: number; totalPages: number };
 type Counts = { pending: number; approved: number; rejected: number; minPerProduct: number; minForSite: number; siteVisible: boolean };
 type Visibility = { approved: number; minToShow: number; visible: boolean };
-type Request = { orderNumber: string; customerName: string | null; phone: string | null; products: string[]; allReviewed: boolean; reviewsLeft: number; link: string; whatsappUrl: string | null; placedAt: string };
+type Request = { orderNumber: string; customerName: string | null; phone: string | null; products: string[]; allReviewed: boolean; reviewsLeft: number; link: string; whatsappUrl: string | null; placedAt: string; auto: { email: Channel; whatsapp: Channel } | null };
+type Channel = { status: string | null; detail: string | null };
+type AutoStatus = { enabled: boolean; delayHours: number; maxAgeDays: number; template: string; whatsappConfigured: boolean };
 
 const TABS: Array<{ key: Status | 'ask' | 'add'; label: string }> = [
   { key: 'PENDING', label: 'Waiting' }, { key: 'APPROVED', label: 'Approved' }, { key: 'REJECTED', label: 'Turned away' },
@@ -50,6 +52,7 @@ export default function ReviewsPage() {
   const [page, setPage] = useState(1);
   const [counts, setCounts] = useState<Counts | null>(null);
   const [requests, setRequests] = useState<Request[] | null>(null);
+  const [auto, setAuto] = useState<AutoStatus | null>(null);
   const [replying, setReplying] = useState<{ id: string; text: string } | null>(null);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [feedback, setFeedback] = useFeedbackState();
@@ -72,7 +75,10 @@ export default function ReviewsPage() {
   const loadTab = useCallback(async () => {
     if (!token || !profile) return;
     try {
-      if (tab === 'ask') setRequests(await apiRequest<Request[]>('/reviews/requests', { method: 'GET' }, token));
+      if (tab === 'ask') {
+        setRequests(await apiRequest<Request[]>('/reviews/requests', { method: 'GET' }, token));
+        setAuto(await apiRequest<AutoStatus>('/reviews/auto-status', { method: 'GET' }, token).catch(() => null));
+      }
       else if (tab !== 'add') setData(await apiRequest<Page>(`/reviews?status=${tab}&page=${page}`, { method: 'GET' }, token));
     } catch (error) {
       setErrorMessage(error);
@@ -178,7 +184,7 @@ export default function ReviewsPage() {
                 ))}
               </div>
 
-              {tab === 'ask' ? <AskTab requests={requests} /> : tab === 'add' ? (
+              {tab === 'ask' ? <AskTab requests={requests} auto={auto} /> : tab === 'add' ? (
                 canCreate ? <AddTab token={token} onDone={(m) => void after(m)} onError={setErrorMessage} /> : <p className="portal-muted">Your role cannot add reviews.</p>
               ) : (
                 <>
@@ -241,12 +247,27 @@ export default function ReviewsPage() {
 }
 
 /** Recent paid orders, each with the review link ready to send on WhatsApp. This is where most reviews will come from. */
-function AskTab({ requests }: { requests: Request[] | null }) {
+/** How one channel of the automatic request went, in a few words. */
+function ChannelChip({ label, channel }: { label: string; channel: Channel | undefined }) {
+  if (!channel?.status) return null;
+  const tone = channel.status === 'SENT' ? 'is-success' : channel.status === 'FAILED' ? 'is-danger' : 'is-muted';
+  const word = channel.status === 'SENT' ? 'sent' : channel.status === 'FAILED' ? 'failed' : channel.status === 'SENDING' ? 'sending' : 'skipped';
+  return <span className={`portal-chip ${tone}`} style={{ marginLeft: 8 }} title={channel.detail ?? undefined}>{label} {word}</span>;
+}
+
+function AskTab({ requests, auto }: { requests: Request[] | null; auto: AutoStatus | null }) {
   const [copied, setCopied] = useState<string | null>(null);
   if (!requests) return <p className="portal-muted">Loading...</p>;
   if (requests.length === 0) return <div className="portal-empty-state">No paid orders with a phone number in the last 60 days.</div>;
   return (
     <>
+      {auto ? (
+        <p className="portal-note" style={{ marginTop: 0 }}>
+          {auto.enabled
+            ? `Automatic: each retail order is asked by email and WhatsApp ${auto.delayHours === 0 ? 'as soon as' : `${auto.delayHours} hours after`} it is marked delivered (orders delivered in the last ${auto.maxAgeDays} days). ${auto.whatsappConfigured ? '' : 'WhatsApp is not set up on the server, so only the email goes. '}The chips below show what happened.`
+            : 'Automatic review requests are switched off. Set REVIEW_REQUESTS_ENABLED=true on the server to send them after delivery; until then, send the links below yourself.'}
+        </p>
+      ) : null}
       <p className="portal-muted" style={{ marginTop: 0 }}>Send the link to people who have received their pairs. It is theirs alone, and a review left through it is marked as a verified purchase. It still waits here for you to approve.</p>
       <div className="portal-list-stack">
         {requests.map((r) => (
@@ -255,6 +276,8 @@ function AskTab({ requests }: { requests: Request[] | null }) {
               <div style={{ minWidth: 0 }}>
                 <strong>{r.customerName || 'Customer'}</strong> <span className="portal-muted">· {r.orderNumber} · {formatDate(r.placedAt)}</span>
                 {r.allReviewed ? <span className="portal-chip is-success" style={{ marginLeft: 8 }}>Reviewed</span> : r.reviewsLeft ? <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>{r.reviewsLeft} left</span> : null}
+                <ChannelChip label="Email" channel={r.auto?.email} />
+                <ChannelChip label="WhatsApp" channel={r.auto?.whatsapp} />
                 <p className="portal-muted" style={{ margin: '2px 0 0', overflowWrap: 'anywhere' }}>{r.products.join(', ')}</p>
               </div>
               <div className="portal-action-row" style={{ flexWrap: 'wrap' }}>

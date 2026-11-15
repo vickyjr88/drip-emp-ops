@@ -273,7 +273,7 @@ export class ReviewsService {
       where: { status: { in: REVIEWABLE }, placedAt: { gte: since }, customerPhone: { not: null } },
       orderBy: { placedAt: 'desc' },
       take: 50,
-      include: { lines: { include: { variant: { select: { product: { select: { id: true, name: true } } } } } }, reviews: { select: { productId: true } } },
+      include: { lines: { include: { variant: { select: { product: { select: { id: true, name: true } } } } } }, reviews: { select: { productId: true } }, reviewRequest: true },
     });
     return orders.map((order) => {
       const products = new Map<string, string>();
@@ -286,6 +286,8 @@ export class ReviewsService {
       const message = `Hi ${greetingName(order.customerName)}, thank you for shopping at Drip Emporium! How are your ${names.length === 1 ? names[0] : 'new pairs'}? A short review helps other shoppers choose, and takes a minute: ${link}`;
       return {
         orderNumber: order.orderNumber, status: order.status, placedAt: order.placedAt, customerName: order.customerName, phone,
+        // What the automatic request did for this order, when it has run: each channel is SENT, FAILED, SKIPPED (with the reason) or not yet tried.
+        auto: order.reviewRequest ? { email: { status: order.reviewRequest.emailStatus, detail: order.reviewRequest.emailDetail }, whatsapp: { status: order.reviewRequest.whatsappStatus, detail: order.reviewRequest.whatsappDetail } } : null,
         products: names, allReviewed, reviewsLeft: reviewed.size, link, whatsappUrl: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : null,
       };
     });

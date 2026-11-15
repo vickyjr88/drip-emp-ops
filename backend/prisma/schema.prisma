@@ -1666,6 +1666,8 @@ model Order {
   commission Commission?
   /// Reviews left through the link for this order (verified purchases).
   reviews    ProductReview[]
+  /// The automatic "how are your pairs?" message sent after delivery, and what happened on each channel.
+  reviewRequest ReviewRequest?
 
   @@index([customerId])
   @@index([referredByCustomerId])
@@ -2629,4 +2631,32 @@ model ProductReview {
   @@index([status, createdAt])
   @@index([productId, status])
   @@index([orderId])
+}
+
+/// The automatic review request for one delivered order: an email and a WhatsApp message carrying the order's review link. The unique orderId is the
+/// claim, so the request is made once however many backend slots are running. Each channel records what happened: SENDING (taken, not finished; a crash
+/// leaves it here rather than risk a second message), SENT, FAILED (retried a few times) or SKIPPED (with the reason in the detail).
+model ReviewRequest {
+  id                String    @id @default(uuid())
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId           String    @unique
+  /// Who it went to, so someone with several orders is not asked again straight away. Digits with the country code; the real email.
+  phone             String?
+  email             String?
+  emailStatus       String?
+  emailDetail       String?
+  emailAt           DateTime?
+  whatsappStatus    String?
+  whatsappDetail    String?
+  whatsappAt        DateTime?
+  whatsappMessageId String?
+  attempts          Int       @default(1)
+  /// When a failed channel is tried again; null once nothing is left to retry.
+  nextAttemptAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([phone])
+  @@index([email])
+  @@index([nextAttemptAt])
 }

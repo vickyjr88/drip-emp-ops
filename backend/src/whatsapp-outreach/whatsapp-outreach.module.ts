@@ -15,5 +15,6 @@ import { WhatsappWebhookController } from './whatsapp-webhook.controller';
   imports: [PrismaModule, DailyReportModule, PageContentModule, MauticModule],
   controllers: [WhatsAppOutreachController, WhatsappContactsController, WhatsappWebhookController],
   providers: [WhatsAppOutreachService, WhatsappContactsService, WhatsappSequenceService, WhatsappMauticSyncService],
+  exports: [WhatsAppOutreachService],
 })
 export class WhatsAppOutreachModule {}
