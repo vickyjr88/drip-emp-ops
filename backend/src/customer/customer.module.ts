@@ -3,10 +3,12 @@ import { CustomerService } from './customer.service';
 import { CustomerController } from './customer.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { MauticModule } from '../mautic/mautic.module';
+import { CustomerDuplicatesController } from './customer-duplicates.controller';
+import { CustomerMergeService } from './customer-merge.service';
 
 @Module({
   imports: [PrismaModule, MauticModule],
-  controllers: [CustomerController],
-  providers: [CustomerService],
+  controllers: [CustomerController, CustomerDuplicatesController],
+  providers: [CustomerService, CustomerMergeService],
 })
 export class CustomerModule {}

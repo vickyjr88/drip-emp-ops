@@ -160,11 +160,16 @@ export default function CustomersPage() {
             <article className="portal-card" data-tour="customers.list">
               <div className="portal-card-head">
                 <h2 style={{ margin: 0 }}>All Customers</h2>
-                {canCreate ? (
-                  <Link href="/portal/customers/new" className="portal-primary-btn">
-                    Add Customer
+                <div className="portal-action-row">
+                  <Link href="/portal/customers/duplicates" className="portal-inline-btn">
+                    Find duplicates
                   </Link>
-                ) : null}
+                  {canCreate ? (
+                    <Link href="/portal/customers/new" className="portal-primary-btn">
+                      Add Customer
+                    </Link>
+                  ) : null}
+                </div>
               </div>
 
               <div className="list-toolbar">

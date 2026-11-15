@@ -25,7 +25,7 @@ test('it is off unless switched on, and the settings fall back to sensible value
 });
 
 test('a failed channel is retried a few times, six hours apart, and then left alone', () => {
-  const now = new Date('2026-11-20T09:00:00Z');
+  const now = new Date('2027-03-10T09:00:00Z');
   assert.equal(nextAttemptAt(false, 1, now), null);
   assert.equal(nextAttemptAt(true, MAX_ATTEMPTS, now), null);
   assert.equal(nextAttemptAt(true, 1, now)?.getTime(), now.getTime() + RETRY_AFTER_HOURS * 3_600_000);
@@ -56,8 +56,11 @@ afterEach(() => {
   }
 });
 
-/** Midday in Nairobi, inside the send window. */
-const NOON = new Date('2026-11-20T09:00:00Z');
+/**
+ * Midday in Nairobi, inside the send window. Well after any real data in the database, so that orders delivered before the tests ran (on a scratch
+ * database that was used for something else) are too old to be picked up, and the counts below are only about the orders each test makes.
+ */
+const NOON = new Date('2027-03-10T09:00:00Z');
 const hoursBefore = (hours: number, from = NOON) => new Date(from.getTime() - hours * 3_600_000);
 
 async function harness() {
@@ -175,8 +178,8 @@ db('nothing is sent unless it is switched on, and nothing outside the send windo
     delete process.env.REVIEW_REQUESTS_ENABLED;
     assert.deepEqual(await h.make().tick(NOON), { asked: 0, retried: 0, emailSent: 0, whatsappSent: 0, failed: 0 });
     process.env.REVIEW_REQUESTS_ENABLED = 'true';
-    await h.make().tick(new Date('2026-11-20T19:30:00Z')); // 22:30 Nairobi
-    await h.make().tick(new Date('2026-11-20T03:00:00Z')); // 06:00 Nairobi
+    await h.make().tick(new Date('2027-03-10T19:30:00Z')); // 22:30 Nairobi
+    await h.make().tick(new Date('2027-03-10T03:00:00Z')); // 06:00 Nairobi
     assert.equal(await h.request(order.id), null);
     assert.equal(h.sent.email.length + h.sent.whatsapp.length, 0);
     await h.make().tick(NOON);

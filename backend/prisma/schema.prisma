@@ -2660,3 +2660,20 @@ model ReviewRequest {
   @@index([email])
   @@index([nextAttemptAt])
 }
+
+/// A record that one customer was merged into another (see CustomerMergeService). The removed customer is gone from Customer, so this keeps what it
+/// was: enough to understand a merge later and to put the record back by hand if it was a mistake. Deliberately not a relation, so it outlives
+/// either customer. The snapshot never holds a password hash or a reset token.
+model CustomerMerge {
+  id               String   @id @default(uuid())
+  keptCustomerId   String
+  mergedCustomerId String
+  mergedSnapshot   Json
+  /// How many rows moved to the kept customer, by kind: { orders: 2, cartLeads: 1, ... }.
+  moved            Json
+  mergedBy         String
+  createdAt        DateTime @default(now())
+
+  @@index([keptCustomerId])
+  @@index([mergedCustomerId])
+}
