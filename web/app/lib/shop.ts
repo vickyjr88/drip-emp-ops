@@ -36,6 +36,32 @@ export type ShopVariant = {
   canOrder: boolean;
 };
 
+/** A review as the shop window may show it: a name and initial, the stars, the words, and whether it was a verified purchase. Nothing about who wrote it. */
+export type PublicReview = {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  displayName: string;
+  verified: boolean;
+  createdAt: string;
+  reply: string | null;
+  repliedAt: string | null;
+};
+
+/**
+ * A product's reviews. `visible` is false until the product has enough approved reviews: until then there is no list, no average and no spread of
+ * stars, only how many there are, and the page offers to take a review instead of showing a thin one.
+ */
+export type ProductReviews = {
+  visible: boolean;
+  count: number;
+  average: number | null;
+  distribution: number[] | null;
+  minToShow: number;
+  items: PublicReview[];
+};
+
 export type ShopProduct = {
   /** Set when any size is discounted, so a card can badge itself. */
   onOffer?: boolean;
@@ -65,6 +91,8 @@ export type ShopProduct = {
   sizesInStock: string[];
   anyInStock: boolean;
   related?: ShopProduct[];
+  /** Present on a product's own page only. */
+  reviews?: ProductReviews;
 };
 
 export type ShopCategory = { name: string; slug: string; productCount: number; isTopLevel: boolean };

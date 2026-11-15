@@ -26,6 +26,7 @@ export type PortalNavKey =
   | 'customers'
   | 'outreach'
   | 'inquiries'
+  | 'reviews'
   | 'accounting'
   | 'analytics'
   | 'insights'
@@ -64,6 +65,7 @@ const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
   { key: 'customers', href: '/portal/customers', label: 'Customers' },
   { key: 'outreach', href: '/portal/outreach', label: 'WhatsApp Outreach' },
   { key: 'inquiries', href: '/portal/inquiries', label: 'Inquiries' },
+  { key: 'reviews', href: '/portal/reviews', label: 'Reviews' },
   { key: 'accounting', href: '/portal/accounting', label: 'Accounting' },
   { key: 'analytics', href: '/portal/analytics', label: 'Analytics' },
   { key: 'insights', href: '/portal/insights', label: 'Insights' },
@@ -102,6 +104,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   customers: 'Customers',
   outreach: 'WhatsApp Outreach',
   inquiries: 'Inquiries',
+  reviews: 'Reviews',
   accounting: 'Accounting',
   analytics: 'Analytics',
   insights: 'Insights',

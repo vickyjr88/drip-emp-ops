@@ -84,6 +84,20 @@ export default async function ProductPage({ params }: { params: { slug: string }
           ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
           ...(product.imageUrls.length ? { image: product.imageUrls } : {}),
           ...(product.description ? { description: product.description } : {}),
+          // Reviews are told to search engines only once there are enough to show on the page: a rating they cannot see on the page is not allowed.
+          ...(product.reviews?.visible && product.reviews.average !== null
+            ? {
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: product.reviews.average, reviewCount: product.reviews.count, bestRating: 5, worstRating: 1 },
+                review: product.reviews.items.slice(0, 5).map((r) => ({
+                  '@type': 'Review',
+                  author: { '@type': 'Person', name: r.displayName },
+                  datePublished: r.createdAt.slice(0, 10),
+                  reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5, worstRating: 1 },
+                  ...(r.title ? { name: r.title } : {}),
+                  reviewBody: r.body,
+                })),
+              }
+            : {}),
           offers: {
             '@type': 'AggregateOffer',
             priceCurrency: 'KES',

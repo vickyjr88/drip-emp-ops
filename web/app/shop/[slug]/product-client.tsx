@@ -29,6 +29,8 @@ import { EliteLayout } from '../../components/elite-layout';
 import { ProductCard } from '../../components/product-card';
 import { ShareButton } from '../../components/share-button';
 import { PhoneIcon, WhatsAppIcon } from '../../components/contact-icons';
+import { ProductReviewsSection } from '../../components/product-reviews';
+import { Stars } from '../../components/stars';
 import { FavoriteButton } from '../../components/favorite-button';
 import { useEnquiryContact } from '../../lib/use-enquiry-contact';
 import { useCart } from '../../lib/cart';
@@ -282,6 +284,13 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               </div>
             </div>
             <h1>{product.name}</h1>
+            {/* The rating beside the name, only once the product has enough approved reviews to show one (the server decides). */}
+            {product.reviews?.visible && product.reviews.average !== null ? (
+              <a className="de-rating" href="#reviews">
+                <Stars value={product.reviews.average} size={16} />
+                <span>{product.reviews.average.toFixed(1)} · {product.reviews.count} review{product.reviews.count === 1 ? '' : 's'}</span>
+              </a>
+            ) : null}
             <p className="de-product-price">
               {chosen ? formatKes(chosen.priceKes) : priceLabel(product)}
               {/* Struck-through original beside the sale price: a discount a
@@ -432,6 +441,14 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
             ) : null}
           </div>
         </section>
+
+        <ProductReviewsSection
+          // A fresh start when another product (or its reviews) arrives, so one pair's list never lingers on another's page.
+          key={`${product.id}-${product.reviews?.count ?? 0}`}
+          slug={product.slug}
+          productName={product.name}
+          reviews={product.reviews ?? { visible: false, count: 0, average: null, distribution: null, minToShow: 3, items: [] }}
+        />
 
         {product.related?.length ? (
           <section className="lp-container de-related">

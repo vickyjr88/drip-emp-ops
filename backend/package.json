@@ -25,6 +25,7 @@
     "test:contact-email": "node --require ts-node/register/transpile-only --test test/contact-email.test.ts",
     "test:mautic-phone": "node --require ts-node/register/transpile-only --test test/mautic-phone.test.ts",
     "test:phone-checkout": "node --require ts-node/register/transpile-only --test test/phone-checkout.test.ts",
+    "test:reviews": "node --require ts-node/register/transpile-only --test test/reviews.test.ts",
     "test:scheduler-replicas": "node --require ts-node/register/transpile-only --test test/scheduler-replicas.test.ts",
     "test:status-kit": "node --require ts-node/register/transpile-only --test test/status-kit.test.ts",
     "test:social-posting": "node --require ts-node/register/transpile-only --test test/social-posting.test.ts",

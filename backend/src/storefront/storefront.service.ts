@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { storefrontOrigin } from '../common/storefront-origin';
 import { csvField } from '../common/csv.util';
 import { priceForTier } from '../common/price-for-tier';
+import { ReviewsService } from '../reviews/reviews.service';
 
 /**
  * Meta's product-feed taxonomy, by this shop's category slug. Was hardcoded
@@ -51,7 +52,12 @@ export const SHOP_LINE = { line: 'SHOP' } as const satisfies Prisma.ProductWhere
  */
 @Injectable()
 export class StorefrontService {
-  constructor(private readonly prisma: PrismaService) {}
+  /** Reads reviews (it needs nothing but the database, so it is made here rather than injected: the storefront is built directly in several tests). */
+  private readonly reviews: ReviewsService;
+
+  constructor(private readonly prisma: PrismaService) {
+    this.reviews = new ReviewsService(prisma);
+  }
 
   /** RETAIL for a guest or a retail customer; a signed-in reseller/wholesale
    *  customer's own tier otherwise. Mirrors the same rule checkout uses: the
@@ -766,6 +772,8 @@ export class StorefrontService {
     return {
       ...shaped,
       related: related.map((item) => this.shape(item, relatedStock, relatedOffers, tier)),
+      // The product's reviews, but only once it has enough approved ones: below that it says how many there are and nothing else.
+      reviews: await this.reviews.forProduct(product.id),
     };
   }
 

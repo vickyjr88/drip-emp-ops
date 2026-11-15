@@ -95,33 +95,33 @@ model Customer {
   resetTokenHash      String?
   resetTokenExpiresAt DateTime?
 
-  createdAt    DateTime           @default(now())
-  documents    CustomerDocument[]
-  invoices     Invoice[]
-  receipts     Receipt[]
-  orders       Order[]
-  consignments Consignment[]
-  whatsappOutreach WhatsappOutreach[]
-  cartLeads    CartLead[]
+  createdAt            DateTime              @default(now())
+  documents            CustomerDocument[]
+  invoices             Invoice[]
+  receipts             Receipt[]
+  orders               Order[]
+  consignments         Consignment[]
+  whatsappOutreach     WhatsappOutreach[]
+  cartLeads            CartLead[]
   /// Orders placed by someone else that this customer's referral code
   /// attributed. Distinct from `orders` (this customer's own purchases).
-  referredOrders Order[] @relation("OrderReferredBy")
+  referredOrders       Order[]               @relation("OrderReferredBy")
   resellerApplications ResellerApplication[]
   /// Commission earned on orders this reseller referred. Named distinctly
   /// from `orders` (their own purchases) and `referredOrders` (the orders
   /// themselves) -- this is the money side of the same relationship.
-  resellerCommissions Commission[] @relation("ResellerCommissions")
-  resellerPayouts     ResellerPayout[] @relation("ResellerPayouts")
+  resellerCommissions  Commission[]          @relation("ResellerCommissions")
+  resellerPayouts      ResellerPayout[]      @relation("ResellerPayouts")
   /// One row per landing on this reseller's shared link -- see ReferralClick.
-  referralClicks      ReferralClick[]
+  referralClicks       ReferralClick[]
   /// WhatsApp taps attributed to this reseller's referral -- see WhatsAppClick.
-  whatsappClicks      WhatsAppClick[] @relation("WhatsAppClickReseller")
+  whatsappClicks       WhatsAppClick[]       @relation("WhatsAppClickReseller")
   /// WhatsApp leads (CartLead) attributed to this reseller's referral,
   /// distinct from referredOrders (which only ever holds online-checkout
   /// orders) -- this is the same relationship for the WhatsApp-then-manual-
   /// order path.
-  referredCartLeads   CartLead[]      @relation("CartLeadReferredBy")
-  favorites           Favorite[]
+  referredCartLeads    CartLead[]            @relation("CartLeadReferredBy")
+  favorites            Favorite[]
 }
 
 model CustomerDocument {
@@ -1384,6 +1384,8 @@ model Product {
   kit       KitProduct?
   variants  ProductVariant[]
   favorites Favorite[]
+  /// Shoppers' reviews; only approved ones show, and only once there are enough (see reviews/reviews.rules.ts).
+  reviews   ProductReview[]
 
   @@index([categoryId])
   @@index([isFeatured])
@@ -1475,7 +1477,7 @@ model ProductVariant {
   /// supplier per order instead. Lets the order form default a line's
   /// fulfillment to SUPPLIER_ORDER without inferring it from an absent
   /// StockLevel row, which would misfire the moment real stock arrives.
-  isDropShip       Boolean  @default(false)
+  isDropShip Boolean @default(false)
 
   stock            StockLevel[]
   orderLines       OrderLine[]
@@ -1612,14 +1614,14 @@ enum StockMovementType {
 /// A customer order. Money owed and money paid are tracked separately so a
 /// part-paid order is a normal state rather than an edge case.
 model Order {
-  id          String      @id @default(uuid())
-  orderNumber String      @unique
-  customer    Customer?   @relation(fields: [customerId], references: [id])
-  customerId  String?
+  id                   String             @id @default(uuid())
+  orderNumber          String             @unique
+  customer             Customer?          @relation(fields: [customerId], references: [id])
+  customerId           String?
   /// The reseller whose referral code was attached to this order at
   /// checkout, if any. Never the same customer as `customerId` -- see the
   /// self-referral guard in CheckoutService.start().
-  referredBy           Customer? @relation("OrderReferredBy", fields: [referredByCustomerId], references: [id])
+  referredBy           Customer?          @relation("OrderReferredBy", fields: [referredByCustomerId], references: [id])
   referredByCustomerId String?
   /// The paid-marketing campaign whose link was attached at checkout, if
   /// any. Mutually exclusive with referredByCustomerId in practice --
@@ -1629,15 +1631,15 @@ model Order {
   /// commission.
   attributedCampaign   MarketingCampaign? @relation("OrderAttributedCampaign", fields: [attributedCampaignId], references: [id])
   attributedCampaignId String?
-  store       Store       @relation(fields: [storeId], references: [id])
-  storeId     String
-  status      OrderStatus @default(PENDING)
-  channel     String      @default("IN_STORE")
+  store                Store              @relation(fields: [storeId], references: [id])
+  storeId              String
+  status               OrderStatus        @default(PENDING)
+  channel              String             @default("IN_STORE")
   /// The shopper's browsing session (see StorefrontEvent), so a website order can be traced to the visit that produced it.
-  sessionId   String?
+  sessionId            String?
   /// Which price list this order was written against. A walk-in is RETAIL;
   /// a shop buying outright is RESELLER or WHOLESALE.
-  priceTier   PriceTier   @default(RETAIL)
+  priceTier            PriceTier          @default(RETAIL)
 
   subtotal   Decimal @default(0)
   discount   Decimal @default(0)
@@ -1658,10 +1660,12 @@ model Order {
   cancelledAt DateTime?
   createdBy   String    @default("system")
 
-  lines    OrderLine[]
-  payments OrderPayment[]
-  cartLead CartLead?
+  lines      OrderLine[]
+  payments   OrderPayment[]
+  cartLead   CartLead?
   commission Commission?
+  /// Reviews left through the link for this order (verified purchases).
+  reviews    ProductReview[]
 
   @@index([customerId])
   @@index([referredByCustomerId])
@@ -1693,16 +1697,16 @@ model ReferralClick {
 /// (not generated) so the resulting link stays short and readable in an ad
 /// or on print.
 model MarketingCampaign {
-  id             String              @id @default(uuid())
-  code           String              @unique
+  id             String          @id @default(uuid())
+  code           String          @unique
   name           String
-  isActive       Boolean             @default(true)
-  createdAt      DateTime            @default(now())
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
   createdBy      String?
   clicks         CampaignClick[]
-  orders         Order[]             @relation("OrderAttributedCampaign")
-  whatsappClicks WhatsAppClick[]     @relation("WhatsAppClickCampaign")
-  cartLeads      CartLead[]          @relation("CartLeadAttributedCampaign")
+  orders         Order[]         @relation("OrderAttributedCampaign")
+  whatsappClicks WhatsAppClick[] @relation("WhatsAppClickCampaign")
+  cartLeads      CartLead[]      @relation("CartLeadAttributedCampaign")
 
   @@index([isActive])
 }
@@ -1732,16 +1736,16 @@ model CampaignClick {
 /// ?camp=/?ref= ever captured) so the shop-wide WhatsApp click total is
 /// still accurate, not just the attributed slice of it.
 model WhatsAppClick {
-  id            String             @id @default(uuid())
-  campaign      MarketingCampaign? @relation("WhatsAppClickCampaign", fields: [campaignId], references: [id])
-  campaignId    String?
-  reseller      Customer?          @relation("WhatsAppClickReseller", fields: [resellerId], references: [id])
-  resellerId    String?
+  id         String             @id @default(uuid())
+  campaign   MarketingCampaign? @relation("WhatsAppClickCampaign", fields: [campaignId], references: [id])
+  campaignId String?
+  reseller   Customer?          @relation("WhatsAppClickReseller", fields: [resellerId], references: [id])
+  resellerId String?
   /// Which button was tapped -- lets a campaign's dashboard tell "product
   /// page enquiry" apart from "cart checkout via WhatsApp" if that distinction
   /// ever matters, without needing a schema change to add it later.
-  source        String
-  clickedAt     DateTime           @default(now())
+  source     String
+  clickedAt  DateTime           @default(now())
 
   @@index([campaignId])
   @@index([resellerId])
@@ -1761,24 +1765,24 @@ enum CommissionStatus {
 /// reseller to reseller. Credited only to the one reseller who actually
 /// referred the order (Order.referredByCustomerId), never split or pooled.
 model Commission {
-  id         String           @id @default(uuid())
-  order      Order            @relation(fields: [orderId], references: [id])
-  orderId    String           @unique
-  reseller   Customer         @relation("ResellerCommissions", fields: [resellerId], references: [id])
-  resellerId String
-  amount     Decimal
-  status     CommissionStatus @default(ACCRUED)
-  accruedAt  DateTime         @default(now())
+  id                     String           @id @default(uuid())
+  order                  Order            @relation(fields: [orderId], references: [id])
+  orderId                String           @unique
+  reseller               Customer         @relation("ResellerCommissions", fields: [resellerId], references: [id])
+  resellerId             String
+  amount                 Decimal
+  status                 CommissionStatus @default(ACCRUED)
+  accruedAt              DateTime         @default(now())
   /// The accrual entry: debit Reseller Commission Expense, credit Reseller
   /// Commissions Payable. Null when amount is 0 -- a balanced journal needs
   /// non-zero lines, and there is nothing to accrue.
   journalEntryId         String?
-  payout                 ResellerPayout? @relation(fields: [payoutId], references: [id])
+  payout                 ResellerPayout?  @relation(fields: [payoutId], references: [id])
   payoutId               String?
   /// Set only if the order was later cancelled/refunded while this
   /// commission was still ACCRUED -- ledger.reverseJournal's resulting entry.
   reversalJournalEntryId String?
-  createdAt              DateTime        @default(now())
+  createdAt              DateTime         @default(now())
 
   @@index([resellerId])
   @@index([status])
@@ -1851,7 +1855,7 @@ model OrderLine {
   /// the supplier afterwards -- it never touches StockLevel and its cost of
   /// goods is deferred until the supplier bill is actually recorded, so
   /// margin is not booked against inventory that was never held.
-  fulfillmentType   OrderLineFulfillmentType   @default(STOCK)
+  fulfillmentType   OrderLineFulfillmentType    @default(STOCK)
   /// Null for STOCK lines. Tracks a SUPPLIER_ORDER line from placement
   /// through to the customer actually having it in hand.
   fulfillmentStatus OrderLineFulfillmentStatus?
@@ -1935,32 +1939,32 @@ enum PriceTier {
 /// Anonymous browsing is not recorded here at all: without a name, phone or
 /// email there is no lead to act on, only a cart nobody can be reached about.
 model CartLead {
-  id            String         @id @default(uuid())
-  source        CartLeadSource
-  status        CartLeadStatus @default(NEW)
-  customer      Customer?      @relation(fields: [customerId], references: [id])
-  customerId    String?
-  customerName  String?
-  customerPhone String?
-  customerEmail String?
+  id              String         @id @default(uuid())
+  source          CartLeadSource
+  status          CartLeadStatus @default(NEW)
+  customer        Customer?      @relation(fields: [customerId], references: [id])
+  customerId      String?
+  customerName    String?
+  customerPhone   String?
+  customerEmail   String?
   shippingAddress String?
   /// Snapshot of CartLine[] from the storefront cart at the moment this was
   /// recorded: variantId, sku, name, size, quantity, priceKes. Copied rather
   /// than referenced because the cart it came from is client-side and gone by
   /// the time anyone looks at this.
-  lines    Json
-  subtotal Decimal
-  shipping Decimal @default(0)
-  total    Decimal
+  lines           Json
+  subtotal        Decimal
+  shipping        Decimal        @default(0)
+  total           Decimal
   /// The exact WhatsApp message sent, when source is WHATSAPP_ORDER. Null for
   /// an abandoned cart, which was never sent anywhere.
   /// The shopper's browsing session (see StorefrontEvent).
-  sessionId String?
-  message String?
+  sessionId       String?
+  message         String?
   /// Set once staff turn this into a real Order, so the lead stops showing as
   /// outstanding without deleting the trail that produced the sale.
-  order   Order?  @relation(fields: [orderId], references: [id])
-  orderId String? @unique
+  order           Order?         @relation(fields: [orderId], references: [id])
+  orderId         String?        @unique
 
   /// The campaign or reseller referral active (via the de_attr cookie) when
   /// this WhatsApp lead was captured, mirroring Order's own attribution
@@ -2023,25 +2027,25 @@ model Favorite {
 /// listing, its own slug per record, and posts published/unpublished one at
 /// a time, none of which a single-document-per-slug store can express.
 model BlogPost {
-  id              String    @id @default(uuid())
-  slug            String    @unique
-  title           String
+  id            String    @id @default(uuid())
+  slug          String    @unique
+  title         String
   /// One or two sentences shown on the listing card and used as the meta
   /// description/share text when nothing more specific is set.
-  excerpt         String
+  excerpt       String
   /// Sanitised HTML, matching how LegalPage/FaqPage already store rich text
   /// elsewhere in this app -- no markdown parser exists in this codebase, and
   /// adding one for a handful of hand-authored posts isn't worth a new
   /// dependency. Rendered server-side so the full article is in the HTML a
   /// crawler sees.
-  body            String
-  coverImageUrl   String?
-  author          String    @default("Drip Emporium")
+  body          String
+  coverImageUrl String?
+  author        String    @default("Drip Emporium")
   /// Null until published; a draft is created with this unset and excluded
   /// from every public listing/sitemap query until a value is set.
-  publishedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([publishedAt])
 }
@@ -2195,20 +2199,20 @@ model DailyReportSetting {
 /// One row per report day, channel and recipient. The unique key is what stops a report going out twice when the
 /// scheduler retries or two API replicas both fire.
 model DailyReportRun {
-  id         String   @id @default(uuid())
+  id            String   @id @default(uuid())
   /// The day described, YYYY-MM-DD in Nairobi time.
-  reportDate String
-  channel    String
-  recipient  String
+  reportDate    String
+  channel       String
+  recipient     String
   /// PENDING while being sent, then SENT, FAILED or SKIPPED.
-  status     String
-  error      String?
+  status        String
+  error         String?
   /// WhatsApp only: Meta's id for the message, and the latest delivery report for it (sent, delivered, read or failed).
   messageId     String?
   delivery      String?
   deliveryError String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@unique([reportDate, channel, recipient])
   @@index([reportDate])
@@ -2218,24 +2222,24 @@ model DailyReportRun {
 /// One row per WhatsApp marketing message sent from the portal's Outreach screen (app download, group invite, Google
 /// rating). `SENT` means Meta accepted it, not that the phone has received it.
 model WhatsappOutreach {
-  id          String    @id @default(uuid())
-  customerId  String?
-  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  phone       String
+  id            String    @id @default(uuid())
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  phone         String
   /// APP, GROUP, REVIEW, GOOGLE_REVIEW, SHOE_RANGE or LOCATION.
-  kind        String
-  template    String
+  kind          String
+  template      String
   /// SENT or FAILED.
-  status      String
-  messageId   String?
-  error       String?
+  status        String
+  messageId     String?
+  error         String?
   /// The latest delivery report Meta sent for messageId: sent, delivered, read or failed. Null until one arrives.
   delivery      String?
   deliveryError String?
   /// Set when the message went to someone who messaged us (WhatsappContact) rather than to a customer.
-  contactId   String?
-  triggeredBy String
-  createdAt   DateTime  @default(now())
+  contactId     String?
+  triggeredBy   String
+  createdAt     DateTime  @default(now())
 
   @@index([customerId, kind])
   @@index([createdAt])
@@ -2296,23 +2300,23 @@ enum KitEdition {
 
 /// A club or national team. Its colours drive the generic (no crest, no sponsor) kit drawn in the design center.
 model KitClub {
-  id           String   @id @default(uuid())
-  slug         String   @unique
-  name         String
+  id        String   @id @default(uuid())
+  slug      String   @unique
+  name      String
   /// What shoppers type: "man u", "gunners", "spurs".
-  aliases      String[]
+  aliases   String[]
   /// EPL, LA_LIGA, SERIE_A, BUNDESLIGA, LIGUE_1, NATIONAL, KENYA, OTHER.
-  league       String
+  league    String
   /// { primary, secondary, trim, pattern, sleeves } for each edition; see backend/src/kits/kit-catalogue.ts.
-  home         Json
-  away         Json
-  third        Json
+  home      Json
+  away      Json
+  third     Json
   /// Keys of the look-alike fonts suggested for this club, the first being the default.
-  fontKeys     String[]
-  sortOrder    Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  fontKeys  String[]
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   kits KitProduct[]
 
@@ -2365,13 +2369,13 @@ model KitDesign {
 /// One row (id "kits"): whether the jersey and T-shirt line is switched on for the public site. Off until an admin turns it
 /// on in the portal (Kits > Switch). The KITS_ENABLED=false environment variable is an emergency override that forces it off.
 model KitSettings {
-  id        String   @id
-  enabled   Boolean  @default(false)
+  id              String   @id
+  enabled         Boolean  @default(false)
   /// Keys of the built-in drawn shirts staff have hidden because they do not match what is sold. Hidden ones are not offered
   /// in the design center and cannot be chosen for a new kit.
   hiddenTemplates String[] @default([])
-  updatedBy String?
-  updatedAt DateTime @updatedAt
+  updatedBy       String?
+  updatedAt       DateTime @updatedAt
 }
 
 /// A shirt template staff upload: a photo of the front and back for each colour, with the print areas marked on the photo.
@@ -2396,7 +2400,6 @@ model KitTemplate {
 
   @@index([kind])
 }
-
 
 /// One thing a shopper did on the storefront: arrived, looked at a product, added to cart, began checkout, tapped
 /// WhatsApp, searched. First-party and anonymous: the sessionId is a random string made in the browser tab, with no name,
@@ -2439,40 +2442,39 @@ model AdSpend {
   @@index([day])
 }
 
-
 /// Someone who messaged the shop's WhatsApp number (most often from an ad). They are told they will get updates and can
 /// reply STOP; until they do they are put through the onboarding messages (see WhatsappSequenceService).
 model WhatsappContact {
-  id             String    @id @default(uuid())
+  id                 String    @id @default(uuid())
   /// Digits with the country code, as WhatsApp reports it: 254712345678.
-  phone          String    @unique
-  name           String?
+  phone              String    @unique
+  name               String?
   /// Which ad brought them, when they came from a click-to-WhatsApp ad (Meta's referral details on the first message).
-  adSourceId     String?
-  adHeadline     String?
-  adClickId      String?
-  subscribed     Boolean   @default(true)
+  adSourceId         String?
+  adHeadline         String?
+  adClickId          String?
+  subscribed         Boolean   @default(true)
   /// Why they are not subscribed: STOP (they replied STOP) or TRADE (a reseller, wholesaler or supplier, never messaged).
   unsubscribedReason String?
-  subscribedAt   DateTime  @default(now())
-  unsubscribedAt DateTime?
+  subscribedAt       DateTime  @default(now())
+  unsubscribedAt     DateTime?
   /// When the "you will get updates, reply STOP to opt out" message was sent. Sent once.
-  noticeSentAt   DateTime?
+  noticeSentAt       DateTime?
   /// Which onboarding message is next (0 = the app, 1 = the group, 2 = the rating; 3 = finished) and when it is due.
-  nextStep       Int       @default(0)
-  nextStepAt     DateTime?
-  failures       Int       @default(0)
-  firstMessageAt DateTime  @default(now())
-  lastMessageAt  DateTime  @default(now())
+  nextStep           Int       @default(0)
+  nextStepAt         DateTime?
+  failures           Int       @default(0)
+  firstMessageAt     DateTime  @default(now())
+  lastMessageAt      DateTime  @default(now())
   /// The same person in Mautic. mauticSyncedAt equal to updatedAt means Mautic is up to date; a later updatedAt (or none)
   /// means the row changed since and WhatsappMauticSyncService will push it. mauticTags is what Mautic was last told.
-  mauticContactId Int?
-  mauticSyncedAt  DateTime?
-  mauticTags      String?
-  mauticTriedAt   DateTime?
-  mauticError     String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  mauticContactId    Int?
+  mauticSyncedAt     DateTime?
+  mauticTags         String?
+  mauticTriedAt      DateTime?
+  mauticError        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([subscribed, nextStepAt])
   @@index([createdAt])
@@ -2542,28 +2544,28 @@ model SocialSetting {
 /// One post the engine made (or tried to make) to one channel. slotKey is "2026-11-08@09:00" for a scheduled post, which with
 /// the channel is unique: that is what stops both backend slots posting the same slot twice.
 model SocialPost {
-  id         String    @id @default(uuid())
-  channel    String
-  slotKey    String
-  productId  String?
-  productName String?
-  productSlug String?
-  caption    String?
-  imageUrl   String?
+  id           String    @id @default(uuid())
+  channel      String
+  slotKey      String
+  productId    String?
+  productName  String?
+  productSlug  String?
+  caption      String?
+  imageUrl     String?
   /// PENDING (being posted), POSTED, RETRY (Facebook was unavailable, tried again shortly), FAILED or SKIPPED (nothing to post).
-  status     String    @default("PENDING")
-  detail     String?
-  attempts   Int       @default(0)
+  status       String    @default("PENDING")
+  detail       String?
+  attempts     Int       @default(0)
   /// The channel's id for the post: Facebook's looks like 405520572643076_122229878420494913, Threads' is a number.
-  externalId String?
+  externalId   String?
   /// A link to the post, when the channel gives one (Threads does; a Facebook post's is built from its id).
-  permalink  String?
+  permalink    String?
   scheduledFor DateTime?
-  postedAt   DateTime?
+  postedAt     DateTime?
   /// Who started it: "schedule" or a staff member (Post now).
-  triggeredBy String   @default("schedule")
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  triggeredBy  String    @default("schedule")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([channel, slotKey])
   @@index([channel, status, postedAt])
@@ -2575,12 +2577,56 @@ model SocialPost {
 /// refreshed before then. Only the app's backend reads it. sourceHash is the hash of the token set in the server's .env, so
 /// putting a new token there replaces this row's instead of being ignored.
 model SocialCredential {
-  channel      String    @id
-  accessToken  String
-  userId       String?
-  expiresAt    DateTime?
-  refreshedAt  DateTime?
-  sourceHash   String?
-  error        String?
-  updatedAt    DateTime  @updatedAt
+  channel     String    @id
+  accessToken String
+  userId      String?
+  expiresAt   DateTime?
+  refreshedAt DateTime?
+  sourceHash  String?
+  error       String?
+  updatedAt   DateTime  @updatedAt
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A shopper's review of a product. Nothing shows on the storefront until staff approve it, and a product's reviews only show once it has
+/// enough approved ones (reviews/reviews.rules.ts). Read by the public as a name and initial, a rating and words; everything else is for staff.
+model ProductReview {
+  id               String       @id @default(uuid())
+  product          Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId        String
+  /// 1 to 5 (also enforced by a check constraint in the database).
+  rating           Int
+  title            String?
+  body             String
+  /// Shown with the review: first name and last initial ("Wanjiku K."), never a full name.
+  displayName      String
+  status           ReviewStatus @default(PENDING)
+  /// True only when it came through the link for a paid order that contained this product. Anything typed on the product page is not verified.
+  verifiedPurchase Boolean      @default(false)
+  /// "order-link", "product-page", or "staff" (typed in by staff from a review a customer sent them).
+  source           String       @default("product-page")
+  order            Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId          String?
+  /// Who it is from, for staff to follow up: a phone number or an email. Never shown on the storefront.
+  reviewerContact  String?
+  /// A hash of who it is from (customer, else phone, else email), so one person leaves one review per product. Never shown.
+  reviewerKey      String
+  /// The shop's public reply, shown under the review.
+  reply            String?
+  repliedAt        DateTime?
+  rejectionReason  String?
+  moderatedBy      String?
+  moderatedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([productId, reviewerKey])
+  @@index([status, createdAt])
+  @@index([productId, status])
+  @@index([orderId])
 }
