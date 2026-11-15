@@ -6,6 +6,8 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CustomerQueryDto } from './dto/customer-query.dto';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
+import { placeholderEmailFor, realEmail } from '../common/contact-email';
+import { MauticService } from '../mautic/mautic.service';
 
 /**
  * Never select the portal password hash. Staff need to know *whether* a customer
@@ -26,7 +28,7 @@ const CUSTOMER_SELECT = Prisma.validator<Prisma.CustomerSelect>()({
 
 @Injectable()
 export class CustomerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly mautic: MauticService) {}
 
   create(dto: CreateCustomerDto) {
     const email = dto.email?.trim().toLowerCase();
@@ -38,7 +40,7 @@ export class CustomerService {
         // the same shape the reseller flow already uses for a trade account
         // opened with no address on hand. It cannot receive mail, so the
         // account stays inert until a real email is entered.
-        email: email || `${dto.phone.replace(/[^0-9]/g, '')}@customer.invalid`,
+        email: email || placeholderEmailFor(dto.phone),
       },
       select: CUSTOMER_SELECT,
     });
@@ -76,8 +78,29 @@ export class CustomerService {
     return this.prisma.customer.findUnique({ where: { id }, select: CUSTOMER_SELECT });
   }
 
-  update(id: string, dto: UpdateCustomerDto) {
-    return this.prisma.customer.update({ where: { id }, data: dto, select: CUSTOMER_SELECT });
+  /**
+   * Edits a customer. Giving a customer who had no email one is the moment to tell Mautic: the contact it holds for their phone number gains
+   * the address (see MauticService.syncContact), so nobody is left in Mautic as a number with no email once the shop has found the email.
+   */
+  async update(id: string, dto: UpdateCustomerDto) {
+    const { email: typed, ...rest } = dto;
+    const email = typed === undefined ? undefined : realEmail(typed);
+    if (typed !== undefined && typed.trim() !== '' && !email) {
+      throw new BadRequestException('That is not an email address a customer can be reached on.');
+    }
+    const before = await this.prisma.customer.findUnique({ where: { id }, select: { email: true } });
+    if (!before) throw new NotFoundException(`Customer ${id} not found`);
+    if (email && email !== before.email) {
+      const taken = await this.prisma.customer.findUnique({ where: { email }, select: { id: true } });
+      if (taken && taken.id !== id) throw new BadRequestException('That email already belongs to another customer.');
+    }
+
+    const updated = await this.prisma.customer.update({ where: { id }, data: { ...rest, ...(email ? { email } : {}) }, select: CUSTOMER_SELECT });
+
+    if (email && realEmail(before.email) !== email) {
+      void this.mautic.syncContact({ email, firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
+    }
+    return updated;
   }
 
   remove(id: string) {

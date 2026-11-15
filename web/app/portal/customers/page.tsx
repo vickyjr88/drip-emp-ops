@@ -24,6 +24,7 @@ import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime,
   hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
+import { realEmail } from '../../lib/contact-email';
 
 type Customer = {
   id: string;
@@ -175,7 +176,7 @@ export default function CustomersPage() {
                     columns: [
                       { header: 'First Name', value: (row) => row.firstName },
                       { header: 'Last Name', value: (row) => row.lastName },
-                      { header: 'Email', value: (row) => row.email },
+                      { header: 'Email', value: (row) => realEmail(row.email) || '' },
                       { header: 'Phone', value: (row) => row.phone || '' },
                       { header: 'Account', value: (row) => (row.portalEnabled ? 'Yes' : 'No') },
                     ],
@@ -200,7 +201,7 @@ export default function CustomersPage() {
                           </Link>
                         </strong>
                         <p className="portal-muted" style={{ margin: '2px 0 0' }}>
-                          {customer.email}
+                          {realEmail(customer.email) ?? 'No email'}
                           {customer.phone ? ` · ${customer.phone}` : ''}
                         </p>
                       </div>

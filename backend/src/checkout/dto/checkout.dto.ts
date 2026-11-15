@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize, IsArray, IsEmail, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Min, MinLength, ValidateNested,
 } from 'class-validator';
@@ -42,9 +42,14 @@ export class CheckoutDto {
   @IsNotEmpty()
   lastName!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Optional. A shopper may check out with a phone number alone; an email, when given, is used for the receipt and the account, and is added to the customer record.',
+  })
+  // A blank box in the form arrives as "", which is "no email" rather than an invalid one.
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsOptional()
   @IsEmail()
-  email!: string;
+  email?: string;
 
   @ApiProperty({ example: '+254113206481' })
   @IsValidPhoneNumber()

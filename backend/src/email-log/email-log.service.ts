@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailSenderService } from './email-sender.service';
+import { isPlaceholderEmail } from '../common/contact-email';
 
 @Injectable()
 export class EmailLogService {
@@ -27,6 +28,21 @@ export class EmailLogService {
     invoiceId?: string;
     supplierInvoiceId?: string;
   }) {
+    // A customer with no email is stored under a stand-in address that can never receive mail (see common/contact-email.ts). Nothing is sent to
+    // it, and the log says why, instead of attempting a delivery to an address that never existed.
+    if (isPlaceholderEmail(params.recipient)) {
+      return this.prisma.emailLog.create({
+        data: {
+          recipient: params.recipient,
+          subject: params.subject,
+          invoiceId: params.invoiceId,
+          supplierInvoiceId: params.supplierInvoiceId,
+          status: 'FAILED',
+          errorMessage: 'Not sent: no email address on file for this customer (they gave a phone number only)',
+        },
+      });
+    }
+
     const result = params.html
       ? await this.sender.send({
           to: params.recipient,

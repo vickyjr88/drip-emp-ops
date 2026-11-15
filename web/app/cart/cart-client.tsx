@@ -11,6 +11,10 @@
  * The account password is one optional field rather than a step in front of
  * the purchase. Requiring signup to buy is the most reliable way to lose a
  * sale.
+ *
+ * So is requiring an email. Many shoppers here do not use one, so a phone number
+ * is enough to order: the email is optional, and is asked for only when it earns
+ * something (the receipt, or an account, which signs in by it).
  */
 
 import Link from 'next/link';
@@ -340,7 +344,8 @@ export function CartClient() {
           lines: cart.payableLines.map((line) => ({ variantId: line.variantId, quantity: line.quantity, ...(line.designToken ? { designToken: line.designToken } : {}) })),
           firstName: form.firstName,
           lastName: form.lastName,
-          email: form.email,
+          // Optional: sent only when typed, so a blank box is no email rather than an invalid one.
+          email: form.email.trim() || undefined,
           phone: form.phone,
           shippingAddress: deliver ? form.shippingAddress : undefined,
           password: wantAccount && form.password ? form.password : undefined,
@@ -493,14 +498,14 @@ export function CartClient() {
                   onChange={(event) => setForm((p) => ({ ...p, lastName: event.target.value }))} />
               </label>
               <label>
-                <span>Email <small className="de-field-hint">(for your receipt)</small></span>
-                <input type="email" value={form.email} required autoComplete="email"
-                  onChange={(event) => setForm((p) => ({ ...p, email: event.target.value }))} />
-              </label>
-              <label>
-                <span>Phone</span>
+                <span>Phone <small className="de-field-hint">(we will use it to reach you about your order)</small></span>
                 <PhoneInput value={form.phone} required autoComplete="tel"
                   onChange={(phone) => setForm((p) => ({ ...p, phone }))} />
+              </label>
+              <label>
+                <span>Email <small className="de-field-hint">(optional, for your receipt)</small></span>
+                <input type="email" value={form.email} required={wantAccount} autoComplete="email" inputMode="email"
+                  onChange={(event) => setForm((p) => ({ ...p, email: event.target.value }))} />
               </label>
 
               <label className="de-check">
@@ -522,7 +527,7 @@ export function CartClient() {
                 <label className="de-check">
                   <input type="checkbox" checked={wantAccount}
                     onChange={(event) => setWantAccount(event.target.checked)} />
-                  <span>Create an account to track my orders</span>
+                  <span>Create an account to track my orders <small className="de-field-hint">(needs an email)</small></span>
                 </label>
               )}
 

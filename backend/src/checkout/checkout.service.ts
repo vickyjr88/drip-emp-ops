@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier, Prisma } from '@prisma/client';
+import { Customer, OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
@@ -16,6 +16,8 @@ import { CheckoutDto, CustomerSignupDto } from './dto/checkout.dto';
 import { nextReference, retryOnDuplicateReference } from '../common/next-reference';
 import { priceForTier } from '../common/price-for-tier';
 import { normalizePhoneNumber } from '../common/phone.util';
+import { payerEmail, phoneTail, placeholderEmailFor, realEmail } from '../common/contact-email';
+import { findPhoneOnlyCustomer } from '../common/phone-only-customer';
 
 /**
  * Delivery is not charged at checkout.
@@ -44,6 +46,15 @@ export function orderNumberFromReference(reference: string): string {
   return match ? match[1] : reference.trim();
 }
 
+/** The storefront's own host, for the payer address handed to the payment provider. */
+function hostOf(origin: string): string {
+  try {
+    return new URL(origin).hostname;
+  } catch {
+    return '';
+  }
+}
+
 @Injectable()
 export class CheckoutService {
   private readonly logger = new Logger(CheckoutService.name);
@@ -63,24 +74,39 @@ export class CheckoutService {
   ) {}
 
   /**
-   * Creates the account, or attaches to an existing one.
+   * Creates the customer, or attaches to the one who is already known.
    *
-   * An email already in use is not an error here: the shop knows this person,
-   * and refusing the purchase to protect a password they may not have set
-   * would cost a sale for nothing. A password is only ever set when the
-   * account has none.
+   * An email is optional. With one, the customer is keyed by it, as always. Without one, the customer is keyed by their phone number (a stand-in
+   * address built from it, see common/contact-email.ts), so the same number buying again is the same customer, and nothing is lost by not having
+   * asked. When an email turns up later (typed at a later checkout, or an account made) the same record gains it and keeps its orders.
+   *
+   * An email already in use is not an error here: the shop knows this person, and refusing the purchase to protect a password they may not have
+   * set would cost a sale for nothing. A password is only ever set when the account has none, and only with a real email: an account signs in by it.
    */
   private async upsertCustomer(
     tx: Prisma.TransactionClient,
-    details: { firstName: string; lastName: string; email: string; phone: string; password?: string },
-  ) {
-    const email = details.email.trim().toLowerCase();
+    details: { firstName: string; lastName: string; email?: string | null; phone: string; password?: string },
+  ): Promise<{ customer: Customer; created: boolean; emailAdded: boolean }> {
+    const email = realEmail(details.email);
     // Stored in one canonical shape (E.164) regardless of how it was typed --
     // 0722..., 254722... and +254722... must not be treated as different
     // numbers by anything matching on Customer.phone later. Safe to assume
     // it parses: CheckoutDto/CustomerSignupDto's IsValidPhoneNumber already
     // rejected anything that wouldn't.
     const phone = normalizePhoneNumber(details.phone) ?? details.phone.trim();
+    if (details.password && !email) {
+      throw new BadRequestException('An account needs an email address to sign in with. Add one, or leave the account out.');
+    }
+
+    if (!email) {
+      const known = await findPhoneOnlyCustomer(tx, phone);
+      if (known) return { customer: known, created: false, emailAdded: false };
+      const created = await tx.customer.create({
+        data: { firstName: details.firstName.trim(), lastName: details.lastName.trim(), email: placeholderEmailFor(phone), phone },
+      });
+      return { customer: created, created: true, emailAdded: false };
+    }
+
     const existing = await tx.customer.findUnique({ where: { email } });
 
     if (existing) {
@@ -98,9 +124,30 @@ export class CheckoutService {
         // customer record from an earlier guest checkout was never that.
         void this.ownerNotification.notifySignup(updated);
         void this.mautic.syncSignup({ email: updated.email, firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
-        return updated;
+        return { customer: updated, created: false, emailAdded: false };
       }
-      return existing;
+      return { customer: existing, created: false, emailAdded: false };
+    }
+
+    // Nobody is known by this address. A record for the same phone number with no address is the same person: it keeps its name, its history and
+    // its orders, and gains the address.
+    const phoneOnly = await findPhoneOnlyCustomer(tx, phone);
+    if (phoneOnly) {
+      const updated = await tx.customer.update({
+        where: { id: phoneOnly.id },
+        data: {
+          email,
+          // A name typed at the counter may be a nickname; the one typed with a real email is the shopper's own.
+          firstName: details.firstName.trim() || phoneOnly.firstName,
+          lastName: details.lastName.trim() || phoneOnly.lastName,
+          ...(details.password ? { portalPassword: await bcrypt.hash(details.password, 10), portalEnabled: true } : {}),
+        },
+      });
+      if (details.password) {
+        void this.ownerNotification.notifySignup(updated);
+        void this.mautic.syncSignup({ email: updated.email, firstName: updated.firstName, lastName: updated.lastName, phone: updated.phone });
+      }
+      return { customer: updated, created: false, emailAdded: true };
     }
 
     const created = await tx.customer.create({
@@ -120,7 +167,7 @@ export class CheckoutService {
       void this.ownerNotification.notifySignup(created);
       void this.mautic.syncSignup({ email: created.email, firstName: created.firstName, lastName: created.lastName, phone: created.phone });
     }
-    return created;
+    return { customer: created, created: true, emailAdded: false };
   }
 
   /** Signup on its own, for someone creating an account before buying. */
@@ -133,7 +180,7 @@ export class CheckoutService {
       throw new BadRequestException('An account with that email already exists. Sign in instead.');
     }
 
-    const customer = await this.prisma.$transaction((tx) => this.upsertCustomer(tx, dto));
+    const { customer } = await this.prisma.$transaction((tx) => this.upsertCustomer(tx, dto));
     return { id: customer.id, email: customer.email, firstName: customer.firstName };
   }
 
@@ -172,14 +219,14 @@ export class CheckoutService {
     // Retried as a whole: the order number is read inside the transaction, and
     // a unique violation rolls the transaction back, so re-running the create
     // alone is not possible -- the stock reservation goes with it.
-    const { order, customer } = await retryOnDuplicateReference(() =>
+    const { order, customer, emailAdded } = await retryOnDuplicateReference(() =>
       this.prisma.$transaction(async (tx) => {
       const store = dto.storeId
         ? await tx.store.findUnique({ where: { id: dto.storeId } })
         : await tx.store.findFirst({ where: { isActive: true }, orderBy: { name: 'asc' } });
       if (!store) throw new NotFoundException('No shop is available to fulfil this order.');
 
-      const customer = await this.upsertCustomer(tx, dto);
+      const { customer, emailAdded } = await this.upsertCustomer(tx, dto);
 
       // See the doc comment on start(): the tier is the authenticated
       // session's, never derived from the posted email/customer record.
@@ -330,7 +377,8 @@ export class CheckoutService {
           priceTier: tier,
           customerName: `${customer.firstName} ${customer.lastName}`.trim(),
           customerPhone: customer.phone,
-          customerEmail: customer.email,
+          // The person's own address, or none: a stand-in for a phone-only customer must not be shown, mailed or reported as one.
+          customerEmail: realEmail(customer.email),
           shippingAddress: dto.shippingAddress?.trim() || null,
           subtotal: new Prisma.Decimal(subtotal),
           shipping: new Prisma.Decimal(shipping),
@@ -371,7 +419,12 @@ export class CheckoutService {
         where: {
           status: 'NEW',
           source: 'ABANDONED_CART',
-          OR: [{ customerId: customer.id }, ...(customer.email ? [{ customerEmail: customer.email }] : [])],
+          OR: [
+            { customerId: customer.id },
+            ...(realEmail(customer.email) ? [{ customerEmail: realEmail(customer.email)! }] : []),
+            // A lead left by phone alone is converted by an order from the same number.
+            ...(phoneTail(customer.phone).length >= 7 ? [{ customerPhone: { contains: phoneTail(customer.phone) } }] : []),
+          ],
         },
       });
       if (abandonedLead) {
@@ -381,9 +434,15 @@ export class CheckoutService {
         });
       }
 
-      return { order, customer };
+      return { order, customer, emailAdded };
       }),
     );
+
+    // A phone-only customer who has now given an email: Mautic's contact for that number gains it (and the contact is enrolled), whether or not
+    // this order is ever paid. Fire and forget, like every Mautic call.
+    if (emailAdded) {
+      void this.mautic.syncContact({ email: customer.email, firstName: customer.firstName, lastName: customer.lastName, phone: customer.phone });
+    }
 
     // Paystack is called outside the transaction: an external call inside one
     // holds a database lock for as long as the network takes.
@@ -397,7 +456,8 @@ export class CheckoutService {
     const paymentReference = `${order.orderNumber}-${Date.now().toString(36).toUpperCase()}`;
 
     const init = await this.paystack.initialise({
-      email: customer.email,
+      // Paystack insists on an address. A customer with none is paid for under one made from their number, which receives nothing.
+      email: payerEmail({ email: customer.email, phone: customer.phone, host: hostOf(origin) }),
       amountKes: Number(order.total),
       reference: paymentReference,
       callbackUrl: `${origin}/checkout/complete?ref=${paymentReference}`,
@@ -433,10 +493,6 @@ export class CheckoutService {
     if (order.status !== OrderStatus.PENDING) {
       throw new BadRequestException(`Order ${order.orderNumber} is not awaiting payment.`);
     }
-    if (!order.customerEmail) {
-      throw new BadRequestException('This order has no email on file to send a receipt to.');
-    }
-
     // Same per-attempt reference scheme as start(): Paystack refuses a
     // repeat of a reference it has already seen, including an abandoned one,
     // so resuming needs its own fresh reference rather than reusing the
@@ -444,7 +500,7 @@ export class CheckoutService {
     const paymentReference = `${order.orderNumber}-${Date.now().toString(36).toUpperCase()}`;
 
     const init = await this.paystack.initialise({
-      email: order.customerEmail,
+      email: payerEmail({ email: order.customerEmail, phone: order.customerPhone ?? '', host: hostOf(origin) }),
       amountKes: Number(order.total) - Number(order.amountPaid),
       reference: paymentReference,
       callbackUrl: `${origin}/checkout/complete?ref=${paymentReference}`,

@@ -1,4 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { realEmail } from '../common/contact-email';
+import { normalizePhoneNumber } from '../common/phone.util';
+
+/** Marks a Mautic contact known only by its phone number, until an email is found for it. */
+export const PHONE_ONLY_TAG = 'phone-only';
+
+/** What a sync did: which Mautic contact, and how it got there. */
+export type MauticOutcome = { ok: true; id: number; via: 'email' | 'phone' | 'upgraded' } | { ok: false; error: string };
 
 /**
  * Syncs storefront contacts into Mautic and enrolls them into the
@@ -141,34 +149,106 @@ export class MauticService {
     return created && created.status < 300 && idOf(created) ? { ok: true, id: idOf(created)! } : fail(created);
   }
 
-  /**
-   * Creates or updates the contact by email (Mautic's own create-or-update
-   * semantics for this endpoint), tags it, and enrolls it into the
-   * e-commerce welcome campaign. One call covers all four trigger events --
-   * signup, paid order, cart lead, inquiry -- since each just needs "this
-   * person is a known contact, on the campaign" regardless of which path
-   * got them there.
-   */
-  private async syncContact(params: { email: string; firstName?: string; lastName?: string; phone?: string; whatsappOnboarding?: boolean }) {
-    if (!this.configured) return;
-    const email = params.email.trim().toLowerCase();
-    if (!email) return;
+  /** A Mautic contact found by its mobile number, with what matters for deciding what to do with it. */
+  private async findByMobile(mobile: string): Promise<{ id: number; email: string | null; firstName: string; lastName: string } | { error: string } | null> {
+    const found = await this.call(`/api/contacts?search=${encodeURIComponent(`mobile:${mobile}`)}&limit=1`, { method: 'GET' });
+    if (!found || found.status >= 300) return { error: found ? `Mautic answered ${found.status}` : 'Mautic could not be reached' };
+    const row = Object.values(found.body?.contacts ?? {})[0] as any;
+    if (!row?.id) return null;
+    const core = row.fields?.core ?? {};
+    const value = (key: string) => String(core[key]?.value ?? '').trim();
+    return { id: Number(row.id), email: value('email') || null, firstName: value('firstname'), lastName: value('lastname') };
+  }
 
-    const response = await this.request(`/api/contacts/new`, {
+  /**
+   * Puts a customer who has only a phone number into Mautic, keyed by their mobile number: the contact with that number if there is one (a
+   * person who messaged the shop on WhatsApp is already there), else a new one. Tagged `phone-only` until an address turns up. Not enrolled in the
+   * e-commerce campaign, whose messages are email: this keeps them in Mautic to segment and reach on WhatsApp, and ready for the day an email arrives.
+   */
+  private async syncPhoneOnly(params: { mobile: string; firstName?: string; lastName?: string }): Promise<MauticOutcome> {
+    const found = await this.findByMobile(params.mobile);
+    if (found && 'error' in found) return { ok: false, error: found.error };
+    if (found) {
+      const tags = found.email ? [this.tag] : [this.tag, PHONE_ONLY_TAG];
+      const edited = await this.call(`/api/contacts/${found.id}/edit`, { method: 'PATCH', body: JSON.stringify({ tags }) });
+      return edited && edited.status < 300 ? { ok: true, id: found.id, via: 'phone' } : { ok: false, error: edited ? `Mautic answered ${edited.status}` : 'Mautic could not be reached' };
+    }
+    const created = await this.call(`/api/contacts/new`, {
       method: 'POST',
       body: JSON.stringify({
-        email,
+        mobile: params.mobile,
         ...(params.firstName ? { firstname: params.firstName } : {}),
         ...(params.lastName ? { lastname: params.lastName } : {}),
-        ...(params.phone ? { phone: params.phone } : {}),
-        tags: [this.tag],
+        tags: [this.tag, PHONE_ONLY_TAG],
         overwriteWithBlank: false,
       }),
     });
-    if (!response) return;
-    const body = (await response.json().catch(() => null)) as { contact?: { id?: number } } | null;
-    const contactId = body?.contact?.id;
-    if (!contactId) return;
+    const id = Number(created?.body?.contact?.id) || null;
+    return created && created.status < 300 && id ? { ok: true, id, via: 'phone' } : { ok: false, error: created ? `Mautic answered ${created.status}` : 'Mautic could not be reached' };
+  }
+
+  /**
+   * Syncs a person to Mautic, whether or not they have an email. This is the one entry for storefront contacts.
+   *
+   * - **An email and a phone:** if Mautic already holds a contact for that number with no email (made earlier from this phone alone, or from a
+   *   WhatsApp chat), that contact is given the email, so it is one person with their history, not two. If the address already belongs to another
+   *   contact, Mautic's own create-or-update by email takes over. Then the contact is enrolled in the e-commerce campaign.
+   * - **An email only:** created or updated by email, as before.
+   * - **A phone only** (the email left blank at checkout): a contact keyed by the mobile number, tagged `phone-only`, see syncPhoneOnly.
+   *
+   * Never throws, and says what happened, so callers that fire it and forget it lose nothing and a test can see the outcome.
+   */
+  async syncContact(params: { email?: string | null; firstName?: string; lastName?: string; phone?: string | null; whatsappOnboarding?: boolean }): Promise<MauticOutcome> {
+    if (!this.configured) return { ok: false, error: 'Mautic is not configured' };
+    const email = realEmail(params.email);
+    const mobile = params.phone ? normalizePhoneNumber(params.phone) : null;
+    if (!email) {
+      return mobile ? this.syncPhoneOnly({ mobile, firstName: params.firstName, lastName: params.lastName }) : { ok: false, error: 'No email and no valid phone number' };
+    }
+
+    let contactId: number | null = null;
+    let via: 'email' | 'upgraded' = 'email';
+    if (mobile) {
+      const found = await this.findByMobile(mobile);
+      if (found && 'error' in found) return { ok: false, error: found.error };
+      if (found && !found.email) {
+        // A contact for this number that has no address yet: it is the same person, so it gains the address (and a name only if it has none).
+        const edited = await this.call(`/api/contacts/${found.id}/edit`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            email,
+            ...(params.firstName && !found.firstName ? { firstname: params.firstName } : {}),
+            ...(params.lastName && !found.lastName ? { lastname: params.lastName } : {}),
+            tags: [this.tag, `-${PHONE_ONLY_TAG}`],
+          }),
+        });
+        if (edited && edited.status < 300) {
+          contactId = found.id;
+          via = 'upgraded';
+        } else if (!edited || edited.status >= 500) {
+          return { ok: false, error: edited ? `Mautic answered ${edited.status}` : 'Mautic could not be reached' };
+        }
+        // Anything else (the address is already on another contact, so Mautic refused): fall through to create-or-update by email, which merges
+        // into that contact. The phone-only one is left as it is rather than guessed at.
+      }
+    }
+
+    if (!contactId) {
+      const made = await this.call(`/api/contacts/new`, {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          ...(params.firstName ? { firstname: params.firstName } : {}),
+          ...(params.lastName ? { lastname: params.lastName } : {}),
+          ...(mobile ? { mobile } : {}),
+          ...(params.phone ? { phone: params.phone } : {}),
+          tags: [this.tag],
+          overwriteWithBlank: false,
+        }),
+      });
+      contactId = Number(made?.body?.contact?.id) || null;
+      if (!made || made.status >= 300 || !contactId) return { ok: false, error: made ? `Mautic answered ${made.status}` : 'Mautic could not be reached' };
+    }
 
     if (this.campaignId) {
       await this.request(`/api/campaigns/${this.campaignId}/contact/${contactId}/add`, { method: 'POST' });
@@ -178,19 +258,21 @@ export class MauticService {
     if (params.whatsappOnboarding && this.whatsappCampaignId) {
       await this.request(`/api/campaigns/${this.whatsappCampaignId}/contact/${contactId}/add`, { method: 'POST' });
     }
+    return { ok: true, id: contactId, via };
   }
 
   async syncSignup(params: { email: string; firstName?: string; lastName?: string; phone?: string }) {
     void this.syncContact({ ...params, whatsappOnboarding: true });
   }
 
+  /** A paid order. The email is optional: a customer with a phone number alone is a contact too. */
   async syncOrder(params: { email?: string | null; firstName?: string; lastName?: string; phone?: string | null }) {
-    if (!params.email) return;
-    void this.syncContact({ email: params.email, firstName: params.firstName, lastName: params.lastName, phone: params.phone ?? undefined });
+    void this.syncContact({ email: params.email, firstName: params.firstName, lastName: params.lastName, phone: params.phone });
   }
 
+  /** Abandoned carts are followed up by email, so only a cart with an address is synced; a phone-only lead is left to staff (the WhatsApp link). */
   async syncCartLead(params: { email?: string | null; name?: string | null; phone?: string | null }) {
-    if (!params.email) return;
+    if (!realEmail(params.email)) return;
     const [firstName, ...rest] = (params.name ?? '').trim().split(/\s+/).filter(Boolean);
     void this.syncContact({ email: params.email, firstName, lastName: rest.join(' ') || undefined, phone: params.phone ?? undefined });
   }

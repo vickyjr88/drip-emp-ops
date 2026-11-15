@@ -18,6 +18,7 @@ import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
+import { realEmail } from '../../lib/contact-email';
 
 type Customer = {
   id: string;
@@ -62,7 +63,8 @@ export default function CustomerFormClient({
         setForm({
           firstName: customer.firstName || '',
           lastName: customer.lastName || '',
-          email: customer.email || '',
+          // A customer with only a phone number is stored under a stand-in address: the box shows empty, not that.
+          email: realEmail(customer.email) || '',
           phone: customer.phone || '',
         });
         setPortalEnabled(customer.portalEnabled);
@@ -88,7 +90,8 @@ export default function CustomerFormClient({
       const body = {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
-        email: form.email.trim().toLowerCase(),
+        // Left out when blank: a customer with no email stays as they are, and one who is given an email gains it (and Mautic is told).
+        ...(form.email.trim() ? { email: form.email.trim().toLowerCase() } : {}),
         phone: form.phone.trim(),
       };
       if (mode === 'edit' && customerId) {
@@ -181,11 +184,10 @@ export default function CustomerFormClient({
                 </div>
                 <div className="portal-entity-grid-2">
                   <label>
-                    <span>Email</span>
+                    <span>Email <small className="portal-muted">(optional: leave blank for a phone-only customer, add it when you have it)</small></span>
                     <input
                       type="email"
                       value={form.email}
-                      required
                       disabled={!canWrite}
                       onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
                     />

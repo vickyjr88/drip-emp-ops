@@ -10,6 +10,7 @@ import { AllocateReceiptDto, CancelReceiptDto, CreateReceiptDto } from './dto/cr
 import { ReceiptQueryDto } from './dto/receipt-query.dto';
 import { nextReference } from '../common/next-reference';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
+import { realEmail } from '../common/contact-email';
 
 const PURPOSE_BY_SOURCE_TYPE: Record<InvoiceSourceType, AccountPurpose> = {
   ORDER: AccountPurpose.SALES,
@@ -166,7 +167,7 @@ export class ReceiptService {
       amount: Number(receipt.amount),
       currency: receipt.currency,
       payerName: `${receipt.customer.firstName} ${receipt.customer.lastName}`,
-      payerEmail: receipt.customer.email,
+      payerEmail: realEmail(receipt.customer.email),
       paymentMethod: receipt.paymentMethod,
       transactionReference: receipt.transactionReference,
       description:

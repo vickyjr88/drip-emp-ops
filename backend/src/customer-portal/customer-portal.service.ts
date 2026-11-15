@@ -15,6 +15,8 @@ import { ctaButton } from '../email-log/email-html.util';
 import { ensureReferralCode } from '../common/generate-code';
 import { dailyTrend, trendSince } from '../common/daily-trend.util';
 import { normalizePhoneNumber } from '../common/phone.util';
+import { findPhoneOnlyCustomer } from '../common/phone-only-customer';
+import { MauticService } from '../mautic/mautic.service';
 
 const REFERRAL_TREND_DAYS = 30;
 import { ResellerApplicationService } from '../reseller-application/reseller-application.service';
@@ -37,6 +39,7 @@ export class CustomerPortalService {
     private readonly jwt: JwtService,
     private readonly email: EmailLogService,
     private readonly resellerApplication: ResellerApplicationService,
+    private readonly mautic: MauticService,
   ) {}
 
   /**
@@ -75,9 +78,17 @@ export class CustomerPortalService {
       portalEnabled: true,
     };
 
+    // Someone who bought with a phone number alone and now makes an account: their record gains the email and the password, and keeps its
+    // orders, so the account shows what they bought before they had one.
+    const phoneOnly = existing ? null : await findPhoneOnlyCustomer(this.prisma, data.phone);
     const customer = existing
       ? await this.prisma.customer.update({ where: { id: existing.id }, data })
-      : await this.prisma.customer.create({ data: { ...data, email } });
+      : phoneOnly
+        ? await this.prisma.customer.update({ where: { id: phoneOnly.id }, data: { ...data, email } })
+        : await this.prisma.customer.create({ data: { ...data, email } });
+
+    // The email is new to Mautic's contact for this phone number: give it to that contact (no onboarding: they have bought before).
+    if (phoneOnly) void this.mautic.syncContact({ email, firstName: customer.firstName, lastName: customer.lastName, phone: customer.phone });
 
     return this.issueToken(customer);
   }
