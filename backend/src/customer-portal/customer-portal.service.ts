@@ -305,7 +305,7 @@ export class CustomerPortalService {
    * an unreliable free-text snapshot a guest checkout can set to anything.
    */
   async myReferrals(customerId: string) {
-    const [orders, ownOrders, totalClicks, totalWhatsappClicks, whatsappLeads] = await Promise.all([
+    const [orders, ownOrders, totalClicks, totalWhatsappClicks, whatsappLeads, shareRows] = await Promise.all([
       this.prisma.order.findMany({
         where: { referredByCustomerId: customerId },
         include: {
@@ -333,6 +333,8 @@ export class CustomerPortalService {
       // understate their link's actual reach.
       this.prisma.whatsAppClick.count({ where: { resellerId: customerId } }),
       this.prisma.cartLead.count({ where: { referredByCustomerId: customerId, source: 'WHATSAPP_ORDER' } }),
+      // Taps on a share button, by channel: how often they shared, which the clicks and orders above are what came of.
+      this.prisma.shareEvent.groupBy({ by: ['channel'], where: { customerId }, _count: { _all: true } }),
     ]);
 
     const accruedBalance = orders
@@ -357,6 +359,8 @@ export class CustomerPortalService {
         whatsappLeads,
         ownOrders: ownOrders.length,
         ownRevenue: ownOrders.reduce((sum, order) => sum + Number(order.total), 0),
+        totalShares: shareRows.reduce((sum, row) => sum + row._count._all, 0),
+        sharesByChannel: shareRows.map((row) => ({ channel: row.channel, count: row._count._all })).sort((a, b) => b.count - a.count),
       },
       orders: orders.map((order) => ({
         orderNumber: order.orderNumber,
@@ -380,16 +384,18 @@ export class CustomerPortalService {
   async myReferralSeries(customerId: string) {
     const since = trendSince(REFERRAL_TREND_DAYS);
 
-    const [clicks, orders, whatsappLeads] = await Promise.all([
+    const [clicks, orders, whatsappLeads, shares] = await Promise.all([
       this.prisma.referralClick.findMany({ where: { resellerId: customerId, clickedAt: { gte: since } }, select: { clickedAt: true } }),
       this.prisma.order.findMany({ where: { referredByCustomerId: customerId, placedAt: { gte: since } }, select: { placedAt: true } }),
       this.prisma.cartLead.findMany({
         where: { referredByCustomerId: customerId, source: 'WHATSAPP_ORDER', createdAt: { gte: since } },
         select: { createdAt: true },
       }),
+      this.prisma.shareEvent.findMany({ where: { customerId, createdAt: { gte: since } }, select: { createdAt: true } }),
     ]);
 
     return {
+      shares: dailyTrend(shares.map((row) => row.createdAt), REFERRAL_TREND_DAYS),
       clicks: dailyTrend(clicks.map((row) => row.clickedAt), REFERRAL_TREND_DAYS),
       orders: dailyTrend(orders.map((row) => row.placedAt), REFERRAL_TREND_DAYS),
       whatsappLeads: dailyTrend(whatsappLeads.map((row) => row.createdAt), REFERRAL_TREND_DAYS),

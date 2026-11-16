@@ -10,6 +10,7 @@
  * backend's own performance() response already keeps them separate.
  */
 
+import { describeShareChannels } from '../../../lib/share-labels';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
@@ -41,6 +42,7 @@ type Performance = {
     conversionRate: number | null;
     totalWhatsappClicks: number; whatsappLeads: number; convertedWhatsappLeads: number;
     accruedCommission: number; paidCommission: number;
+    totalShares?: number; sharesByChannel?: Array<{ channel: string; count: number }>;
   };
   ownOrders: OrderRow[];
   referredOrders: OrderRow[];
@@ -48,6 +50,7 @@ type Performance = {
 };
 
 type Series = {
+  shares?: Array<{ date: string; count: number }>;
   clicks: Array<{ date: string; count: number }>;
   orders: Array<{ date: string; count: number }>;
   whatsappLeads: Array<{ date: string; count: number }>;
@@ -215,6 +218,11 @@ export default function ResellerDetailClient({ resellerId }: { resellerId: strin
             <div className="portal-stat-grid">
               <div className="portal-stat"><span>Their own orders</span><h3>{summary.ownOrders}</h3></div>
               <div className="portal-stat"><span>Their own spend</span><h3>{formatMoney(summary.ownRevenue)}</h3></div>
+              <div className="portal-stat">
+                <span>Times they shared</span>
+                <h3>{summary.totalShares ?? 0}</h3>
+                <span className="portal-stat-note">{summary.sharesByChannel?.length ? describeShareChannels(summary.sharesByChannel) : 'taps on a share button on the Share page'}</span>
+              </div>
               <div className="portal-stat"><span>Referral link clicks</span><h3>{summary.totalClicks}</h3></div>
               <div className="portal-stat"><span>Orders they referred</span><h3>{summary.referredOrders}</h3></div>
               <div className="portal-stat">
@@ -239,6 +247,15 @@ export default function ResellerDetailClient({ resellerId }: { resellerId: strin
               <article className="portal-card">
                 <h2 style={{ marginTop: 0 }}>Referral link, last 30 days</h2>
                 <div className="portal-detail-grid">
+                  {series.shares ? (
+                    <ChartFrame title="Shares" subtitle="Taps on a share button on the Share page, per day.">
+                      <TrendChart
+                        data={series.shares.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
+                        valueFormat={(value) => `${value}`}
+                        color="var(--chart-cat-4, var(--chart-cat-2))"
+                      />
+                    </ChartFrame>
+                  ) : null}
                   <ChartFrame title="Link clicks" subtitle="Landings on this reseller's shared link, per day.">
                     <TrendChart
                       data={series.clicks.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}

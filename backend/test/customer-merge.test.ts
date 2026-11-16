@@ -130,6 +130,7 @@ async function harness() {
     const ids = customers.map((c) => c.id);
     await prisma.orderLine.deleteMany({ where: { order: { orderNumber: { startsWith: `CM-${tag}` } } } });
     await prisma.order.deleteMany({ where: { orderNumber: { startsWith: `CM-${tag}` } } });
+    await prisma.shareEvent.deleteMany({ where: { customerId: { in: ids } } });
     await prisma.referralClick.deleteMany({ where: { resellerId: { in: ids } } });
     await prisma.cartLead.deleteMany({ where: { customerId: { in: ids } } });
     await prisma.whatsappOutreach.deleteMany({ where: { phone: intl } });
@@ -155,6 +156,7 @@ db('a phone-only record is merged into the real account: everything it owned mov
     await h.prisma.favorite.create({ data: { customerId: phoneOnly.id, productId: h.product.id } }); // one they both have
     await h.prisma.favorite.create({ data: { customerId: phoneOnly.id, productId: h.product2.id } }); // one only the duplicate has
     await h.prisma.customerDocument.create({ data: { customerId: phoneOnly.id, documentType: 'NATIONAL_ID', fileName: 'id.pdf', objectKey: 'k', url: 'u' } });
+    await h.prisma.shareEvent.createMany({ data: [{ customerId: phoneOnly.id, channel: 'whatsapp', kind: 'PRODUCT' }, { customerId: phoneOnly.id, channel: 'link', kind: 'PRODUCT' }] });
 
     const groups = (await h.service.groups()).groups.filter((g) => g.members.some((m) => m.id === account.id));
     assert.equal(groups.length, 1);
@@ -168,8 +170,8 @@ db('a phone-only record is merged into the real account: everything it owned mov
     const out = await h.service.merge(account.id, [phoneOnly.id], 'staff@test');
     assert.equal(out.merged, 1);
     assert.deepEqual(
-      [out.moved.orders, out.moved.cartLeads, out.moved.whatsappMessages, out.moved.documents, out.moved.favorites, out.moved.favoritesAlreadyHad],
-      [2, 1, 1, 1, 1, 1],
+      [out.moved.orders, out.moved.cartLeads, out.moved.whatsappMessages, out.moved.documents, out.moved.favorites, out.moved.favoritesAlreadyHad, out.moved.shares],
+      [2, 1, 1, 1, 1, 1, 2],
     );
 
     assert.equal(await h.prisma.customer.count({ where: { id: phoneOnly.id } }), 0);
@@ -178,6 +180,7 @@ db('a phone-only record is merged into the real account: everything it owned mov
     assert.equal(await h.prisma.whatsappOutreach.count({ where: { customerId: account.id } }), 1);
     assert.equal(await h.prisma.customerDocument.count({ where: { customerId: account.id } }), 1);
     assert.equal(await h.prisma.favorite.count({ where: { customerId: account.id } }), 2);
+    assert.equal(await h.prisma.shareEvent.count({ where: { customerId: account.id } }), 2, 'their share history is the kept customer\'s now, not deleted with the duplicate');
 
     // The kept account is untouched: its own email and sign-in survive, and it takes nothing it already has.
     const kept = await h.prisma.customer.findUniqueOrThrow({ where: { id: account.id } });

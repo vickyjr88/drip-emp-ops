@@ -10,6 +10,10 @@
 /** Where a share goes. `share` is the phone's own share sheet (which reaches Instagram, TikTok, Messages and the rest); `link` is a copied address. */
 export type ShareChannel = 'whatsapp' | 'facebook' | 'x' | 'telegram' | 'share' | 'link';
 
+/** What a tap on a share button is recorded as: the channels above, or `download` for a picture saved to send by hand. */
+export type ShareRecordChannel = ShareChannel | 'download';
+export type ShareKind = 'PRODUCT' | 'PICTURE' | 'KIT';
+
 /** An absolute product address with the sharer's code (an affiliate) and a tag for the channel. */
 export function buildShareLink(base: string, options: { code?: string | null; channel: ShareChannel }): string {
   const url = new URL(base);

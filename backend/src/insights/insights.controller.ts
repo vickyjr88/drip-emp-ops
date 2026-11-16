@@ -6,6 +6,7 @@ import { AdSpendInput, AdSpendService } from './ad-spend.service';
 import { BuyersService } from './buyers.service';
 import { FunnelService } from './funnel.service';
 import { StockService } from './stock.service';
+import { ShareStatsService } from './share-stats.service';
 import { WhatsappReportService } from './whatsapp-report.service';
 
 const DAY = 24 * 3600_000;
@@ -30,6 +31,7 @@ export class InsightsController {
     private stockService: StockService,
     private buyersService: BuyersService,
     private whatsappReport: WhatsappReportService,
+    private shareStats: ShareStatsService,
   ) {}
 
   /** Visits to orders: the funnel by source and device, what ads return, and the products people look at. */
@@ -38,6 +40,14 @@ export class InsightsController {
   funnel(@Query('from') from?: string, @Query('to') to?: string) {
     const w = periodOf(from, to);
     return this.funnelService.funnel(w.start, w.end);
+  }
+
+  /** What customers and affiliates shared from the Share page: how often, where to, which products, who. */
+  @Get('shares')
+  @Permissions(buildPermissionKey('MarketingCampaign', 'read'))
+  shares(@Query('from') from?: string, @Query('to') to?: string) {
+    const w = periodOf(from, to);
+    return this.shareStats.summary(w.start, w.end);
   }
 
   @Get('ad-spend')

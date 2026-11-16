@@ -33,6 +33,18 @@ credits them. **Share picture** opens the phone's share sheet with the picture a
 
 A picture is drawn on request and not stored, 120 an hour per affiliate; the response varies by sign-in (`Vary: Authorization`) so a shared device cannot replay one.
 
+## Share counts
+
+Every tap on a share button is recorded (`ShareEvent`, migration `20261122120000_add_share_events`): who, where to (`whatsapp`, `facebook`, `x`, `telegram`, `share` the phone's share sheet, `link` copied, `download` a picture saved),
+which kind (`PRODUCT` a search result, `PICTURE` a status picture, `KIT` an item of the day's kit) and which product. **It counts the intention, not the arrival**: the networks tell a website nothing about what happened next, so
+a share is counted when its share screen was opened, the link was copied, or the picture was handed to the share sheet, and **not** when someone closed the share sheet. Two taps on the same button within two seconds are one share.
+What a share brought in is counted where it always was: link clicks, orders and WhatsApp leads against the affiliate's code, and visits by channel in Insights.
+
+- **The server decides** whether a share carried a referral code (from who the customer is, never from the request), accepts only the known channels, kinds and a valid product address, and limits a customer to 300 a hour.
+- **Affiliates** see "Times you shared" (with the channels) and a 30-day trend on their dashboard, beside link clicks, orders and leads.
+- **Staff** see the same on a reseller's page, and Portal > Insights > Visits & ads has a **Shares** card for the period: total, people who shared, with a code and plain links, by channel, most shared products, who shares most.
+- Merging duplicate customers moves share history to the kept customer.
+
 ## Where to find it
 
 A "Share & earn" / "Share products" panel on the account page, and a button at the top of the affiliate dashboard.
@@ -42,10 +54,11 @@ A "Share & earn" / "Share products" panel on the account page, and a button at t
 - Backend: `backend/src/share-kit/` (`share-kit.ts` the rules, `share-kit.service.ts`, `share-kit.controller.ts`: `GET /customer-portal/share-kit` and `GET /customer-portal/share-kit/picture/:slug`),
   the `mode: 'affiliate'` picture in `social-posting/status-image.ts`.
 - Web: `web/app/account/share/`, `web/app/lib/share-links.ts` (links and each channel's share address), styles at the end of `globals.css`.
-- Tests: `npm run test:share-kit` (rules, picture, gating) and `npm run test:share-links` (the page's links, tied to the server's).
+- Counting: `backend/src/share-kit/share-events.ts`, `POST /customer-portal/share-kit/shares`, `insights/share-stats.service.ts` (`GET /insights/shares`), `ShareEvent` in the schema.
+- Tests: `npm run test:share-kit` (rules, picture, gating), `npm run test:share-links` (the page's links, tied to the server's) and `npm run test:share-events` (what is recorded and counted; needs `KITS_TEST_DATABASE_URL`).
 
 ## Not done
 
-- No posting on anyone's behalf, and no share-click counts: visits show in Insights by channel, but a share that nobody clicks is not seen.
+- No posting on anyone's behalf. A share is counted when it was started, not when it arrived or was read: there is no way to know that.
 - Instagram and TikTok have no web share address, so they go through More... or Copy link.
 - Watches and kits can be shared as links, but only shop products get a picture.

@@ -15,6 +15,7 @@ import { EliteLayout } from '../../components/elite-layout';
 import { customerApi, useCustomerAuth } from '../../lib/customer-auth';
 import { formatKes } from '../../lib/shop';
 import { TrendChart } from '../../portal/analytics/charts';
+import { describeShareChannels } from '../../lib/share-labels';
 
 // Unlike shop.ts's formatKes (built for a product price, where 0 or less
 // means "no real price yet" and should read as "Price on request"), a
@@ -55,12 +56,16 @@ type Referrals = {
     whatsappLeads: number;
     ownOrders: number;
     ownRevenue: number;
+    /** Taps on a share button on the Share page, and where they went. */
+    totalShares?: number;
+    sharesByChannel?: Array<{ channel: string; count: number }>;
   };
   orders: ReferralOrder[];
   ownOrders: OwnOrder[];
 };
 
 type ReferralSeries = {
+  shares?: Array<{ date: string; count: number }>;
   clicks: Array<{ date: string; count: number }>;
   orders: Array<{ date: string; count: number }>;
   whatsappLeads: Array<{ date: string; count: number }>;
@@ -147,6 +152,13 @@ export function ResellerDashboardClient() {
         <section className="lp-container">
           <div className="de-stat-grid is-wide">
             <div className="de-stat-card">
+              <span>Times you shared</span>
+              <strong>{data?.summary.totalShares ?? 0}</strong>
+              <span style={{ marginTop: 6, marginBottom: 0 }}>
+                {data?.summary.sharesByChannel?.length ? describeShareChannels(data.summary.sharesByChannel) : 'taps on a share button'}
+              </span>
+            </div>
+            <div className="de-stat-card">
               <span>Link clicks</span>
               <strong>{data?.summary.totalClicks ?? 0}</strong>
             </div>
@@ -196,6 +208,16 @@ export function ResellerDashboardClient() {
                 tracked.
               </p>
               <div className="de-trend-grid">
+                {series.shares ? (
+                  <div className="de-trend-block">
+                    <h3>Times you shared</h3>
+                    <TrendChart
+                      data={series.shares.map((point) => ({ label: shortDayLabel(point.date), value: point.count }))}
+                      valueFormat={(value) => `${value}`}
+                      color="var(--chart-cat-4, var(--chart-cat-2))"
+                    />
+                  </div>
+                ) : null}
                 <div className="de-trend-block">
                   <h3>Link clicks</h3>
                   <TrendChart

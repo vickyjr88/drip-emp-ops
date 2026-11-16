@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { shareChannelLabel } from '../../lib/share-labels';
 import { AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, hasPermission, loadProfile, roleLabelFor } from '../accounting/lib';
 
 type Row = { sessions: number; viewedProduct: number; addedToCart: number; viewedCart: number; beganCheckout: number; tappedWhatsapp: number; tappedCall: number; whatsappOrders: number; orders: number; revenueKes: number };
@@ -197,6 +198,59 @@ function useReport<T>(path: string, token: string): T | null | undefined {
   return data;
 }
 
+type ShareStats = {
+  total: number; sharers: number; withCode: number; withoutCode: number;
+  byChannel: Array<{ channel: string; count: number }>;
+  topProducts: Array<{ slug: string; name: string; count: number }>;
+  topSharers: Array<{ customerId: string; name: string; affiliate: boolean; count: number }>;
+};
+
+/** What customers and affiliates shared from the Share page. A tap on a share button, not an arrival: what a share brought in shows in the visits above (by channel) and on each affiliate's page. */
+function SharesCard({ token, from, to }: { token: string; from: string; to: string }) {
+  const s = useReport<ShareStats>(`/insights/shares?from=${from}&to=${to}`, token);
+  if (s === undefined) return <article className="portal-card" style={{ marginBottom: 20 }}><h2 style={{ marginTop: 0 }}>Shares</h2><p className="portal-muted">Loading...</p></article>;
+  if (s === null) return null;
+  return (
+    <article className="portal-card" style={{ marginBottom: 20 }}>
+      <h2 style={{ marginTop: 0 }}>Shares</h2>
+      {s.total === 0 ? (
+        <p className="portal-muted">Nobody has shared a product from the Share page in this period yet. Customers and affiliates find it under their account.</p>
+      ) : (
+        <>
+          <div className="portal-stat-grid">
+            <div className="portal-stat"><span>Shares</span><h3>{s.total.toLocaleString('en-KE')}</h3><span className="portal-stat-note">taps on a share button</span></div>
+            <div className="portal-stat"><span>People who shared</span><h3>{s.sharers.toLocaleString('en-KE')}</h3></div>
+            <div className="portal-stat"><span>With an affiliate code</span><h3>{s.withCode.toLocaleString('en-KE')}</h3><span className="portal-stat-note">{s.withoutCode.toLocaleString('en-KE')} plain links from customers</span></div>
+            {s.byChannel.map((c) => (
+              <div key={c.channel} className="portal-stat"><span>{shareChannelLabel(c.channel)}</span><h3>{c.count.toLocaleString('en-KE')}</h3><span className="portal-stat-note">{pct(c.count, s.total)} of shares</span></div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
+            <div>
+              <h3 style={{ marginTop: 0 }}>Most shared products</h3>
+              <div className="portal-table-wrap">
+                <table className="portal-data-table is-compact">
+                  <thead><tr><th>Product</th><th>Shares</th></tr></thead>
+                  <tbody>{s.topProducts.map((p) => <tr key={p.slug}><td>{p.name}</td><td>{p.count}</td></tr>)}</tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <h3 style={{ marginTop: 0 }}>Who shares most</h3>
+              <div className="portal-table-wrap">
+                <table className="portal-data-table is-compact">
+                  <thead><tr><th>Name</th><th>Kind</th><th>Shares</th></tr></thead>
+                  <tbody>{s.topSharers.map((p) => <tr key={p.customerId}><td>{p.name}</td><td>{p.affiliate ? 'Affiliate' : 'Customer'}</td><td>{p.count}</td></tr>)}</tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
 function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthProfile; from: string; to: string }) {
   const [version, setVersion] = useState(0);
   const f = useReport<Funnel>(`/insights/funnel?from=${from}&to=${to}&v=${version}`, token);
@@ -236,6 +290,8 @@ function VisitsTab({ token, profile, from, to }: { token: string; profile: AuthP
           </>
         )}
       </article>
+
+      <SharesCard token={token} from={from} to={to} />
 
       <article className="portal-card" style={{ marginBottom: 20 }}>
         <h2 style={{ marginTop: 0 }}>What ads return</h2>

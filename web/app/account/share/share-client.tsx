@@ -16,7 +16,7 @@ import { customerApi, useCustomerAuth } from '../../lib/customer-auth';
 import { ShopProduct, fetchProducts, priceLabel } from '../../lib/shop';
 import { fetchWatches, watchPath } from '../../lib/watches';
 import { absoluteUrl } from '../../lib/site';
-import { ShareChannel, buildShareLink, channelHref, pictureFileName } from '../../lib/share-links';
+import { ShareChannel, ShareKind, ShareRecordChannel, buildShareLink, channelHref, pictureFileName } from '../../lib/share-links';
 
 const API = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3100').replace(/\/$/, '');
 
@@ -69,6 +69,7 @@ export function ShareClient() {
   const noticeTimer = useRef<number | undefined>(undefined);
   const latest = useRef(0);
   const loadingPictures = useRef<Set<string>>(new Set());
+  const lastShare = useRef<{ key: string; at: number } | null>(null);
 
   useEffect(() => {
     if (auth.ready && !auth.customer) router.replace('/account/login');
@@ -79,6 +80,25 @@ export function ShareClient() {
     window.clearTimeout(noticeTimer.current);
     noticeTimer.current = window.setTimeout(() => setNotice(null), 5000);
   }, []);
+
+  /**
+   * Reports a share to the shop, so affiliates and staff can see how often products are shared and where. Counted when a share screen was opened, a link
+   * copied or a picture handed over, never when someone cancelled the share sheet. Fire and forget: a failure here must not touch the share itself.
+   * Two taps on the same button within two seconds are one share.
+   */
+  const recordShare = useCallback((channel: ShareRecordChannel, kind: ShareKind, productSlug?: string) => {
+    if (!token) return;
+    const key = `${channel}|${kind}|${productSlug ?? ''}`;
+    const now = Date.now();
+    if (lastShare.current && lastShare.current.key === key && now - lastShare.current.at < 2000) return;
+    lastShare.current = { key, at: now };
+    void fetch(`${API}/customer-portal/share-kit/shares`, {
+      method: 'POST',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, kind, productSlug }),
+    }).catch(() => undefined);
+  }, [token]);
 
   // Without the sign-in on purpose: what is shared is the price anyone sees, not the trade price an affiliate is shown.
   useEffect(() => {
@@ -139,24 +159,37 @@ export function ShareClient() {
     );
   }
 
-  const copy = async (text: string, done: string) => {
-    try { await navigator.clipboard.writeText(text); say(done); } catch { say('Could not copy. Press and hold the text to copy it.'); }
+  const copy = async (text: string, done: string): Promise<boolean> => {
+    try { await navigator.clipboard.writeText(text); say(done); return true; } catch { say('Could not copy. Press and hold the text to copy it.'); return false; }
   };
 
   /** Opens a channel's own share screen (or the phone's share sheet, or copies) for one product. */
   async function shareProduct(product: Hit, channel: ShareChannel) {
     const link = buildShareLink(absoluteUrl(pathOf(product)), { code, channel });
     const text = `${product.name}\n${priceLabel(product)}`;
-    if (channel === 'link') return copy(link, 'Link copied. Paste it anywhere.');
+    if (channel === 'link') {
+      if (await copy(link, 'Link copied. Paste it anywhere.')) recordShare('link', 'PRODUCT', product.slug);
+      return;
+    }
     if (channel === 'share') {
       if (navigator.share) {
-        try { await navigator.share({ title: product.name, text, url: link }); } catch (error) { if ((error as Error)?.name !== 'AbortError') await copy(link, 'Link copied. Paste it anywhere.'); }
+        try {
+          await navigator.share({ title: product.name, text, url: link });
+          recordShare('share', 'PRODUCT', product.slug);
+        } catch (error) {
+          // Closing the share sheet is not a share. Anything else falls back to copying the link.
+          if ((error as Error)?.name !== 'AbortError' && (await copy(link, 'Link copied. Paste it anywhere.'))) recordShare('link', 'PRODUCT', product.slug);
+        }
         return;
       }
-      return copy(link, 'Link copied. Paste it into Instagram, TikTok or any chat.');
+      if (await copy(link, 'Link copied. Paste it into Instagram, TikTok or any chat.')) recordShare('link', 'PRODUCT', product.slug);
+      return;
     }
     const href = channelHref(channel, { link, text });
-    if (href) window.open(href, '_blank', 'noopener');
+    if (href) {
+      window.open(href, '_blank', 'noopener');
+      recordShare(channel, 'PRODUCT', product.slug);
+    }
   }
 
   async function pictureFor(product: Hit) {
@@ -166,15 +199,22 @@ export function ShareClient() {
     setPictures((prev) => ({ ...prev, [product.slug]: picture }));
     const link = buildShareLink(absoluteUrl(pathOf(product)), { code, channel: 'whatsapp' });
     const result = await sharePicture(picture, product.slug, `${product.name}\n${priceLabel(product)}\n\n🛒 ${link}`);
-    if (result === 'downloaded') say('Downloaded. Open WhatsApp > Status and add it from your gallery, then paste the text.');
-    else say('');
+    if (result === 'downloaded') {
+      say('Downloaded. Open WhatsApp > Status and add it from your gallery, then paste the text.');
+      recordShare('download', 'PICTURE', product.slug);
+    } else {
+      say('');
+      if (result === 'shared') recordShare('share', 'PICTURE', product.slug);
+    }
   }
 
   async function shareKitPicture(item: KitItem) {
     const picture = pictures[item.slug];
     if (!picture || picture === 'failed') return;
     const result = await sharePicture(picture, item.slug, item.caption);
+    if (result === 'shared') recordShare('share', 'KIT', item.slug);
     if (result === 'downloaded') {
+      recordShare('download', 'KIT', item.slug);
       await copy(item.caption, 'Picture downloaded and the text copied. Open WhatsApp > Status, add the picture, and paste the text.');
     }
   }
@@ -186,6 +226,7 @@ export function ShareClient() {
     a.href = picture.url;
     a.download = pictureFileName(item.slug);
     a.click();
+    recordShare('download', 'KIT', item.slug);
   }
 
   const searchingNow = term.trim().length >= 2;
@@ -255,10 +296,11 @@ export function ShareClient() {
                           href={`https://wa.me/?text=${encodeURIComponent(item.caption)}`}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={() => recordShare('whatsapp', 'KIT', item.slug)}
                         >
                           <WhatsAppIcon /> Send as a message
                         </a>
-                        <button type="button" className="lp-button lp-button-ghost" onClick={() => void copy(item.caption, 'Text copied, with your link.')}>Copy text</button>
+                        <button type="button" className="lp-button lp-button-ghost" onClick={() => void copy(item.caption, 'Text copied, with your link.').then((ok) => { if (ok) recordShare('link', 'KIT', item.slug); })}>Copy text</button>
                         <button type="button" className="lp-button lp-button-ghost" disabled={!picture || picture === 'failed'} onClick={() => downloadKitPicture(item)}>Download</button>
                       </div>
                     </article>

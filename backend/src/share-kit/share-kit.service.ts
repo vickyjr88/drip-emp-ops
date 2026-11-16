@@ -1,10 +1,12 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PageContentService } from '../page-content/page-content.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from '../storefront/storefront.service';
 import { shopFacts } from '../facebook-comments/shop-facts';
 import { PostableProduct, isPostable, nairobiParts } from '../social-posting/social-post';
 import { fetchPhoto, renderStatusImage } from '../social-posting/status-image';
 import { affiliateKitSize, affiliateLink, buildAffiliateCaption, isAffiliate, pickDaily } from './share-kit';
+import { cleanShareEvent } from './share-events';
 
 const CACHE_MS = 60_000;
 
@@ -23,6 +25,7 @@ export class ShareKitService {
   constructor(
     private readonly storefront: StorefrontService,
     private readonly pages: PageContentService,
+    private readonly prisma: PrismaService,
   ) {}
 
   private async candidates(): Promise<PostableProduct[]> {
@@ -34,6 +37,18 @@ export class ShareKitService {
 
   private async facts() {
     return shopFacts(this.pages, process.env.FACEBOOK_PAGE_ID || '', this.logger);
+  }
+
+  /**
+   * Records one tap on a share button. Open to every signed-in customer, not only affiliates. Whether the link carried a referral code is decided here from
+   * who they are, never taken from the request, so a count of "affiliate shares" cannot be inflated by asking for it.
+   */
+  async record(customer: ShareCustomer, body: unknown) {
+    const event = cleanShareEvent(body);
+    await this.prisma.shareEvent.create({
+      data: { customerId: customer.id, channel: event.channel, kind: event.kind, productSlug: event.productSlug, withCode: isAffiliate(customer) },
+    });
+    return { recorded: true };
   }
 
   private requireAffiliate(customer: ShareCustomer) {

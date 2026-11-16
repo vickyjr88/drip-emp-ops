@@ -1,4 +1,4 @@
-import { Controller, Get, Header, HttpException, Param, Req, StreamableFile, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpException, Param, Post, Req, StreamableFile, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { CustomerAuthGuard } from '../customer-portal/customer-auth.guard';
@@ -7,6 +7,8 @@ import { ShareKitService } from './share-kit.service';
 
 /** A picture is drawn on request (a few hundred milliseconds of work), so one affiliate cannot ask for more than this many an hour. */
 const allowPicture = makeRateLimiter(120, 60 * 60_000);
+/** A person taps share a few dozen times in a sitting at most; a script does thousands. Per customer, per hour. */
+const allowShareEvent = makeRateLimiter(300, 60 * 60_000);
 
 /**
  * The affiliate share kit. @Public only steps the *staff* guards aside; CustomerAuthGuard authenticates every route, and the customer (and so
@@ -23,6 +25,13 @@ export class ShareKitController {
   @Get()
   today(@Req() req: any) {
     return this.kit.today(req.user);
+  }
+
+  /** A tap on a share button (any signed-in customer, not only affiliates). */
+  @Post('shares')
+  share(@Body() body: unknown, @Req() req: any) {
+    if (!allowShareEvent(String(req.user?.id))) throw new HttpException('Too many shares recorded in the last hour.', 429);
+    return this.kit.record(req.user, body);
   }
 
   @Get('picture/:slug')

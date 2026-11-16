@@ -146,7 +146,7 @@ export class ResellerService {
     if (!customer) throw new NotFoundException(`Trade customer ${id} not found`);
     const reseller = { ...customer, name: customerDisplayName(customer) };
 
-    const [ownOrders, referredOrders, totalClicks, totalWhatsappClicks, whatsappLeads, commissionAccrued, commissionPaid] =
+    const [ownOrders, referredOrders, totalClicks, totalWhatsappClicks, whatsappLeads, commissionAccrued, commissionPaid, shareRows] =
       await Promise.all([
         this.prisma.order.findMany({
           where: { customerId: id },
@@ -172,6 +172,8 @@ export class ResellerService {
         }),
         this.prisma.commission.aggregate({ where: { resellerId: id, status: 'ACCRUED' }, _sum: { amount: true } }),
         this.prisma.commission.aggregate({ where: { resellerId: id, status: 'PAID' }, _sum: { amount: true } }),
+        // Taps on a share button on the Share page, by channel: the activity in front of the clicks above.
+        this.prisma.shareEvent.groupBy({ by: ['channel'], where: { customerId: id }, _count: { _all: true } }),
       ]);
 
     const confirmedReferred = referredOrders.filter(
@@ -196,6 +198,8 @@ export class ResellerService {
         convertedWhatsappLeads: convertedWhatsappLeads.length,
         accruedCommission: Number(commissionAccrued._sum.amount ?? 0),
         paidCommission: Number(commissionPaid._sum.amount ?? 0),
+        totalShares: shareRows.reduce((sum, row) => sum + row._count._all, 0),
+        sharesByChannel: shareRows.map((row) => ({ channel: row.channel, count: row._count._all })).sort((a, b) => b.count - a.count),
       },
       ownOrders: ownOrders.map((order) => ({
         id: order.id,
@@ -234,16 +238,18 @@ export class ResellerService {
     await this.findOne(id);
     const since = trendSince(TREND_DAYS);
 
-    const [clicks, orders, whatsappLeads] = await Promise.all([
+    const [clicks, orders, whatsappLeads, shares] = await Promise.all([
       this.prisma.referralClick.findMany({ where: { resellerId: id, clickedAt: { gte: since } }, select: { clickedAt: true } }),
       this.prisma.order.findMany({ where: { referredByCustomerId: id, placedAt: { gte: since } }, select: { placedAt: true } }),
       this.prisma.cartLead.findMany({
         where: { referredByCustomerId: id, source: 'WHATSAPP_ORDER', createdAt: { gte: since } },
         select: { createdAt: true },
       }),
+      this.prisma.shareEvent.findMany({ where: { customerId: id, createdAt: { gte: since } }, select: { createdAt: true } }),
     ]);
 
     return {
+      shares: dailyTrend(shares.map((row) => row.createdAt), TREND_DAYS),
       clicks: dailyTrend(clicks.map((row) => row.clickedAt), TREND_DAYS),
       orders: dailyTrend(orders.map((row) => row.placedAt), TREND_DAYS),
       whatsappLeads: dailyTrend(whatsappLeads.map((row) => row.createdAt), TREND_DAYS),

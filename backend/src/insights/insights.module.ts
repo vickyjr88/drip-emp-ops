@@ -6,12 +6,13 @@ import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 import { FunnelService } from './funnel.service';
 import { InsightsController } from './insights.controller';
+import { ShareStatsService } from './share-stats.service';
 import { StockService } from './stock.service';
 import { WhatsappReportService } from './whatsapp-report.service';
 
 @Module({
   imports: [PrismaModule],
   controllers: [EventsController, InsightsController],
-  providers: [EventsService, FunnelService, AdSpendService, StockService, BuyersService, WhatsappReportService],
+  providers: [EventsService, FunnelService, AdSpendService, StockService, BuyersService, WhatsappReportService, ShareStatsService],
 })
 export class InsightsModule {}

@@ -122,6 +122,8 @@ model Customer {
   /// order path.
   referredCartLeads    CartLead[]            @relation("CartLeadReferredBy")
   favorites            Favorite[]
+  /// Each time they tapped a share button on the Share page (see ShareEvent).
+  shareEvents          ShareEvent[]
 }
 
 model CustomerDocument {
@@ -2676,4 +2678,27 @@ model CustomerMerge {
 
   @@index([keptCustomerId])
   @@index([mergedCustomerId])
+}
+
+/// One tap on a share button on the Share page (/account/share): a customer or an affiliate sending a product to WhatsApp, Facebook, X, Telegram,
+/// the phone's share sheet, or copying its link. It counts the intention, not the arrival: the networks tell a website nothing about what happened
+/// next, so "shared" means the share screen was opened (or the link copied, or the picture handed to the share sheet) and not cancelled. What the
+/// shares brought in is counted where it always was: link clicks, orders and WhatsApp leads against the referral code.
+model ShareEvent {
+  id          String   @id @default(uuid())
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId  String
+  /// whatsapp, facebook, x, telegram, share (the phone's share sheet), link (copied) or download (a picture saved to send by hand).
+  channel     String
+  /// PRODUCT (a search result's link), PICTURE (a status picture for a product) or KIT (an item of the day's Status kit).
+  kind        String
+  /// The product's address name; null for nothing in particular.
+  productSlug String?
+  /// Whether the link carried the sharer's referral code (they were an affiliate at the time), so a later change of tier does not rewrite history.
+  withCode    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([createdAt])
+  @@index([productSlug])
 }

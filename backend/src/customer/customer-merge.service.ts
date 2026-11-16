@@ -5,9 +5,9 @@ import { MauticService } from '../mautic/mautic.service';
 import { realEmail } from '../common/contact-email';
 import { DupCustomer, DupGroup, adoptFrom, groupDuplicates } from './customer-duplicates.rules';
 
-export type MergeCounts = Record<'orders' | 'referredOrders' | 'invoices' | 'receipts' | 'consignments' | 'cartLeads' | 'referredCartLeads' | 'whatsappMessages' | 'documents' | 'favorites' | 'favoritesAlreadyHad', number>;
+export type MergeCounts = Record<'orders' | 'referredOrders' | 'invoices' | 'receipts' | 'consignments' | 'cartLeads' | 'referredCartLeads' | 'whatsappMessages' | 'documents' | 'shares' | 'favorites' | 'favoritesAlreadyHad', number>;
 
-const emptyCounts = (): MergeCounts => ({ orders: 0, referredOrders: 0, invoices: 0, receipts: 0, consignments: 0, cartLeads: 0, referredCartLeads: 0, whatsappMessages: 0, documents: 0, favorites: 0, favoritesAlreadyHad: 0 });
+const emptyCounts = (): MergeCounts => ({ orders: 0, referredOrders: 0, invoices: 0, receipts: 0, consignments: 0, cartLeads: 0, referredCartLeads: 0, whatsappMessages: 0, documents: 0, shares: 0, favorites: 0, favoritesAlreadyHad: 0 });
 
 /**
  * Merges customers who are the same person into one record: everything the others own (orders, invoices, receipts, carts, documents, favourites, WhatsApp
@@ -93,6 +93,8 @@ export class CustomerMergeService {
           moved.referredCartLeads = (await tx.cartLead.updateMany({ where: { referredByCustomerId: dup.id }, data: { referredByCustomerId: keep.id } })).count;
           moved.whatsappMessages = (await tx.whatsappOutreach.updateMany(own)).count;
           moved.documents = (await tx.customerDocument.updateMany(own)).count;
+          // Their share history goes with them, so an affiliate's counts do not shrink when a duplicate record is merged into theirs.
+          moved.shares = (await tx.shareEvent.updateMany(own)).count;
 
           // A favourite is one row per customer and product: move the ones the kept customer does not have, drop the repeats.
           const have = new Set((await tx.favorite.findMany({ where: { customerId: keep.id }, select: { productId: true } })).map((f) => f.productId));

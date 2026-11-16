@@ -88,7 +88,7 @@ async function service() {
   global.fetch = (async (input: any) => (String(input).startsWith('https://cdn.example.test/') ? new Response(jpeg, { status: 200 }) : realFetch(input))) as any;
   const storefront = { postableProducts: async () => catalogue.map((p) => ({ ...p })) } as any;
   const pages = { findOne: async () => { throw new Error('no site content in a test'); } } as any;
-  return { svc: new ShareKitService(storefront, pages), restore: () => { global.fetch = realFetch; } };
+  return { svc: new ShareKitService(storefront, pages, {} as any), restore: () => { global.fetch = realFetch; } };
 }
 
 const affiliate = { id: 'c1', firstName: 'Wanjiru', priceTier: 'RESELLER', referralCode: 'kZ3F9pQd' };
