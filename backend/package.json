@@ -34,7 +34,9 @@
     "test:facebook-comments": "node --require ts-node/register/transpile-only --test test/facebook-comments.test.ts",
     "test:whatsapp-mautic": "node --require ts-node/register/transpile-only --test test/whatsapp-mautic-sync.test.ts",
     "test:whatsapp-subscription": "node --require ts-node/register/transpile-only --test test/whatsapp-subscription.test.ts",
-    "test:follow-up": "node --require ts-node/register/transpile-only --test test/follow-up.test.ts"
+    "test:follow-up": "node --require ts-node/register/transpile-only --test test/follow-up.test.ts",
+    "test:share-kit": "node --require ts-node/register/transpile-only --test test/share-kit.test.ts",
+    "test:share-links": "node --require ts-node/register/transpile-only --test test/share-links.test.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",

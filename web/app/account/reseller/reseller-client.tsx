@@ -139,6 +139,9 @@ export function ResellerDashboardClient() {
         <section className="lp-container de-shop-head">
           <p style={{ margin: '0 0 10px' }}><Link href="/account">← Back to your account</Link></p>
           <h1>Your affiliate dashboard</h1>
+          <p style={{ margin: '12px 0 0' }}>
+            <Link href="/account/share" className="lp-button lp-button-primary">Share products &amp; today&apos;s Status kit</Link>
+          </p>
         </section>
 
         <section className="lp-container">

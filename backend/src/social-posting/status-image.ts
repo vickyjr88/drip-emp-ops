@@ -70,7 +70,15 @@ function fit(text: string, size: number, min: number, max: number, maxLines: num
   return { lines: last, size: s };
 }
 
-export type StatusFacts = { whatsapp: string; site: string };
+export type StatusFacts = {
+  whatsapp: string;
+  site: string;
+  /**
+   * `shop` (the default) invites people to reply to the Status, which reaches the shop's own chat. `affiliate` is for a picture an affiliate shares: replies
+   * would go to the affiliate, not the shop, so it points at the link in the text that goes with it, which carries the affiliate's code.
+   */
+  mode?: 'shop' | 'affiliate';
+};
 
 /** The picture, as the drawing instructions (everything except the product photo). Kept separate so it can be tested without a photo. */
 export function statusOverlay(product: PostableProduct, facts: StatusFacts): string {
@@ -106,10 +114,12 @@ export function statusOverlay(product: PostableProduct, facts: StatusFacts): str
 
   // Fixed foot of the picture, so the call to action is always in the same place.
   parts.push(`<rect x="60" y="1738" width="${STATUS_WIDTH - 120}" height="2" fill="#2a2a2a"/>`);
-  parts.push(line('Reply to this status to order', 46, 1806, GOLD));
+  const affiliate = facts.mode === 'affiliate';
+  parts.push(line(affiliate ? 'Tap the link below to order' : 'Reply to this status to order', 46, 1806, GOLD));
   const phone = facts.whatsapp ? formatKenyanPhone(facts.whatsapp.replace(/^https?:\/\/wa\.me\//, '')) : '';
   const host = facts.site.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-  parts.push(line([host, phone ? `WhatsApp ${phone}` : ''].filter(Boolean).join('   ·   '), 34, 1868, MUTED));
+  // An affiliate's picture does not carry the shop's own chat number: an order from it should go through the affiliate's link, which is what credits them.
+  parts.push(line([host, !affiliate && phone ? `WhatsApp ${phone}` : ''].filter(Boolean).join('   ·   '), 34, 1868, MUTED));
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${STATUS_WIDTH}" height="${STATUS_HEIGHT}" viewBox="0 0 ${STATUS_WIDTH} ${STATUS_HEIGHT}">${parts.join('')}</svg>`;
 }
 

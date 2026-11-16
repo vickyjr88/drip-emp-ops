@@ -366,6 +366,17 @@ export function AccountClient() {
               )}
             </div>
 
+            <div className="de-checkout-panel">
+              <h2>{isTrade && customer.referralCode ? 'Share & earn' : 'Share products'}</h2>
+              <p className="de-checkout-note">
+                Search any product and share it on WhatsApp or social media
+                {isTrade && customer.referralCode ? ', with your referral link and a daily Status kit of ready pictures.' : '.'}
+              </p>
+              <Link href="/account/share" className="lp-button lp-button-primary" style={{ width: '100%' }}>
+                {isTrade && customer.referralCode ? 'Open your share kit' : 'Search and share'}
+              </Link>
+            </div>
+
             {isTrade && customer.referralCode ? (
               <div className="de-checkout-panel">
                 <h2>Your referral link</h2>
