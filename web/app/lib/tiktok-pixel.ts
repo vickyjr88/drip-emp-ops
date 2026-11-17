@@ -14,6 +14,8 @@
  * per TikTok Events API's documented standard event set.
  */
 
+import { whenPixelReady } from './pixel-ready';
+
 declare global {
   interface Window {
     ttq?: {
@@ -25,8 +27,12 @@ declare global {
 }
 
 function fire(event: string, params?: Record<string, unknown>) {
-  if (typeof window === 'undefined' || typeof window.ttq?.track !== 'function') return;
-  window.ttq.track(event, params);
+  // Waits for the pixel when the page reports an event before its script has run (see pixel-ready.ts).
+  whenPixelReady({
+    configured: Boolean(process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID),
+    isReady: () => typeof window.ttq?.track === 'function',
+    send: () => window.ttq?.track?.(event, params),
+  });
 }
 
 /** A shopper lands on a product page. */

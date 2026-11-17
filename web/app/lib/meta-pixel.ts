@@ -9,6 +9,8 @@
  * told about it.
  */
 
+import { whenPixelReady } from './pixel-ready';
+
 declare global {
   interface Window {
     fbq?: (...args: unknown[]) => void;
@@ -16,8 +18,12 @@ declare global {
 }
 
 function fire(event: string, params?: Record<string, unknown>) {
-  if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
-  window.fbq('track', event, params);
+  // Waits for the pixel when the page reports an event before its script has run (see pixel-ready.ts): a product page's ViewContent used to be skipped.
+  whenPixelReady({
+    configured: Boolean(process.env.NEXT_PUBLIC_META_PIXEL_ID),
+    isReady: () => typeof window.fbq === 'function',
+    send: () => window.fbq?.('track', event, params),
+  });
 }
 
 /** A shopper lands on a product page. */

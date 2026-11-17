@@ -36,6 +36,13 @@ the first screen.** Nothing a visitor could act on was visible without scrolling
 - New visit events `CALL_CLICK` and `VIEW_CART`; Insights shows **Opened the cart** and **Tapped call**, calls by source, and a note saying whether carts are never opened or opened and left.
 - WhatsApp taps, call taps and opening the cart are now also sent to **Meta and TikTok** as `Contact` and `InitiateCheckout`. Set the campaigns' conversion event to `Contact` (see `INSIGHTS.md`).
 
+## Ad pixels: events that arrive before the pixel does
+
+The Meta, X and TikTok base scripts are added after a page has hydrated. A page that reported an event at once (a product page's **ViewContent**) used to find no pixel yet, and the event was silently skipped. Most visits land straight on a
+product page from an ad, so ViewContent was being lost for most of them. `web/app/lib/pixel-ready.ts` now holds an event until its pixel exists (in order, up to 10 seconds) and drops it quietly if the pixel never comes (not configured, or an ad blocker).
+Verified on a production build: ViewContent on a fresh load, Purchase on the order-complete page (once per order, never again on a reload), and AddToCart each reach all three pixels.
+Meta's Test Events tab (Events Manager) is how to confirm delivery on the real pixel; the pixel ID is `NEXT_PUBLIC_META_PIXEL_ID`, set at build time.
+
 ## How to tell whether it worked
 
 Deploy, wait two weeks, then in Portal > Insights > Visits & ads compare with the figures above:

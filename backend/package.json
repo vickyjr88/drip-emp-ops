@@ -37,7 +37,8 @@
     "test:follow-up": "node --require ts-node/register/transpile-only --test test/follow-up.test.ts",
     "test:share-kit": "node --require ts-node/register/transpile-only --test test/share-kit.test.ts",
     "test:share-links": "node --require ts-node/register/transpile-only --test test/share-links.test.ts",
-    "test:share-events": "node --require ts-node/register/transpile-only --test test/share-events.test.ts"
+    "test:share-events": "node --require ts-node/register/transpile-only --test test/share-events.test.ts",
+    "test:pixel-ready": "node --require ts-node/register/transpile-only --test test/pixel-ready.test.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",

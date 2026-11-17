@@ -10,6 +10,8 @@
  * sites without one being an afterthought.
  */
 
+import { whenPixelReady } from './pixel-ready';
+
 declare global {
   interface Window {
     twq?: (...args: unknown[]) => void;
@@ -26,8 +28,12 @@ declare global {
  * per event if X Ads Manager is set up with them.
  */
 function fire(event: string, params?: Record<string, unknown>) {
-  if (typeof window === 'undefined' || typeof window.twq !== 'function') return;
-  window.twq('event', event, params);
+  // Waits for the pixel when the page reports an event before its script has run (see pixel-ready.ts).
+  whenPixelReady({
+    configured: Boolean(process.env.NEXT_PUBLIC_X_PIXEL_ID),
+    isReady: () => typeof window.twq === 'function',
+    send: () => window.twq?.('event', event, params),
+  });
 }
 
 /** A shopper lands on a product page. */
