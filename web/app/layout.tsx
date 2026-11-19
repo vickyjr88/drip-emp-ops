@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   // origin. Without it Next emits relative URLs that crawlers cannot follow.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} | Official Sneaker & Streetwear Shop in Nairobi`,
+    default: `Affordable Quality Shoes & Sneakers in Kenya | ${SITE_NAME}`,
     // Page titles read "Listings | Drip Emporium" rather than each page
     // repeating the brand by hand.
     template: `%s | ${SITE_NAME}`,
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     locale: 'en_KE',
     url: SITE_URL,
-    title: `${SITE_NAME} | Official Sneaker & Streetwear Shop in Nairobi`,
+    title: `Affordable Quality Shoes & Sneakers in Kenya | ${SITE_NAME}`,
     description: SITE_DESCRIPTION,
   },
   twitter: {

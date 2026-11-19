@@ -186,7 +186,7 @@ export function SiteFooter() {
   const brandDescription = contentValue(
     content,
     'brand.description',
-    'Quality affordable sneakers and streetwear in Nairobi. Ronald Ngala Street, open 08:00 to 20:00.',
+    'Quality affordable shoes, sneakers and streetwear in Nairobi. Ronald Ngala Street, open Monday to Saturday, 08:00 to 20:00.',
   );
 
   const quickHeading = contentValue(content, 'quickLinks.heading', 'Quick Links');

@@ -118,7 +118,7 @@ export function WatchClient({ watch, faqs }: { watch: WatchProduct; faqs: FaqIte
             <ul className="de-assurances">
               <li>{enquiry.deliveryNote}</li>
               <li>See it in person at Dubai Merchants Mall, Ronald Ngala Street</li>
-              <li>Open 08:00–20:00, every day</li>
+              <li>Open Monday to Saturday, 08:00–20:00</li>
             </ul>
             {watch.description ? <div className="de-product-copy"><p>{watch.description}</p></div> : null}
           </div>

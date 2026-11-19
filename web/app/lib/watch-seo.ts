@@ -34,7 +34,7 @@ export const LISTING_INTRO = 'Watches at Drip Emporium, Nairobi. Browse the rang
 
 export function listingFaqs(): FaqItem[] {
   return [
-    { question: 'Where can I buy a watch in Nairobi?', answer: 'At Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD (open every day 08:00 to 20:00), or online with delivery across Kenya.' },
+    { question: 'Where can I buy a watch in Nairobi?', answer: 'At Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD (open Monday to Saturday, 08:00 to 20:00), or online with delivery across Kenya.' },
     { question: 'Can I see a watch before I buy it?', answer: 'Yes. Visit the shop at Dubai Merchants Mall to see any watch in person, or message us on WhatsApp and we will answer questions and send more photos.' },
     { question: 'Do you deliver watches across Kenya?', answer: 'Yes. We deliver from Nairobi across Kenya. The delivery cost depends on the destination and is confirmed after you order.' },
     { question: 'How do I order a watch?', answer: 'Add it to your cart and pay online, or message us on WhatsApp with the watch you want.' },
@@ -58,7 +58,7 @@ export function brandFaqs(brand: string, watches: WatchProduct[]): FaqItem[] {
   const price = kes(fromPrice(watches));
   return [
     { question: `How much is a ${brand} watch in Kenya?`, answer: price ? `${brand} watches at Drip Emporium start from ${price}. Each watch page shows its price.` : `Message us for today's prices on ${brand} watches.` },
-    { question: `Where can I see ${brand} watches in Nairobi?`, answer: 'At Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD, open every day 08:00 to 20:00.' },
+    { question: `Where can I see ${brand} watches in Nairobi?`, answer: 'At Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD, open Monday to Saturday, 08:00 to 20:00.' },
     { question: `Do you deliver ${brand} watches outside Nairobi?`, answer: 'Yes. We deliver across Kenya; the cost depends on the destination and is confirmed after you order.' },
   ];
 }
@@ -77,7 +77,7 @@ export function watchFaqs(watch: WatchProduct): FaqItem[] {
   const price = kes(watch.priceFrom);
   return [
     { question: `How much is the ${watch.name} in Kenya?`, answer: price ? `The ${watch.name} is ${price} at Drip Emporium.` : `Message us for today's price on the ${watch.name}.` },
-    { question: 'Can I see it before I buy?', answer: 'Yes. Visit Drip Emporium at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi (open every day 08:00 to 20:00), or message us on WhatsApp for more photos.' },
+    { question: 'Can I see it before I buy?', answer: 'Yes. Visit Drip Emporium at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi (open Monday to Saturday, 08:00 to 20:00), or message us on WhatsApp for more photos.' },
     { question: 'Do you deliver across Kenya?', answer: 'Yes. We deliver from Nairobi across Kenya; the cost depends on the destination and is confirmed after you order.' },
     { question: 'Does it come in a size?', answer: 'No, a watch has no size. ' + (watch.options.length ? `It comes in ${watch.options.map((o) => o.name).join(' or ')}: choose one on this page.` : 'There is nothing to choose: add it to your cart.') },
   ];

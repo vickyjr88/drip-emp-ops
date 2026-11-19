@@ -22,7 +22,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3
 export const SITE_NAME = 'Drip Emporium';
 
 export const SITE_DESCRIPTION =
-  'The official Drip Emporium shop: quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan ' +
+  'The official Drip Emporium shop: quality affordable shoes, sneakers and streetwear in Nairobi. Nike, Adidas, Jordan ' +
   'and Puma at Dubai Merchants Mall, Ronald Ngala Street, with delivery across Kenya.';
 
 /** The shop floor, as quoted in the footer, structured data and /llms.txt. */
@@ -38,7 +38,13 @@ export function appDownloadUrl(placement: string): string {
 }
 
 export const STORE_ADDRESS = 'Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD';
-export const STORE_HOURS = 'Every day, 08:00 to 20:00';
+export const STORE_HOURS = 'Monday to Saturday, 08:00 to 20:00';
+/** The same hours for structured data. The shop is closed on Sundays. */
+export const STORE_OPEN_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const STORE_OPENS = '08:00';
+export const STORE_CLOSES = '20:00';
+export const STORE_PHONE = '+254 113 206 481';
+export const STORE_EMAIL = 'hello@dripemporium.store';
 
 /** Absolute URL for a site-relative path. */
 export function absoluteUrl(path = '/') {
@@ -70,6 +76,23 @@ export function organizationSchema(socialUrls: string[] = []) {
       containedInPlace: { '@type': 'Country', name: 'Kenya' },
     },
     knowsLanguage: ['en', 'sw'],
+    // This is a shoe shop with a counter, so say where it is and when it is open. The same facts are in /llms.txt and
+    // on the contact page; having them in the schema is what lets a map result or an AI answer quote them. Coordinates
+    // are left out until the exact pin is confirmed: an approximate one is worse than none.
+    telephone: STORE_PHONE,
+    email: STORE_EMAIL,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: 'Dubai Merchants Mall, Shop F53, Ronald Ngala Street',
+      addressLocality: 'Nairobi',
+      addressCountry: 'KE',
+    },
+    openingHoursSpecification: {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: STORE_OPEN_DAYS,
+      opens: STORE_OPENS,
+      closes: STORE_CLOSES,
+    },
     ...(socialUrls.length ? { sameAs: socialUrls } : {}),
   };
 }
@@ -105,7 +128,7 @@ export function productFaqSchema(product: { name: string; sizesInStock: string[]
         name: 'Can I visit the physical shop?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'Yes, visit us at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD. Open 08:00 to 20:00 daily.',
+          text: 'Yes, visit us at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD. Open Monday to Saturday, 08:00 to 20:00.',
         },
       },
       {

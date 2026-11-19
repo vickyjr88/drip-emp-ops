@@ -11,7 +11,7 @@ import { MIN_BRAND_PRODUCTS, NO_BRAND_PAGE, slugify } from './collections';
 type Words = { title: string; heading: string };
 
 const WORDS: Record<string, Words> = {
-  sneakers: { title: 'Sneakers in Nairobi, Kenya', heading: 'Sneakers' },
+  sneakers: { title: 'Affordable Sneakers & Shoes in Nairobi, Kenya', heading: 'Sneakers' },
   casuals: { title: 'Casual Shoes in Nairobi, Kenya', heading: 'Casual Shoes' },
   officials: { title: 'Official Shoes in Nairobi, Kenya', heading: 'Official Shoes' },
   'smart-casuals': { title: 'Smart Casual Shoes in Nairobi, Kenya', heading: 'Smart Casual Shoes' },

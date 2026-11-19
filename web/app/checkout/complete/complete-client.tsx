@@ -149,7 +149,7 @@ export function CompleteClient() {
               <p className="de-complete-where">
                 {order.shippingAddress
                   ? `Delivering to ${order.shippingAddress}.`
-                  : `Collect at ${order.store?.name || 'our shop'}${order.store?.location ? `, ${order.store.location}` : ''}. Open 08:00 to 20:00.`}
+                  : `Collect at ${order.store?.name || 'our shop'}${order.store?.location ? `, ${order.store.location}` : ''}. Open Monday to Saturday, 08:00 to 20:00.`}
               </p>
 
               {/* What was paid covers the goods only. Saying so here, on the

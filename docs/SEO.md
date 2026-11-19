@@ -131,6 +131,25 @@ curl -s -o /dev/null -w "%{http_code}\n" https://dripemporium.store/llms.txt    
 
 To undo either, delete its file and reload nginx.
 
+## Shoes, and the shop's hours
+
+Shoppers searching "affordable shoes" or "quality shoes" say *shoes*, where the site used to say *sneakers and streetwear*. The home title is
+now "Affordable Quality Shoes & Sneakers in Kenya | Drip Emporium", `/shop` is "Shop Affordable Shoes & Sneakers in Kenya", the sneakers
+category is "Affordable Sneakers & Shoes in Nairobi, Kenya", and the home description, hero heading, footer line and `llms.txt` say "shoes,
+sneakers and streetwear". Model pages keep "Price in Kenya", which is how a model is searched.
+
+The store's address, phone, email and opening hours are in the site-wide `ShoeStore` schema (`organizationSchema` in `lib/site.tsx`), not only
+on the contact page. `geo` coordinates are left out until the exact pin is confirmed; an approximate one misleads map results. `priceRange` is
+left out because a fixed value would go stale as prices change.
+
+**Hours are Monday to Saturday, 08:00 to 20:00; closed on Sundays.** They live in `STORE_HOURS` and `STORE_OPEN_DAYS` in `lib/site.tsx`, which
+the schema, `llms.txt`, collection pages and contact page read. Wording is in a few places beyond that (product, cart, checkout-complete, FAQ,
+footer, watch and kit pages, and the CMS defaults in `page-content.defaults.ts`); change them together. Hours typed into the CMS (`contact`,
+`about`) are stored copy, so editing the defaults alone does not change the live site: the `seo` document is not stored, so its defaults apply,
+but `home.hero.heading`, `contact` and `about` are.
+
+The Google Business Profile hours must say the same.
+
 ## Off-site, to do by hand
 
 - **Google Search Console and Bing Webmaster Tools:** verify the domain and submit `https://dripemporium.store/sitemap.xml`.

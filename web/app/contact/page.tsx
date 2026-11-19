@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { seoMetadata } from '../lib/page-metadata';
 import { EliteLayout } from '../components/elite-layout';
 import { contentValue, fetchPageContent } from '../lib/page-content';
-import { JsonLd, SITE_URL } from '../lib/site';
+import { JsonLd, SITE_URL, STORE_CLOSES, STORE_OPENS, STORE_OPEN_DAYS } from '../lib/site';
 import { ContactForm } from './contact-form';
 
 /**
@@ -91,7 +91,7 @@ export default async function ContactPage() {
     },
     {
       title: 'Exclusive Inventory',
-      description: 'Ronald Ngala Street, open 08:00 to 20:00, and a WhatsApp line that gets answered.',
+      description: 'Ronald Ngala Street, open Monday to Saturday, 08:00 to 20:00, and a WhatsApp line that gets answered.',
     },
   ]);
 
@@ -116,17 +116,15 @@ export default async function ContactPage() {
           email,
           address: {
             '@type': 'PostalAddress',
-            streetAddress: officeAddress,
+            streetAddress: officeAddress.replace(/[.\s]+$/, ''),
             addressLocality: 'Nairobi',
             addressCountry: 'KE',
           },
           openingHoursSpecification: {
             '@type': 'OpeningHoursSpecification',
-            dayOfWeek: [
-              'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-            ],
-            opens: '08:00',
-            closes: '20:00',
+            dayOfWeek: STORE_OPEN_DAYS,
+            opens: STORE_OPENS,
+            closes: STORE_CLOSES,
           },
           priceRange: 'KES',
         }}

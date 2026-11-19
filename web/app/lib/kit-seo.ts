@@ -173,7 +173,7 @@ export function leagueFaqs(league: League, config: KitConfig | null): FaqItem[] 
   return [
     {
       question: `Where can I buy ${league.name} jerseys in Nairobi?`,
-      answer: `At Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD (open every day 08:00 to 20:00), or online with delivery across Kenya.`,
+      answer: `At Drip Emporium, Dubai Merchants Mall, Shop F53, Ronald Ngala Street, Nairobi CBD (open Monday to Saturday, 08:00 to 20:00), or online with delivery across Kenya.`,
     },
     {
       question: `Are these official ${league.name} shirts?`,

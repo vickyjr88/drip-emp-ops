@@ -33,7 +33,7 @@ const DEFAULT_FAQS: FaqItem[] = [
   {
     question: 'Can I collect my order instead?',
     answer:
-      'Yes. Choose collection at checkout and pick up from Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi. Open 08:00 to 20:00.',
+      'Yes. Choose collection at checkout and pick up from Dubai Merchants Mall shop F53, Ronald Ngala Street, Nairobi. Open Monday to Saturday, 08:00 to 20:00.',
   },
   {
     question: 'How do I pay?',

@@ -433,7 +433,7 @@ export function ProductClient({ product: initialProduct }: { product: ShopProduc
               <li>{enquiry.deliveryNote}</li>
               <li>Pay by M-Pesa or card online, or order on WhatsApp</li>
               <li>Try before you pay at either shop</li>
-              <li>Open 08:00–20:00, Ronald Ngala Street</li>
+              <li>Open Monday to Saturday, 08:00–20:00, Ronald Ngala Street</li>
             </ul>
 
             {product.description ? (

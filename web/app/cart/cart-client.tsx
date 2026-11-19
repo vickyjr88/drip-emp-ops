@@ -567,7 +567,7 @@ export function CartClient() {
 
               <p className="de-checkout-note">
                 {online === false ? 'We will confirm your order and payment on WhatsApp. ' : ''}
-                Collect at Dubai Merchants Mall shop F53, open 08:00 to 20:00, or ask for delivery above.
+                Collect at Dubai Merchants Mall shop F53, open Monday to Saturday, 08:00 to 20:00, or ask for delivery above.
                 {' '}Questions? <a href={enquiry.phoneHref} data-source="cart">Call {enquiry.phone}</a>
               </p>
             </form>

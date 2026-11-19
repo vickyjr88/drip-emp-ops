@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     key: 'home',
     path: '/',
     description: SITE_DESCRIPTION,
-    shareTitle: `${SITE_NAME} | Official Sneaker & Streetwear Shop in Nairobi`,
+    shareTitle: `Drip Emporium | Quality Affordable Shoes & Sneakers in Nairobi`,
     image: contentValue(content, 'hero.backgroundImage', ''),
   });
 }

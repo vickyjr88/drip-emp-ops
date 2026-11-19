@@ -62,7 +62,7 @@ export default function HomeClient() {
     // the featured rail with the new tier's pricing.
   }, [auth.token]);
 
-  const heroHeading = contentValue(content, 'hero.heading', 'Quality Affordable\nSneakers & Streetwear');
+  const heroHeading = contentValue(content, 'hero.heading', 'Quality Affordable\nShoes, Sneakers & Streetwear');
   const heroSubheading = contentValue(
     content,
     'hero.subheading',

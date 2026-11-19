@@ -179,7 +179,7 @@ export function collectionIntro(c: Collection): string {
     f.inStockStyles > 0
       ? `${f.inStockStyles} of ${f.count} ${f.count === 1 ? 'is' : 'are'} on the shelf in at least one size right now, and any other listed size can be ordered for you.`
       : 'Every listed size can be ordered for you.',
-    `Visit the shop at ${STORE_ADDRESS} (${STORE_HOURS.toLowerCase()}) or order online with delivery across Kenya.`,
+    `Visit the shop at ${STORE_ADDRESS} (${STORE_HOURS}) or order online with delivery across Kenya.`,
   ].join(' ');
 }
 
@@ -211,7 +211,7 @@ export function collectionFaqs(c: Collection): Faq[] {
   }
   faqs.push({
     question: `Where can I buy ${subject} in Nairobi?`,
-    answer: `Visit Drip Emporium at ${STORE_ADDRESS}. We are open ${STORE_HOURS.toLowerCase()}. You can also order online and we will arrange delivery.`,
+    answer: `Visit Drip Emporium at ${STORE_ADDRESS}. We are open ${STORE_HOURS}. You can also order online and we will arrange delivery.`,
   });
   faqs.push({
     question: `Do you deliver ${subject} outside Nairobi?`,

@@ -16,10 +16,10 @@ export async function generateMetadata({
   const metadata = await seoMetadata({
     key: 'properties',
     path: '/shop',
-    title: 'Shop Sneakers & Streetwear',
+    title: 'Shop Affordable Shoes & Sneakers in Kenya',
     description:
-      'Nike, Adidas, Jordan and Puma in EUR 36–46. Filter by size, brand and price. Ronald Ngala Street, Nairobi.',
-    shareTitle: 'Shop Sneakers in Nairobi | Drip Emporium',
+      'Quality affordable shoes and sneakers in Kenya: Nike, Adidas, Jordan and Puma in EUR 36–46. Filter by size, brand and price. Ronald Ngala Street, Nairobi.',
+    shareTitle: 'Shop Affordable Shoes & Sneakers in Kenya | Drip Emporium',
   });
   // Kept out of the index (links still followed): the canonical already points at /shop, and a
   // filtered grid is thin, duplicate content that should not compete with the pages it filters.

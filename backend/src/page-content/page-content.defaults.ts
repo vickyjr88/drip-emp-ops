@@ -132,7 +132,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
   },
   home: {
     hero: {
-      heading: 'Quality Affordable\nSneakers & Streetwear',
+      heading: 'Quality Affordable\nShoes, Sneakers & Streetwear',
       subheading:
         'Curating the finest sneakers and premium streetwear. Define your look, own your style, stay fresh.',
       backgroundImage: '',
@@ -261,7 +261,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     cta: {
       heading: 'Come and try a pair on',
       body:
-        'Dubai Merchants Mall shop F53, Ronald Ngala Street. Open 08:00 to 20:00.',
+        'Dubai Merchants Mall shop F53, Ronald Ngala Street. Open Monday to Saturday, 08:00 to 20:00.',
       primaryLabel: 'Get Directions',
       secondaryLabel: 'Shop Online',
     },
@@ -271,17 +271,17 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     home: {
       title: '',
       description:
-        'The official Drip Emporium shop: quality affordable sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall, Ronald Ngala Street, with delivery across Kenya.',
-      shareTitle: 'Drip Emporium | Quality Affordable Sneakers & Streetwear',
+        'The official Drip Emporium shop: quality affordable shoes, sneakers and streetwear in Nairobi. Nike, Adidas, Jordan and Puma at Dubai Merchants Mall, Ronald Ngala Street, with delivery across Kenya.',
+      shareTitle: 'Drip Emporium | Quality Affordable Shoes & Sneakers',
     },
     // Key is "properties" rather than "shop" -- a naming leftover from before
     // this was a shoe shop -- but it is what /shop/page.tsx actually reads,
     // so it stays rather than risk losing content already edited under it.
     properties: {
-      title: 'Shop All Sneakers & Streetwear',
+      title: 'Shop Affordable Shoes & Sneakers in Kenya',
       description:
-        'Browse sneakers, boots, casuals, sandals and officials from Nike, Adidas, Jordan and Puma. Free delivery on orders over KES 15,000.',
-      shareTitle: 'Shop Sneakers & Streetwear | Drip Emporium',
+        'Quality affordable shoes and sneakers in Kenya: boots, casuals, sandals and officials from Nike, Adidas, Jordan and Puma. Try them on at Ronald Ngala Street, Nairobi, or order with delivery across Kenya.',
+      shareTitle: 'Shop Affordable Shoes & Sneakers in Kenya | Drip Emporium',
     },
     about: {
       title: 'About Us',
@@ -300,7 +300,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     contact: {
       title: 'Contact Us',
       description:
-        'Visit Drip Emporium at Dubai Merchants Mall shop F53, Ronald Ngala Street. Open 08:00 to 20:00.',
+        'Visit Drip Emporium at Dubai Merchants Mall shop F53, Ronald Ngala Street. Open Monday to Saturday, 08:00 to 20:00.',
       shareTitle: 'Contact Drip Emporium',
     },
   },
@@ -471,7 +471,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       items: [
         { title: 'Ask About Your Size', description: 'Tell us the shoe and the size; we answer straight away.' },
         { title: 'Genuine Stock', description: 'Nike, Adidas, Jordan and Puma, priced honestly.' },
-        { title: 'Two Shops, One Street', description: 'Ronald Ngala Street, open 08:00 to 20:00 daily.' },
+        { title: 'Two Shops, One Street', description: 'Ronald Ngala Street, open Monday to Saturday, 08:00 to 20:00.' },
       ],
     },
   },
