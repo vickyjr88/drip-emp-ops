@@ -212,7 +212,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       kicker: 'Drip Emporium',
       heading: 'Who We Are',
       intro:
-        'A Nairobi sneaker and streetwear shop, trading from two stores on Ronald Ngala Street.',
+        'A Nairobi shoe, sneaker and streetwear shop at Dubai Merchants Mall on Ronald Ngala Street.',
       image: '',
     },
     story: {
@@ -286,7 +286,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
     about: {
       title: 'About Us',
       description:
-        'Drip Emporium curates the finest sneakers and premium streetwear. Two stores on Ronald Ngala Street, Nairobi.',
+        'Drip Emporium curates the finest sneakers and premium streetwear. Visit our shop on Ronald Ngala Street, Nairobi.',
       shareTitle: 'About Drip Emporium',
     },
     terms: {
@@ -471,7 +471,7 @@ export const DEFAULT_CONTENT: Record<PageSlug, Record<string, any>> = {
       items: [
         { title: 'Ask About Your Size', description: 'Tell us the shoe and the size; we answer straight away.' },
         { title: 'Genuine Stock', description: 'Nike, Adidas, Jordan and Puma, priced honestly.' },
-        { title: 'Two Shops, One Street', description: 'Ronald Ngala Street, open Monday to Saturday, 08:00 to 20:00.' },
+        { title: 'Easy To Find', description: 'Dubai Merchants Mall, Shop F53, Ronald Ngala Street. Open Monday to Saturday, 08:00 to 20:00.' },
       ],
     },
   },

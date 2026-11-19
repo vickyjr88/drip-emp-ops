@@ -20,7 +20,7 @@ We deliver countrywide. Delivery is not charged at checkout because the cost dep
 
 Collection in Nairobi
 
-If you would rather collect in person, both our Nairobi shops on Ronald Ngala Street are open for collection once your order is confirmed.
+If you would rather collect in person, our shop at Dubai Merchants Mall, Shop F53, Ronald Ngala Street, is open for collection once your order is confirmed. We are open Monday to Saturday, 08:00 to 20:00.
 
 Order tracking
 

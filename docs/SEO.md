@@ -150,6 +150,9 @@ but `home.hero.heading`, `contact` and `about` are.
 
 The Google Business Profile hours must say the same.
 
+There is **one shop**: Dubai Merchants Mall, Shop F53. The Palms Mall shop (BF75) is closed. Its `Store` row is deactivated, not deleted, because
+orders, stock history and accounts point at it; only active stores appear in `/shop/stores`.
+
 ## Off-site, to do by hand
 
 - **Google Search Console and Bing Webmaster Tools:** verify the domain and submit `https://dripemporium.store/sitemap.xml`.
