@@ -14646,3 +14646,11 @@ img {
 .ptodo-list em { font-style: normal; color: #5a617f; }
 .ptodo-list strong.is-money { font-size: 15px; }
 .ptodo-list a:has(strong.is-money) { grid-template-columns: 110px minmax(0, 1fr) auto; }
+
+/* Opening stock on the new product form */
+.pstock-open { border: 1px solid var(--eef-border); border-radius: 8px; padding: 14px; display: grid; gap: 12px; margin: 0; min-width: 0; }
+.pstock-open legend { padding: 0 6px; font: 800 11px 'Manrope', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #444; }
+.pstock-open legend i { font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; color: #5a617f; }
+.pstock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.pstock-grid label { display: grid; gap: 4px; }
+.pstock-grid input { text-align: center; }

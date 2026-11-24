@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { parseStockList } from './stock-list';
 import { useUnsavedGuard } from '../components/use-unsaved-guard';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
@@ -87,6 +88,12 @@ export default function CataloguePage() {
    * product gets a single variant with no size.
    */
   const [attributeValues, setAttributeValues] = useState<string[]>([]);
+  // Opening stock typed on the form, so a new product can be sellable the moment it is saved rather than after a second trip to Inventory.
+  const [stores, setStores] = useState<Array<{ id: string; name: string }>>([]);
+  const [openStore, setOpenStore] = useState('');
+  const [openStock, setOpenStock] = useState<Record<string, string>>({});
+  const [stockPaste, setStockPaste] = useState('');
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
   /** For a supplier's line we do not stock ourselves -- every size sources per order. */
   const [dropShip, setDropShip] = useState(false);
   /** The product being duplicated, or null when the panel is closed. */
@@ -122,6 +129,12 @@ export default function CataloguePage() {
       setProfile(nextProfile);
       const cats = await apiRequest<Category[] | { items: Category[] }>('/product-categories', { method: 'GET' }, authToken);
       setCategories(Array.isArray(cats) ? cats : Array.isArray(cats?.items) ? cats.items : []);
+      if (hasPermission(nextProfile, 'store.read') && hasPermission(nextProfile, 'stock-movement.create')) {
+        const rows = await apiRequest<Array<{ id: string; name: string }> | { items: Array<{ id: string; name: string }> }>('/stores', { method: 'GET' }, authToken).catch(() => []);
+        const list = Array.isArray(rows) ? rows : Array.isArray(rows?.items) ? rows.items : [];
+        setStores(list);
+        setOpenStore((current) => current || list[0]?.id || '');
+      }
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -339,7 +352,7 @@ export default function CataloguePage() {
         // No size-like attribute at all: a single variant named after the
         // product itself, with no size to distinguish it from anything.
         : [{ sku: form.sku, name: form.name, attributes: {}, ...commonVariantFields }];
-      await apiRequest('/products', {
+      const created = await apiRequest<{ variants?: Array<{ id: string; sku: string }> }>('/products', {
         method: 'POST',
         body: JSON.stringify({
           ...form,
@@ -348,11 +361,31 @@ export default function CataloguePage() {
           variants,
         }),
       }, token);
+
+      // Opening stock, for the sizes that were given a count. The product exists either way; a failed count is reported, not hidden.
+      let stocked = 0;
+      const stockFailures: string[] = [];
+      if (openStore && categoryAttribute) {
+        for (const value of attributeValues) {
+          const quantity = Math.floor(Number(openStock[value] || 0));
+          const variant = created.variants?.find((v) => v.sku === `${form.sku}-${skuSuffix(value)}`);
+          if (!variant || !(quantity > 0)) continue;
+          try {
+            await apiRequest('/inventory/movements', { method: 'POST', body: JSON.stringify({ variantId: variant.id, storeId: openStore, type: 'PURCHASE', quantity, reference: 'Opening stock', notes: `Entered with the product ${form.sku}` }) }, token);
+            stocked += quantity;
+          } catch {
+            stockFailures.push(value);
+          }
+        }
+      }
       setFeedback(
-        categoryAttribute
+        (categoryAttribute
           ? `${form.name} added with ${attributeValues.length} ${categoryAttribute.label.toLowerCase()}${attributeValues.length === 1 ? '' : 's'}.`
-          : `${form.name} added.`,
+          : `${form.name} added.`)
+        + (stocked ? ` ${stocked} in stock.` : '')
+        + (stockFailures.length ? ` Stock could not be recorded for ${stockFailures.join(', ')}: add it from Inventory.` : ''),
       );
+      setOpenStock({}); setStockPaste(''); setPasteNote(null);
       setForm(BLANK); setPrice(''); setCost(''); setResellerPrice('');
       setWholesalePrice(''); setImages([]); setAttributeValues([]); setDropShip(false); setShowForm(false); addGuard.markClean();
       await load(token);
@@ -616,6 +649,47 @@ export default function CataloguePage() {
                       variant with no size.
                     </p>
                   )}
+
+                  {categoryAttribute && attributeValues.length > 0 && stores.length > 0 && !dropShip ? (
+                    <fieldset className="pstock-open">
+                      <legend>Opening stock <i>(optional)</i></legend>
+                      <p className="portal-muted" style={{ margin: 0 }}>How many of each size are on the shelf now, so it can be sold as soon as it is saved. Leave blank for none.</p>
+                      <div className="portal-entity-grid-2">
+                        {stores.length > 1 ? (
+                          <label>
+                            <span>Into store</span>
+                            <select value={openStore} onChange={(event) => setOpenStore(event.target.value)}>
+                              {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+                            </select>
+                          </label>
+                        ) : null}
+                        <label>
+                          <span>Paste a list</span>
+                          <input
+                            value={stockPaste}
+                            placeholder={attributeValues.slice(0, 3).map((value, index) => `${value.split(' ').pop()}:${[3, 5, 2][index]}`).join(', ')}
+                            onChange={(event) => {
+                              const text = event.target.value;
+                              setStockPaste(text);
+                              const parsed = parseStockList(text, attributeValues);
+                              setOpenStock((prev) => ({ ...prev, ...Object.fromEntries(Object.entries(parsed.quantities).map(([k, v]) => [k, String(v)])) }));
+                              setPasteNote(parsed.unknown.length ? `Not matched to a ticked size: ${parsed.unknown.join(', ')}` : null);
+                            }}
+                          />
+                          {pasteNote ? <small className="portal-muted" style={{ color: '#b3261e' }}>{pasteNote}</small> : <small className="portal-muted">Size, then count; commas or new lines between.</small>}
+                        </label>
+                      </div>
+                      <div className="pstock-grid">
+                        {categoryAttribute.options.filter((o) => attributeValues.includes(o)).map((value) => (
+                          <label key={value}>
+                            <span>{value}</span>
+                            <input type="number" inputMode="numeric" min="0" step="1" placeholder="0" value={openStock[value] ?? ''}
+                              onChange={(event) => setOpenStock((prev) => ({ ...prev, [value]: event.target.value }))} />
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ) : null}
 
                   <label className="portal-check">
                     <input type="checkbox" checked={dropShip} onChange={(event) => setDropShip(event.target.checked)} />
