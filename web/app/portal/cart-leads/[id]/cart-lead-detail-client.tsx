@@ -14,6 +14,7 @@ import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
 import { ImageLightbox } from '../../components/image-lightbox';
 import { FollowUp, FollowUpButton, FollowUpPreview } from '../../components/follow-up-button';
+import { LeadFollowUpCard, LeadFollowUpFields } from '../../components/lead-followup';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, formatMoney,
@@ -25,7 +26,7 @@ type CartLeadLine = {
   imageUrl: string | null;
 };
 
-type CartLead = {
+type CartLead = LeadFollowUpFields & {
   id: string;
   source: 'WHATSAPP_ORDER' | 'ABANDONED_CART';
   status: 'NEW' | 'CONTACTED' | 'CONVERTED' | 'EXPIRED';
@@ -44,6 +45,10 @@ type CartLead = {
   customer?: { id: string; firstName: string; lastName: string; email?: string | null; phone?: string | null } | null;
   order?: { id: string; orderNumber: string } | null;
   followUp?: FollowUp | null;
+  followUpMessages?: {
+    emails: Array<{ id: string; recipient: string; subject: string; status: string; errorMessage: string | null; sentAt: string | null; createdAt: string }>;
+    whatsapp: Array<{ id: string; kind: string; template: string; status: string; error: string | null; delivery: string | null; deliveryError: string | null; createdAt: string }>;
+  };
 };
 
 function statusLabel(status: CartLead['status']) {
@@ -268,6 +273,15 @@ export default function CartLeadDetailClient({ leadId }: { leadId: string }) {
                     lead.followUp ? <FollowUpPreview followUp={lead.followUp} /> : <p className="portal-muted" style={{ marginTop: 12 }}>No WhatsApp follow-up: this lead has no phone number we can message.</p>
                   ) : null}
                 </article>
+
+                <LeadFollowUpCard
+                  token={token}
+                  leadId={lead.id}
+                  lead={lead}
+                  messages={lead.followUpMessages}
+                  closed={lead.status === 'CONVERTED' || lead.status === 'EXPIRED'}
+                  onChanged={() => void load(token)}
+                />
 
                 <article className="portal-card">
                   <h2 style={{ marginTop: 0 }}>Cart contents</h2>

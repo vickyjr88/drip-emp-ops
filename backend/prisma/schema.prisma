@@ -575,7 +575,14 @@ model EmailLog {
   status            EmailLogStatus   @default(QUEUED)
   errorMessage      String?
   sentAt            DateTime?
+  /// What the email was for, when it is not an invoice: LEAD_FOLLOWUP for the automatic follow-up on a lead or abandoned cart.
+  kind              String?
+  /// The cart lead it followed up.
+  cartLeadId        String?
   createdAt         DateTime         @default(now())
+
+  @@index([cartLeadId])
+  @@index([kind, recipient, sentAt])
 }
 
 // -------------------- Inquiries --------------------
@@ -1662,12 +1669,12 @@ model Order {
   cancelledAt DateTime?
   createdBy   String    @default("system")
 
-  lines      OrderLine[]
-  payments   OrderPayment[]
-  cartLead   CartLead?
-  commission Commission?
+  lines         OrderLine[]
+  payments      OrderPayment[]
+  cartLead      CartLead?
+  commission    Commission?
   /// Reviews left through the link for this order (verified purchases).
-  reviews    ProductReview[]
+  reviews       ProductReview[]
   /// The automatic "how are your pairs?" message sent after delivery, and what happened on each channel.
   reviewRequest ReviewRequest?
 
@@ -1987,14 +1994,49 @@ model CartLead {
   /// reminder state without a join.
   reminderSentAt DateTime?
 
+  /// The automatic follow-up (CartLeadFollowUpService): about an hour after the last activity, by email and WhatsApp, 08:00-20:00 Nairobi time,
+  /// unless the shopper already opened a WhatsApp conversation. The lead always ends up marked, with the reason.
+  followUpState             CartLeadFollowUp @default(PENDING)
+  /// Machine-readable why: SENT, CONVERSATION, STAFF, CLOSED, TOO_OLD, NO_CONTACT, DUPLICATE, STOPPED, WHATSAPP_FAILED, GAVE_UP, NOT_REACHABLE.
+  followUpReason            String?
+  /// The same in words, for staff.
+  followUpNote              String?
+  followUpAt                DateTime?
+  /// "auto", or the staff member's email when they marked it by hand.
+  followUpBy                String?
+  followUpAttempts          Int              @default(0)
+  /// Do not try again before this (a retry after a failure).
+  followUpNextAt            DateTime?
+  /// Taken by one backend slot while it works on this lead, so two slots never message the same person.
+  followUpClaimedAt         DateTime?
+  /// SENT (the template went and opened a conversation), FAILED (this number cannot be reached on WhatsApp), CONVERSATION (they had already written to us).
+  followUpWhatsapp          String?
+  followUpWhatsappAt        DateTime?
+  followUpWhatsappMessageId String?
+  /// SENT or FAILED. The email itself is in EmailLog (kind LEAD_FOLLOWUP, this lead's id).
+  followUpEmail             String?
+  followUpEmailAt           DateTime?
+  followUpEmailAttempts     Int              @default(0)
+
   lastActivityAt DateTime @default(now())
   createdAt      DateTime @default(now())
 
   @@index([customerId])
   @@index([source])
   @@index([status])
+  @@index([followUpState, lastActivityAt])
   @@index([attributedCampaignId])
   @@index([referredByCustomerId])
+}
+
+/// Where a lead stands on the automatic follow-up. PENDING: not handled yet. DONE: it reached the customer, or a conversation already
+/// existed, or staff did it. FAILED: nothing reached them (the number is not on WhatsApp and there was no email that worked). SKIPPED: not
+/// applicable (an order was placed, too old, nobody to reach, asked us to stop).
+enum CartLeadFollowUp {
+  PENDING
+  DONE
+  FAILED
+  SKIPPED
 }
 
 enum CartLeadSource {

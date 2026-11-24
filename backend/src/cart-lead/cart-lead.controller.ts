@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CartLeadStatus } from '@prisma/client';
 import { Public } from '../auth/decorators/public.decorator';
@@ -7,11 +7,12 @@ import { buildPermissionKey } from '../auth/permissions/permission.util';
 import { CartLeadService } from './cart-lead.service';
 import { RecordCartLeadDto, RecordWhatsAppClickDto } from './dto/cart-lead.dto';
 import { CartLeadQueryDto } from './dto/cart-lead-query.dto';
+import { LeadFollowUpService } from './lead-followup.service';
 
 @ApiTags('cart-leads')
 @Controller('cart-leads')
 export class CartLeadController {
-  constructor(private readonly service: CartLeadService) {}
+  constructor(private readonly service: CartLeadService, private readonly followUp: LeadFollowUpService) {}
 
   /** Called from the storefront the moment a shopper chooses the WhatsApp route. */
   @Public()
@@ -50,6 +51,22 @@ export class CartLeadController {
     return this.service.stats();
   }
 
+  /** The automatic follow-up at a glance: on or paused, what is waiting, what went today, what is marked. Before ':id'. */
+  @ApiBearerAuth()
+  @Get('follow-up/summary')
+  @Permissions(buildPermissionKey('CartLead', 'read'))
+  followUpSummary() {
+    return this.followUp.summary();
+  }
+
+  /** A dry run: the next leads in line and what would be done to each. Sends nothing, changes nothing. */
+  @ApiBearerAuth()
+  @Get('follow-up/preview')
+  @Permissions(buildPermissionKey('CartLead', 'read'))
+  followUpPreview(@Query('limit') limit?: string) {
+    return this.followUp.preview(limit ? Number(limit) : 25);
+  }
+
   @ApiBearerAuth()
   @Get(':id')
   @Permissions(buildPermissionKey('CartLead', 'read'))
@@ -60,8 +77,16 @@ export class CartLeadController {
   @ApiBearerAuth()
   @Patch(':id/status')
   @Permissions(buildPermissionKey('CartLead', 'update'))
-  setStatus(@Param('id') id: string, @Body() body: { status: CartLeadStatus }) {
-    return this.service.setStatus(id, body.status);
+  setStatus(@Param('id') id: string, @Body() body: { status: CartLeadStatus }, @Req() request: any) {
+    return this.service.setStatus(id, body.status, request?.user?.email);
+  }
+
+  /** Staff marking a lead followed up (a call, a visit, a chat from their own phone), or putting it back to waiting. */
+  @ApiBearerAuth()
+  @Patch(':id/follow-up')
+  @Permissions(buildPermissionKey('CartLead', 'update'))
+  setFollowUp(@Param('id') id: string, @Body() body: { state?: 'DONE' | 'PENDING'; note?: string }, @Req() request: any) {
+    return body?.state === 'PENDING' ? this.followUp.reopen(id) : this.followUp.markDone(id, request?.user?.email ?? 'staff', body?.note);
   }
 
   @ApiBearerAuth()

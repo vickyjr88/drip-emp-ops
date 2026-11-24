@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { CartLeadSource, CartLeadStatus } from '@prisma/client';
+import { CartLeadFollowUp, CartLeadSource, CartLeadStatus } from '@prisma/client';
 import { IsEnum, IsOptional } from 'class-validator';
 import { PagedQueryDto } from '../../common/dto/paged-query.dto';
 
@@ -20,6 +20,11 @@ export class CartLeadQueryDto extends PagedQueryDto {
   @IsOptional()
   @IsEnum(CartLeadStatus)
   status?: CartLeadStatus;
+
+  @ApiPropertyOptional({ enum: CartLeadFollowUp, description: 'Where the automatic follow-up stands: PENDING, DONE, FAILED or SKIPPED' })
+  @IsOptional()
+  @IsEnum(CartLeadFollowUp)
+  followUp?: CartLeadFollowUp;
 
   /**
    * The live worklist: still NEW or CONTACTED, nothing dismissed or already

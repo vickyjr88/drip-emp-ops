@@ -453,7 +453,7 @@ export default function OutreachPage() {
                       <div>
                         <strong>{h.customer ? `${h.customer.firstName} ${h.customer.lastName}`.trim() : h.phone}</strong>
                         <span className={`portal-chip ${h.status === 'SENT' ? 'is-success' : 'is-danger'}`} style={{ marginLeft: 8 }}>{h.status === 'SENT' ? 'Sent' : 'Failed'}</span>
-                        <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>{(SHORT as Record<string, string>)[h.kind] ?? ((h.kind as string) === 'REVIEW_REQUEST' ? 'Review request' : h.kind)}</span>
+                        <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>{(SHORT as Record<string, string>)[h.kind] ?? ((h.kind as string) === 'REVIEW_REQUEST' ? 'Review request' : (h.kind as string) === 'FOLLOWUP_CART' ? 'Cart follow-up' : (h.kind as string) === 'FOLLOWUP_ORDER' ? 'Order follow-up' : h.kind)}</span>
                         {h.delivery ? (
                           <span className={`portal-chip ${h.delivery === 'failed' ? 'is-danger' : h.delivery === 'sent' ? 'is-muted' : 'is-success'}`} style={{ marginLeft: 8 }}>{DELIVERY_LABEL[h.delivery] ?? h.delivery}</span>
                         ) : null}

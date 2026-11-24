@@ -139,7 +139,7 @@ export class CartLeadService {
   }
 
   async findAll(query: CartLeadQueryDto) {
-    const { skip, take, search, source, status, outstanding } = query;
+    const { skip, take, search, source, status, outstanding, followUp } = query;
     // `status` is an exact match on one status (the history page's own
     // dropdown); `outstanding` picks a pair of statuses at once (the live
     // worklist's "still open" vs. the history page's "already resolved").
@@ -155,6 +155,7 @@ export class CartLeadService {
     const where: Prisma.CartLeadWhereInput = {
       ...(source ? { source } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
+      ...(followUp ? { followUpState: followUp } : {}),
       ...(search?.trim()
         ? {
             OR: [
@@ -203,13 +204,33 @@ export class CartLeadService {
     });
     if (!lead) throw new NotFoundException(`Cart lead ${id} not found`);
     const detailed = await withLineImages(this.prisma, lead);
-    return { ...detailed, followUp: followUpFor({ ...detailed, customer: lead.customer }) };
+    // What the automatic follow-up actually sent this person: every email (from the email log) and every WhatsApp message (from the outreach log).
+    const digits = (lead.customerPhone ?? lead.customer?.phone ?? '').replace(/\D/g, '');
+    const [emails, whatsapp] = await Promise.all([
+      this.prisma.emailLog.findMany({
+        where: { cartLeadId: id }, orderBy: { createdAt: 'desc' }, take: 10,
+        select: { id: true, recipient: true, subject: true, status: true, errorMessage: true, sentAt: true, createdAt: true },
+      }),
+      digits.length >= 9
+        ? this.prisma.whatsappOutreach.findMany({
+            where: { phone: { endsWith: digits.slice(-9) }, kind: { startsWith: 'FOLLOWUP' } }, orderBy: { createdAt: 'desc' }, take: 10,
+            select: { id: true, kind: true, template: true, status: true, error: true, delivery: true, deliveryError: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    return { ...detailed, followUp: followUpFor({ ...detailed, customer: lead.customer }), followUpMessages: { emails, whatsapp } };
   }
 
-  async setStatus(id: string, status: CartLeadStatus) {
+  async setStatus(id: string, status: CartLeadStatus, by?: string) {
     const lead = await this.prisma.cartLead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException(`Cart lead ${id} not found`);
-    return this.prisma.cartLead.update({ where: { id }, data: { status } });
+    // Opening the WhatsApp follow-up marks a lead contacted: that is a follow-up, so the automatic one leaves it alone. Dismissing it closes it.
+    const followUp: Prisma.CartLeadUpdateInput =
+      lead.followUpState !== 'PENDING' ? {}
+        : status === 'CONTACTED' ? { followUpState: 'DONE', followUpReason: 'STAFF', followUpNote: 'A member of staff followed this up', followUpBy: by || 'staff', followUpAt: new Date() }
+          : status === 'EXPIRED' ? { followUpState: 'SKIPPED', followUpReason: 'CLOSED', followUpNote: 'Dismissed by staff', followUpBy: by || 'staff', followUpAt: new Date() }
+            : {};
+    return this.prisma.cartLead.update({ where: { id }, data: { status, ...followUp } });
   }
 
   /**
@@ -243,7 +264,11 @@ export class CartLeadService {
 
     return this.prisma.cartLead.update({
       where: { id },
-      data: { status: CartLeadStatus.CONVERTED, orderId },
+      data: {
+        status: CartLeadStatus.CONVERTED, orderId,
+        // An order was placed: nothing left to follow up.
+        ...(lead.followUpState === 'PENDING' ? { followUpState: 'SKIPPED' as const, followUpReason: 'CLOSED', followUpNote: 'An order was placed', followUpBy: 'auto', followUpAt: new Date() } : {}),
+      },
     });
   }
 

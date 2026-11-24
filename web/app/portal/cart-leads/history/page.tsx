@@ -17,13 +17,14 @@ import { PortalShell } from '../../components/portal-shell';
 import { ListThumb } from '../../components/list-thumb';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../../components/server-pager';
 import { useErrorState } from '../../components/notifications';
+import { FollowUpChip, LeadFollowUpFields } from '../../components/lead-followup';
 import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, formatMoney,
   hasPermission, loadProfile, roleLabelFor,
 } from '../../accounting/lib';
 
 type CartLeadLine = { variantId: string; sku: string; name: string; size: string; quantity: number; priceKes: number };
-type CartLead = {
+type CartLead = LeadFollowUpFields & {
   id: string;
   source: 'WHATSAPP_ORDER' | 'ABANDONED_CART';
   status: 'NEW' | 'CONTACTED' | 'CONVERTED' | 'EXPIRED';
@@ -184,6 +185,7 @@ export default function CartLeadHistoryPage() {
                           <span className={statusChipClass(lead.status)} style={{ marginLeft: 8 }}>
                             {lead.status === 'CONVERTED' ? 'Converted' : 'Dismissed'}
                           </span>
+                          <span style={{ marginLeft: 8 }}><FollowUpChip lead={lead} /></span>
                           <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>
                             {lead.source === 'WHATSAPP_ORDER' ? 'WhatsApp' : 'Abandoned cart'}
                           </span>

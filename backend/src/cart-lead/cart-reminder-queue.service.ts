@@ -3,6 +3,7 @@ import { Job, Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartReminderEmailService } from './cart-reminder-email';
+import { followUpConfig } from './lead-followup';
 
 export const CART_REMINDER_QUEUE = 'cart-reminders';
 
@@ -104,6 +105,9 @@ export class CartReminderQueueService implements OnModuleInit, OnModuleDestroy {
    * reminder while sitting in the 24h delay does not get emailed anyway.
    */
   private async runSend({ cartLeadId }: CartReminderJob) {
+    // The automatic follow-up (an hour, email and WhatsApp, inside 08:00-20:00, and logged) replaced this day-old email. A job scheduled before it
+    // existed must not send a second email at an hour of its own choosing.
+    if (followUpConfig().enabled) return { status: 'SKIPPED', reason: 'Handled by the automatic lead follow-up' };
     const lead = await this.prisma.cartLead.findUnique({ where: { id: cartLeadId } });
     if (!lead) return { status: 'SKIPPED', reason: 'Lead no longer exists' };
     if (lead.status !== 'NEW') return { status: 'SKIPPED', reason: `status is ${lead.status}` };
@@ -121,6 +125,7 @@ export class CartReminderQueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   async scheduleReminder(cartLeadId: string) {
+    if (followUpConfig().enabled) return;
     if (!this.queue) {
       this.logger.warn(
         `Cart reminder for lead ${cartLeadId} not scheduled — queue unavailable (delayed jobs need Redis; there is no inline equivalent).`,

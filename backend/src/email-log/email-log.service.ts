@@ -27,6 +27,9 @@ export class EmailLogService {
     replyTo?: { email: string; name?: string };
     invoiceId?: string;
     supplierInvoiceId?: string;
+    /** What the email was for, when it is not an invoice (LEAD_FOLLOWUP), and the cart lead it followed up. */
+    kind?: string;
+    cartLeadId?: string;
   }) {
     // A customer with no email is stored under a stand-in address that can never receive mail (see common/contact-email.ts). Nothing is sent to
     // it, and the log says why, instead of attempting a delivery to an address that never existed.
@@ -37,6 +40,8 @@ export class EmailLogService {
           subject: params.subject,
           invoiceId: params.invoiceId,
           supplierInvoiceId: params.supplierInvoiceId,
+          kind: params.kind,
+          cartLeadId: params.cartLeadId,
           status: 'FAILED',
           errorMessage: 'Not sent: no email address on file for this customer (they gave a phone number only)',
         },
@@ -58,6 +63,8 @@ export class EmailLogService {
         subject: params.subject,
         invoiceId: params.invoiceId,
         supplierInvoiceId: params.supplierInvoiceId,
+        kind: params.kind,
+        cartLeadId: params.cartLeadId,
         status: result.delivered ? 'SENT' : 'FAILED',
         errorMessage: result.error,
         sentAt: result.delivered ? new Date() : null,
@@ -75,12 +82,13 @@ export class EmailLogService {
     return log;
   }
 
-  findAll(params: { invoiceId?: string; supplierInvoiceId?: string; inquiryId?: string }) {
+  findAll(params: { invoiceId?: string; supplierInvoiceId?: string; inquiryId?: string; cartLeadId?: string }) {
     return this.prisma.emailLog.findMany({
       where: {
         ...(params.invoiceId ? { invoiceId: params.invoiceId } : {}),
         ...(params.supplierInvoiceId ? { supplierInvoiceId: params.supplierInvoiceId } : {}),
         ...(params.inquiryId ? { inquiryId: params.inquiryId } : {}),
+        ...(params.cartLeadId ? { cartLeadId: params.cartLeadId } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });

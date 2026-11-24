@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-export type WhatsAppSendResult = { delivered: boolean; messageId?: string; error?: string };
+/** `errorCode` is Meta's own code when it refused the message (131026 undeliverable, 131042 payment, 132001 no such template...), so callers can tell the person's problem from the shop's. */
+export type WhatsAppSendResult = { delivered: boolean; messageId?: string; error?: string; errorCode?: string };
 
 /**
  * WhatsApp Business Cloud API. A message to someone who has not written to the business in the last 24 hours must be
@@ -99,7 +100,7 @@ export class WhatsAppService {
       if (!response.ok) {
         const message = body?.error?.message ?? `HTTP ${response.status}`;
         this.logger.warn(`WhatsApp to ${phone} failed: ${message}`);
-        return { delivered: false, error: message };
+        return { delivered: false, error: message, errorCode: body?.error?.code !== undefined ? String(body.error.code) : undefined };
       }
       return { delivered: true, messageId: body?.messages?.[0]?.id };
     } catch (error) {

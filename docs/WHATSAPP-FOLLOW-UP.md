@@ -1,5 +1,7 @@
 # WhatsApp follow-up on carts and orders
 
+> This page is the **manual** button. Leads and abandoned carts are also followed up **automatically** an hour after the shopper stops, by email and WhatsApp, inside 08:00-20:00: see [LEAD-FOLLOW-UP.md](LEAD-FOLLOW-UP.md). Opening the button below counts as a follow-up, so the automatic one leaves that lead alone.
+
 A **Follow up on WhatsApp** button sits on every open cart lead and every order that has a phone number: Cart Leads (list and
 detail), Orders (list, detail, and the lead list inside Orders). It opens the customer's WhatsApp chat with the message
 already written: what was in the cart or order, a link to each product, and the total. **Nothing is sent from the portal.**

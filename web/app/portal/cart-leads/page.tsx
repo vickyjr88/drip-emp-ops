@@ -17,6 +17,7 @@ import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ListThumb } from '../components/list-thumb';
 import { FollowUp, FollowUpButton, markLeadContacted } from '../components/follow-up-button';
+import { FollowUpChip, LeadFollowUpFields, LeadFollowUpPanel, setFollowUp } from '../components/lead-followup';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { useErrorState } from '../components/notifications';
 import {
@@ -25,7 +26,7 @@ import {
 } from '../accounting/lib';
 
 type CartLeadLine = { variantId: string; sku: string; name: string; size: string; quantity: number; priceKes: number };
-type CartLead = {
+type CartLead = LeadFollowUpFields & {
   id: string;
   source: 'WHATSAPP_ORDER' | 'ABANDONED_CART';
   status: 'NEW' | 'CONTACTED' | 'CONVERTED' | 'EXPIRED';
@@ -46,6 +47,8 @@ export default function CartLeadsPage() {
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [sourceFilter, setSourceFilter] = useState('');
+  const [followFilter, setFollowFilter] = useState('');
+  const [panelKey, setPanelKey] = useState(0);
   const [errorMessage, setErrorMessage] = useErrorState();
   const router = useRouter();
 
@@ -71,10 +74,10 @@ export default function CartLeadsPage() {
     void load(token);
   }, [initialized, token, load]);
 
-  const filters = useMemo(() => ({ source: sourceFilter || undefined }), [sourceFilter]);
+  const filters = useMemo(() => ({ source: sourceFilter || undefined, followUp: followFilter || undefined }), [sourceFilter, followFilter]);
 
   const fetchPage = useCallback(
-    async (params: { skip: number; take: number; search: string; source?: string }): Promise<ServerPage<CartLead>> => {
+    async (params: { skip: number; take: number; search: string; source?: string; followUp?: string }): Promise<ServerPage<CartLead>> => {
       if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
       const query = new URLSearchParams();
       query.set('skip', String(params.skip));
@@ -82,6 +85,7 @@ export default function CartLeadsPage() {
       query.set('outstanding', 'true');
       if (params.search) query.set('search', params.search);
       if (params.source) query.set('source', params.source);
+      if (params.followUp) query.set('followUp', params.followUp);
       return apiRequest<ServerPage<CartLead>>(`/cart-leads?${query}`, { method: 'GET' }, token);
     },
     [token],
@@ -139,6 +143,8 @@ export default function CartLeadsPage() {
           >
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
+            <LeadFollowUpPanel token={token} refreshKey={panelKey} />
+
             <article className="portal-card">
               <div className="portal-card-header-row">
                 <div>
@@ -163,6 +169,13 @@ export default function CartLeadsPage() {
                   <option value="">All sources</option>
                   <option value="WHATSAPP_ORDER">WhatsApp order</option>
                   <option value="ABANDONED_CART">Abandoned cart</option>
+                </select>
+                <select value={followFilter} onChange={(event) => setFollowFilter(event.target.value)} aria-label="Follow-up">
+                  <option value="">Any follow-up</option>
+                  <option value="PENDING">Waiting</option>
+                  <option value="DONE">Followed up</option>
+                  <option value="FAILED">Failed</option>
+                  <option value="SKIPPED">Skipped</option>
                 </select>
               </div>
 
@@ -196,6 +209,7 @@ export default function CartLeadsPage() {
                           {lead.status === 'CONTACTED' ? (
                             <span className="portal-chip is-muted" style={{ marginLeft: 8 }}>Contacted</span>
                           ) : null}
+                          <span style={{ marginLeft: 8 }}><FollowUpChip lead={lead} /></span>
                           <p className="portal-muted">
                             {lead.customerPhone || lead.customerEmail || 'No contact on file'} ·{' '}
                             {lead.lines.length} item{lead.lines.length === 1 ? '' : 's'} · {formatDateTime(lead.lastActivityAt)}
@@ -203,8 +217,18 @@ export default function CartLeadsPage() {
                           <p>{formatMoney(lead.total)}</p>
                         </div>
                         {/* The row opens the lead; the follow-up button acts in place. */}
-                        {lead.followUp ? (
+                        {lead.followUp || lead.followUpState !== 'DONE' ? (
                           <div className="portal-action-row" onClick={(event) => event.stopPropagation()}>
+                            {lead.followUpState !== 'DONE' ? (
+                              <button
+                                type="button"
+                                className="portal-inline-btn"
+                                title="Mark this lead as followed up (a call, a visit, a chat from your own phone). The automatic follow-up then leaves it alone."
+                                onClick={() => { if (token) void setFollowUp(token, lead.id, 'DONE').then((ok) => { if (ok) { pager.reload(); setPanelKey((k) => k + 1); } }); }}
+                              >
+                                Mark done
+                              </button>
+                            ) : null}
                             <FollowUpButton
                               followUp={lead.followUp}
                               onOpened={() => {
