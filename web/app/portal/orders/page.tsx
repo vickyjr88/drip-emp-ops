@@ -25,23 +25,6 @@ import {
 } from '../accounting/lib';
 
 type Store = { id: string; code: string; name: string };
-type Customer = { id: string; firstName: string; lastName: string; email: string; phone: string };
-
-type Level = {
-  quantity: number; sellable: number;
-  store: Store;
-  variant: { id: string; sku: string; name: string; priceKes: string | number; product: { name: string } };
-};
-
-/**
- * The full catalogue, for picking something to order in even when nothing is
- * on the shelf -- either a normal variant that happens to be at zero right
- * now, or one that is never stocked at all (isDropShip).
- */
-type CatalogueProduct = {
-  id: string; name: string; brand?: string | null;
-  variants: { id: string; sku: string; name: string; priceKes: string | number; isActive: boolean; isDropShip: boolean }[];
-};
 
 type FulfillmentType = 'STOCK' | 'SUPPLIER_ORDER';
 type FulfillmentStatus = 'AWAITING_SUPPLIER' | 'ORDERED_FROM_SUPPLIER' | 'RECEIVED' | 'HANDED_TO_CUSTOMER';
@@ -63,7 +46,6 @@ type Order = {
   payments: Array<{ id: string; amount: string | number; method: string; reference?: string | null }>;
 };
 
-const CHANNELS = ['IN_STORE', 'WHATSAPP', 'INSTAGRAM', 'WEBSITE'];
 const METHODS = ['MPESA', 'CASH', 'CARD', 'BANK_TRANSFER'];
 
 type CartLeadLine = { variantId: string; sku: string; name: string; size: string; quantity: number; priceKes: number };
@@ -77,42 +59,20 @@ type CartLead = {
   firstLineImageUrl?: string | null;
 };
 
-type Draft = {
-  variantId: string; quantity: number; label: string; price: number;
-  fulfillmentType: FulfillmentType;
-};
-
 export default function OrdersPage() {
   const router = useRouter();
   const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
-  const [levels, setLevels] = useState<Level[]>([]);
-  const [catalogue, setCatalogue] = useState<CatalogueProduct[]>([]);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [showTill, setShowTill] = useState(false);
   const [activeTab, setActiveTab] = useState<'orders' | 'leads'>('orders');
   const [statusFilter, setStatusFilter] = useState('');
   const [awaitingSupplierOnly, setAwaitingSupplierOnly] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
-  const [head, setHead] = useState({ storeId: '', channel: 'IN_STORE', customerId: '', customerName: '', customerPhone: '' });
-  const [draft, setDraft] = useState<Draft[]>([]);
-  const [pick, setPick] = useState({ variantId: '', quantity: '1' });
-  /** Item search across the whole catalogue, not just what is on the shelf here. */
-  const [itemQuery, setItemQuery] = useState('');
-  /** Search text for the customer autocomplete. Blank once a customer is
-   *  picked, same pattern as the item and reseller pickers elsewhere. */
-  const [customerQuery, setCustomerQuery] = useState('');
   const [payment, setPayment] = useState({ orderId: '', amount: '', method: 'MPESA', reference: '' });
-  /** Set while the till is being used to ring up a specific lead, so placing the order can mark that lead converted afterwards. */
-  const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null);
-
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
     setInitialized(true);
@@ -123,19 +83,6 @@ export default function OrdersPage() {
     try {
       const nextProfile = await loadProfile(authToken);
       setProfile(nextProfile);
-      const [levelRows, storeRows, productRows, customerRows] = await Promise.all([
-        apiRequest<unknown>('/inventory/levels', { method: 'GET' }, authToken),
-        apiRequest<Store[]>('/stores', { method: 'GET' }, authToken),
-        apiRequest<unknown>('/products?take=500', { method: 'GET' }, authToken),
-        // Only needed to fill the customer picker -- a role without
-        // customer.read simply gets the free-text fallback instead.
-        apiRequest<unknown>('/customers?take=500', { method: 'GET' }, authToken).catch(() => []),
-      ]);
-      setLevels(asList<Level>(levelRows));
-      setStores(storeRows);
-      setCatalogue(asList<CatalogueProduct>(productRows));
-      setCustomers(asList<Customer>(customerRows));
-      setHead((prev) => ({ ...prev, storeId: prev.storeId || storeRows[0]?.id || '' }));
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -231,31 +178,9 @@ export default function OrdersPage() {
   }
 
   /** Pre-fills the till with this lead's items and contact so staff ring it up as a real order instead of retyping it. */
+  /** The new-order screen takes the lead's items and contact, so the sale is rung up once and the lead is closed with it. */
   function onStartOrderFromLead(lead: CartLead) {
-    setHead((prev) => ({
-      ...prev,
-      channel: lead.source === 'WHATSAPP_ORDER' ? 'WHATSAPP' : prev.channel,
-      customerId: '',
-      customerName: lead.customerName || '',
-      customerPhone: lead.customerPhone || '',
-    }));
-    // The name field reads from customerQuery until a customer is picked from
-    // the autocomplete (see its value binding below) -- without also setting
-    // this, the prefill would be invisible even though head.customerName is
-    // correctly set underneath it.
-    setCustomerQuery(lead.customerName || '');
-    setDraft(
-      lead.lines.map((line) => ({
-        variantId: line.variantId,
-        quantity: line.quantity,
-        label: `${line.name} (${line.size})`,
-        price: line.priceKes,
-        fulfillmentType: 'STOCK' as FulfillmentType,
-      })),
-    );
-    setConvertingLeadId(lead.id);
-    setShowTill(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    router.push(`/portal/orders/new?lead=${lead.id}`);
   }
 
   const [exportRows, setExportRows] = useState<Order[]>([]);
@@ -296,176 +221,6 @@ export default function OrdersPage() {
   const canPay = hasPermission(profile, 'order-payment.create');
   const canAddCustomer = hasPermission(profile, 'customer.create');
 
-  const customerMatches = useMemo(() => {
-    const query = customerQuery.trim().toLowerCase();
-    const scored = !query
-      ? customers
-      : customers.filter((customer) => {
-          const name = `${customer.firstName} ${customer.lastName}`.trim().toLowerCase();
-          return name.includes(query) || customer.phone?.toLowerCase().includes(query) || customer.email?.toLowerCase().includes(query);
-        });
-    return scored.slice(0, 25);
-  }, [customers, customerQuery]);
-
-  // Sellable quantity here, per variant -- the picker uses this to decide
-  // whether a line rings up as STOCK or has to become a SUPPLIER_ORDER.
-  const sellableHere = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of levels) {
-      if (row.store.id !== head.storeId) continue;
-      map.set(row.variant.id, row.sellable);
-    }
-    return map;
-  }, [levels, head.storeId]);
-
-  /**
-   * Every active variant in the catalogue, whether or not it is on the
-   * shelf here. A variant with nothing sellable at this store -- including
-   * one that is never stocked at all -- is offered too, just flagged as a
-   * supplier order rather than left out. That is the whole point: "we don't
-   * have it, but the supplier does" should not mean it cannot be sold.
-   */
-  const itemOptions = useMemo(() => {
-    const options: Array<{
-      variantId: string; sku: string; label: string; price: number;
-      sellable: number; mustOrder: boolean;
-    }> = [];
-    for (const product of catalogue) {
-      for (const variant of product.variants) {
-        if (!variant.isActive) continue;
-        const sellable = sellableHere.get(variant.id) ?? 0;
-        options.push({
-          variantId: variant.id,
-          sku: variant.sku,
-          label: `${product.name} — ${variant.name}`,
-          price: Number(variant.priceKes),
-          sellable,
-          // A drop-ship variant is never on the shelf, so it always has to
-          // be ordered in, even if some stray StockLevel row said otherwise.
-          mustOrder: variant.isDropShip || sellable <= 0,
-        });
-      }
-    }
-    return options;
-  }, [catalogue, sellableHere]);
-
-  const itemMatches = useMemo(() => {
-    const query = itemQuery.trim().toLowerCase();
-    const scored = !query
-      ? itemOptions
-      : itemOptions.filter(
-          (option) => option.label.toLowerCase().includes(query) || option.sku.toLowerCase().includes(query),
-        );
-    // Capped, same reasoning as elsewhere: a few hundred rendered rows is a
-    // slow first paint for a list nobody scrolls to the end of.
-    return scored.slice(0, 25);
-  }, [itemOptions, itemQuery]);
-
-  const draftTotal = draft.reduce((sum, line) => sum + line.price * line.quantity, 0);
-
-  function addLine() {
-    const option = itemOptions.find((row) => row.variantId === pick.variantId);
-    if (!option) return;
-    const quantity = Number(pick.quantity) || 1;
-    const fulfillmentType: FulfillmentType = option.mustOrder ? 'SUPPLIER_ORDER' : 'STOCK';
-    setDraft((prev) => {
-      const existing = prev.find((line) => line.variantId === option.variantId);
-      if (existing) {
-        return prev.map((line) =>
-          line.variantId === option.variantId ? { ...line, quantity: line.quantity + quantity } : line);
-      }
-      return [...prev, {
-        variantId: option.variantId,
-        quantity,
-        label: option.label,
-        price: option.price,
-        fulfillmentType,
-      }];
-    });
-    setPick({ variantId: '', quantity: '1' });
-    setItemQuery('');
-  }
-
-  async function onAddCustomer() {
-    if (!token) return;
-    const result = await dialog.prompt({
-      title: 'New Customer',
-      message: 'Adds a customer record, then picks it for this order.',
-      fields: [
-        { name: 'firstName', label: 'First name', required: true },
-        { name: 'lastName', label: 'Last name', required: true },
-        { name: 'phone', label: 'Phone', required: true, placeholder: '+254…' },
-        { name: 'email', label: 'Email', placeholder: 'Leave blank if unknown' },
-      ],
-      confirmLabel: 'Add Customer',
-    });
-    if (!result) return;
-    try {
-      const created = await apiRequest<Customer>('/customers', {
-        method: 'POST',
-        body: JSON.stringify({
-          firstName: result.firstName,
-          lastName: result.lastName,
-          phone: result.phone,
-          email: result.email || undefined,
-        }),
-      }, token);
-      setCustomers((prev) => [...prev, created]);
-      setHead((prev) => ({
-        ...prev,
-        customerId: created.id,
-        customerName: `${created.firstName} ${created.lastName}`.trim(),
-        customerPhone: created.phone,
-      }));
-      setCustomerQuery('');
-      setFeedback(`${created.firstName} ${created.lastName} added.`);
-    } catch (error) {
-      setErrorMessage(error);
-    }
-  }
-
-  async function onPlace(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!token || draft.length === 0) return;
-    setSaving(true);
-    try {
-      const order = await apiRequest<Order>('/orders', {
-        method: 'POST',
-        body: JSON.stringify({
-          storeId: head.storeId,
-          channel: head.channel,
-          customerId: head.customerId || undefined,
-          customerName: head.customerName || undefined,
-          customerPhone: head.customerPhone || undefined,
-          lines: draft.map((line) => ({
-            variantId: line.variantId,
-            quantity: line.quantity,
-            fulfillmentType: line.fulfillmentType,
-          })),
-        }),
-      }, token);
-      setFeedback(`${order.orderNumber} placed — ${formatMoney(order.total)}.`);
-      if (convertingLeadId) {
-        await apiRequest(`/cart-leads/${convertingLeadId}/convert`, { method: 'PATCH', body: JSON.stringify({ orderId: order.id }) }, token)
-          .catch(() => {
-            // The order is real either way; the lead just stays listed as
-            // outstanding if this follow-up call fails.
-          });
-        setConvertingLeadId(null);
-        leadsPager.reload();
-      }
-      setDraft([]);
-      setHead((prev) => ({ ...prev, customerId: '', customerName: '', customerPhone: '' }));
-      setCustomerQuery('');
-      setShowTill(false);
-      await load(token);
-      ordersPager.reload();
-    } catch (error) {
-      setErrorMessage(error);
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function onSetStatus(order: Order, status: string) {
     if (!token) return;
@@ -558,219 +313,6 @@ export default function OrdersPage() {
                 Cart Leads
               </button>
             </div>
-
-            {activeTab === 'orders' && showTill && canCreate ? (
-              <article className="portal-card" data-tour="orders.new">
-                <h2 style={{ marginTop: 0 }}>New Order</h2>
-                <form className="portal-entity-form" onSubmit={onPlace}>
-                  <div className="portal-entity-grid-2">
-                    <label>
-                      <span>Store</span>
-                      <select value={head.storeId}
-                        onChange={(event) => { setHead((prev) => ({ ...prev, storeId: event.target.value })); setDraft([]); }}>
-                        {stores.map((store) => (
-                          <option key={store.id} value={store.id}>{store.name}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Channel</span>
-                      <select value={head.channel}
-                        onChange={(event) => setHead((prev) => ({ ...prev, channel: event.target.value }))}>
-                        {CHANNELS.map((channel) => (
-                          <option key={channel} value={channel}>{channel.replace('_', ' ')}</option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="portal-entity-grid-2">
-                    <label>
-                      <span>Customer name</span>
-                      <input
-                        value={head.customerId ? head.customerName : customerQuery}
-                        placeholder="Walk-in — search an existing customer, or type a name"
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setCustomerQuery(value);
-                          // Typing after a customer is picked starts a walk-in
-                          // name instead: the field never locks once chosen.
-                          setHead((prev) => ({ ...prev, customerId: '', customerName: value }));
-                        }}
-                      />
-                      {head.customerId ? (
-                        <div className="portal-picked-row">
-                          <span>
-                            <strong>{head.customerName}</strong>{' '}
-                            <span className="portal-muted">{head.customerPhone}</span>
-                          </span>
-                          <button
-                            type="button"
-                            className="portal-inline-btn"
-                            onClick={() => setHead((prev) => ({ ...prev, customerId: '', customerName: '', customerPhone: '' }))}
-                          >
-                            Change
-                          </button>
-                        </div>
-                      ) : customerQuery.trim() ? (
-                        <div className="portal-picker-results">
-                          {customerMatches.length === 0 ? (
-                            <p className="portal-muted" style={{ margin: 8 }}>No customer matches that.</p>
-                          ) : (
-                            customerMatches.map((customer) => (
-                              <button
-                                key={customer.id}
-                                type="button"
-                                className="portal-picker-option"
-                                onClick={() => {
-                                  setHead((prev) => ({
-                                    ...prev,
-                                    customerId: customer.id,
-                                    customerName: `${customer.firstName} ${customer.lastName}`.trim(),
-                                    customerPhone: customer.phone,
-                                  }));
-                                  setCustomerQuery('');
-                                }}
-                              >
-                                <span>{customer.firstName} {customer.lastName}</span>
-                                <span className="portal-muted">{customer.phone || customer.email}</span>
-                              </button>
-                            ))
-                          )}
-                          {canAddCustomer ? (
-                            <button type="button" className="portal-picker-option is-action" onClick={() => void onAddCustomer()}>
-                              <span>+ Add new customer</span>
-                            </button>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </label>
-                    <label>
-                      <span>Phone</span>
-                      <input value={head.customerPhone} placeholder="+254…"
-                        onChange={(event) => setHead((prev) => ({ ...prev, customerPhone: event.target.value }))} />
-                    </label>
-                  </div>
-
-                  <div className="portal-entity-grid-3">
-                    <label>
-                      <span>Item</span>
-                      <input
-                        value={itemQuery}
-                        placeholder="Search product, size or SKU…"
-                        onChange={(event) => { setItemQuery(event.target.value); setPick((prev) => ({ ...prev, variantId: '' })); }}
-                      />
-                      {pick.variantId ? (
-                        <div className="portal-picked-row">
-                          <span>
-                            <strong>{itemOptions.find((option) => option.variantId === pick.variantId)?.label}</strong>
-                          </span>
-                          <button
-                            type="button"
-                            className="portal-inline-btn"
-                            onClick={() => { setPick((prev) => ({ ...prev, variantId: '' })); setItemQuery(''); }}
-                          >
-                            Change
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="portal-picker-results">
-                          {itemMatches.length === 0 ? (
-                            <p className="portal-muted" style={{ margin: 8 }}>
-                              {itemQuery.trim() ? 'Nothing matches that.' : 'Start typing, or pick from the list.'}
-                            </p>
-                          ) : (
-                            itemMatches.map((option) => (
-                              <button
-                                key={option.variantId}
-                                type="button"
-                                className="portal-picker-option"
-                                onClick={() => { setPick((prev) => ({ ...prev, variantId: option.variantId })); setItemQuery(''); }}
-                              >
-                                <span>{option.label}</span>
-                                <span className="portal-muted">
-                                  {option.sku}
-                                  {option.mustOrder ? ' · order from supplier' : ` · ${option.sellable} on shelf`}
-                                </span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
-                      {!pick.variantId ? (
-                        <small className="portal-muted">
-                          Anything in the catalogue can be added, even with nothing on the shelf — it rings up as
-                          an order from the supplier instead.
-                        </small>
-                      ) : null}
-                    </label>
-                    <label>
-                      <span>Quantity</span>
-                      <input type="number" min="1" value={pick.quantity}
-                        onChange={(event) => setPick((prev) => ({ ...prev, quantity: event.target.value }))} />
-                    </label>
-                    <label>
-                      <span>&nbsp;</span>
-                      <button type="button" className="portal-inline-btn" onClick={addLine} disabled={!pick.variantId}>
-                        Add to Order
-                      </button>
-                    </label>
-                  </div>
-
-                  {draft.length > 0 ? (
-                    <div className="portal-table-wrap">
-                      <table className="portal-data-table is-doc">
-                        <thead><tr><th>Item</th><th>Fulfillment</th><th>Qty</th><th>Price</th><th>Total</th><th /></tr></thead>
-                        <tbody>
-                          {draft.map((line) => (
-                            <tr key={line.variantId}>
-                              <td>{line.label}</td>
-                              <td>
-                                {line.fulfillmentType === 'SUPPLIER_ORDER' ? (
-                                  <span className="portal-chip is-danger">From supplier</span>
-                                ) : (
-                                  <span className="portal-chip is-muted">On shelf</span>
-                                )}
-                              </td>
-                              <td>{line.quantity}</td>
-                              <td>{formatMoney(line.price)}</td>
-                              <td>{formatMoney(line.price * line.quantity)}</td>
-                              <td>
-                                <button type="button" className="portal-inline-btn is-danger"
-                                  onClick={() => setDraft((prev) => prev.filter((item) => item.variantId !== line.variantId))}>
-                                  Remove
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                          <tr>
-                            <td colSpan={4}><strong>Total</strong></td>
-                            <td colSpan={2}><strong>{formatMoney(draftTotal)}</strong></td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="portal-empty-state">Nothing added yet.</div>
-                  )}
-                  {draft.some((line) => line.fulfillmentType === 'SUPPLIER_ORDER') ? (
-                    <p className="portal-muted">
-                      Item(s) marked &ldquo;From supplier&rdquo; are charged in full now, same as anything on the
-                      shelf. Let the customer know it is being sourced and roughly when to expect it — the order
-                      will sit in Awaiting Supplier until it is bought in and handed over.
-                    </p>
-                  ) : null}
-
-                  <div className="portal-inline-actions">
-                    <button type="submit" className="portal-primary-btn" disabled={saving || draft.length === 0}>
-                      {saving ? 'Placing...' : `Place Order — ${formatMoney(draftTotal)}`}
-                    </button>
-                    <button type="button" className="portal-ghost-btn" onClick={() => { setShowTill(false); setDraft([]); setConvertingLeadId(null); }}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </article>
-            ) : null}
 
             {payment.orderId && canPay ? (
               <article className="portal-card">
@@ -901,10 +443,10 @@ export default function OrdersPage() {
                 <div>
                   <h2 style={{ margin: 0 }}>Orders</h2>
                 </div>
-                {canCreate && !showTill ? (
-                  <button type="button" className="portal-primary-btn" onClick={() => setShowTill(true)}>
+                {canCreate ? (
+                  <Link href="/portal/orders/new" className="portal-primary-btn" data-tour="orders.new">
                     New Order
-                  </button>
+                  </Link>
                 ) : null}
               </div>
 

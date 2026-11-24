@@ -264,7 +264,7 @@ export default function CartLeadDetailClient({ leadId }: { leadId: string }) {
                       <button type="button" className="portal-inline-btn" onClick={() => void onDismiss()}>
                         Dismiss
                       </button>
-                      <Link href="/portal/orders" className="portal-inline-btn">
+                      <Link href={`/portal/orders/new?lead=${lead.id}`} className="portal-inline-btn">
                         Start Order From Cart
                       </Link>
                     </div>

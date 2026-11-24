@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * A customer, as a shoe shop needs one: who they are and how to reach them.
@@ -33,4 +33,15 @@ export class CreateCustomerDto {
   @IsString()
   @IsNotEmpty()
   phone!: string;
+
+  @ApiPropertyOptional({ enum: ['RETAIL', 'RESELLER', 'WHOLESALE'], description: 'Which price list they buy at. Defaults to RETAIL. A shop buying to resell is RESELLER or WHOLESALE.' })
+  @IsOptional()
+  @IsIn(['RETAIL', 'RESELLER', 'WHOLESALE'])
+  priceTier?: 'RETAIL' | 'RESELLER' | 'WHOLESALE';
+
+  @ApiPropertyOptional({ description: 'The shop or business they buy for, when they buy as a trade customer.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  businessName?: string;
 }

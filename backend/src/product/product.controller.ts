@@ -20,6 +20,13 @@ export class ProductController {
     return this.service.create(dto);
   }
 
+  /** The till's item box: words, a size or a SKU, with tier prices and stock at the chosen store. Before ':id'. */
+  @Get('variants/lookup')
+  @Permissions(buildPermissionKey('Product', 'read'))
+  variantLookup(@Query('q') q?: string, @Query('storeId') storeId?: string, @Query('limit') limit?: string) {
+    return this.service.variantLookup(q ?? '', storeId || undefined, limit ? Number(limit) : 12);
+  }
+
   @Get()
   @Permissions(buildPermissionKey('Product', 'read'))
   findAll(@Query() query: ProductQueryDto) {

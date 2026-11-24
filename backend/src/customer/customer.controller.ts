@@ -26,6 +26,13 @@ export class CustomerController {
     return this.service.findAll(query);
   }
 
+  /** The till's customer box: one field for a name, a mobile number (any format) or an email. Before ':id'. */
+  @Get('lookup')
+  @Permissions(buildPermissionKey('Customer', 'read'))
+  lookup(@Query('q') q?: string, @Query('limit') limit?: string) {
+    return this.service.lookup(q ?? '', limit ? Number(limit) : 8);
+  }
+
   // Before ':id', or "stats" would be read as a customer id.
   @Get('stats')
   @Permissions(buildPermissionKey('Customer', 'read'))

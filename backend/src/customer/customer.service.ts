@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,6 +8,7 @@ import { CustomerQueryDto } from './dto/customer-query.dto';
 import { containsAny, paginate, searchOr } from '../common/pagination.util';
 import { placeholderEmailFor, realEmail } from '../common/contact-email';
 import { MauticService } from '../mautic/mautic.service';
+import { isSearchable, likeEscape, parseLookup, phoneKey } from './customer-lookup';
 
 /**
  * Never select the portal password hash. Staff need to know *whether* a customer
@@ -30,8 +31,28 @@ const CUSTOMER_SELECT = Prisma.validator<Prisma.CustomerSelect>()({
 export class CustomerService {
   constructor(private readonly prisma: PrismaService, private readonly mautic: MauticService) {}
 
-  create(dto: CreateCustomerDto) {
+  /**
+   * Adds a customer. Someone who is already on file is not added twice: the same email, or the same phone number written any way (0712..., +254712...),
+   * answers with who they are, so the till can use that record instead of making a second one. (Before this the second one hit the unique email
+   * and failed with a server error.)
+   */
+  async create(dto: CreateCustomerDto) {
     const email = dto.email?.trim().toLowerCase();
+    const key = phoneKey(dto.phone);
+    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT c.id FROM "Customer" c
+      WHERE ${email ? Prisma.sql`c.email = ${email} OR` : Prisma.empty}
+            c.email = ${placeholderEmailFor(dto.phone)}
+            ${key ? Prisma.sql`OR right(regexp_replace(c.phone, '[^0-9]', '', 'g'), 9) = ${key}` : Prisma.empty}
+      LIMIT 1`);
+    if (existing[0]) {
+      const found = await this.prisma.customer.findUniqueOrThrow({ where: { id: existing[0].id }, select: CUSTOMER_SELECT });
+      throw new ConflictException({
+        statusCode: 409,
+        message: `${found.firstName} ${found.lastName}`.trim() + ' is already a customer with this ' + (email && found.email === email ? 'email' : 'phone number') + '.',
+        existing: found,
+      });
+    }
     return this.prisma.customer.create({
       data: {
         ...dto,
@@ -44,6 +65,37 @@ export class CustomerService {
       },
       select: CUSTOMER_SELECT,
     });
+  }
+
+  /**
+   * The till's customer box: type a name, a mobile number in any format, or an email, in one field, and get the few customers who match, the ones who
+   * buy most often first. Matches the words of a name against the first and last name, the business name, the trade code and the email; a number is
+   * compared by its digits so 0712 345 678 finds +254712345678.
+   */
+  async lookup(raw: string, limit = 8) {
+    const q = parseLookup(raw);
+    if (!isSearchable(q)) return [];
+    const conditions: Prisma.Sql[] = [Prisma.sql`c."isActive" = true`];
+    // Everything a person might type a name or an email against, in one lower-case string. A stand-in address (a phone number with no email) is not searched.
+    const haystack = Prisma.sql`lower(c."firstName" || ' ' || c."lastName" || ' ' || coalesce(c."businessName", '') || ' ' || coalesce(c.code, '') || ' ' || CASE WHEN c.email LIKE '%.invalid' THEN '' ELSE c.email END)`;
+    for (const word of q.words) conditions.push(Prisma.sql`${haystack} LIKE ${`%${likeEscape(word)}%`}`);
+    if (q.email) conditions.push(Prisma.sql`c.email LIKE ${`%${likeEscape(q.email)}%`} AND c.email NOT LIKE '%.invalid'`);
+    if (q.phone) conditions.push(Prisma.sql`regexp_replace(c.phone, '[^0-9]', '', 'g') LIKE ${`%${likeEscape(q.phone)}%`}`);
+    const exactPhone = q.phone ? Prisma.sql`right(regexp_replace(c.phone, '[^0-9]', '', 'g'), length(${q.phone})) = ${q.phone}` : Prisma.sql`false`;
+
+    const rows = await this.prisma.$queryRaw<Array<{
+      id: string; firstName: string; lastName: string; email: string; phone: string; priceTier: string; businessName: string | null;
+      orders: number; lastOrderAt: Date | null;
+    }>>(Prisma.sql`
+      SELECT c.id, c."firstName", c."lastName", c.email, c.phone, c."priceTier"::text AS "priceTier", c."businessName",
+             (SELECT count(*) FROM "Order" o WHERE o."customerId" = c.id)::int AS orders,
+             (SELECT max(o."placedAt") FROM "Order" o WHERE o."customerId" = c.id) AS "lastOrderAt"
+      FROM "Customer" c
+      WHERE ${Prisma.join(conditions, ' AND ')}
+      ORDER BY (CASE WHEN ${exactPhone} THEN 0 ELSE 1 END), orders DESC, "lastOrderAt" DESC NULLS LAST, c."firstName", c."lastName"
+      LIMIT ${Math.min(20, Math.max(1, limit))}`);
+    // A stand-in address is not shown as if it were the customer's.
+    return rows.map((r) => ({ ...r, email: realEmail(r.email) }));
   }
 
   findAll(query: CustomerQueryDto) {

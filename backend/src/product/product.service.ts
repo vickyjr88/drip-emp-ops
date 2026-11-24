@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { likeEscape } from '../customer/customer-lookup';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, CreateVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto, UpdateVariantDto } from './dto/update-product.dto';
@@ -92,6 +93,40 @@ export class ProductService {
    * Matching runs across name, SKU and brand together, because someone looking
    * for a shoe types whichever of the three they happen to remember.
    */
+  /**
+   * The till's item box: type any of a product's words, its brand, a size or a SKU ("air max 42", "nike black", "ADS-CMP") and get the variants that match
+   * every word, with the price on each price list and what is sellable at the chosen store. Anything active can be sold, even with nothing on the shelf
+   * (it rings up as an order from the supplier), so sold-out variants are returned too, flagged, and listed after the ones in stock.
+   */
+  async variantLookup(raw: string, storeId?: string, limit = 12) {
+    const words = (raw ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6);
+    if (!words.length || words.every((w) => w.length < 2)) return [];
+    const haystack = Prisma.sql`lower(p.name || ' ' || coalesce(p.brand, '') || ' ' || v.name || ' ' || v.sku || ' ' || coalesce(p.sku, ''))`;
+    const conditions = [Prisma.sql`v."isActive" = true`, Prisma.sql`p."isActive" = true`, ...words.map((w) => Prisma.sql`${haystack} LIKE ${`%${likeEscape(w)}%`}`)];
+    const rows = await this.prisma.$queryRaw<Array<{
+      variantId: string; sku: string; variantName: string; productId: string; productName: string; brand: string | null;
+      priceKes: Prisma.Decimal; resellerPriceKes: Prisma.Decimal | null; wholesalePriceKes: Prisma.Decimal | null;
+      isDropShip: boolean; sellable: number; imageUrl: string | null;
+    }>>(Prisma.sql`
+      SELECT v.id AS "variantId", v.sku, v.name AS "variantName", p.id AS "productId", p.name AS "productName", p.brand,
+             v."priceKes", v."resellerPriceKes", v."wholesalePriceKes", v."isDropShip",
+             ${storeId ? Prisma.sql`coalesce((SELECT sl.quantity - sl.reserved FROM "StockLevel" sl WHERE sl."variantId" = v.id AND sl."storeId" = ${storeId}), 0)` : Prisma.sql`0`}::int AS sellable,
+             coalesce(p."featuredImageUrl", p."imageUrls" ->> 0) AS "imageUrl"
+      FROM "ProductVariant" v JOIN "Product" p ON p.id = v."productId"
+      WHERE ${Prisma.join(conditions, ' AND ')}
+      ORDER BY (CASE WHEN v."isDropShip" THEN 1 WHEN ${storeId ? Prisma.sql`coalesce((SELECT sl.quantity - sl.reserved FROM "StockLevel" sl WHERE sl."variantId" = v.id AND sl."storeId" = ${storeId}), 0)` : Prisma.sql`0`} > 0 THEN 0 ELSE 1 END),
+               p.name, v.name
+      LIMIT ${Math.min(30, Math.max(1, limit))}`);
+    return rows.map((r) => ({
+      ...r,
+      priceKes: Number(r.priceKes),
+      resellerPriceKes: r.resellerPriceKes === null ? null : Number(r.resellerPriceKes),
+      wholesalePriceKes: r.wholesalePriceKes === null ? null : Number(r.wholesalePriceKes),
+      // Never on the shelf, or nothing sellable here: it has to be ordered in.
+      mustOrder: r.isDropShip || r.sellable <= 0,
+    }));
+  }
+
   async findAll(query: ProductQueryDto) {
     const { skip, take, search, categoryId, brand, isActive, isFeatured, sortBy, dateFrom, dateTo } = query;
     const where: Prisma.ProductWhereInput = {

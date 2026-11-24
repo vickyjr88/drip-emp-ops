@@ -14364,3 +14364,130 @@ img {
   .de-sharekit-row { grid-template-columns: 72px minmax(0, 1fr) auto; }
   .de-sharekit-buttons { grid-column: auto; justify-content: flex-end; max-width: 520px; }
 }
+
+/* =====================================================================================================================
+   Portal forms and the new order screen
+   One set of form parts (pform-*), the type-to-search box (pcb-*), the customer picker (pcust-*, ptier*), and the order screen (pord-*, pline-*).
+   Same ink, borders and Manrope as the rest of the portal; larger tap targets, because these are used all day, often on a phone.
+   ===================================================================================================================== */
+
+.pform { display: grid; gap: 14px; }
+.pform-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.pform-field { display: grid; gap: 6px; min-width: 0; }
+.pform-field > span, .pform-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #444; }
+.pform-field > span em { color: #b3261e; font-style: normal; }
+.pform-field > span i { font-style: normal; font-weight: 500; letter-spacing: 0.02em; text-transform: none; color: #6c7493; }
+.pform-field input, .pform-field select, .pform-field textarea, .pline-price input, .pline-qty input, .pord-summary input {
+  width: 100%; min-width: 0; min-height: 44px; padding: 9px 14px; border: 1px solid var(--eef-border); border-radius: 6px;
+  font: 14px 'Manrope', sans-serif; background: #fff; color: #1f2121;
+}
+.pform-field textarea { resize: vertical; min-height: 72px; }
+.pform-field input:focus, .pform-field select:focus, .pform-field textarea:focus, .pline-price input:focus, .pline-qty input:focus, .pord-summary input:focus, .pcb-field input:focus {
+  outline: 2px solid var(--eef-primary); outline-offset: 0; border-color: var(--eef-primary);
+}
+.pform-error { margin: 0; padding: 10px 12px; border-radius: 6px; background: #fdecea; color: #8c1d18; font-size: 13px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.pform-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Type-to-search box */
+.pcb { position: relative; display: grid; gap: 6px; }
+.pcb-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #444; }
+.pcb-field { position: relative; }
+.pcb-field input { width: 100%; min-height: 48px; padding: 10px 70px 10px 14px; border: 1px solid #1a1c1c; border-radius: 6px; font: 15px 'Manrope', sans-serif; background: #fff; }
+.pcb-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; background: none; font-size: 22px; line-height: 1; color: #6c7493; cursor: pointer; border-radius: 50%; }
+.pcb-clear:hover { background: #f3f3f4; color: #1a1c1c; }
+.pcb-spinner { position: absolute; right: 44px; top: 50%; width: 16px; height: 16px; margin-top: -8px; border: 2px solid #d8dcdb; border-top-color: #1a1c1c; border-radius: 50%; animation: pcb-spin 0.7s linear infinite; }
+@keyframes pcb-spin { to { transform: rotate(360deg); } }
+.pcb-hint { font-size: 12px; color: #6c7493; margin: 0; }
+.pcb-list { position: absolute; z-index: 30; left: 0; right: 0; top: 100%; margin: 4px 0 0; padding: 0; list-style: none; max-height: 340px; overflow-y: auto; background: #fff; border: 1px solid #1a1c1c; border-radius: 6px; box-shadow: 0 14px 34px rgba(26, 28, 28, 0.18); }
+.pcb-option { padding: 10px 12px; border-bottom: 1px solid var(--eef-border); cursor: pointer; font-size: 14px; }
+.pcb-option:last-child { border-bottom: 0; }
+.pcb-option.is-active { background: #f3f3f4; }
+.pcb-option.is-action { color: var(--eef-primary); font-weight: 700; border-top: 2px solid var(--eef-border); }
+.pcb-empty { padding: 12px; font-size: 13px; color: #6c7493; }
+
+/* Customer rows, the chosen customer, and the Retail / Reseller / Wholesale tag */
+.pcust-row, .pitem-main { display: grid; gap: 2px; min-width: 0; }
+.pcust-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pcust-biz { color: #444; font-weight: 400; }
+.pcust-sub { font-size: 12px; color: #6c7493; overflow-wrap: anywhere; }
+.pcust-tier { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; background: #e8eaf8; color: #06166e; }
+.pcust-tier.is-wholesale { background: #1a1c1c; color: #fff; }
+.pcust-card { display: grid; gap: 12px; padding: 14px; border: 1px solid #1a1c1c; border-radius: 8px; background: #fafafa; }
+.pcust-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.pcust-name { font-size: 16px; }
+.pcust-new { padding: 14px; border: 1px solid #1a1c1c; border-radius: 8px; background: #fafafa; }
+.pcust-biz-field { display: grid; gap: 6px; max-width: 420px; }
+.pcust-biz-field > span { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #444; }
+.pcust-biz-field input { min-height: 40px; padding: 8px 12px; border: 1px solid var(--eef-border); border-radius: 6px; font: 14px 'Manrope', sans-serif; }
+.pcust-walkin { margin-top: 8px; }
+.ptier { display: inline-flex; border: 1px solid #1a1c1c; border-radius: 8px; overflow: hidden; max-width: 100%; }
+.ptier-opt { min-height: 44px; padding: 0 18px; border: 0; border-right: 1px solid #1a1c1c; background: #fff; font: 700 12px 'Manrope', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; color: #1a1c1c; }
+.ptier-opt:last-child { border-right: 0; }
+.ptier + .pcb-hint { display: block; margin-top: 6px; }
+.ptier-opt:hover:not(:disabled):not(.is-on) { background: #f3f3f4; }
+.ptier-opt.is-on { background: #1a1c1c; color: #fff; }
+.ptier-opt.is-on.is-trade { background: var(--eef-primary); }
+.ptier-opt:disabled { cursor: not-allowed; opacity: 0.6; }
+
+/* Chip choices (how it came in, how it was paid) */
+.pchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pchip { min-height: 44px; padding: 0 16px; border: 1px solid #c9cdd3; border-radius: 999px; background: #fff; font: 700 13px 'Manrope', sans-serif; cursor: pointer; color: #1a1c1c; }
+.pchip:hover:not(.is-on) { border-color: #1a1c1c; }
+.pchip.is-on { background: #1a1c1c; border-color: #1a1c1c; color: #fff; }
+
+/* The order screen */
+.pord { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; align-items: start; }
+.pord-main { display: grid; gap: 16px; min-width: 0; }
+.pord-section h2 { margin: 0 0 14px; display: flex; align-items: center; gap: 10px; font-size: 17px; }
+.pord-step { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #1a1c1c; color: #fff; font: 700 13px 'Manrope', sans-serif; }
+.pord-lead { margin: 0; padding: 10px 14px; background: #eef1ff; border-left: 3px solid var(--eef-primary); font-size: 13px; }
+.pord-empty { margin: 14px 0 0; padding: 22px; text-align: center; border: 1px dashed #c9cdd3; border-radius: 8px; color: #6c7493; font-size: 14px; }
+.pord-check { display: flex; gap: 10px; align-items: center; font-size: 14px; cursor: pointer; }
+.pord-check input { width: 20px; height: 20px; }
+.pord-side { position: sticky; top: calc(var(--lp-header-h, 64px) + 90px); }
+.pord-summary { display: grid; gap: 14px; }
+.pord-summary h2 { margin: 0; font-size: 17px; }
+.pord-summary dl { margin: 0; display: grid; gap: 8px; }
+.pord-summary dl > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; }
+.pord-summary dt { color: #6c7493; font-size: 13px; }
+.pord-summary dd { margin: 0; font-weight: 600; text-align: right; }
+.pord-summary dd input { width: 110px; min-height: 36px; text-align: right; }
+.pord-total { border-top: 2px solid #1a1c1c; padding-top: 10px; }
+.pord-total dt { color: #1a1c1c; font-weight: 800; }
+.pord-total dd { font-size: 20px; }
+.pord-problems { margin: 0; padding: 10px 12px 10px 28px; background: #fff7e6; border-radius: 6px; font-size: 13px; color: #7a4b00; }
+.pord-place { width: 100%; min-height: 50px; font-size: 14px; }
+.pord-cancel { text-align: center; }
+.pord-done { display: grid; gap: 10px; }
+.pord-done h2 { margin: 0; }
+
+.pline-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 10px; }
+.pline { display: grid; grid-template-columns: minmax(150px, 1.6fr) auto minmax(100px, 0.8fr) minmax(90px, 0.6fr) minmax(110px, auto); gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--eef-border); border-radius: 8px; background: #fff; }
+.pline-name { display: grid; gap: 3px; min-width: 0; }
+.pline-warn { font-size: 12px; color: #7a4b00; background: #fff7e6; padding: 4px 8px; border-radius: 4px; }
+.pline-qty { display: inline-flex; align-items: center; border: 1px solid var(--eef-border); border-radius: 6px; overflow: hidden; }
+.pline-qty button { width: 40px; min-height: 44px; border: 0; background: #f3f3f4; font-size: 20px; cursor: pointer; }
+.pline-qty button:hover { background: #e8e9ea; }
+.pline-qty input { width: 52px; border: 0; border-radius: 0; text-align: center; padding: 0; -moz-appearance: textfield; }
+.pline-price { display: grid; gap: 4px; }
+.pline-price > span { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #6c7493; }
+.pline-price small { font-size: 11px; color: #6c7493; }
+.pline-total { display: grid; gap: 6px; justify-items: end; text-align: right; }
+.pstock { display: inline-block; width: fit-content; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: #e6f4ec; color: #0f7a40; }
+.pstock.is-low { background: #fdeee0; color: #a85b00; }
+.pstock.is-order { background: #fdecea; color: #b3261e; }
+.pitem-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.pitem-row img, .pitem-noimg { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: #f3f3f4; }
+.pitem-side { display: grid; gap: 3px; justify-items: end; text-align: right; }
+
+@media (max-width: 1280px) {
+  .pord { grid-template-columns: 1fr; }
+  .pord-side { position: static; }
+}
+@media (max-width: 760px) {
+  .pform-row { grid-template-columns: 1fr; }
+  .pline { grid-template-columns: 1fr 1fr; }
+  .pline-name { grid-column: 1 / -1; }
+  .pline-total { grid-column: 1 / -1; grid-auto-flow: column; justify-content: space-between; align-items: center; justify-items: start; text-align: left; }
+  .ptier-opt { padding: 0 12px; }
+}
