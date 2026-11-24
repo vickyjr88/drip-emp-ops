@@ -12,6 +12,26 @@ export class UpdateSocialSettingsDto {
   @IsBoolean()
   threadsEnabled?: boolean;
 
+  @ApiPropertyOptional({ description: 'Post to Instagram on the schedule' })
+  @IsOptional()
+  @IsBoolean()
+  instagramEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Post to X on the schedule (X charges for each post)' })
+  @IsOptional()
+  @IsBoolean()
+  xEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Post to TikTok on the schedule' })
+  @IsOptional()
+  @IsBoolean()
+  tiktokEnabled?: boolean;
+
+  @ApiPropertyOptional({ enum: ['INBOX', 'DIRECT'], description: 'INBOX sends TikTok posts to the owner\'s TikTok inbox to finish; DIRECT publishes them (only once TikTok has audited the app)' })
+  @IsOptional()
+  @IsIn(['INBOX', 'DIRECT'])
+  tiktokMode?: 'INBOX' | 'DIRECT';
+
   @ApiPropertyOptional({ example: ['09:00', '13:00', '19:00'], description: 'Nairobi time, HH:MM, at most six' })
   @IsOptional()
   @IsArray()
@@ -34,8 +54,8 @@ export class PostNowDto {
   @IsString()
   productId?: string;
 
-  @ApiPropertyOptional({ enum: ['FACEBOOK', 'THREADS'], description: 'Where to post. Defaults to the Facebook Page.' })
+  @ApiPropertyOptional({ enum: ['FACEBOOK', 'THREADS', 'INSTAGRAM', 'X', 'TIKTOK'], description: 'Where to post. Defaults to the Facebook Page.' })
   @IsOptional()
-  @IsIn(['FACEBOOK', 'THREADS'])
-  channel?: 'FACEBOOK' | 'THREADS';
+  @IsIn(['FACEBOOK', 'THREADS', 'INSTAGRAM', 'X', 'TIKTOK'])
+  channel?: 'FACEBOOK' | 'THREADS' | 'INSTAGRAM' | 'X' | 'TIKTOK';
 }

@@ -111,6 +111,17 @@ x-backend-environment: &backend-environment
   SOCIAL_POSTING: ${SOCIAL_POSTING:-true}
   THREADS_ACCESS_TOKEN: ${THREADS_ACCESS_TOKEN:-}
   THREADS_USER_ID: ${THREADS_USER_ID:-}
+  # Instagram posts through the Facebook Page connection above; these two are only for when its token or account needs setting directly.
+  INSTAGRAM_ACCESS_TOKEN: ${INSTAGRAM_ACCESS_TOKEN:-}
+  INSTAGRAM_BUSINESS_ACCOUNT_ID: ${INSTAGRAM_BUSINESS_ACCOUNT_ID:-}
+  # X: the account's own keys from the X developer console (OAuth 1.0a, Read and write). X charges per post.
+  X_API_KEY: ${X_API_KEY:-}
+  X_API_SECRET: ${X_API_SECRET:-}
+  X_ACCESS_TOKEN: ${X_ACCESS_TOKEN:-}
+  X_ACCESS_TOKEN_SECRET: ${X_ACCESS_TOKEN_SECRET:-}
+  # TikTok: the app from the TikTok developer portal; the account itself is connected from Portal > Social Posting.
+  TIKTOK_CLIENT_KEY: ${TIKTOK_CLIENT_KEY:-}
+  TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
   FACEBOOK_REPLY_WHATSAPP: ${FACEBOOK_REPLY_WHATSAPP:-}
   FACEBOOK_PRIVATE_REPLY_TEXT: ${FACEBOOK_PRIVATE_REPLY_TEXT:-}
   FACEBOOK_PUBLIC_REPLY_TEXT: ${FACEBOOK_PUBLIC_REPLY_TEXT:-}

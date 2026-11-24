@@ -34,7 +34,7 @@ const OPENERS = [
 ];
 
 /** A product's own page, tagged so Insights counts the visit as coming from that channel, by the engine (campaign `autopost`) or the Status kit (`status`). */
-export function postLink(origin: string, slug: string, channel: 'facebook' | 'threads' | 'whatsapp', campaign: 'autopost' | 'status' = 'autopost'): string {
+export function postLink(origin: string, slug: string, channel: 'facebook' | 'threads' | 'instagram' | 'x' | 'tiktok' | 'whatsapp', campaign: 'autopost' | 'status' = 'autopost'): string {
   return `${origin.replace(/\/+$/, '')}/shop/${slug}?utm_source=${channel}&utm_medium=social&utm_campaign=${campaign}`;
 }
 
@@ -149,6 +149,130 @@ export function buildThreadsCaption(product: PostableProduct, ctx: PostContext, 
   // Measured with a one-letter name: an empty one would collapse a blank line and read one character short.
   const maxName = THREADS_LIMIT - length(compose('x', bare)) + 1;
   return compose(`${Array.from(product.name).slice(0, Math.max(10, maxName - 1)).join('').trim()}…`, bare);
+}
+
+// --- Instagram, X and TikTok ---------------------------------------------------------------------------------------------
+
+/** "https://wa.me/254113206481" (or bare digits) as people dial it: "0113 206 481". Empty when there is nothing to show. */
+function whatsappNumber(whatsapp: string): string {
+  const digits = (/wa\.me\/(\d+)/.exec(whatsapp)?.[1] ?? whatsapp).replace(/\D/g, '');
+  return digits ? formatKenyanPhone(digits) : '';
+}
+
+/** A product's address without "https://", for places where a link is not clickable (an Instagram caption) but can still be typed. */
+function plainAddress(origin: string, slug: string): string {
+  return `${origin.replace(/^https?:\/\//, '').replace(/\/+$/, '')}/shop/${slug}`;
+}
+
+const priceLine = (product: PostableProduct) => product.offer
+  ? `🔥 ${kes(product.offer.price)} (was ${kes(product.offer.was)})`
+  : product.priceFrom === product.priceTo || !product.priceTo ? `💰 ${kes(product.priceFrom)}` : `💰 From ${kes(product.priceFrom)}`;
+
+const hashtagsFor = (product: PostableProduct, extra: string[]) => {
+  const brandTag = product.brand ? `#${product.brand.replace(/[^A-Za-z0-9]/g, '')}` : '';
+  return [...new Set(['#DripEmporium', '#NairobiShoes', ...extra, brandTag].filter(Boolean))];
+};
+
+/** Instagram allows 2,200 characters and 30 hashtags. */
+export const INSTAGRAM_LIMIT = 2200;
+
+/**
+ * The Instagram caption. Links in a caption are not clickable there, so the product's address is written plainly (it can be typed) and the
+ * WhatsApp number is given to dial; the shop's name and the hashtags carry the discovery.
+ */
+export function buildInstagramCaption(product: PostableProduct, ctx: PostContext, day: string): string {
+  const opener = OPENERS[hash(`${product.id}:${day}:instagram`) % OPENERS.length];
+  const sizes = sizeLine(product.sizesInStock);
+  const phone = whatsappNumber(ctx.whatsapp);
+  const text = [
+    opener,
+    '',
+    product.name,
+    priceLine(product),
+    sizes ? `📏 Sizes available: ${sizes}` : null,
+    '',
+    `🛒 ${plainAddress(ctx.origin, product.slug)}`,
+    phone ? `💬 WhatsApp: ${phone}` : null,
+    ctx.location ? `📍 ${ctx.location}` : null,
+    '',
+    hashtagsFor(product, ['#Sneakers', '#KenyaFashion', '#NairobiFashion']).slice(0, 30).join(' '),
+  ].filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return Array.from(text).slice(0, INSTAGRAM_LIMIT).join('');
+}
+
+/** X counts every link as 23 characters whatever its length, and an emoji as 2. */
+export function xLength(text: string): number {
+  const withoutLinks = text.replace(/https?:\/\/\S+/g, '\u0000'.repeat(23));
+  let n = 0;
+  for (const ch of Array.from(withoutLinks)) n += /\p{Extended_Pictographic}/u.test(ch) || (ch.codePointAt(0) ?? 0) > 0xffff ? 2 : 1;
+  return n;
+}
+
+/** X allows 280; a margin is kept because emoji sequences are counted unevenly. */
+export const X_LIMIT = 270;
+
+/**
+ * The X post: short, with the tagged link kept (an X post with a link costs more than one without, but the link is why it is posted).
+ * When the text is too long the location goes, then the sizes, then the WhatsApp number, then the name is cut; the price and the link never are.
+ */
+export function buildXCaption(product: PostableProduct, ctx: PostContext, day: string): string {
+  const opener = OPENERS[hash(`${product.id}:${day}:x`) % OPENERS.length];
+  const sizes = sizeLine(product.sizesInStock);
+  const phone = whatsappNumber(ctx.whatsapp);
+  const tags = hashtagsFor(product, []).slice(0, 3).join(' ');
+  const link = `🛒 ${postLink(ctx.origin, product.slug, 'x')}`;
+  const compose = (name: string, o: { sizes: boolean; location: boolean; whatsapp: boolean; tags: boolean; opener: boolean }) =>
+    [o.opener ? opener : null, o.opener ? '' : null, name, o.sizes && sizes ? `${priceLine(product)} · 📏 ${sizes}` : priceLine(product), '', link,
+      o.whatsapp && phone ? `💬 ${phone}` : null, o.location && ctx.location ? `📍 ${ctx.location}` : null, o.tags ? tags : null]
+      .filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  for (const o of [
+    { opener: true, sizes: true, location: true, whatsapp: true, tags: true },
+    { opener: true, sizes: true, location: false, whatsapp: true, tags: true },
+    { opener: false, sizes: true, location: false, whatsapp: true, tags: true },
+    { opener: false, sizes: false, location: false, whatsapp: true, tags: true },
+    { opener: false, sizes: false, location: false, whatsapp: false, tags: true },
+    { opener: false, sizes: false, location: false, whatsapp: false, tags: false },
+  ]) {
+    const text = compose(product.name, o);
+    if (xLength(text) <= X_LIMIT) return text;
+  }
+  const bare = { opener: false, sizes: false, location: false, whatsapp: false, tags: false };
+  const room = X_LIMIT - xLength(compose('x', bare)) + 1;
+  return compose(`${Array.from(product.name).slice(0, Math.max(10, room - 2)).join('').trim()}…`, bare);
+}
+
+/** TikTok's title holds 90 characters and its description 4,000. */
+export const TIKTOK_TITLE_LIMIT = 90;
+export const TIKTOK_DESCRIPTION_LIMIT = 4000;
+
+/**
+ * The TikTok post as one piece of text: the first line is the title (the product's name, cut to fit) and the rest is the description.
+ * Links are not clickable on TikTok, so the address is written plainly and the WhatsApp number is given to dial.
+ */
+export function buildTikTokCaption(product: PostableProduct, ctx: PostContext, day: string): string {
+  const opener = OPENERS[hash(`${product.id}:${day}:tiktok`) % OPENERS.length];
+  const sizes = sizeLine(product.sizesInStock);
+  const phone = whatsappNumber(ctx.whatsapp);
+  const chars = Array.from(product.name.replace(/\s+/g, ' ').trim());
+  const title = chars.length > TIKTOK_TITLE_LIMIT ? `${chars.slice(0, TIKTOK_TITLE_LIMIT - 1).join('').trim()}…` : chars.join('');
+  const description = [
+    opener,
+    priceLine(product),
+    sizes ? `📏 Sizes available: ${sizes}` : null,
+    '',
+    `🛒 ${plainAddress(ctx.origin, product.slug)}`,
+    phone ? `💬 WhatsApp: ${phone}` : null,
+    ctx.location ? `📍 ${ctx.location}` : null,
+    '',
+    hashtagsFor(product, ['#Sneakers', '#NairobiFashion']).join(' '),
+  ].filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return `${title}\n\n${Array.from(description).slice(0, TIKTOK_DESCRIPTION_LIMIT).join('')}`;
+}
+
+/** The title and description from a TikTok caption built above. */
+export function splitTikTokCaption(caption: string): { title: string; description: string } {
+  const [title, ...rest] = caption.split('\n');
+  return { title: title.trim(), description: rest.join('\n').trim() };
 }
 
 /** Whether a product is good enough to put on the brand's Page unattended. */

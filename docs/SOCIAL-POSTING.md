@@ -1,7 +1,7 @@
-# Social posting: products posted to the Facebook Page and Threads automatically
+# Social posting: products posted to Facebook, Instagram, Threads, X and TikTok automatically
 
 Portal > **Social Posting**. At set times each day (default **09:00, 13:00 and 19:00 Nairobi**, up to six) the engine picks a product and
-posts it to the Drip Emporium Facebook Page and to Threads (each switched on separately): the product photo with a caption of the name, price, sizes in stock, a link to the product,
+posts it to the Drip Emporium Facebook Page, Instagram, Threads, X and TikTok (each switched on separately): the product photo with a caption of the name, price, sizes in stock, a link to the product,
 the WhatsApp link and the shop's location. It is **fully automatic**: no one approves a post first. Because every post is public it is
 **off until someone turns it on** on the screen.
 
@@ -75,10 +75,77 @@ than a day old); the screen shows when it ends. If it cannot be renewed the scre
 
 Taking a Threads post down from the screen uses Threads' delete call; if Threads refuses it (it needs its delete permission), delete the post in the Threads app.
 
+## Instagram, X and TikTok
+
+Each has its own switch, its own rotation (a product is not repeated on a channel for 30 days whatever the others posted) and its own caption, shaped to what
+that platform allows. Migration `20261125120000_social_more_channels` adds the switches and TikTok's login fields.
+
+| | Caption | Link | Delete from the portal | Costs |
+|---|---|---|---|---|
+| Instagram | up to 2,200 characters, at most 30 hashtags | not clickable on Instagram, so the address is written plainly and the WhatsApp number given to dial | **No**: Instagram offers no delete call; delete it in the Instagram app | free |
+| X | up to 280 (a link counts as 23, an emoji as 2): name, price, sizes, the tagged link, number, tags; the location, sizes and number go first when it is too long | `utm_source=x` | yes | **per post** (below) |
+| TikTok | a title of at most 90 characters (the product name) and a description | not clickable: plain address and number | **No**: delete it in the TikTok app | free |
+
+**The picture.** Instagram takes JPEG only (no PNG or WebP), 8 MB at most, and only a shape between 4:5 and 1.91:1. Product photos are PNG, WebP or JPEG in any shape,
+so the app converts each one: transparency becomes white, the colours are made sRGB, a photo outside the allowed shape is centred on white to the nearest allowed shape (nothing is cut off),
+and it is brought to 1080 wide. Instagram and TikTok fetch the converted copy from `<API address>/social-posting/media/<post id>.jpg`, a public address that only answers for a real post's
+random id. X is sent the same copy directly. (The API address is `PUBLIC_API_ORIGIN`, else `MEDIA_PUBLIC_BASE_URL`, which production already has.)
+
+### Instagram
+
+Instagram posts through the same Facebook Page connection as the Page. Nothing new goes in `.env` if the Page token has the Instagram permissions.
+1. The shop's Instagram account must be a **Professional** (Business or Creator) account **linked to the Facebook Page** (Page settings > Linked accounts).
+2. Make the Page token again with `instagram_basic` and `instagram_content_publish` added to the Page permissions it already has, and put it in `FACEBOOK_PAGE_ACCESS_TOKEN`.
+   The screen shows **Posts to @account** once the Page's linked account is found, or the reason it is not.
+3. If the account cannot be found from a Page token (Meta's wording is not clear that a Page token is enough), set `INSTAGRAM_BUSINESS_ACCOUNT_ID` (the id from
+   `GET /me/accounts?fields=instagram_business_account`) and, if needed, `INSTAGRAM_ACCESS_TOKEN` (a different token with the same permissions).
+4. Portal > Social Posting > Instagram: **Preview**, one **Post now**, then **Start posting**.
+
+A post is three calls (make a container, wait until Instagram has fetched the picture, publish it). A refusal for permission is shown with the fix; a picture
+Instagram cannot use fails at once; a slow one is retried. Instagram limits API posts to 50 or 100 a day (Meta's pages disagree); the engine makes six at most.
+
+### X
+
+X is paid per request. From X's pricing page (read 25 Nov 2026, "subject to change"): **$0.015** for a post, **$0.200** for a post that contains a URL. Every post this engine makes has the product link, so
+**$0.20 each**: three a day is about **$18 a month**. Whether the picture upload is charged on top is not documented (a developer reported X staff saying each upload counts like a post, which would make
+a picture post about $0.23); check your first days' usage in the console. There is no free tier. Credit is bought in advance in the X developer console, where an auto-recharge and a spending limit
+can be set. **When the credit runs out the posts fail** (the screen says "X has no credit left") and are not retried until credit is added.
+1. X developer console (console.x.com): create an app in a project. Under **User authentication settings** set the app permission to **Read and write**.
+2. **Keys and tokens**: copy the **API Key** and **API Key Secret**; generate the **Access Token** and **Access Token Secret** for the shop's X account (do this after setting Read and write,
+   or the token will be read-only and X answers 401/403).
+3. Server `.env`: `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`, then deploy. These keys do not expire, so no sign-in or renewal is needed.
+4. Portal > Social Posting > X: **Preview**, one **Post now**, then **Start posting** (the dialog repeats the cost).
+
+The app signs each request itself (OAuth 1.0a) and uploads the picture to `POST /2/media/upload` then posts with `POST /2/tweets`; a post is deleted with `DELETE /2/tweets/:id`.
+
+### TikTok
+
+TikTok is connected from the portal, because its login is short-lived and its refresh token changes every time it is used: the app keeps the newest one, renews it ahead of time, and
+two backend slots never renew at once (whoever loses picks up the winner's login). The connection lasts as long as it is used.
+1. TikTok for Developers: create an app. Add the products **Login Kit** and **Content Posting API**, with the scopes `user.info.basic`, `video.publish` and `video.upload`.
+2. Login Kit > Redirect URI: `https://api.dripemporium.store/social-posting/connect/tiktok/callback` (it must match exactly; it must be https).
+3. **Verify the picture address.** TikTok only fetches pictures from an address you have proven you own. In the app's **URL properties** add either the domain `api.dripemporium.store`
+   (verified with a DNS record) or the URL prefix `https://api.dripemporium.store/social-posting/media/` (verified with a signature file). Without this every post fails with `url_ownership_unverified`.
+4. Server `.env`: `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET`, then deploy.
+5. Portal > Social Posting > TikTok > **Connect TikTok**, and sign in with the shop's TikTok account. The screen then shows **Connected as ...**.
+6. Choose how posts reach TikTok:
+   - **Send to the TikTok inbox** (the default, and the only thing that works before TikTok audits the app): each post is sent to the connected account's TikTok inbox and **someone has to open TikTok and press post**.
+     It needs a recent TikTok app (31.8 or later) and TikTok allows at most 5 unfinished inbox posts a day, so finish or discard them.
+   - **Publish directly**: posts go public on their own. TikTok blocks this (`unaudited_client_can_only_post_to_private_accounts`) until the app has passed its audit
+     (apply from the Content Posting API page in the developer portal). Switch to it only then.
+
+Photo posts are one picture (TikTok "photo mode"). A post is checked until TikTok reports it posted or in the inbox; if it is still processing after 90 seconds it is recorded as sent, with the id to look for in the TikTok app, and not posted twice.
+
+### What was and was not tested
+
+Everything above is tested against **fakes** of the three platforms (their requests and answers as their documentation describes them), never against the real ones: no X, Instagram or TikTok
+account was used. The X request signing was checked against an independent OAuth 1.0 implementation. Expect the first real posts to turn up what the fakes could not (a permission, an unverified address,
+a picture shape). Preview, then one **Post now**, before **Start posting**, as for Facebook and Threads.
+
 ## Not built yet
 
-- **Instagram.** The token has `instagram_content_publish`; not connected here.
 - Several photos per post (only the first photo is used), and choosing by sales rather than stock.
+- TikTok videos, Instagram Reels and Stories, X threads.
 
 ## WhatsApp Status kit
 

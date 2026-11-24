@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The marketing engine: products posted to the Facebook Page and to Threads on their own, at set times, three a day by default.
+ * The marketing engine: products posted to Facebook, Instagram, Threads, X and TikTok on their own, at set times, three a day by default.
  *
  * The server does the work (backend/src/social-posting). This screen is the control room: the switch, the times, what the next
  * post would look like, a button to post one now, and every post the engine has made, with a way to take one down. The engine is
@@ -19,12 +19,18 @@ import {
   AuthProfile, TOKEN_KEY, apiRequest, canReadRbacFor, formatDateTime, hasPermission, loadProfile, roleLabelFor,
 } from '../accounting/lib';
 
-type Channel = 'FACEBOOK' | 'THREADS';
+type Channel = 'FACEBOOK' | 'THREADS' | 'INSTAGRAM' | 'X' | 'TIKTOK';
 type ChannelStatus = { configured: boolean; enabled: boolean; nextPostAt: string | null; posted: number; failed: number; skipped: number; removed: number };
+type TikTokMode = 'INBOX' | 'DIRECT';
 type Status = {
   allowed: boolean; times: string[]; cooldownDays: number; updatedBy: string;
-  facebook: ChannelStatus; threads: ChannelStatus & { tokenExpiresAt: string | null; tokenError: string | null };
+  facebook: ChannelStatus;
+  threads: ChannelStatus & { tokenExpiresAt: string | null; tokenError: string | null };
+  instagram: ChannelStatus & { account: string | null; problem: string | null };
+  x: ChannelStatus;
+  tiktok: ChannelStatus & { clientConfigured: boolean; mode: TikTokMode; account: string | null; connectedAt: string | null; refreshExpiresAt: string | null; error: string | null };
 };
+type SettingsPatch = { facebookEnabled?: boolean; threadsEnabled?: boolean; instagramEnabled?: boolean; xEnabled?: boolean; tiktokEnabled?: boolean; tiktokMode?: TikTokMode; times?: string[] };
 type Post = {
   id: string; channel: Channel; slotKey: string; productName: string | null; productSlug: string | null; caption: string | null; imageUrl: string | null;
   status: string; detail: string | null; externalId: string | null; permalink: string | null; postedAt: string | null; triggeredBy: string; createdAt: string;
@@ -32,8 +38,14 @@ type Post = {
 type Preview = { product: { id: string; name: string; slug: string; imageUrl: string; brand: string | null } | null; caption: string | null };
 type Previews = { previews: Record<Channel, Preview> };
 
-const CHANNEL_LABEL: Record<Channel, string> = { FACEBOOK: 'Facebook Page', THREADS: 'Threads' };
-const CHANNEL_SHORT: Record<Channel, string> = { FACEBOOK: 'Facebook', THREADS: 'Threads' };
+const CHANNELS: Channel[] = ['FACEBOOK', 'INSTAGRAM', 'THREADS', 'X', 'TIKTOK'];
+const CHANNEL_LABEL: Record<Channel, string> = { FACEBOOK: 'Facebook Page', THREADS: 'Threads', INSTAGRAM: 'Instagram', X: 'X', TIKTOK: 'TikTok' };
+const CHANNEL_SHORT: Record<Channel, string> = { FACEBOOK: 'Facebook', THREADS: 'Threads', INSTAGRAM: 'Instagram', X: 'X', TIKTOK: 'TikTok' };
+const STATUS_KEY = { FACEBOOK: 'facebook', THREADS: 'threads', INSTAGRAM: 'instagram', X: 'x', TIKTOK: 'tiktok' } as const;
+const ENABLE_KEY = { FACEBOOK: 'facebookEnabled', THREADS: 'threadsEnabled', INSTAGRAM: 'instagramEnabled', X: 'xEnabled', TIKTOK: 'tiktokEnabled' } as const;
+
+/** X charges for each post made through its API, and about thirteen times more when the post has a link (which these always do). */
+const X_COST_PER_POST_USD = 0.2;
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   POSTED: { label: 'Posted', cls: 'portal-chip is-success' },
@@ -60,7 +72,7 @@ export function SocialPostingView() {
   const [times, setTimes] = useState<string[]>([]);
   const [draftTime, setDraftTime] = useState('');
   const [preview, setPreview] = useState<Previews | null>(null);
-  const [busy, setBusy] = useState<'save' | 'preview' | 'post' | 'toggle' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'preview' | 'post' | 'toggle' | 'connect' | null>(null);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [feedback, setFeedback] = useFeedbackState();
   const dialog = usePortalDialog();
@@ -71,6 +83,14 @@ export function SocialPostingView() {
     setInitialized(true);
     if (saved) void loadProfile(saved).then(setProfile).catch(() => setProfile(null));
   }, []);
+
+  // TikTok sends the browser back here after its sign-in, with the outcome in the address.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('connected') === 'tiktok') setFeedback('TikTok is connected. Choose how it should post, then start posting.');
+    else if (q.get('connect_error')) setErrorMessage(`TikTok was not connected: ${q.get('connect_error')}`);
+    if (q.get('connected') || q.get('connect_error')) window.history.replaceState(null, '', window.location.pathname);
+  }, [setFeedback, setErrorMessage]);
 
   const load = useCallback(async (authToken: string) => {
     try {
@@ -121,7 +141,7 @@ export function SocialPostingView() {
   const canRemove = hasPermission(profile, 'social-post.delete');
   const timesChanged = Boolean(status) && JSON.stringify(times) !== JSON.stringify(status!.times);
 
-  async function save(patch: { facebookEnabled?: boolean; threadsEnabled?: boolean; times?: string[] }, kind: 'save' | 'toggle', message: string) {
+  async function save(patch: SettingsPatch, kind: 'save' | 'toggle', message: string) {
     setBusy(kind);
     try {
       const next = await apiRequest<Status>('/social-posting/settings', { method: 'PUT', body: JSON.stringify(patch) }, token!);
@@ -138,14 +158,59 @@ export function SocialPostingView() {
   async function onToggle(channel: Channel, on: boolean) {
     if (!status) return;
     if (on) {
+      const perMonth = status.times.length * 30;
+      const extra: Record<Channel, string> = {
+        FACEBOOK: '',
+        THREADS: '',
+        INSTAGRAM: ' Instagram does not let this system delete a post: a bad one has to be deleted in the Instagram app.',
+        X: ` X charges for every post, about $${X_COST_PER_POST_USD.toFixed(2)} each with a link: roughly $${(perMonth * X_COST_PER_POST_USD).toFixed(0)} a month at ${status.times.length} a day, taken from the credit you have bought in the X developer console. When the credit runs out the posts fail until you add more.`,
+        TIKTOK: status.tiktok.mode === 'INBOX'
+          ? ' Each post is sent to the TikTok inbox of the connected account: someone has to open TikTok and finish it. TikTok does not let this system delete a post.'
+          : ' Each post is published publicly on TikTok at once. TikTok does not let this system delete a post.',
+      };
       const ok = await dialog.confirm({
         title: `Start posting to ${CHANNEL_LABEL[channel]} automatically?`,
-        message: `From the next set time (${status.times.join(', ')} Nairobi time) a product that is in stock is posted to ${CHANNEL_LABEL[channel]} with no one checking it first, up to ${status.times.length} a day. Every post is public. You can pause it here at any time and take a post down from the list below.`,
+        message: `From the next set time (${status.times.join(', ')} Nairobi time) a product that is in stock is posted to ${CHANNEL_LABEL[channel]} with no one checking it first, up to ${status.times.length} a day. ${channel === 'TIKTOK' && status.tiktok.mode === 'INBOX' ? '' : 'Every post is public. '}You can pause it here at any time.${extra[channel]}`,
         confirmLabel: 'Start posting',
       });
       if (!ok) return;
     }
-    await save(channel === 'FACEBOOK' ? { facebookEnabled: on } : { threadsEnabled: on }, 'toggle', `${CHANNEL_SHORT[channel]}: automatic posting is ${on ? 'on' : 'paused'}.`);
+    await save({ [ENABLE_KEY[channel]]: on } as SettingsPatch, 'toggle', `${CHANNEL_SHORT[channel]}: automatic posting is ${on ? 'on' : 'paused'}.`);
+  }
+
+  async function onConnectTikTok() {
+    setBusy('connect');
+    try {
+      const out = await apiRequest<{ url?: string; error?: string }>('/social-posting/connect/tiktok', { method: 'GET' }, token!);
+      if (out.url) { window.location.href = out.url; return; }
+      setErrorMessage(out.error || 'TikTok could not be reached.');
+    } catch (error) {
+      setErrorMessage(errorText(error));
+    }
+    setBusy(null);
+  }
+
+  async function onDisconnectTikTok() {
+    const ok = await dialog.confirm({ title: 'Disconnect TikTok?', message: 'Automatic posting to TikTok stops and the saved TikTok login is forgotten. You can connect again at any time.', confirmLabel: 'Disconnect', danger: true });
+    if (!ok) return;
+    try {
+      setStatus(await apiRequest<Status>('/social-posting/connect/tiktok', { method: 'DELETE' }, token!));
+      setFeedback('TikTok is disconnected.');
+    } catch (error) {
+      setErrorMessage(errorText(error));
+    }
+  }
+
+  async function onTikTokMode(mode: TikTokMode) {
+    if (mode === 'DIRECT') {
+      const ok = await dialog.confirm({
+        title: 'Publish TikTok posts directly?',
+        message: 'TikTok only allows this after it has audited the app. Until then every direct post fails with an error. Direct posts go public immediately, with no chance to edit them first.',
+        confirmLabel: 'Publish directly',
+      });
+      if (!ok) return;
+    }
+    await save({ tiktokMode: mode }, 'save', mode === 'INBOX' ? 'TikTok posts go to the TikTok inbox to finish.' : 'TikTok posts are published directly.');
   }
 
   function addTime(e: FormEvent) {
@@ -214,7 +279,7 @@ export function SocialPostingView() {
             tourIsAdmin={profile.role === 'ADMIN' || (profile.roles || []).some((r: { name: string }) => r.name === 'ADMIN')}
             active="social"
             pageTitle="Social Posting"
-            pageSubtitle="Products posted to the Facebook Page and Threads automatically."
+            pageSubtitle="Products posted to Facebook, Instagram, Threads, X and TikTok automatically."
             email={profile.email}
             roleLabel={roleLabelFor(profile)}
             permissionCount={profile.permissions?.length || 0}
@@ -233,14 +298,16 @@ export function SocialPostingView() {
                   <h2 style={{ margin: 0 }}>Automatic posting</h2>
                   <p className="portal-muted">
                     At each time below a product that is in stock, has a photo and has not been posted lately goes out: the photo, price, sizes
-                    available, a link to the product, our WhatsApp and the shop&apos;s location. Visits from these links show in Insights as Facebook or Threads, and comments
-                    on Facebook posts get the private Messenger reply. Nothing is checked by a person first, so each channel stays off until you turn it on.
+                    available, how to buy (a link on Facebook, Threads and X; the address and WhatsApp number on Instagram and TikTok, where links cannot be clicked) and the shop&apos;s
+                    location. Visits from the links show in Insights by channel, and comments on Facebook posts get the private Messenger reply. Nothing is checked by a
+                    person first, so each channel stays off until you turn it on.
                   </p>
                   {!status.allowed ? <p className="portal-error">Posting is switched off on the server (SOCIAL_POSTING=false), whatever is set here.</p> : null}
 
-                  {(['FACEBOOK', 'THREADS'] as Channel[]).map((channel) => {
-                    const c = channel === 'FACEBOOK' ? status.facebook : status.threads;
+                  {CHANNELS.map((channel) => {
+                    const c: ChannelStatus = status[STATUS_KEY[channel]];
                     const live = c.enabled && c.configured && status.allowed;
+                    const tt = status.tiktok;
                     return (
                       <div key={channel} style={{ borderTop: '1px solid var(--eef-border)', paddingTop: 14, marginTop: 14 }}>
                         <div className="portal-card-header-row">
@@ -251,9 +318,12 @@ export function SocialPostingView() {
                         </div>
                         {!c.configured ? (
                           <p className="portal-error" style={{ margin: '8px 0 0' }}>
-                            {channel === 'FACEBOOK'
-                              ? 'The server has no Facebook Page connected (FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN).'
-                              : 'The server has no Threads login (THREADS_ACCESS_TOKEN). See docs/SOCIAL-POSTING.md for how to get one.'}
+                            {channel === 'FACEBOOK' ? 'The server has no Facebook Page connected (FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN).' : null}
+                            {channel === 'THREADS' ? 'The server has no Threads login (THREADS_ACCESS_TOKEN). See docs/SOCIAL-POSTING.md for how to get one.' : null}
+                            {channel === 'INSTAGRAM' ? 'Instagram posts through the Facebook Page connection, which is not set up yet (FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN). See docs/SOCIAL-POSTING.md.' : null}
+                            {channel === 'X' ? 'The server has no X keys (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN and X_ACCESS_TOKEN_SECRET). See docs/SOCIAL-POSTING.md for how to get them.' : null}
+                            {channel === 'TIKTOK' && !tt.clientConfigured ? 'The server has no TikTok app (TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET). See docs/SOCIAL-POSTING.md for how to create one.' : null}
+                            {channel === 'TIKTOK' && tt.clientConfigured ? 'No TikTok account is connected yet.' : null}
                           </p>
                         ) : null}
                         {channel === 'THREADS' && status.threads.configured ? (
@@ -262,16 +332,57 @@ export function SocialPostingView() {
                             {status.threads.tokenError ? ` ${status.threads.tokenError}` : ''}
                           </p>
                         ) : null}
+                        {channel === 'INSTAGRAM' && status.instagram.configured ? (
+                          status.instagram.problem ? (
+                            <p className="portal-error" style={{ margin: '8px 0 0' }}>{status.instagram.problem} The Facebook token must have the instagram_basic and instagram_content_publish permissions, and the Instagram account must be a Professional account linked to the Page.</p>
+                          ) : (
+                            <p className="portal-muted" style={{ margin: '8px 0 0' }}>
+                              {status.instagram.account ? <>Posts to <strong>{status.instagram.account}</strong>. </> : null}
+                              Instagram does not let this system delete a post; do that in the Instagram app.
+                            </p>
+                          )
+                        ) : null}
+                        {channel === 'X' && status.x.configured ? (
+                          <p className="portal-muted" style={{ margin: '8px 0 0' }}>
+                            X charges for every post, about ${X_COST_PER_POST_USD.toFixed(2)} each with a link: roughly ${(status.times.length * 30 * X_COST_PER_POST_USD).toFixed(0)} a month at {status.times.length} a day. It is paid from credit bought in the X developer console; when that runs out, posts fail until you add more.
+                          </p>
+                        ) : null}
+                        {channel === 'TIKTOK' && tt.configured ? (
+                          <div style={{ margin: '8px 0 0' }}>
+                            <p className="portal-muted" style={{ margin: 0 }}>
+                              Connected{tt.account ? <> as <strong>{tt.account}</strong></> : ''}{tt.refreshExpiresAt ? `; the connection lasts until ${formatDateTime(tt.refreshExpiresAt)} and renews each time it is used` : ''}.
+                              TikTok does not let this system delete a post.
+                            </p>
+                            {tt.error ? <p className="portal-error" style={{ margin: '6px 0 0' }}>{tt.error}</p> : null}
+                            <fieldset style={{ border: 0, padding: 0, margin: '10px 0 0' }} disabled={!canEdit}>
+                              <legend style={{ fontWeight: 700, fontSize: 13 }}>How posts reach TikTok</legend>
+                              <label className="portal-check" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '6px 0' }}>
+                                <input type="radio" name="tiktok-mode" checked={tt.mode === 'INBOX'} onChange={() => void onTikTokMode('INBOX')} />
+                                <span><strong>Send to the TikTok inbox</strong> (works now). Each post waits in the account&apos;s TikTok inbox; someone opens TikTok and presses post.</span>
+                              </label>
+                              <label className="portal-check" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '6px 0' }}>
+                                <input type="radio" name="tiktok-mode" checked={tt.mode === 'DIRECT'} onChange={() => void onTikTokMode('DIRECT')} />
+                                <span><strong>Publish directly</strong> (only after TikTok has audited the app). Posts go public on their own.</span>
+                              </label>
+                            </fieldset>
+                          </div>
+                        ) : null}
                         <p className="portal-muted" style={{ margin: '8px 0 0' }}>
                           {c.posted} posted, {c.failed} failed, {c.skipped} skipped{c.removed ? `, ${c.removed} taken down` : ''}.
                           {c.nextPostAt ? <> Next post: <strong>{formatDateTime(c.nextPostAt)}</strong>.</> : ''}
                         </p>
                         {canEdit ? (
                           <div className="portal-action-row" style={{ marginTop: 10 }}>
+                            {channel === 'TIKTOK' && tt.clientConfigured ? (
+                              <button type="button" className={tt.configured ? 'portal-inline-btn' : 'portal-primary-btn'} disabled={busy === 'connect'} onClick={() => void onConnectTikTok()}>
+                                {busy === 'connect' ? 'Opening TikTok…' : tt.configured ? 'Connect a different account' : 'Connect TikTok'}
+                              </button>
+                            ) : null}
                             <button type="button" className={c.enabled ? 'portal-inline-btn' : 'portal-primary-btn'} disabled={busy === 'toggle' || !c.configured}
                               onClick={() => void onToggle(channel, !c.enabled)}>
                               {busy === 'toggle' ? 'Saving…' : c.enabled ? 'Pause posting' : 'Start posting'}
                             </button>
+                            {channel === 'TIKTOK' && tt.configured ? <button type="button" className="portal-inline-btn" onClick={() => void onDisconnectTikTok()}>Disconnect</button> : null}
                           </div>
                         ) : null}
                       </div>
@@ -279,7 +390,7 @@ export function SocialPostingView() {
                   })}
 
                   <div style={{ marginTop: 18, borderTop: '1px solid var(--eef-border)', paddingTop: 14 }}>
-                    <strong>Times (Nairobi), the same for both</strong>
+                    <strong>Times (Nairobi), the same for every channel</strong>
                     <p className="portal-muted" style={{ margin: '2px 0 0' }}>A product is not posted again to the same channel for {status.cooldownDays} days.</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0' }}>
                       {times.length === 0 ? <span className="portal-muted">None: nothing will be posted.</span> : times.map((t) => (
@@ -309,9 +420,9 @@ export function SocialPostingView() {
                   <div className="portal-action-row">
                     <button type="button" className="portal-inline-btn" disabled={busy === 'preview'} onClick={() => void onPreview()}>{busy === 'preview' ? 'Choosing…' : 'Preview the next posts'}</button>
                   </div>
-                  {preview ? (['FACEBOOK', 'THREADS'] as Channel[]).map((channel) => {
+                  {preview ? CHANNELS.map((channel) => {
                     const p = preview.previews[channel];
-                    const c = channel === 'FACEBOOK' ? status.facebook : status.threads;
+                    const c: ChannelStatus = status[STATUS_KEY[channel]];
                     return (
                       <div key={channel} style={{ marginTop: 18 }}>
                         <strong>{CHANNEL_LABEL[channel]}</strong>
@@ -355,8 +466,12 @@ export function SocialPostingView() {
                               </p>
                               {p.status === 'POSTED' && p.externalId ? (
                                 <p style={{ margin: '4px 0 0' }}>
-                                  <a href={p.permalink || facebookUrl(p.externalId)} target="_blank" rel="noreferrer">View on {CHANNEL_SHORT[p.channel] ?? 'the channel'}</a>
-                                  {canRemove ? <> · <button type="button" className="portal-inline-btn" onClick={() => void onRemove(p)}>Take down</button></> : null}
+                                  {p.permalink || p.channel === 'FACEBOOK'
+                                    ? <a href={p.permalink || facebookUrl(p.externalId)} target="_blank" rel="noreferrer">View on {CHANNEL_SHORT[p.channel] ?? 'the channel'}</a>
+                                    : <span className="portal-muted">Open {CHANNEL_SHORT[p.channel] ?? 'the channel'} to see it</span>}
+                                  {canRemove && p.channel !== 'INSTAGRAM' && p.channel !== 'TIKTOK'
+                                    ? <> · <button type="button" className="portal-inline-btn" onClick={() => void onRemove(p)}>Take down</button></>
+                                    : <span className="portal-muted"> · To remove it, delete it in the {CHANNEL_SHORT[p.channel]} app</span>}
                                 </p>
                               ) : null}
                             </div>

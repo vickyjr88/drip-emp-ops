@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,9 +7,16 @@ import { StorefrontService } from '../storefront/storefront.service';
 import { paginate } from '../common/pagination.util';
 import { isTransientFacebookError } from '../facebook-comments/facebook-comments';
 import { shopFacts } from '../facebook-comments/shop-facts';
+import { storefrontOrigin } from '../common/storefront-origin';
 import {
-  PostableProduct, buildCaption, buildThreadsCaption, cleanTimes, dueSlots, isPostable, nairobiParts, nextSlot, pickProduct,
+  PostableProduct, buildCaption, buildInstagramCaption, buildThreadsCaption, buildTikTokCaption, buildXCaption, cleanTimes, dueSlots, isPostable, nairobiParts,
+  nextSlot, pickProduct, splitTikTokCaption,
 } from './social-post';
+import { Call, Posted, sleep } from './channels/types';
+import { InstagramClient } from './channels/instagram-client';
+import { TikTokClient, TikTokMode, authorizeUrl, checkState, signState } from './channels/tiktok-client';
+import { XClient, XCredentials } from './channels/x-client';
+import { renditionFromUrl } from './social-image';
 
 const TICK_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 3;
@@ -21,19 +28,19 @@ const THREADS_API = 'https://graph.threads.net/v1.0';
 /** Renew a Threads token when it has less than this left (it lasts 60 days). */
 const THREADS_RENEW_BEFORE_MS = 20 * DAY_MS;
 
-export type Channel = 'FACEBOOK' | 'THREADS';
-export const CHANNELS: Channel[] = ['FACEBOOK', 'THREADS'];
+export type Channel = 'FACEBOOK' | 'THREADS' | 'INSTAGRAM' | 'X' | 'TIKTOK';
+export const CHANNELS: Channel[] = ['FACEBOOK', 'THREADS', 'INSTAGRAM', 'X', 'TIKTOK'];
 
 /** Switch for the whole engine, whatever the portal says. `SOCIAL_POSTING=false` stops every post at once. */
 export const socialPostingAllowed = () => (process.env.SOCIAL_POSTING || 'true') !== 'false';
 
-type Settings = { facebookEnabled: boolean; threadsEnabled: boolean; times: string[]; cooldownDays: number; updatedBy: string };
-const DEFAULTS: Settings = { facebookEnabled: false, threadsEnabled: false, times: ['09:00', '13:00', '19:00'], cooldownDays: 30, updatedBy: 'system' };
-
-type Posted = { ok: true; id: string; permalink?: string } | { ok: false; error: string; transient: boolean };
+type Settings = {
+  facebookEnabled: boolean; threadsEnabled: boolean; instagramEnabled: boolean; xEnabled: boolean; tiktokEnabled: boolean; tiktokMode: TikTokMode;
+  times: string[]; cooldownDays: number; updatedBy: string;
+};
+const DEFAULTS: Settings = { facebookEnabled: false, threadsEnabled: false, instagramEnabled: false, xEnabled: false, tiktokEnabled: false, tiktokMode: 'INBOX', times: ['09:00', '13:00', '19:00'], cooldownDays: 30, updatedBy: 'system' };
 
 const hashOf = (text: string) => createHash('sha256').update(text).digest('hex');
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * The marketing engine: at the set times each day it picks a product that is in stock with a photo and has not been posted lately,
@@ -63,8 +70,59 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
   private get version() { return process.env.WHATSAPP_API_VERSION || 'v21.0'; }
   private get threadsEnvToken() { return process.env.THREADS_ACCESS_TOKEN || ''; }
 
+  private get igToken() { return process.env.INSTAGRAM_ACCESS_TOKEN || this.fbToken; }
+  private get igAccountId() { return process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || ''; }
+  private get xCreds(): XCredentials | null {
+    const c = { apiKey: process.env.X_API_KEY || '', apiSecret: process.env.X_API_SECRET || '', accessToken: process.env.X_ACCESS_TOKEN || '', accessTokenSecret: process.env.X_ACCESS_TOKEN_SECRET || '' };
+    return c.apiKey && c.apiSecret && c.accessToken && c.accessTokenSecret ? c : null;
+  }
+
+  /** Where this API is on the internet: TikTok and Instagram fetch the pictures from here, and TikTok sends the sign-in back here. */
+  private publicApi(): string {
+    // PUBLIC_API_ORIGIN if set; else the address uploaded media is already served from (MEDIA_PUBLIC_BASE_URL, the API's public address in production).
+    const set = (process.env.PUBLIC_API_ORIGIN || process.env.MEDIA_PUBLIC_BASE_URL || '').trim();
+    if (set) return set.replace(/\/+$/, '');
+    const site = storefrontOrigin();
+    return /^https:\/\/(?!api\.)/.test(site) ? site.replace('https://', 'https://api.') : 'http://localhost:3101';
+  }
+  mediaUrl(postId: string) { return `${this.publicApi()}/social-posting/media/${postId}.jpg`; }
+
+  /** The service's own HTTP call, shared by the channel clients. */
+  private readonly send: Call = (url, init, label) => this.call(url, init, label);
+
+  private xClient() { const creds = this.xCreds; return creds ? new XClient(creds, this.send) : null; }
+  private igClient() {
+    return this.igToken && (this.igAccountId || this.pageId)
+      ? new InstagramClient({ version: this.version, token: this.igToken, pageId: this.pageId, accountId: this.igAccountId || undefined, waitMs: Number(process.env.INSTAGRAM_PUBLISH_WAIT_MS || 60_000), pollMs: Number(process.env.INSTAGRAM_POLL_MS || 3_000) }, this.send)
+      : null;
+  }
+  private tiktok() {
+    const clientKey = process.env.TIKTOK_CLIENT_KEY || '';
+    const clientSecret = process.env.TIKTOK_CLIENT_SECRET || '';
+    return clientKey && clientSecret
+      ? new TikTokClient({ clientKey, clientSecret, redirectUri: `${this.publicApi()}/social-posting/connect/tiktok/callback`, waitMs: Number(process.env.TIKTOK_PUBLISH_WAIT_MS || 90_000), pollMs: Number(process.env.TIKTOK_POLL_MS || 3_000) }, this.send)
+      : null;
+  }
+  private igCache: InstagramClient | null = null;
+  private igShared() { return (this.igCache ??= this.igClient()); }
+
+  /** Whether the server has what the channel needs from its settings. (TikTok also needs a sign-in: see connected().) */
   configured(channel: Channel) {
-    return channel === 'FACEBOOK' ? Boolean(this.pageId && this.fbToken) : Boolean(this.threadsEnvToken);
+    switch (channel) {
+      case 'FACEBOOK': return Boolean(this.pageId && this.fbToken);
+      case 'THREADS': return Boolean(this.threadsEnvToken);
+      case 'INSTAGRAM': return Boolean(this.igToken && (this.igAccountId || this.pageId));
+      case 'X': return Boolean(this.xCreds);
+      case 'TIKTOK': return Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET);
+    }
+  }
+
+  /** Whether the channel can post right now. For TikTok that means someone has signed in and the sign-in has not run out. */
+  async connected(channel: Channel): Promise<boolean> {
+    if (!this.configured(channel)) return false;
+    if (channel !== 'TIKTOK') return true;
+    const row = await this.prisma.socialCredential.findUnique({ where: { channel: 'TIKTOK' } });
+    return Boolean(row?.refreshToken && (!row.refreshExpiresAt || row.refreshExpiresAt.getTime() > Date.now()));
   }
 
   onApplicationBootstrap() {
@@ -89,12 +147,21 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
   async getSettings(): Promise<Settings> {
     const row = await this.prisma.socialSetting.findUnique({ where: { id: 'singleton' } });
     return row
-      ? { facebookEnabled: row.facebookEnabled, threadsEnabled: row.threadsEnabled, times: cleanTimes(row.times), cooldownDays: row.cooldownDays, updatedBy: row.updatedBy }
+      ? {
+          facebookEnabled: row.facebookEnabled, threadsEnabled: row.threadsEnabled, instagramEnabled: row.instagramEnabled, xEnabled: row.xEnabled, tiktokEnabled: row.tiktokEnabled,
+          tiktokMode: row.tiktokMode === 'DIRECT' ? 'DIRECT' : 'INBOX', times: cleanTimes(row.times), cooldownDays: row.cooldownDays, updatedBy: row.updatedBy,
+        }
       : DEFAULTS;
   }
 
   private enabled(settings: Settings, channel: Channel) {
-    return channel === 'FACEBOOK' ? settings.facebookEnabled : settings.threadsEnabled;
+    switch (channel) {
+      case 'FACEBOOK': return settings.facebookEnabled;
+      case 'THREADS': return settings.threadsEnabled;
+      case 'INSTAGRAM': return settings.instagramEnabled;
+      case 'X': return settings.xEnabled;
+      case 'TIKTOK': return settings.tiktokEnabled;
+    }
   }
 
   async updateSettings(patch: Partial<Settings>, updatedBy: string) {
@@ -102,6 +169,10 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
     const next = {
       facebookEnabled: patch.facebookEnabled ?? current.facebookEnabled,
       threadsEnabled: patch.threadsEnabled ?? current.threadsEnabled,
+      instagramEnabled: patch.instagramEnabled ?? current.instagramEnabled,
+      xEnabled: patch.xEnabled ?? current.xEnabled,
+      tiktokEnabled: patch.tiktokEnabled ?? current.tiktokEnabled,
+      tiktokMode: patch.tiktokMode ?? current.tiktokMode,
       times: patch.times ? cleanTimes(patch.times) : current.times,
       cooldownDays: patch.cooldownDays ?? current.cooldownDays,
       updatedBy,
@@ -244,8 +315,113 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
     return { ok: true, id: String(id), permalink: link?.data?.permalink ? String(link.data.permalink) : undefined };
   }
 
-  private publishTo(channel: Channel, imageUrl: string, caption: string): Promise<Posted> {
-    return channel === 'FACEBOOK' ? this.publishFacebook(imageUrl, caption) : this.publishThreads(imageUrl, caption);
+  // Instagram, X and TikTok ---------------------------------------------------------------------------------------------
+
+  /** A product photo as a JPEG the platforms accept. Instagram and TikTok fetch it from the API (mediaFor); X is sent the bytes. */
+  private mediaCache = new Map<string, Buffer>();
+  async mediaFor(file: string): Promise<Buffer> {
+    const id = /^([0-9a-f-]{36})\.jpg$/i.exec(file)?.[1];
+    if (!id) throw new NotFoundException();
+    const cached = this.mediaCache.get(id);
+    if (cached) return cached;
+    const row = await this.prisma.socialPost.findUnique({ where: { id }, select: { imageUrl: true } });
+    if (!row?.imageUrl) throw new NotFoundException();
+    let jpeg: Buffer;
+    try { jpeg = await renditionFromUrl(row.imageUrl); } catch { throw new NotFoundException(); }
+    if (this.mediaCache.size >= 30) this.mediaCache.delete(this.mediaCache.keys().next().value as string);
+    this.mediaCache.set(id, jpeg);
+    return jpeg;
+  }
+
+  private async publishInstagram(postId: string, caption: string): Promise<Posted> {
+    const client = this.igShared();
+    return client ? client.publish(this.mediaUrl(postId), caption) : { ok: false, error: 'Instagram is not set up on the server (the Facebook Page settings, with the Instagram permissions).', transient: false };
+  }
+
+  private async publishX(imageUrl: string, caption: string): Promise<Posted> {
+    const client = this.xClient();
+    if (!client) return { ok: false, error: 'X is not set up on the server (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET).', transient: false };
+    let jpeg: Buffer;
+    try { jpeg = await renditionFromUrl(imageUrl); } catch (error) { return { ok: false, error: `The picture could not be prepared: ${(error as Error).message}`, transient: true }; }
+    return client.publish(jpeg, caption);
+  }
+
+  private async publishTikTok(postId: string, caption: string): Promise<Posted> {
+    const client = this.tiktok();
+    if (!client) return { ok: false, error: 'TikTok is not set up on the server (TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET).', transient: false };
+    const access = await this.tiktokAccess();
+    if ('error' in access) return { ok: false, error: access.error, transient: false };
+    const { title, description } = splitTikTokCaption(caption);
+    return client.publishPhoto(access.token, { imageUrl: this.mediaUrl(postId), title, description, mode: (await this.getSettings()).tiktokMode, username: access.username });
+  }
+
+  // TikTok's login: connected from the portal, kept and renewed here. Its refresh token changes on every use, so two backend slots
+  // must never renew at once: whoever loses the race picks up what the winner saved.
+
+  /** The address that starts the TikTok sign-in. The signed state is what lets the callback know a staff member began it. */
+  tiktokConnectUrl(by: string): { url: string } | { error: string } {
+    const client = this.tiktok();
+    if (!client) return { error: 'TikTok is not set up on the server (TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET).' };
+    return { url: authorizeUrl(process.env.TIKTOK_CLIENT_KEY!, `${this.publicApi()}/social-posting/connect/tiktok/callback`, signState(this.stateSecret(), by)) };
+  }
+  private stateSecret() { return process.env.JWT_SECRET || 'super-secret-key-change-me'; }
+
+  /** What TikTok sends back after the sign-in: checks it, swaps the code for the login and keeps it. */
+  async completeTikTokConnect(code: string | undefined, state: string | undefined): Promise<{ ok: true } | { ok: false; error: string }> {
+    const checked = checkState(this.stateSecret(), state ?? '');
+    if (!checked) return { ok: false, error: 'The TikTok sign-in expired or was not started here. Start it again from Social Posting.' };
+    const client = this.tiktok();
+    if (!client) return { ok: false, error: 'TikTok is not set up on the server.' };
+    if (!code) return { ok: false, error: 'TikTok did not give a sign-in code.' };
+    const got = await client.exchangeCode(code);
+    if (!got.ok) return { ok: false, error: got.error };
+    const name = await client.displayName(got.tokens.accessToken).catch(() => null);
+    const data = { accessToken: got.tokens.accessToken, refreshToken: got.tokens.refreshToken, expiresAt: got.tokens.expiresAt, refreshExpiresAt: got.tokens.refreshExpiresAt, refreshedAt: new Date(), userId: got.tokens.openId || null, username: name, error: null, sourceHash: null };
+    await this.prisma.socialCredential.upsert({ where: { channel: 'TIKTOK' }, create: { channel: 'TIKTOK', ...data }, update: data });
+    this.logger.log(`TikTok connected${name ? ` as ${name}` : ''} by ${checked.by || 'staff'}.`);
+    return { ok: true };
+  }
+
+  async disconnectTikTok(by: string) {
+    await this.prisma.socialCredential.deleteMany({ where: { channel: 'TIKTOK' } });
+    await this.updateSettings({ tiktokEnabled: false }, by);
+    return this.status();
+  }
+
+  /** A TikTok access token that is good for at least five more minutes, renewing the login if it is not. */
+  async tiktokAccess(now: Date = new Date()): Promise<{ token: string; username: string | null } | { error: string }> {
+    const row = await this.prisma.socialCredential.findUnique({ where: { channel: 'TIKTOK' } });
+    if (!row?.refreshToken) return { error: 'TikTok is not connected: connect it on the Social Posting screen.' };
+    if (row.refreshExpiresAt && row.refreshExpiresAt.getTime() <= now.getTime()) return { error: 'The TikTok connection has run out: connect TikTok again.' };
+    const fresh = (r: typeof row) => Boolean(r.expiresAt && r.expiresAt.getTime() - now.getTime() > 5 * 60_000);
+    if (fresh(row)) return { token: row.accessToken, username: row.username };
+
+    const client = this.tiktok();
+    if (!client) return { error: 'TikTok is not set up on the server (TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET).' };
+    const renewed = await client.refresh(row.refreshToken, now);
+    if (renewed.ok) {
+      const saved = await this.prisma.socialCredential.updateMany({
+        where: { channel: 'TIKTOK', refreshToken: row.refreshToken },
+        data: { accessToken: renewed.tokens.accessToken, refreshToken: renewed.tokens.refreshToken, expiresAt: renewed.tokens.expiresAt, refreshExpiresAt: renewed.tokens.refreshExpiresAt, refreshedAt: now, error: null },
+      });
+      if (saved.count === 1) return { token: renewed.tokens.accessToken, username: row.username };
+    }
+    // The renewal failed or lost a race: the other backend slot may already have saved a newer login.
+    const latest = await this.prisma.socialCredential.findUnique({ where: { channel: 'TIKTOK' } });
+    if (latest?.refreshToken && latest.refreshToken !== row.refreshToken && fresh(latest)) return { token: latest.accessToken, username: latest.username };
+    const why = renewed.ok ? 'The TikTok login could not be saved.' : renewed.permanent ? `${renewed.error} Connect TikTok again.` : renewed.error;
+    await this.prisma.socialCredential.updateMany({ where: { channel: 'TIKTOK' }, data: { error: why.slice(0, 400) } });
+    return { error: why };
+  }
+
+  private publishTo(channel: Channel, imageUrl: string, caption: string, postId: string): Promise<Posted> {
+    switch (channel) {
+      case 'FACEBOOK': return this.publishFacebook(imageUrl, caption);
+      case 'THREADS': return this.publishThreads(imageUrl, caption);
+      case 'INSTAGRAM': return this.publishInstagram(postId, caption);
+      case 'X': return this.publishX(imageUrl, caption);
+      case 'TIKTOK': return this.publishTikTok(postId, caption);
+    }
   }
 
   // --- choosing ---------------------------------------------------------------------------------------------------------
@@ -275,7 +451,13 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
     const facts = await shopFacts(this.pages, this.pageId, this.logger);
     const ctx = { origin: facts.site, whatsapp: facts.whatsapp, location: facts.location };
     const day = nairobiParts(now).day;
-    return channel === 'FACEBOOK' ? buildCaption(product, ctx, day) : buildThreadsCaption(product, ctx, day);
+    switch (channel) {
+      case 'FACEBOOK': return buildCaption(product, ctx, day);
+      case 'THREADS': return buildThreadsCaption(product, ctx, day);
+      case 'INSTAGRAM': return buildInstagramCaption(product, ctx, day);
+      case 'X': return buildXCaption(product, ctx, day);
+      case 'TIKTOK': return buildTikTokCaption(product, ctx, day);
+    }
   }
 
   /** What the next post would be on each channel, without posting it. */
@@ -324,9 +506,9 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
       await this.prisma.socialPost.update({ where: { id }, data: { productId: pid, productName, productSlug: product.slug, imageUrl, caption } });
     }
 
-    const posted = await this.publishTo(channel, imageUrl!, caption!);
+    const posted = await this.publishTo(channel, imageUrl!, caption!, id);
     if (posted.ok) {
-      return this.prisma.socialPost.update({ where: { id }, data: { status: 'POSTED', externalId: posted.id, permalink: posted.permalink ?? null, postedAt: new Date(), attempts, detail: null } });
+      return this.prisma.socialPost.update({ where: { id }, data: { status: 'POSTED', externalId: posted.id, permalink: posted.permalink ?? null, postedAt: new Date(), attempts, detail: posted.detail ?? null } });
     }
     const retry = posted.transient && attempts < MAX_ATTEMPTS;
     if (!retry) this.logger.warn(`${channel} post of ${productName} failed: ${posted.error}`);
@@ -347,8 +529,14 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
 
     if (this.configured('THREADS')) await this.maintainThreadsLogin(now).catch((e) => this.logger.warn(`Threads login check failed: ${(e as Error).message}`));
 
+    // TikTok's login is renewed ahead of time, so it is fresh when a post is due and does not lapse through disuse.
+    if (await this.connected('TIKTOK')) {
+      const row = await this.prisma.socialCredential.findUnique({ where: { channel: 'TIKTOK' } });
+      if (!row?.expiresAt || row.expiresAt.getTime() - now.getTime() < 30 * 60_000) await this.tiktokAccess(now).catch((e) => this.logger.warn(`TikTok login check failed: ${(e as Error).message}`));
+    }
+
     for (const channel of CHANNELS) {
-      if (!this.configured(channel) || !this.enabled(settings, channel)) continue;
+      if (!(await this.connected(channel)) || !this.enabled(settings, channel)) continue;
 
       // Retries first: a post that could not be taken a few minutes ago, while its slot is still fresh.
       const due = await this.prisma.socialPost.findMany({
@@ -375,8 +563,15 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
 
   /** A post started by staff, now, on one channel. Works whether or not the schedule is on. */
   async postNow(by: string, productId?: string, channel: Channel = 'FACEBOOK') {
-    if (!this.configured(channel)) {
-      return { status: 'FAILED', detail: channel === 'FACEBOOK' ? 'The Facebook Page is not set up on the server (FACEBOOK_PAGE_ID / FACEBOOK_PAGE_ACCESS_TOKEN).' : 'Threads is not set up on the server (THREADS_ACCESS_TOKEN).' };
+    if (!(await this.connected(channel))) {
+      const why: Record<Channel, string> = {
+        FACEBOOK: 'The Facebook Page is not set up on the server (FACEBOOK_PAGE_ID / FACEBOOK_PAGE_ACCESS_TOKEN).',
+        THREADS: 'Threads is not set up on the server (THREADS_ACCESS_TOKEN).',
+        INSTAGRAM: 'Instagram is not set up on the server (the Facebook Page settings, with the Instagram permissions).',
+        X: 'X is not set up on the server (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET).',
+        TIKTOK: this.configured('TIKTOK') ? 'TikTok is not connected: connect it on this screen.' : 'TikTok is not set up on the server (TIKTOK_CLIENT_KEY, TIKTOK_CLIENT_SECRET).',
+      };
+      return { status: 'FAILED', detail: why[channel] };
     }
     if (!socialPostingAllowed()) return { status: 'FAILED', detail: 'Posting is switched off on the server (SOCIAL_POSTING=false).' };
     return this.runSlot(channel, `manual@${Date.now()}`, null, by, productId);
@@ -386,6 +581,16 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
   async remove(id: string) {
     const row = await this.prisma.socialPost.findUnique({ where: { id } });
     if (!row || row.status !== 'POSTED' || !row.externalId) return { removed: false, detail: 'That post is not live' };
+    // Instagram and TikTok give other apps no way to delete a post; X does.
+    if (row.channel === 'INSTAGRAM') return { removed: false, detail: 'Instagram does not let other apps delete a post: delete it in the Instagram app.' };
+    if (row.channel === 'TIKTOK') return { removed: false, detail: 'TikTok does not let other apps delete a post: delete it in the TikTok app.' };
+    if (row.channel === 'X') {
+      const client = this.xClient();
+      if (!client) return { removed: false, detail: 'X is not set up on the server' };
+      const out = await client.remove(row.externalId);
+      if (out.removed) await this.prisma.socialPost.update({ where: { id }, data: { status: 'REMOVED', detail: 'Taken down' } });
+      return out;
+    }
     let r: { status: number; data: any } | null;
     if (row.channel === 'FACEBOOK') {
       r = await this.fb(row.externalId, null, 'DELETE');
@@ -404,23 +609,40 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
 
   // --- for the portal ---------------------------------------------------------------------------------------------------
 
+  /** The Instagram account the posts go to, for "Connected as ...". Looked up at most every ten minutes. */
+  private async instagramInfo(): Promise<{ account: string | null; problem: string | null }> {
+    const client = this.igShared();
+    if (!client) return { account: null, problem: null };
+    try {
+      const found = await client.account();
+      return 'error' in found ? { account: null, problem: found.error } : { account: found.username ? `@${found.username}` : found.id, problem: null };
+    } catch {
+      return { account: null, problem: null };
+    }
+  }
+
   async status() {
     const now = new Date();
     const settings = await this.getSettings();
     const today = nairobiParts(now).day;
-    const [counts, todays, login] = await Promise.all([
+    const [counts, todays, login, tiktokLogin] = await Promise.all([
       this.prisma.socialPost.groupBy({ by: ['channel', 'status'], _count: true }),
       this.prisma.socialPost.findMany({ where: { channel: { in: CHANNELS }, slotKey: { startsWith: today } }, select: { channel: true, slotKey: true, status: true } }),
       this.prisma.socialCredential.findUnique({ where: { channel: 'THREADS' } }),
+      this.prisma.socialCredential.findUnique({ where: { channel: 'TIKTOK' } }),
     ]);
+    const live = new Map<Channel, boolean>();
+    for (const c of CHANNELS) live.set(c, await this.connected(c));
     const tally = (channel: Channel, status: string) => counts.find((c) => c.channel === channel && c.status === status)?._count ?? 0;
     const channel = (c: Channel) => ({
-      configured: this.configured(c),
+      configured: live.get(c) ?? false,
       enabled: this.enabled(settings, c),
-      nextPostAt: this.enabled(settings, c) && this.configured(c) && socialPostingAllowed() ? nextSlot(now, settings.times) : null,
+      nextPostAt: this.enabled(settings, c) && live.get(c) && socialPostingAllowed() ? nextSlot(now, settings.times) : null,
       posted: tally(c, 'POSTED'), failed: tally(c, 'FAILED'), skipped: tally(c, 'SKIPPED'), removed: tally(c, 'REMOVED'),
     });
     const threadsLogin = login && login.sourceHash === hashOf(this.threadsEnvToken) ? login : null;
+    const instagram = live.get('INSTAGRAM') ? await this.instagramInfo() : { account: null, problem: null };
+    const total = (status: string) => ['FACEBOOK', 'THREADS'].reduce((n, c) => n + tally(c as Channel, status), 0);
     return {
       allowed: socialPostingAllowed(),
       times: settings.times,
@@ -429,11 +651,21 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
       today: todays,
       facebook: channel('FACEBOOK'),
       threads: { ...channel('THREADS'), tokenExpiresAt: threadsLogin?.expiresAt ?? null, tokenError: threadsLogin?.error ?? null },
+      instagram: { ...channel('INSTAGRAM'), ...instagram },
+      x: channel('X'),
+      tiktok: {
+        ...channel('TIKTOK'),
+        clientConfigured: this.configured('TIKTOK'),
+        mode: settings.tiktokMode,
+        account: tiktokLogin?.username ?? null,
+        connectedAt: tiktokLogin?.refreshedAt ?? null,
+        refreshExpiresAt: tiktokLogin?.refreshExpiresAt ?? null,
+        error: tiktokLogin?.error ?? null,
+      },
       // The first version of the screen read these; kept so it keeps working.
       configured: this.configured('FACEBOOK'), facebookEnabled: settings.facebookEnabled, threadsEnabled: settings.threadsEnabled,
       nextPostAt: channel('FACEBOOK').nextPostAt,
-      posted: tally('FACEBOOK', 'POSTED') + tally('THREADS', 'POSTED'), failed: tally('FACEBOOK', 'FAILED') + tally('THREADS', 'FAILED'),
-      skipped: tally('FACEBOOK', 'SKIPPED') + tally('THREADS', 'SKIPPED'), removed: tally('FACEBOOK', 'REMOVED') + tally('THREADS', 'REMOVED'),
+      posted: total('POSTED'), failed: total('FAILED'), skipped: total('SKIPPED'), removed: total('REMOVED'),
     };
   }
 

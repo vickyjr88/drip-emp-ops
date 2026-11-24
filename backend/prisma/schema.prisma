@@ -2576,15 +2576,21 @@ model FacebookCommentReply {
 /// Switches and timing for the marketing engine that posts products to the Page on its own. One row, id "singleton".
 /// Off until staff turn it on: a post is public, so the engine never starts by itself on a fresh deploy.
 model SocialSetting {
-  id              String   @id @default("singleton")
-  facebookEnabled Boolean  @default(false)
-  threadsEnabled  Boolean  @default(false)
+  id               String   @id @default("singleton")
+  facebookEnabled  Boolean  @default(false)
+  threadsEnabled   Boolean  @default(false)
+  instagramEnabled Boolean  @default(false)
+  xEnabled         Boolean  @default(false)
+  tiktokEnabled    Boolean  @default(false)
+  /// INBOX sends each TikTok photo post to the owner's TikTok inbox to finish and publish (works before TikTok has audited the app);
+  /// DIRECT publishes it publicly (only once TikTok has audited the app).
+  tiktokMode       String   @default("INBOX")
   /// When to post, Nairobi time, "HH:MM". Three a day by default; at most six.
-  times           String[] @default(["09:00", "13:00", "19:00"])
+  times            String[] @default(["09:00", "13:00", "19:00"])
   /// A product is not posted again to the same channel for this many days.
-  cooldownDays    Int      @default(30)
-  updatedBy       String   @default("system")
-  updatedAt       DateTime @updatedAt
+  cooldownDays     Int      @default(30)
+  updatedBy        String   @default("system")
+  updatedAt        DateTime @updatedAt
 }
 
 /// One post the engine made (or tried to make) to one channel. slotKey is "2026-11-08@09:00" for a scheduled post, which with
@@ -2623,14 +2629,19 @@ model SocialPost {
 /// refreshed before then. Only the app's backend reads it. sourceHash is the hash of the token set in the server's .env, so
 /// putting a new token there replaces this row's instead of being ignored.
 model SocialCredential {
-  channel     String    @id
-  accessToken String
-  userId      String?
-  expiresAt   DateTime?
-  refreshedAt DateTime?
-  sourceHash  String?
-  error       String?
-  updatedAt   DateTime  @updatedAt
+  channel          String    @id
+  accessToken      String
+  /// TikTok's refresh token. It changes every time it is used, so the newest one is always kept here.
+  refreshToken     String?
+  refreshExpiresAt DateTime?
+  /// The account's name, for the screen ("Connected as ...").
+  username         String?
+  userId           String?
+  expiresAt        DateTime?
+  refreshedAt      DateTime?
+  sourceHash       String?
+  error            String?
+  updatedAt        DateTime  @updatedAt
 }
 
 enum ReviewStatus {

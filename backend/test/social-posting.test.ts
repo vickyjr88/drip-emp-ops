@@ -109,6 +109,11 @@ async function world(opts: { products?: any[]; responder?: (call: Call) => { sta
   let n = 0;
   (globalThis as any).fetch = async (input: any, init: any) => {
     const path = String(input).replace(/^https:\/\/graph\.facebook\.com\/v[\d.]+\//, '');
+    // The screen's "Connected as ..." for Instagram reads the linked account from the Page. It is not a post call, so it is answered
+    // here and not counted with the calls these tests assert on.
+    if (path.startsWith('111?fields=instagram_business_account')) {
+      return new Response(JSON.stringify({ id: '111', instagram_business_account: { id: '17841400000000000', username: 'dripemporium' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     const call = { path, method: init?.method ?? 'GET', body: init?.body ? JSON.parse(init.body) : null };
     calls.push(call);
     const fixed = opts.responder ? opts.responder(call) : null;
