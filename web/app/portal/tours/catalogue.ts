@@ -54,10 +54,22 @@ export const TOURS: Tour[] = [
         body: "This is where the business runs day to day -- products, inventory, orders, customer details, financial reports, and team management. Let's walk through the layout. You can leave at any point with Esc.",
       },
       {
+        anchor: 'nav.find',
+        placement: 'right',
+        title: 'Find anything from here',
+        body: 'Type a page name, a customer\'s name, mobile number or email, an order number or a product. Press Enter for the first match, or use the arrow keys. Ctrl or Cmd+K jumps here from any page.',
+      },
+      {
+        anchor: 'nav.newOrder',
+        placement: 'right',
+        title: 'New order is always one click away',
+        body: 'Key in a sale that came from a call, a message or the counter, and attach it to an existing customer.',
+      },
+      {
         anchor: 'nav.stores',
         placement: 'right',
-        title: 'Stores are where it starts',
-        body: 'A store is a physical location. Products, stock and sales all attach to one, so this is worth setting up first.',
+        title: 'Pages are grouped by the job they do',
+        body: 'Sell, Products, Resellers, Marketing, Reports & money, People and System. Click a group heading to fold away the ones you do not use. Stores are where setting up starts: products, stock and sales all attach to one.',
       },
       {
         anchor: 'nav.catalogue',
@@ -200,6 +212,27 @@ export const TOURS: Tour[] = [
         placement: 'bottom',
         title: 'Record New Order',
         body: 'Capture sales orders with items, quantities, discounts, and payment methods.',
+      },
+      {
+        route: '/portal/orders/new',
+        anchor: 'orders.customer',
+        placement: 'bottom',
+        title: 'Find the customer in one box',
+        body: 'Type part of a name, a mobile number or an email. Enter picks the first match. Not on file? Add them right there. Choose Retail, Reseller or Wholesale and the prices follow.',
+      },
+      {
+        route: '/portal/orders/new',
+        anchor: 'orders.items',
+        placement: 'top',
+        title: 'Add items by typing',
+        body: 'Try "air max 42" and press Enter: that adds the item at the right price for this customer. A barcode scanner works here too.',
+      },
+      {
+        route: '/portal/orders/new',
+        anchor: 'orders.summary',
+        placement: 'left',
+        title: 'Check, then place the order',
+        body: 'Anything missing is listed here. After placing, send the customer a receipt on WhatsApp or print one.',
       },
       {
         route: '/portal/orders',

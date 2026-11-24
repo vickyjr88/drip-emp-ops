@@ -521,7 +521,7 @@ export default function NewOrderPage() {
                 </div>
 
                 <aside className="pord-side">
-                  <div className="portal-card pord-summary">
+                  <div className="portal-card pord-summary" data-tour="orders.summary">
                     <h2>Summary</h2>
                     <dl>
                       <div><dt>Customer</dt><dd>{customer ? `${customer.firstName} ${customer.lastName}` : walkIn ? (walkInInfo.name.trim() || 'Walk-in') : '—'}</dd></div>

@@ -82,6 +82,8 @@ type ConsignmentRow = {
   overdue: boolean;
 };
 
+const TIER_NAME: Record<string, string> = { RETAIL: 'Retail', RESELLER: 'Reseller', WHOLESALE: 'Wholesale' };
+
 type SalesSummary = {
   orderCount: number;
   revenue: number;
@@ -91,6 +93,7 @@ type SalesSummary = {
   unconfirmed: { count: number; value: number };
   byStatus: Array<{ status: string; count: number; value: number }>;
   byChannel: Array<{ channel: string; count: number; value: number }>;
+  byTier?: Array<{ tier: string; count: number; value: number }>;
 };
 
 type LeadStats = {
@@ -522,6 +525,32 @@ export function AnalyticsView() {
                           color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
                         }))}
                         valueFormat={(value) => `${value} order${value === 1 ? '' : 's'}`}
+                      />
+                    </ChartFrame>
+                  </div>
+                ) : null}
+
+                {/* ---- Retail against reseller and wholesale ----------------- */}
+                {summary?.byTier?.length ? (
+                  <div className="portal-detail-grid" style={{ marginBottom: 20 }}>
+                    <ChartFrame
+                      title="Sales by customer type"
+                      subtitle="Which price list the sale was made at: shoppers paying retail, resellers and wholesale buyers. Counts orders that are not pending, cancelled or refunded."
+                      table={{
+                        headers: ['Price list', 'Orders', 'Value', 'Share'],
+                        rows: summary.byTier.map((row) => {
+                          const all = summary.byTier!.reduce((n, r) => n + r.value, 0) || 1;
+                          return [TIER_NAME[row.tier] ?? row.tier, row.count, formatMoney(row.value), `${Math.round((row.value / all) * 100)}%`];
+                        }),
+                      }}
+                    >
+                      <StackedBar
+                        segments={summary.byTier.map((row, index) => ({
+                          label: TIER_NAME[row.tier] ?? row.tier,
+                          value: row.value,
+                          color: CHART_CATEGORICAL[index % CHART_CATEGORICAL.length],
+                        }))}
+                        valueFormat={formatCompact}
                       />
                     </ChartFrame>
                   </div>

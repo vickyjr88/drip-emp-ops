@@ -258,7 +258,7 @@ export function PortalNav({ active, canReadRbac, canReadUsers, onNavigate }: Por
         </Link>
       ) : null}
 
-      <label className="pnav-find">
+      <label className="pnav-find" data-tour="nav.find">
         <Search size={15} strokeWidth={1.9} aria-hidden="true" />
         <input
           ref={searchRef}
