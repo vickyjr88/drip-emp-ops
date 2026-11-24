@@ -74,7 +74,9 @@ db('things on the shelf come first; sold-out, drop-ship and inactive are handled
     assert.deepEqual(await w.service.variantLookup('c', w.store.id), []);
     assert.deepEqual(await w.service.variantLookup('', w.store.id), []);
     assert.deepEqual(await w.service.variantLookup('%%', w.store.id), []);
-    // With no store named, nothing is claimed to be on a shelf.
-    assert.ok((await w.service.variantLookup('court classic')).every((r) => r.sellable === 0));
+    // With no store named (the menu finder), stock is the total across stores: what is held is shown, not 0.
+    const everywhere = await w.service.variantLookup('court classic');
+    assert.equal(everywhere.find((r) => r.variantId === inStock.id)?.sellable, 2);
+    assert.equal(everywhere.find((r) => r.variantId === out.id)?.sellable, 0);
   } finally { await w.cleanup(); await w.prisma.$disconnect(); }
 });

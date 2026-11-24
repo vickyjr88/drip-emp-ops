@@ -21,51 +21,37 @@ Not touched on purpose: tagging a customer as trade also stops marketing WhatsAp
 - Found and fixed while testing: a form nested inside the order form reloaded the page; Enter pressed before results arrived did nothing; the layout was cramped between 900 and 1280px wide; the internal stand-in email (`…@customer.invalid`) leaked into the customer card.
 - **Not tested:** on a real phone or a real barcode scanner; with a staff role that has fewer permissions than the test user (the screen hides what that role cannot do, from the permission list, but that was not exercised with a real limited role); the other ~30 forms after the shared styling (they were checked by reading the CSS, not by opening each one); anything on production.
 
-## Improvements still worth doing, in order
+## Second round (25 Nov 2026): the twelve follow-ups
 
-Each says why, how big, and what it would touch.
+Every item from the first review's list was taken up. Where the first review was wrong, it says so.
 
-### 1. Hide menu items a person cannot open (small, high value)
-Today the menu shows every page. A staff member who clicks Reseller Payouts without the permission gets the page with "You do not have permission to do that" (this happened during testing). The menu should only list pages the signed-in role can read. It needs one table mapping each menu key to the permission its page needs (read the controllers to get it right), checked against the profile the shell already receives. Empty groups then disappear, which also makes the menu shorter for most staff.
+| # | Item | What was done |
+|---|---|---|
+| 1 | Hide menu items a role cannot open | Each menu item names the permission its page reads (taken from the backend controllers). Roles without it do not see the link; groups with nothing left disappear; the New order button needs `order.create`. Until a page has registered who is signed in, everything shows, and the API still enforces access. Tested with a limited role. |
+| 2 | Customer and order records match the new flow | Customer record: shows and changes the customer type (Retail / Reseller / Wholesale) and has a New order button; the create and edit form has the same control and a business name. Orders list: channel filter, "Reseller & wholesale only", a tag on trade orders, "keyed by" on each row. Order detail: **Order again** (same customer and items at today's prices and stock). |
+| 3 | Receipts | The order carries a receipt written as a WhatsApp message (items by product name and size, delivery, discount, paid, balance) that opens the chat for staff to send, and a printable page at `/portal/orders/:id/receipt` (print or save as PDF). Both are on the order screen and on the success card after keying an order in. Nothing is sent automatically. |
+| 4 | Search records, not just pages | The menu's finder also searches customers (name, phone, email), orders and products, with arrow keys and Enter. Each source is asked only if the role may read it. |
+| 5 | Replace the browser's own confirm boxes | All six (customer merge, delete review, turn a review away, delete template, switch clubs on and off) use the portal dialog, which can say what will happen. Escape closes any portal dialog. |
+| 6 | Warn before losing work | `useUnsavedGuard` warns on closing the tab and, unlike the browser's own warning, when following a link inside the portal. Used on the new order screen and the customer, user, new product and product details forms. The other forms (stores, categories, consignments, accounting) do not have it yet. |
+| 7 | The very large screens | **The first review was mostly wrong here.** Payroll, receivables, payables, HR and the ledger already use tabs, and reminders has three views; only the Catalogue is one long page, and most of its length is the new product form. No restructuring was done: splitting working files with 40+ fields each carries risk and no gain for staff. The new product form was improved instead (item 10). File size is a maintenance concern, not a usability one. |
+| 8 | A "today" view on the dashboard | "Needs you today": orders waiting for payment, money owed on part-paid orders, orders waiting on a supplier, leads the automatic follow-up could not reach, open carts and enquiries, sizes running low. Each row links to the matching list, already filtered. Rows a role cannot read are not shown. |
+| 9 | Reports by channel and customer type | **The channel breakdown already existed on Analytics.** What was missing was the price list: Analytics now has "Sales by customer type" (retail against reseller and wholesale). The orders list filters on both. |
+| 10 | Product entry in bulk | The new product form takes opening stock: a count under each ticked size, or a pasted list (`40:3, 41:5` or one per line, unmatched sizes are flagged), recorded into the chosen store when the product is saved. |
+| 11 | Phone layout of the lists | Rows stack by the width of the list rather than of the screen, so they stop cramming when the sidebar is open. |
+| 12 | Housekeeping | Tours cover the finder, New order, the grouped menu and the new order screen. Hint text and placeholders were darkened to meet 4.5:1 contrast (two greys measured at 4.4:1 and 3.2:1). "Keyed by" shows on the orders list. |
 
-### 2. Make the customer and order records match the new flow (small)
-- Customer detail: show the tier and business name, with the same Retail / Reseller / Wholesale control, and a **New order** button. Today it is only reachable from the list.
-- Orders list and order detail: show the channel and a trade tag on each row, and add a **channel** filter. Most orders now come from outside WhatsApp and nobody can filter for them.
-- Order detail: **Order again** for a repeat customer (copies the lines onto the new screen).
+Also fixed on the way: an order created with only a customer id was stored with no name or number (it read as a walk-in in lists and could not be sent a receipt); the order follow-up message used the stored description ("EUR 42 (SKU)") instead of the product name; product lookup without a store showed 0 in stock instead of the total.
 
-### 3. A receipt, sent from the success card (medium)
-After keying in an order the person has a number and nothing to give the customer. Add "Send receipt on WhatsApp" (inside the 24-hour window it is a free-form message, otherwise it needs an approved template) and "Print / save PDF". Customers who pay by M-Pesa expect to see the order recorded.
+### Tested, and not tested (second round)
 
-### 4. Search records, not just pages (medium)
-The finder in the menu could also search customers, orders and products using the lookup endpoints that now exist. "0722 111" from anywhere in the portal lands on that customer. This is the single biggest time saver left for someone answering phone calls.
+- Backend: 6 receipt tests, 3 order-customer tests, the 13 lookup tests, and the existing follow-up, lead and merge tests (96 in all, passing three runs in a row), plus a production build of both apps. `npm run test:customer-lookup` needs `KITS_TEST_DATABASE_URL` pointing at a fresh migrated scratch database and runs its files one at a time: test files that share a database flake when run in parallel.
+- In a browser against a scratch database, as an admin and as a limited role: the menu for each, the finder (page, customer, product), the customer record and its type control, a new customer with a business name, order again, the receipt on the order screen and after keying an order in, the print page, filtered links from the dashboard, the dialogs and the unsaved-changes warning (stay and leave), Analytics, and the new product form with a pasted stock list.
+- A parser for the pasted stock list has 5 tests (`node --test web/app/portal/catalogue/stock-list.test.mjs`); they are not in CI.
+- **Not tested:** a real phone, a real barcode scanner, WhatsApp opening the receipt (only the link and its text were checked), a real printer, and the screens outside the ones listed. The permission-to-page table was built by reading the controllers; a role with an unusual mix of permissions could see a link whose page then partly fails, which is the same behaviour as before this change.
 
-### 5. Replace the browser's own confirm boxes (small)
-Six places still use `window.confirm` (merging duplicate customers, deleting a review, deleting a kit template, switching all clubs on or off). The portal already has a dialog component. The native box cannot say what will happen, is unstyled on phones, and is easy to dismiss by reflex on destructive actions such as the customer merge.
+## Still open
 
-### 6. Warn before losing work on edit forms (small)
-Only the new-order screen warns when leaving with unsaved input. The catalogue, customer, user and product-detail forms do not. A shared hook (like the one on the new-order screen) would cover them.
-
-### 7. The very large screens (large)
-Accounting ledger (1,646 lines, 43 fields), payroll (1,202), catalogue (1,147), receivables (1,109), HR (1,065), payables (1,058). These are the hardest to use and the hardest to change safely. Split each into tabs or steps with one job each, and move the repeated form code onto the shared form parts in `portal/components/` (`pform-*`, `Combobox`). Do this one screen at a time, starting with whichever staff complain about most.
-
-### 8. A "today" view on the dashboard (medium)
-The dashboard shows sales, money owed and low stock. What a person opens the day for is a to-do list: orders awaiting supplier, unconfirmed orders, leads whose automatic follow-up failed (the new lead follow-up records this), carts worth chasing, reminders due. Each row should be one tap from the action.
-
-### 9. Reports by channel and customer type (medium)
-Channel is now a fixed set of choices rather than free text, and customers carry a tier. Analytics and the daily report can split revenue by both: how much came from Instagram, how much from resellers. Today that question cannot be answered.
-
-### 10. Product entry in bulk (medium)
-Adding a product asks for each size separately. A size grid (tick sizes, set one price, paste a stock list) is quicker and is the same pattern as the item search: type less, pick more.
-
-### 11. Phone layout of the lists (small to medium)
-Staff use phones. The list rows (customers, orders) put several buttons and a date block on one line; at phone width they wrap into each other ("No account" runs into "Added…"). A row card layout with the main action large and the rest in a menu would fix it.
-
-### 12. Housekeeping that affects trust
-- **Guided tours** should get a step for the new order screen and the grouped menu (`web/app/portal/tours/catalogue.ts`).
-- **Who keyed it in:** show "Entered by" on each order (the audit log has it; staff cannot see it where they work).
-- **Contrast:** the grey used for hints and small labels (`#6c7493` on near-white) is below the usual readable contrast at 11-12px. Darken it a step.
-- **Saved menu state** is per browser (local storage). That is fine, but it is not shared between a person's phone and laptop.
-
-## What would make a good next step
-
-Items 1, 2 and 5 together: they are all small, they use pieces that now exist, and they remove the roughest edges staff will meet this week. Items 3 and 4 are the ones staff will ask for next.
+- **Unsaved-changes guard** on the remaining forms (stores, categories, consignments, accounting). One line per form once the form's save handler is identified.
+- **Saved menu state** is per browser (local storage), so it is not shared between a person's phone and laptop.
+- **Reseller and wholesale tagging stops marketing WhatsApp messages** to that customer (the system already treats trade numbers that way). Staff should know this when tagging.
+- **A search by customer on the orders list** matches the name and phone stored on the order. Orders created before this change with only a customer id (some other client may have done that) have no stored name, so searching their customer's name will not find them (searching from the menu finder, or opening the customer, will).

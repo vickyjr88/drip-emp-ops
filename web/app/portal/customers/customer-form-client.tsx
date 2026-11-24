@@ -10,6 +10,7 @@
  */
 
 import Link from 'next/link';
+import { TierTag, type Tier } from '../components/customer-picker';
 import { useUnsavedGuard } from '../components/use-unsaved-guard';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
@@ -27,10 +28,12 @@ type Customer = {
   lastName: string;
   email: string;
   phone: string;
+  priceTier?: Tier | null;
+  businessName?: string | null;
   portalEnabled: boolean;
 };
 
-const BLANK = { firstName: '', lastName: '', email: '', phone: '' };
+const BLANK = { firstName: '', lastName: '', email: '', phone: '', priceTier: 'RETAIL' as Tier, businessName: '' };
 
 export default function CustomerFormClient({
   mode,
@@ -68,6 +71,8 @@ export default function CustomerFormClient({
           // A customer with only a phone number is stored under a stand-in address: the box shows empty, not that.
           email: realEmail(customer.email) || '',
           phone: customer.phone || '',
+          priceTier: customer.priceTier || 'RETAIL',
+          businessName: customer.businessName || '',
         });
         setPortalEnabled(customer.portalEnabled);
       }
@@ -95,6 +100,9 @@ export default function CustomerFormClient({
         // Left out when blank: a customer with no email stays as they are, and one who is given an email gains it (and Mautic is told).
         ...(form.email.trim() ? { email: form.email.trim().toLowerCase() } : {}),
         phone: form.phone.trim(),
+        priceTier: form.priceTier,
+        // Blank clears it; a retail customer's business name is left as it is.
+        ...(form.priceTier !== 'RETAIL' ? { businessName: form.businessName.trim() || null } : {}),
       };
       if (mode === 'edit' && customerId) {
         await apiRequest(`/customers/${customerId}`, { method: 'PATCH', body: JSON.stringify(body) }, token);
@@ -205,6 +213,24 @@ export default function CustomerFormClient({
                       onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
                     />
                   </label>
+                </div>
+
+                <div className="portal-entity-grid-2">
+                  <div className="pform-field">
+                    <span className="pform-label">Customer type</span>
+                    <TierTag value={form.priceTier} disabled={!canWrite} onChange={(priceTier) => { setForm((prev) => ({ ...prev, priceTier })); guard.markDirty(); }} />
+                  </div>
+                  {form.priceTier !== 'RETAIL' ? (
+                    <label>
+                      <span>Business <small className="portal-muted">(optional)</small></span>
+                      <input
+                        value={form.businessName}
+                        placeholder="Shop or business name"
+                        disabled={!canWrite}
+                        onChange={(event) => setForm((prev) => ({ ...prev, businessName: event.target.value }))}
+                      />
+                    </label>
+                  ) : null}
                 </div>
 
                 {mode === 'edit' ? (
