@@ -73,6 +73,14 @@ export default function OrdersPage() {
   const [awaitingSupplierOnly, setAwaitingSupplierOnly] = useState(false);
   const [channelFilter, setChannelFilter] = useState('');
   const [tradeOnly, setTradeOnly] = useState(false);
+  // Links from elsewhere (the dashboard's to-do list) arrive with a filter already chosen.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('status')) setStatusFilter(q.get('status') as string);
+    if (q.get('awaitingSupplier')) setAwaitingSupplierOnly(true);
+    if (q.get('channel')) setChannelFilter(q.get('channel') as string);
+    if (q.get('trade')) setTradeOnly(true);
+  }, []);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 

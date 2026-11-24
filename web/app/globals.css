@@ -14633,3 +14633,16 @@ img {
   .portal-list-row .portal-inline-btn { min-height: 40px; }
   .portal-list-meta { display: grid; gap: 2px; }
 }
+
+/* Dashboard: what needs a person today */
+.ptodo { display: grid; gap: 4px; margin-bottom: 20px; }
+.ptodo-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
+.ptodo-list li + li { border-top: 1px solid #eceef1; }
+.ptodo-list a { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 4px; text-decoration: none; color: #1a1c1c; border-radius: 6px; }
+.ptodo-list a:hover { background: #f3f4f8; }
+.ptodo-list strong { font: 800 22px 'Manrope', sans-serif; text-align: right; }
+.ptodo-list span { display: grid; gap: 1px; font: 700 14px 'Manrope', sans-serif; }
+.ptodo-list small { font: 500 12.5px 'Manrope', sans-serif; color: #5a617f; }
+.ptodo-list em { font-style: normal; color: #5a617f; }
+.ptodo-list strong.is-money { font-size: 15px; }
+.ptodo-list a:has(strong.is-money) { grid-template-columns: 110px minmax(0, 1fr) auto; }

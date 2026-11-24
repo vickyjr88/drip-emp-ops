@@ -102,6 +102,8 @@ export default function PortalPage() {
   const [consignmentCount, setConsignmentCount] = useState<number | null>(null);
   const [resellerCount, setResellerCount] = useState<number | null>(null);
   const [customerCount, setCustomerCount] = useState<number | null>(null);
+  // What needs a person today: each row is a count and where to go to deal with it. A source the role cannot read is simply not asked.
+  const [todoInputs, setTodoInputs] = useState<{ awaitingSupplier: number; leads: number; failedFollowUps: number } | null>(null);
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -144,6 +146,14 @@ export default function PortalPage() {
         setCustomerCount(typeof customerPage?.total === 'number' ? customerPage.total : null);
         setResellerCount(typeof resellerPage?.total === 'number' ? resellerPage.total : null);
       }
+
+      const total = (path: string) => apiRequest<{ total: number }>(path, { method: 'GET' }, authToken).then((p) => (typeof p?.total === 'number' ? p.total : 0)).catch(() => 0);
+      const [awaitingSupplier, leads, failedFollowUps] = await Promise.all([
+        hasPermission(nextProfile, 'order.read') ? total('/orders?awaitingSupplier=true&take=1') : Promise.resolve(0),
+        hasPermission(nextProfile, 'cart-lead.read') ? total('/cart-leads?outstanding=true&take=1') : Promise.resolve(0),
+        hasPermission(nextProfile, 'cart-lead.read') ? total('/cart-leads?outstanding=true&followUp=FAILED&take=1') : Promise.resolve(0),
+      ]);
+      setTodoInputs({ awaitingSupplier, leads, failedFollowUps });
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -237,6 +247,27 @@ export default function PortalPage() {
 
   // Only a card whose permission the signed-in role actually has: a link to a
   // page that would 403 on arrival is worse than no card at all.
+  const todoRows: Array<{ key: string; label: string; detail: string; count: number; figure?: string; href: string }> = [
+    ...(summary && summary.unconfirmed.count > 0
+      ? [{ key: 'unpaid', label: 'Orders waiting for payment', detail: `${formatMoney(summary.unconfirmed.value)} not yet paid`, count: summary.unconfirmed.count, href: '/portal/orders?status=PENDING' }]
+      : []),
+    ...(summary && summary.outstanding > 0
+      ? [{ key: 'owing', label: 'Money owed on part-paid orders', detail: 'Take the balance from the order', count: 1, figure: formatMoney(summary.outstanding), href: '/portal/orders' }]
+      : []),
+    ...(todoInputs && todoInputs.awaitingSupplier > 0
+      ? [{ key: 'supplier', label: 'Orders waiting on a supplier', detail: 'Bought in for the customer and not handed over yet', count: todoInputs.awaitingSupplier, href: '/portal/orders?awaitingSupplier=1' }]
+      : []),
+    ...(todoInputs && todoInputs.failedFollowUps > 0
+      ? [{ key: 'failedfollowup', label: 'Leads the automatic follow-up could not reach', detail: 'No WhatsApp or email went through: phone them', count: todoInputs.failedFollowUps, href: '/portal/cart-leads' }]
+      : []),
+    ...(todoInputs && todoInputs.leads > 0
+      ? [{ key: 'leads', label: 'Carts and WhatsApp enquiries still open', detail: 'Shoppers who have not bought yet', count: todoInputs.leads, href: '/portal/cart-leads' }]
+      : []),
+    ...(Array.isArray(lowStock) && lowStock.length > 0
+      ? [{ key: 'lowstock', label: 'Sizes running low', detail: 'At or under their reorder level', count: lowStock.length, href: '/portal/inventory' }]
+      : []),
+  ];
+
   const navCards: NavCard[] = [
     hasPermission(profile, 'order.read')
       ? { key: 'orders', label: 'Orders', href: '/portal/orders', count: summary?.orderCount ?? null, icon: NAV_ICONS.orders }
@@ -271,6 +302,27 @@ export default function PortalPage() {
             onLogout={onLogout}
             onRefresh={() => token && void load(token)}
           >
+            {todoRows.length > 0 || todoInputs ? (
+              <article className="portal-card ptodo" data-tour="dashboard.todo">
+                <h2 style={{ margin: 0 }}>Needs you today</h2>
+                {todoRows.length === 0 ? (
+                  <p className="portal-muted" style={{ margin: '8px 0 0' }}>Nothing is waiting on you right now.</p>
+                ) : (
+                  <ul className="ptodo-list">
+                    {todoRows.map((row) => (
+                      <li key={row.key}>
+                        <Link href={row.href}>
+                          <strong className={row.figure ? 'is-money' : undefined}>{row.figure ?? row.count.toLocaleString('en-KE')}</strong>
+                          <span>{row.label}<small>{row.detail}</small></span>
+                          <em aria-hidden="true">→</em>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+            ) : null}
+
             {navCards.length > 0 ? (
               <div className="portal-nav-card-grid">
                 {navCards.map((card) => (
