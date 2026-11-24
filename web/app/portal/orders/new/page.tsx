@@ -33,7 +33,7 @@ type Line = { option: Option; quantity: number; unitPrice: number; priceEdited: 
 type LeadLine = { variantId: string; sku: string; name: string; size: string; quantity: number; priceKes: number };
 type Lead = {
   id: string; source: 'WHATSAPP_ORDER' | 'ABANDONED_CART'; customerName?: string | null; customerPhone?: string | null; customerEmail?: string | null;
-  lines: LeadLine[]; shippingAddress?: string | null;
+  lines: LeadLine[]; shippingAddress?: string | null; shipping?: string | number | null;
 };
 
 const CHANNELS: Array<{ value: string; label: string }> = [
@@ -173,6 +173,7 @@ export default function NewOrderPage() {
         setLead(found);
         if (found.source === 'WHATSAPP_ORDER') setChannel('WHATSAPP');
         if (found.shippingAddress) setAddress(found.shippingAddress);
+        if (found.shipping && Number(found.shipping) > 0 && found.source === 'WHATSAPP_ORDER') setShipping(String(Number(found.shipping)));
 
         // The items: look each up again so prices and stock are today's, not the cart's.
         const options = await Promise.all(found.lines.map((l) => apiRequest<Option[]>(`/products/variants/lookup?q=${encodeURIComponent(l.sku)}&storeId=${storeId}&limit=5`, { method: 'GET' }, token)
@@ -191,6 +192,16 @@ export default function NewOrderPage() {
       }
     })();
   }, [token, storeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- a customer chosen on the customers list ("New order" beside their name) ---------------------------------------------
+  useEffect(() => {
+    if (!token) return;
+    const customerId = new URLSearchParams(window.location.search).get('customer');
+    if (!customerId) return;
+    apiRequest<PickedCustomer>(`/customers/${encodeURIComponent(customerId)}`, { method: 'GET' }, token)
+      .then((found) => { if (found) chooseCustomer(found); })
+      .catch(setErrorMessage);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- placing it ------------------------------------------------------------------------------------------------------
   const problems = useMemo(() => {

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useRegisterTourViewer, useTours } from '../tours/tour-provider';
 import { TourChecklist } from '../tours/checklist';
+import { PortalNav } from './portal-nav';
 
 export type PortalNavKey =
   | 'dashboard'
@@ -43,46 +44,6 @@ export type PortalNavKey =
   | 'audit'
   | 'rbac';
 
-const NAV_ITEMS: Array<{ key: PortalNavKey; href: string; label: string }> = [
-  { key: 'dashboard', href: '/portal', label: 'Dashboard' },
-  // Catalogue before inventory before orders: the order things are set up in.
-  { key: 'stores', href: '/portal/stores', label: 'Stores' },
-  { key: 'catalogue', href: '/portal/catalogue', label: 'Catalogue' },
-  { key: 'media', href: '/portal/media', label: 'Media' },
-  { key: 'kits', href: '/portal/kits', label: 'Kits' },
-  { key: 'watches', href: '/portal/watches', label: 'Watches' },
-  { key: 'featuredProducts', href: '/portal/featured-products', label: 'Featured Products' },
-  { key: 'categories', href: '/portal/categories', label: 'Categories' },
-  { key: 'inventory', href: '/portal/inventory', label: 'Inventory' },
-  { key: 'orders', href: '/portal/orders', label: 'Orders' },
-  { key: 'cartLeads', href: '/portal/cart-leads', label: 'Cart Leads' },
-  { key: 'consignments', href: '/portal/consignments', label: 'Consignments' },
-  { key: 'offers', href: '/portal/offers', label: 'Offers' },
-  { key: 'resellers', href: '/portal/resellers', label: 'Resellers' },
-  { key: 'resellerApplications', href: '/portal/reseller-applications', label: 'Reseller Applications' },
-  { key: 'resellerPayouts', href: '/portal/reseller-payouts', label: 'Reseller Payouts' },
-  { key: 'campaigns', href: '/portal/campaigns', label: 'Campaigns' },
-  { key: 'customers', href: '/portal/customers', label: 'Customers' },
-  { key: 'outreach', href: '/portal/outreach', label: 'WhatsApp Outreach' },
-  { key: 'inquiries', href: '/portal/inquiries', label: 'Inquiries' },
-  { key: 'reviews', href: '/portal/reviews', label: 'Reviews' },
-  { key: 'accounting', href: '/portal/accounting', label: 'Accounting' },
-  { key: 'analytics', href: '/portal/analytics', label: 'Analytics' },
-  { key: 'insights', href: '/portal/insights', label: 'Insights' },
-  { key: 'dailyReport', href: '/portal/daily-report', label: 'Daily Report' },
-  { key: 'social', href: '/portal/social', label: 'Social Posting' },
-  { key: 'statusKit', href: '/portal/status-kit', label: 'WhatsApp Status' },
-  { key: 'reminders', href: '/portal/reminders', label: 'Reminders' },
-  { key: 'content', href: '/portal/content', label: 'Site Content' },
-  { key: 'blog', href: '/portal/blog', label: 'Blog' },
-  { key: 'users', href: '/portal/users', label: 'Users' },
-  { key: 'hr', href: '/portal/hr', label: 'Staff & Leave' },
-  { key: 'payroll', href: '/portal/payroll', label: 'Payroll' },
-  { key: 'importers', href: '/portal/importers', label: 'Importers' },
-  { key: 'audit', href: '/portal/audit', label: 'Audit Log' },
-  { key: 'rbac', href: '/portal/rbac', label: 'RBAC' },
-];
-
 const PAGE_TITLES: Record<PortalNavKey, string> = {
   dashboard: 'Dashboard',
   stores: 'Stores',
@@ -119,7 +80,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   payroll: 'Payroll',
   importers: 'Importers',
   audit: 'Audit Log',
-  rbac: 'RBAC',
+  rbac: 'Roles & permissions',
 };
 
 type PortalShellProps = {
@@ -205,6 +166,17 @@ export function PortalShell({
     };
   }, []);
 
+  // Scrolling the page with the mouse over a focused number box changes the number (a price of 3,800 becomes 3,799 on the way down the page).
+  // Dropping focus first lets the wheel scroll the page and leaves the value alone.
+  useEffect(() => {
+    function onWheel(event: WheelEvent) {
+      const field = document.activeElement;
+      if (field instanceof HTMLInputElement && field.type === 'number' && event.target === field) field.blur();
+    }
+    document.addEventListener('wheel', onWheel, { passive: true });
+    return () => document.removeEventListener('wheel', onWheel);
+  }, []);
+
   useEffect(() => {
     if (!navOpen) return;
 
@@ -223,12 +195,6 @@ export function PortalShell({
   }, [navOpen]);
 
   const title = pageTitle || PAGE_TITLES[active];
-  const navItems = NAV_ITEMS.filter((item) => {
-    if (item.key === 'rbac') return canReadRbac;
-    if (item.key === 'users') return canReadUsers || canReadRbac;
-    return true;
-  });
-
   const shell = (
     <div className="portal-shell">
       {navOpen ? (
@@ -248,20 +214,12 @@ export function PortalShell({
           <p className="portal-kicker">Control Center</p>
           <strong>Operations</strong>
         </div>
-        <nav className="portal-sidebar-nav">
-          {navItems.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={active === item.key ? 'is-active' : undefined}
-              aria-current={active === item.key ? 'page' : undefined}
-              data-tour={`nav.${item.key}`}
-              onClick={() => setNavOpen(false)}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <PortalNav
+          active={active}
+          canReadRbac={canReadRbac}
+          canReadUsers={canReadUsers}
+          onNavigate={() => setNavOpen(false)}
+        />
 
         {hasViewer && safeAvailableTours.length > 0 ? (
           <button

@@ -14491,3 +14491,89 @@ img {
   .pline-total { grid-column: 1 / -1; grid-auto-flow: column; justify-content: space-between; align-items: center; justify-items: start; text-align: left; }
   .ptier-opt { padding: 0 12px; }
 }
+
+/* ---------------------------------------------------------------------
+   Portal side menu: grouped, with icons (portal/components/portal-nav.tsx)
+   --------------------------------------------------------------------- */
+.portal-sidebar .pnav { display: grid; gap: 4px; align-content: start; }
+
+.pnav-new {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; margin-bottom: 6px;
+  background: var(--eef-primary); color: #fff; text-decoration: none; border-radius: 8px;
+  font: 800 12px 'Manrope', sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.portal-sidebar .pnav .pnav-new { color: #fff; border: 0; min-height: 46px; }
+.portal-sidebar .pnav .pnav-new:hover { filter: brightness(1.12); background: var(--eef-primary); border: 0; }
+.portal-sidebar .pnav .pnav-new span { color: #fff; }
+.pnav-new:focus-visible, .pnav .pnav-link:focus-visible, .pnav-heading:focus-visible, .pnav-find input:focus-visible { outline: 2px solid var(--eef-primary); outline-offset: 2px; }
+
+.pnav-find { position: relative; display: flex; align-items: center; margin-bottom: 8px; color: #6c7493; }
+.pnav-find svg { position: absolute; left: 11px; pointer-events: none; }
+.pnav-find input {
+  width: 100%; min-height: 40px; padding: 0 44px 0 34px; border: 1px solid #d5d8de; border-radius: 8px; background: #fff;
+  font: 500 13px 'Manrope', sans-serif; color: #1a1c1c;
+}
+.pnav-find input::placeholder { color: #8a90a6; }
+.pnav-find kbd { position: absolute; right: 9px; padding: 1px 5px; border: 1px solid #d5d8de; border-radius: 4px; background: #f3f3f4; font: 600 10px 'Manrope', sans-serif; color: #6c7493; }
+@media (max-width: 900px) { .pnav-find kbd { display: none; } .pnav-find input { padding-right: 12px; font-size: 16px; } }
+
+.portal-sidebar .pnav .pnav-link {
+  display: flex; align-items: center; gap: 11px; min-height: 40px; padding: 7px 12px; border: 0; border-radius: 8px;
+  text-transform: none; letter-spacing: 0; font: 600 13.5px 'Manrope', sans-serif; color: #2b2e3a; text-decoration: none;
+}
+.portal-sidebar .pnav .pnav-link svg { flex: none; color: #6c7493; }
+.portal-sidebar .pnav .pnav-link small { margin-left: auto; font: 500 11px 'Manrope', sans-serif; color: #8a90a6; text-transform: none; letter-spacing: 0; }
+.portal-sidebar .pnav .pnav-link:hover { background: #ececee; border: 0; }
+.portal-sidebar .pnav .pnav-link.is-active { background: #1a1c1c; color: #fff; }
+.portal-sidebar .pnav .pnav-link.is-active svg, .portal-sidebar .pnav .pnav-link.is-active small { color: #fff; }
+
+.pnav-group { margin-top: 6px; }
+.pnav-heading {
+  display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 6px 12px; cursor: pointer; list-style: none; user-select: none;
+  font: 800 10.5px 'Manrope', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: #6c7493; border-radius: 6px;
+}
+.pnav-heading::-webkit-details-marker { display: none; }
+.pnav-heading:hover { color: #1a1c1c; }
+.pnav-heading span { flex: 1; }
+.pnav-chevron { transition: transform 0.15s ease; }
+.pnav-group:not([open]) .pnav-chevron { transform: rotate(-90deg); }
+.pnav-items { display: grid; gap: 2px; margin-top: 2px; padding-left: 4px; }
+.pnav-results { display: grid; gap: 2px; }
+.pnav-none { margin: 8px 12px; font-size: 13px; color: #6c7493; }
+@media (prefers-reduced-motion: reduce) { .pnav-chevron { transition: none; } }
+.pnav-find input[type="search"]::-webkit-search-cancel-button, .pnav-find input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+
+/* ---------------------------------------------------------------------
+   Easier forms, everywhere a staff form uses portal-entity-form or portal-dialog
+   --------------------------------------------------------------------- */
+/* A star on the label of anything required, so nobody learns it by being refused. */
+.portal-entity-form label:has(:required) > span:first-child::after,
+.portal-dialog label:has(:required) > span:first-child::after { content: ' *'; color: #b3261e; font-weight: 800; }
+
+.portal-entity-form input:focus-visible, .portal-entity-form select:focus-visible, .portal-entity-form textarea:focus-visible,
+.portal-dialog input:focus-visible, .portal-dialog select:focus-visible, .portal-dialog textarea:focus-visible {
+  border-color: var(--eef-primary); outline: none; box-shadow: 0 0 0 3px rgba(2, 11, 61, 0.14);
+}
+/* Red only after the person has touched the field, never on a fresh form. */
+.portal-entity-form input:user-invalid, .portal-entity-form select:user-invalid, .portal-entity-form textarea:user-invalid,
+.portal-dialog input:user-invalid, .portal-dialog select:user-invalid, .portal-dialog textarea:user-invalid { border-color: #b3261e; box-shadow: 0 0 0 3px rgba(179, 38, 30, 0.12); }
+
+.portal-entity-form input:disabled, .portal-entity-form select:disabled, .portal-entity-form textarea:disabled { background: #f3f3f4; color: #8a8f99; cursor: not-allowed; }
+.portal-entity-form small, .portal-dialog small { line-height: 1.45; }
+.portal-entity-form input[type="number"], .portal-dialog input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.portal-entity-form input[type="number"]::-webkit-outer-spin-button, .portal-entity-form input[type="number"]::-webkit-inner-spin-button,
+.portal-dialog input[type="number"]::-webkit-outer-spin-button, .portal-dialog input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.portal-entity-form .portal-check input, .portal-dialog .portal-check input { width: 20px; height: 20px; min-height: 0; flex: none; }
+
+@media (max-width: 900px) {
+  /* 16px stops iOS zooming the page when a field is tapped; taller fields are easier to hit with a thumb. */
+  .portal-entity-form input, .portal-entity-form select, .portal-entity-form textarea,
+  .portal-dialog input, .portal-dialog select, .portal-dialog textarea { font-size: 16px; min-height: 48px; }
+  .portal-entity-form .portal-primary-btn, .portal-entity-form .portal-ghost-btn { width: 100%; min-height: 48px; }
+  .portal-entity-grid-2, .portal-entity-grid-3 { grid-template-columns: 1fr; }
+}
+
+/* A small tag beside a customer's name for trade customers */
+.ptag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font: 800 10px 'Manrope', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; vertical-align: 2px; }
+.ptag-reseller { background: #e8ebff; color: #1c2a8c; }
+.ptag-wholesale { background: #fff1d6; color: #8a5300; }

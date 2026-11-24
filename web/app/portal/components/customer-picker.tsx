@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { realEmail } from '../../lib/contact-email';
 import { apiRequest, formatDateTime } from '../accounting/lib';
 import { Combobox } from './combobox';
 
@@ -132,7 +133,7 @@ export function CustomerPicker({ token, value, onChange, canCreate, canTag, init
               {customer.priceTier !== 'RETAIL' ? <span className={`pcust-tier is-${customer.priceTier.toLowerCase()}`}>{TIER_LABEL[customer.priceTier]}</span> : null}
             </span>
             <span className="pcust-sub">
-              {[customer.phone, customer.email].filter(Boolean).join(' · ')}
+              {[customer.phone, realEmail(customer.email)].filter(Boolean).join(' · ')}
               {customer.orders ? ` · ${customer.orders} order${customer.orders === 1 ? '' : 's'}${customer.lastOrderAt ? `, last ${formatDateTime(customer.lastOrderAt).split(',')[0]}` : ''}` : ' · no orders yet'}
             </span>
           </span>
@@ -174,7 +175,7 @@ function SelectedCustomer({ token, customer, canTag, onChange, onClear }: { toke
           <strong className="pcust-name">{customer.firstName} {customer.lastName}</strong>
           {customer.businessName ? <span className="pcust-biz"> · {customer.businessName}</span> : null}
           <div className="pcust-sub">
-            {[customer.phone, customer.email].filter(Boolean).join(' · ')}
+            {[customer.phone, realEmail(customer.email)].filter(Boolean).join(' · ')}
             {customer.orders ? ` · ${customer.orders} order${customer.orders === 1 ? '' : 's'}` : ''}
           </div>
         </div>

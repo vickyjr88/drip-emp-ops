@@ -32,6 +32,8 @@ type Customer = {
   lastName: string;
   email: string;
   phone?: string | null;
+  priceTier?: 'RETAIL' | 'RESELLER' | 'WHOLESALE' | null;
+  businessName?: string | null;
   portalEnabled: boolean;
   portalLastLoginAt?: string | null;
   createdAt: string;
@@ -204,8 +206,12 @@ export default function CustomersPage() {
                           <Link href={`/portal/customers/${customer.id}`}>
                             {customer.firstName} {customer.lastName}
                           </Link>
+                          {customer.priceTier && customer.priceTier !== 'RETAIL' ? (
+                            <span className={`ptag ptag-${customer.priceTier.toLowerCase()}`}>{customer.priceTier === 'RESELLER' ? 'Reseller' : 'Wholesale'}</span>
+                          ) : null}
                         </strong>
                         <p className="portal-muted" style={{ margin: '2px 0 0' }}>
+                          {customer.businessName ? `${customer.businessName} · ` : ''}
                           {realEmail(customer.email) ?? 'No email'}
                           {customer.phone ? ` · ${customer.phone}` : ''}
                         </p>
@@ -219,9 +225,14 @@ export default function CustomersPage() {
                         </span>
                         <span className="portal-muted">Added {formatDateTime(customer.createdAt)}</span>
                       </div>
-                      <Link href={`/portal/customers/${customer.id}`} className="portal-inline-btn">
-                        Open
-                      </Link>
+                      <div className="portal-inline-actions">
+                        <Link href={`/portal/orders/new?customer=${customer.id}`} className="portal-inline-btn">
+                          New order
+                        </Link>
+                        <Link href={`/portal/customers/${customer.id}`} className="portal-inline-btn">
+                          Open
+                        </Link>
+                      </div>
                     </div>
                   ))
                 )}

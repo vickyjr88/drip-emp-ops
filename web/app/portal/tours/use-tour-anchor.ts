@@ -10,6 +10,17 @@ export type AnchorRect = {
 };
 
 /**
+ * Finds the element a step points at. A menu link inside a folded group has no size, so the group is opened first: otherwise the step would
+ * be skipped as if the link did not exist.
+ */
+function findAnchor(anchor: string): HTMLElement | null {
+  const element = document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`);
+  const folded = element?.closest('details:not([open])');
+  if (folded) folded.setAttribute('open', '');
+  return element;
+}
+
+/**
  * Resolves a data-tour value to its on-screen rectangle, kept current as the
  * page scrolls or resizes.
  *
@@ -29,7 +40,7 @@ export function useTourAnchor(anchor: string | undefined, enabled: boolean) {
       return;
     }
 
-    const element = document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`);
+    const element = findAnchor(anchor);
     if (!element) {
       setRect(null);
       setResolved(true);
@@ -53,7 +64,7 @@ export function useTourAnchor(anchor: string | undefined, enabled: boolean) {
     setResolved(false);
 
     const element = anchor
-      ? document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`)
+      ? findAnchor(anchor)
       : null;
 
     // Bring an off-screen anchor into view before measuring, otherwise the
@@ -69,7 +80,7 @@ export function useTourAnchor(anchor: string | undefined, enabled: boolean) {
     // would spotlight where the anchor used to be.
     const settle = window.requestAnimationFrame(() => {
       const current = anchor
-        ? document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`)
+        ? findAnchor(anchor)
         : null;
       if (current) {
         current.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
@@ -100,7 +111,7 @@ export function useTourAnchor(anchor: string | undefined, enabled: boolean) {
     if (anchor && !element) {
       const started = Date.now();
       poll = window.setInterval(() => {
-        const late = document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`);
+        const late = findAnchor(anchor);
         if (late) {
           window.clearInterval(poll);
           poll = undefined;
