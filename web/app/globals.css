@@ -14577,3 +14577,40 @@ img {
 .ptag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font: 800 10px 'Manrope', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; vertical-align: 2px; }
 .ptag-reseller { background: #e8ebff; color: #1c2a8c; }
 .ptag-wholesale { background: #fff1d6; color: #8a5300; }
+
+/* ---------------------------------------------------------------------
+   Printable receipt (portal/orders/[id]/receipt)
+   --------------------------------------------------------------------- */
+.receipt-page { max-width: 460px; margin: 0 auto; padding: 24px 16px 48px; font-family: 'Manrope', sans-serif; color: #1a1c1c; }
+.receipt-actions { display: flex; gap: 10px; margin-bottom: 18px; }
+.receipt-error { color: #b3261e; }
+.receipt-sheet { background: #fff; border: 1px solid #d5d8de; border-radius: 8px; padding: 26px 24px; }
+.receipt-sheet header { text-align: center; margin-bottom: 16px; }
+.receipt-sheet h1 { margin: 0; font: 600 24px 'Libre Caslon Text', serif; }
+.receipt-sheet header p { margin: 4px 0 0; font-size: 13px; color: #6c7493; }
+.receipt-meta, .receipt-totals { margin: 0; display: grid; gap: 6px; font-size: 13px; }
+.receipt-meta > div, .receipt-totals > div { display: flex; justify-content: space-between; gap: 16px; }
+.receipt-meta dt, .receipt-totals dt { color: #6c7493; }
+.receipt-meta dd, .receipt-totals dd { margin: 0; text-align: right; font-weight: 600; }
+.receipt-lines { width: 100%; margin: 16px 0; border-collapse: collapse; font-size: 13px; }
+.receipt-lines th { text-align: left; font: 800 10px 'Manrope', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: #6c7493; padding: 6px 0; border-bottom: 1px solid #1a1c1c; }
+.receipt-lines th:not(:first-child), .receipt-lines td:not(:first-child) { text-align: right; white-space: nowrap; padding-left: 10px; }
+.receipt-lines td { padding: 8px 0; border-bottom: 1px solid #eceef1; vertical-align: top; }
+.receipt-lines small { color: #6c7493; }
+.receipt-totals .is-total { padding-top: 8px; border-top: 1px solid #1a1c1c; font-size: 15px; }
+.receipt-totals .is-total dt { color: #1a1c1c; font-weight: 800; }
+.receipt-sheet footer { margin-top: 20px; text-align: center; font-size: 12px; color: #6c7493; }
+@media print {
+  body * { visibility: hidden; }
+  .receipt-sheet, .receipt-sheet * { visibility: visible; }
+  .receipt-sheet { position: absolute; left: 0; top: 0; width: 100%; border: 0; padding: 0; }
+  .receipt-actions { display: none; }
+}
+
+/* Finder results beyond pages: customers, orders, products */
+.pnav-section { margin: 10px 12px 2px; font: 800 10px 'Manrope', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; color: #6c7493; }
+.portal-sidebar .pnav .pnav-record { display: grid; gap: 1px; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: #1a1c1c; }
+.portal-sidebar .pnav .pnav-record strong { font: 700 13.5px 'Manrope', sans-serif; text-transform: none; letter-spacing: 0; }
+.portal-sidebar .pnav .pnav-record small { font: 500 12px 'Manrope', sans-serif; color: #6c7493; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
+.portal-sidebar .pnav .pnav-record:hover, .portal-sidebar .pnav .pnav-record.is-hover, .portal-sidebar .pnav .pnav-link.is-hover { background: #e4e7ef; }
+.pnav-record .ptag { margin-left: 6px; }

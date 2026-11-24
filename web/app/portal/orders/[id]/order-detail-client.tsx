@@ -56,6 +56,8 @@ type Order = {
   lines: OrderLine[];
   payments: Payment[];
   followUp?: FollowUp | null;
+  /** The receipt as a WhatsApp message to send: opens the chat with the text ready. */
+  receipt?: { phone: string; message: string; url: string } | null;
 };
 
 type SupplierInvoiceOption = { id: string; invoiceNumber: string; supplier?: { name: string } };
@@ -419,6 +421,19 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                 Back to Orders
               </Link>
               <div className="portal-action-row">
+                {hasPermission(profile, 'order.create') ? (
+                  <Link href={`/portal/orders/new?again=${order.id}`} className="portal-inline-btn" title="Start a new order with the same customer and items">
+                    Order again
+                  </Link>
+                ) : null}
+                {order.receipt && order.status !== 'CANCELLED' ? (
+                  <a className="portal-inline-btn" href={order.receipt.url} target="_blank" rel="noopener noreferrer" title="Opens WhatsApp with the receipt written. You press send.">
+                    Send receipt on WhatsApp
+                  </a>
+                ) : null}
+                <Link href={`/portal/orders/${order.id}/receipt`} className="portal-inline-btn" target="_blank">
+                  Print receipt
+                </Link>
                 <FollowUpButton followUp={order.followUp} />
                 <span className="portal-chip">{order.status}</span>
                 {isSourcing ? <span className="portal-chip is-danger">Sourcing</span> : null}

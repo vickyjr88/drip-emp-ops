@@ -77,7 +77,8 @@ export default function NewOrderPage() {
   const [pay, setPay] = useState({ on: true, method: 'MPESA', amount: '', reference: '' });
   const [payTouched, setPayTouched] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [placed, setPlaced] = useState<{ id: string; orderNumber: string; total: number; paid: number } | null>(null);
+  const [placed, setPlaced] = useState<{ id: string; orderNumber: string; total: number; paid: number; receiptUrl: string | null } | null>(null);
+  const [againNote, setAgainNote] = useState<string | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const [leadNote, setLeadNote] = useState<string | null>(null);
   const [leadStart, setLeadStart] = useState<{ query: string; creating: ReturnType<typeof splitTyped> | null } | null>(null);
@@ -193,6 +194,43 @@ export default function NewOrderPage() {
     })();
   }, [token, storeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ---- ordering again: the same customer and items as an earlier order, at today's prices and stock ----------------------
+  useEffect(() => {
+    if (!token) return;
+    const orderId = new URLSearchParams(window.location.search).get('again');
+    if (!orderId) return;
+    void (async () => {
+      try {
+        const before = await apiRequest<{
+          orderNumber: string; channel: string; customerName?: string | null; customerPhone?: string | null; shippingAddress?: string | null;
+          store: { id: string }; customer?: { id: string } | null;
+          lines: Array<{ quantity: number; variant?: { id: string; sku: string } | null }>;
+        }>(`/orders/${orderId}`, { method: 'GET' }, token);
+        setStoreId(before.store.id);
+        if (CHANNELS.some((c) => c.value === before.channel)) setChannel(before.channel);
+        if (before.shippingAddress) setAddress(before.shippingAddress);
+
+        let priceList: Tier = 'RETAIL';
+        if (before.customer) {
+          const found = await apiRequest<PickedCustomer>(`/customers/${before.customer.id}`, { method: 'GET' }, token).catch(() => null);
+          if (found) { chooseCustomer(found); priceList = found.priceTier; }
+        } else {
+          setWalkIn(true);
+          setWalkInInfo({ name: before.customerName ?? '', phone: before.customerPhone ?? '' });
+        }
+
+        const wanted = before.lines.filter((l) => l.variant);
+        const options = await Promise.all(wanted.map((l) => apiRequest<Option[]>(`/products/variants/lookup?q=${encodeURIComponent(l.variant!.sku)}&storeId=${before.store.id}&limit=5`, { method: 'GET' }, token)
+          .then((rows) => rows.find((o) => o.variantId === l.variant!.id)).catch(() => undefined)));
+        const gone = wanted.filter((_, i) => !options[i]).length;
+        setLines(wanted.flatMap((l, i) => (options[i] ? [{ option: options[i] as Option, quantity: l.quantity, unitPrice: tierPrice(options[i] as Option, priceList), priceEdited: false, discount: 0, fulfillmentType: (options[i] as Option).mustOrder ? 'SUPPLIER_ORDER' as Fulfilment : 'STOCK' as Fulfilment }] : [])));
+        setAgainNote(`Ordering again from ${before.orderNumber}, at today's prices and stock.${gone ? ` ${gone} item${gone === 1 ? ' is' : 's are'} no longer on sale and ${gone === 1 ? 'was' : 'were'} left off.` : ''}`);
+      } catch (error) {
+        setErrorMessage(error);
+      }
+    })();
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---- a customer chosen on the customers list ("New order" beside their name) ---------------------------------------------
   useEffect(() => {
     if (!token) return;
@@ -258,7 +296,9 @@ export default function NewOrderPage() {
         }
       }
       if (lead) await apiRequest(`/cart-leads/${lead.id}/convert`, { method: 'PATCH', body: JSON.stringify({ orderId: order.id }) }, token).catch(() => undefined);
-      setPlaced({ id: order.id, orderNumber: order.orderNumber, total: Number(order.total), paid: recorded });
+      // The receipt text is written by the server once the payment is in, so it shows what was paid. No receipt (no phone) just means no button.
+      const receipt = await apiRequest<{ receipt?: { url: string } | null }>(`/orders/${order.id}`, { method: 'GET' }, token).then((o) => o.receipt?.url ?? null).catch(() => null);
+      setPlaced({ id: order.id, orderNumber: order.orderNumber, total: Number(order.total), paid: recorded, receiptUrl: receipt });
     } catch (error) {
       setErrorMessage(error);
     } finally {
@@ -269,7 +309,7 @@ export default function NewOrderPage() {
   function startAgain() {
     setPlaced(null); setLines([]); setCustomer(null); setWalkIn(false); setWalkInInfo({ name: '', phone: '' }); setTier('RETAIL'); setAddress('');
     setShipping(''); setOrderDiscount(''); setNotes(''); setPayTouched(false); setPay({ on: true, method: 'MPESA', amount: '', reference: '' }); setChannel('IN_STORE');
-    setLead(null); setLeadNote(null); setLeadStart(null);
+    setLead(null); setLeadNote(null); setLeadStart(null); setAgainNote(null);
     window.history.replaceState(null, '', '/portal/orders/new');
     window.scrollTo({ top: 0 });
   }
@@ -313,6 +353,8 @@ export default function NewOrderPage() {
                 <p>{formatMoney(placed.total)}{placed.paid > 0 ? ` · ${formatMoney(placed.paid)} paid · ${formatMoney(Math.max(0, placed.total - placed.paid))} still to pay` : ' · nothing paid yet'}</p>
                 <div className="portal-inline-actions">
                   <button type="button" className="portal-primary-btn" onClick={startAgain}>Key in another order</button>
+                  {placed.receiptUrl ? <a href={placed.receiptUrl} target="_blank" rel="noopener noreferrer" className="portal-ghost-btn" title="Opens WhatsApp with the receipt written. You press send.">Send receipt on WhatsApp</a> : null}
+                  <Link href={`/portal/orders/${placed.id}/receipt`} target="_blank" className="portal-ghost-btn">Print receipt</Link>
                   <Link href={`/portal/orders/${placed.id}`} className="portal-ghost-btn">View the order</Link>
                   <Link href="/portal/orders" className="portal-ghost-btn">All orders</Link>
                 </div>
@@ -320,6 +362,7 @@ export default function NewOrderPage() {
             ) : (
               <form className="pord" onSubmit={place} noValidate>
                 <div className="pord-main">
+                  {againNote ? <p className="pord-lead">{againNote}</p> : null}
                   {lead ? <p className="pord-lead">Ringing up a cart lead{lead.customerName ? ` from ${lead.customerName}` : ''}. {leadNote}</p> : null}
 
                   <section className="portal-card pord-section" data-tour="orders.customer">

@@ -5,6 +5,8 @@ import { useErrorState, useFeedbackState } from '../../components/notifications'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { TierTag, type Tier } from '../../components/customer-picker';
+import { realEmail } from '../../../lib/contact-email';
 import { formatDateTime, formatMoney } from '../../accounting/lib';
 
 type Customer = {
@@ -14,6 +16,7 @@ type Customer = {
   email: string;
   phone: string;
   priceTier?: 'RETAIL' | 'RESELLER' | 'WHOLESALE';
+  businessName?: string | null;
   portalEnabled?: boolean;
   portalLastLoginAt?: string | null;
   createdAt?: string;
@@ -174,6 +177,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
 
 
   const canUpdateCustomer = hasPermission(profile, 'customer.update');
+  const canCreateOrder = hasPermission(profile, 'order.create');
 
   async function onSetPortalPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -201,6 +205,24 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
       );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to set the portal password.');
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function onSetTier(tier: Tier) {
+    if (!token || !canUpdateCustomer || !customer) return;
+    setMutating(true);
+    setFeedback(null);
+    setErrorMessage(null);
+    try {
+      const updated = await apiRequest<Customer>(`/customers/${customer.id}`, { method: 'PATCH', body: JSON.stringify({ priceTier: tier }) }, token);
+      setCustomer({ ...customer, ...updated });
+      setFeedback(tier === 'RETAIL'
+        ? `${customer.firstName} is a retail customer again.`
+        : `${customer.firstName} is now a ${tier === 'RESELLER' ? 'reseller' : 'wholesale'} customer: new orders use that price list, and marketing WhatsApp messages stop.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to change the customer type.');
     } finally {
       setMutating(false);
     }
@@ -312,8 +334,13 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
               <span>{documents.length} document{documents.length === 1 ? '' : 's'}</span>
             </div>
             <div className="portal-detail-header-actions">
+              {canCreateOrder ? (
+                <Link href={`/portal/orders/new?customer=${customer.id}`} className="portal-primary-btn">
+                  New order
+                </Link>
+              ) : null}
               {canUpdateCustomer ? (
-                <Link href={`/portal/customers/${customer.id}/edit`} className="portal-primary-btn">
+                <Link href={`/portal/customers/${customer.id}/edit`} className="portal-ghost-btn">
                   Edit Customer
                 </Link>
               ) : null}
@@ -331,26 +358,28 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                 <div className="portal-info-list">
                   <div className="portal-info-row">
                     <span>Email</span>
-                    <strong>{customer.email}</strong>
+                    <strong>{realEmail(customer.email) ?? 'None on file'}</strong>
                   </div>
                   <div className="portal-info-row">
                     <span>Phone</span>
                     <strong>{customer.phone}</strong>
                   </div>
-                  <div className="portal-info-row">
-                    <span>Price tier</span>
-                    <strong>{customer.priceTier || 'RETAIL'}</strong>
-                  </div>
+                  {customer.businessName ? (
+                    <div className="portal-info-row">
+                      <span>Business</span>
+                      <strong>{customer.businessName}</strong>
+                    </div>
+                  ) : null}
                 </div>
-                {canUpdateCustomer && (!customer.priceTier || customer.priceTier === 'RETAIL') ? (
-                  <Link
-                    href={`/portal/resellers?customerId=${customer.id}`}
-                    className="portal-inline-btn"
-                    style={{ marginTop: 12, display: 'inline-flex' }}
-                  >
-                    Convert to reseller
-                  </Link>
-                ) : null}
+                <div style={{ marginTop: 14 }}>
+                  <span className="pform-label" style={{ display: 'block', marginBottom: 6 }}>Customer type</span>
+                  <TierTag
+                    value={(customer.priceTier || 'RETAIL') as Tier}
+                    disabled={!canUpdateCustomer}
+                    busy={mutating}
+                    onChange={(tier) => void onSetTier(tier)}
+                  />
+                </div>
               </article>
 
               <article className="portal-card">

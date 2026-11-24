@@ -110,11 +110,11 @@ export class ProductService {
     }>>(Prisma.sql`
       SELECT v.id AS "variantId", v.sku, v.name AS "variantName", p.id AS "productId", p.name AS "productName", p.brand,
              v."priceKes", v."resellerPriceKes", v."wholesalePriceKes", v."isDropShip",
-             ${storeId ? Prisma.sql`coalesce((SELECT sl.quantity - sl.reserved FROM "StockLevel" sl WHERE sl."variantId" = v.id AND sl."storeId" = ${storeId}), 0)` : Prisma.sql`0`}::int AS sellable,
+             ${storeId ? Prisma.sql`coalesce((SELECT sl.quantity - sl.reserved FROM "StockLevel" sl WHERE sl."variantId" = v.id AND sl."storeId" = ${storeId}), 0)` : Prisma.sql`coalesce((SELECT sum(sl.quantity - sl.reserved) FROM "StockLevel" sl WHERE sl."variantId" = v.id), 0)`}::int AS sellable,
              coalesce(p."featuredImageUrl", p."imageUrls" ->> 0) AS "imageUrl"
       FROM "ProductVariant" v JOIN "Product" p ON p.id = v."productId"
       WHERE ${Prisma.join(conditions, ' AND ')}
-      ORDER BY (CASE WHEN v."isDropShip" THEN 1 WHEN ${storeId ? Prisma.sql`coalesce((SELECT sl.quantity - sl.reserved FROM "StockLevel" sl WHERE sl."variantId" = v.id AND sl."storeId" = ${storeId}), 0)` : Prisma.sql`0`} > 0 THEN 0 ELSE 1 END),
+      ORDER BY (CASE WHEN v."isDropShip" THEN 1 WHEN ${storeId ? Prisma.sql`coalesce((SELECT sl.quantity - sl.reserved FROM "StockLevel" sl WHERE sl."variantId" = v.id AND sl."storeId" = ${storeId}), 0)` : Prisma.sql`coalesce((SELECT sum(sl.quantity - sl.reserved) FROM "StockLevel" sl WHERE sl."variantId" = v.id), 0)`} > 0 THEN 0 ELSE 1 END),
                p.name, v.name
       LIMIT ${Math.min(30, Math.max(1, limit))}`);
     return rows.map((r) => ({

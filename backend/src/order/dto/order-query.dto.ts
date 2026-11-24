@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, PriceTier } from '@prisma/client';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { PagedQueryDto } from '../../common/dto/paged-query.dto';
 
@@ -32,6 +32,21 @@ export class OrderQueryDto extends PagedQueryDto {
   @IsOptional()
   @IsString()
   customerId?: string;
+
+  @ApiPropertyOptional({ description: 'How the order came in: IN_STORE, WHATSAPP, PHONE, INSTAGRAM, TIKTOK, WEBSITE, ' })
+  @IsOptional()
+  @IsString()
+  channel?: string;
+
+  @ApiPropertyOptional({ enum: PriceTier, description: 'The price list the order was rung up at: RETAIL, RESELLER or WHOLESALE.' })
+  @IsOptional()
+  @IsEnum(PriceTier)
+  priceTier?: PriceTier;
+
+  @ApiPropertyOptional({ description: 'Only reseller and wholesale orders (everything not at the retail price list).' })
+  @IsOptional()
+  @Transform(toBoolean)
+  tradeOnly?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

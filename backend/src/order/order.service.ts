@@ -14,6 +14,8 @@ import { paginate, searchOr, containsAny } from '../common/pagination.util';
 import { priceForTier } from '../common/price-for-tier';
 import { buildFollowUp, FollowUp, productPath } from '../common/follow-up';
 import { storefrontOrigin } from '../common/storefront-origin';
+import { buildReceipt, Receipt } from '../common/receipt';
+import { realEmail } from '../common/contact-email';
 
 const INCLUDE = {
   store: { select: { id: true, code: true, name: true } },
@@ -60,6 +62,16 @@ const NEXT: Record<OrderStatus, OrderStatus[]> = {
 
 type OrderForFollowUp = Prisma.OrderGetPayload<{ include: typeof INCLUDE }>;
 
+/** What the customer calls the item: the product, not the stored "EUR 42 (UX-P1-42)" description (which has the size and SKU but not the name). */
+function lineName(line: OrderForFollowUp['lines'][number]): string {
+  return line.variant?.product?.name ?? line.description;
+}
+/** The size, unless the variant is just the product again (a watch has one variant named after itself). */
+function lineSize(line: OrderForFollowUp['lines'][number]): string | null {
+  const variant = line.variant?.name?.trim();
+  return variant && variant.toLowerCase() !== (line.variant?.product?.name ?? '').trim().toLowerCase() ? variant : null;
+}
+
 /** The WhatsApp follow-up for an order: its items with a link to each product, worded for where the order has got to. */
 function orderFollowUp(order: OrderForFollowUp): FollowUp | null {
   return buildFollowUp({
@@ -67,7 +79,8 @@ function orderFollowUp(order: OrderForFollowUp): FollowUp | null {
     name: order.customerName || (order.customer ? `${order.customer.firstName} ${order.customer.lastName}` : null),
     phone: order.customerPhone || order.customer?.phone,
     lines: order.lines.map((line) => ({
-      name: line.description,
+      name: lineName(line),
+      size: lineSize(line),
       quantity: line.quantity,
       unitPrice: Number(line.unitPrice),
       path: line.variant?.product ? productPath(line.variant.product) : null,
@@ -77,6 +90,28 @@ function orderFollowUp(order: OrderForFollowUp): FollowUp | null {
     orderStatus: order.status,
     balance: Number(order.total) - Number(order.amountPaid),
     origin: storefrontOrigin(),
+  });
+}
+
+/** The receipt for an order, as a WhatsApp message to send the customer: what they bought, paid and still owe. */
+function orderReceipt(order: OrderForFollowUp): Receipt | null {
+  return buildReceipt({
+    orderNumber: order.orderNumber,
+    storeName: order.store.name,
+    placedAt: order.placedAt,
+    name: order.customerName || (order.customer ? `${order.customer.firstName} ${order.customer.lastName}` : null),
+    phone: order.customerPhone || order.customer?.phone,
+    lines: order.lines.map((line) => ({
+      name: lineName(line),
+      size: lineSize(line),
+      quantity: line.quantity,
+      lineTotal: Number(line.lineTotal),
+    })),
+    discount: Number(order.discount),
+    shipping: Number(order.shipping),
+    total: Number(order.total),
+    paid: Number(order.amountPaid),
+    payments: order.payments.map((payment) => ({ method: payment.method, amount: Number(payment.amount) })),
   });
 }
 
@@ -164,6 +199,11 @@ export class OrderService {
       const total = subtotal - discount + shipping;
       if (total < 0) throw new BadRequestException('The order discount is more than the order is worth.');
 
+      // An order for a customer on file carries that customer's name, number and email unless the caller gave others, so lists and receipts
+      // never call a known customer a walk-in just because the client sent only the id.
+      const known = dto.customerId
+        ? await tx.customer.findUnique({ where: { id: dto.customerId }, select: { firstName: true, lastName: true, phone: true, email: true } })
+        : null;
       const order = await tx.order.create({
         data: {
           orderNumber: await this.nextOrderNumber(tx),
@@ -171,9 +211,9 @@ export class OrderService {
           customerId: dto.customerId,
           channel: dto.channel || 'IN_STORE',
           priceTier: tier,
-          customerName: dto.customerName,
-          customerPhone: dto.customerPhone,
-          customerEmail: dto.customerEmail,
+          customerName: dto.customerName || (known ? `${known.firstName} ${known.lastName}`.trim() : undefined),
+          customerPhone: dto.customerPhone || known?.phone || undefined,
+          customerEmail: dto.customerEmail || (known ? realEmail(known.email) ?? undefined : undefined),
           shippingAddress: dto.shippingAddress,
           notes: dto.notes,
           subtotal: new Prisma.Decimal(subtotal),
@@ -210,11 +250,13 @@ export class OrderService {
   }
 
   async findAll(query: OrderQueryDto) {
-    const { skip, take, search, storeId, status, customerId, from, to, awaitingSupplier } = query;
+    const { skip, take, search, storeId, status, customerId, from, to, awaitingSupplier, channel, priceTier, tradeOnly } = query;
     const where: Prisma.OrderWhereInput = {
       ...(storeId ? { storeId } : {}),
       ...(status ? { status } : {}),
       ...(customerId ? { customerId } : {}),
+      ...(channel ? { channel } : {}),
+      ...(priceTier ? { priceTier } : tradeOnly ? { priceTier: { not: 'RETAIL' as const } } : {}),
       ...(from || to
         ? {
             placedAt: {
@@ -250,7 +292,7 @@ export class OrderService {
   async findOne(id: string) {
     const order = await this.prisma.order.findUnique({ where: { id }, include: INCLUDE });
     if (!order) throw new NotFoundException(`Order ${id} not found`);
-    return { ...order, balance: Number(order.total) - Number(order.amountPaid), followUp: orderFollowUp(order) };
+    return { ...order, balance: Number(order.total) - Number(order.amountPaid), followUp: orderFollowUp(order), receipt: orderReceipt(order) };
   }
 
   /** Moves an order along, refusing a jump the sequence does not allow. */
@@ -485,11 +527,12 @@ export class OrderService {
       status: { notIn: ['CANCELLED', 'REFUNDED', 'PENDING'] },
     };
 
-    const [totals, unconfirmed, byStatus, byChannel] = await Promise.all([
+    const [totals, unconfirmed, byStatus, byChannel, byTier] = await Promise.all([
       this.prisma.order.aggregate({ where: confirmedWhere, _count: true, _sum: { total: true, amountPaid: true } }),
       this.prisma.order.aggregate({ where: { ...dateWhere, status: 'PENDING' }, _count: true, _sum: { total: true } }),
       this.prisma.order.groupBy({ by: ['status'], where: liveWhere, _count: true, _sum: { total: true } }),
       this.prisma.order.groupBy({ by: ['channel'], where: confirmedWhere, _count: true, _sum: { total: true } }),
+      this.prisma.order.groupBy({ by: ['priceTier'], where: confirmedWhere, _count: true, _sum: { total: true } }),
     ]);
 
     const revenue = Number(totals._sum.total ?? 0);
@@ -517,6 +560,12 @@ export class OrderService {
       // revenue figure says nothing about where the demand is coming from.
       byChannel: byChannel.map((row) => ({
         channel: row.channel,
+        count: row._count,
+        value: Number(row._sum.total ?? 0),
+      })),
+      // Which price list the sale was made at: retail shoppers against resellers and wholesale buyers.
+      byTier: byTier.map((row) => ({
+        tier: row.priceTier,
         count: row._count,
         value: Number(row._sum.total ?? 0),
       })),

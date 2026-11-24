@@ -38,13 +38,15 @@ type OrderLine = {
 
 
 type Order = {
-  id: string; orderNumber: string; status: string; channel: string;
+  id: string; orderNumber: string; status: string; channel: string; priceTier?: 'RETAIL' | 'RESELLER' | 'WHOLESALE'; createdBy?: string;
   total: string | number; amountPaid: string | number; placedAt: string;
-  customerName?: string | null; customerPhone?: string | null;
+  customerName?: string | null; customerPhone?: string | null; customer?: { firstName: string; lastName: string } | null;
   store: Store; lines: OrderLine[];
   followUp?: FollowUp | null;
   payments: Array<{ id: string; amount: string | number; method: string; reference?: string | null }>;
 };
+
+const CHANNEL_OPTIONS: Array<[string, string]> = [['IN_STORE', 'In store'], ['WHATSAPP', 'WhatsApp'], ['PHONE', 'Phone call'], ['INSTAGRAM', 'Instagram'], ['TIKTOK', 'TikTok'], ['WEBSITE', 'Website']];
 
 const METHODS = ['MPESA', 'CASH', 'CARD', 'BANK_TRANSFER'];
 
@@ -69,6 +71,8 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState<'orders' | 'leads'>('orders');
   const [statusFilter, setStatusFilter] = useState('');
   const [awaitingSupplierOnly, setAwaitingSupplierOnly] = useState(false);
+  const [channelFilter, setChannelFilter] = useState('');
+  const [tradeOnly, setTradeOnly] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
 
@@ -97,8 +101,8 @@ export default function OrdersPage() {
   }, [initialized, token, load]);
 
   const orderFilters = useMemo(
-    () => ({ status: statusFilter || undefined, awaitingSupplier: awaitingSupplierOnly || undefined }),
-    [statusFilter, awaitingSupplierOnly],
+    () => ({ status: statusFilter || undefined, awaitingSupplier: awaitingSupplierOnly || undefined, channel: channelFilter || undefined, tradeOnly: tradeOnly || undefined }),
+    [statusFilter, awaitingSupplierOnly, channelFilter, tradeOnly],
   );
 
   const fetchOrdersPage = useCallback(
@@ -108,6 +112,8 @@ export default function OrdersPage() {
       search: string;
       status?: string;
       awaitingSupplier?: boolean;
+      channel?: string;
+      tradeOnly?: boolean;
     }): Promise<ServerPage<Order>> => {
       if (!token) return { items: [], total: 0, skip: params.skip, take: params.take };
       const query = new URLSearchParams();
@@ -116,6 +122,8 @@ export default function OrdersPage() {
       if (params.search) query.set('search', params.search);
       if (params.status) query.set('status', params.status);
       if (params.awaitingSupplier) query.set('awaitingSupplier', 'true');
+      if (params.channel) query.set('channel', params.channel);
+      if (params.tradeOnly) query.set('tradeOnly', 'true');
       return apiRequest<ServerPage<Order>>(`/orders?${query}`, { method: 'GET' }, token);
     },
     [token],
@@ -198,7 +206,7 @@ export default function OrdersPage() {
     () =>
       ordersPager.items.map((order) => ({
         ...order,
-        who: order.customerName || 'Walk-in',
+        who: order.customerName || (order.customer ? `${order.customer.firstName} ${order.customer.lastName}` : 'Walk-in'),
         storeName: order.store.name,
         balance: Number(order.total) - Number(order.amountPaid),
       })),
@@ -209,7 +217,7 @@ export default function OrdersPage() {
     () =>
       exportRows.map((order) => ({
         ...order,
-        who: order.customerName || 'Walk-in',
+        who: order.customerName || (order.customer ? `${order.customer.firstName} ${order.customer.lastName}` : 'Walk-in'),
         storeName: order.store.name,
         balance: Number(order.total) - Number(order.amountPaid),
       })),
@@ -458,6 +466,14 @@ export default function OrdersPage() {
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
+                <select value={channelFilter} onChange={(event) => setChannelFilter(event.target.value)} aria-label="How it came in">
+                  <option value="">Any channel</option>
+                  {CHANNEL_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+                <label className="portal-check">
+                  <input type="checkbox" checked={tradeOnly} onChange={(event) => setTradeOnly(event.target.checked)} />
+                  <span>Reseller &amp; wholesale only</span>
+                </label>
                 <label className="portal-check">
                   <input
                     type="checkbox"
@@ -488,7 +504,7 @@ export default function OrdersPage() {
               <div className="portal-list-stack">
                 {!ordersPager.loading && rows.length === 0 ? (
                   <div className="portal-empty-state">
-                    {ordersPager.search || statusFilter || awaitingSupplierOnly ? 'No orders match.' : 'No orders yet.'}
+                    {ordersPager.search || statusFilter || awaitingSupplierOnly || channelFilter || tradeOnly ? 'No orders match.' : 'No orders yet.'}
                   </div>
                 ) : (
                   rows.map((order) => {
@@ -514,6 +530,9 @@ export default function OrdersPage() {
                         />
                         <div>
                           <strong>{order.orderNumber}</strong>
+                          {order.priceTier && order.priceTier !== 'RETAIL' ? (
+                            <span className={`ptag ptag-${order.priceTier.toLowerCase()}`}>{order.priceTier === 'RESELLER' ? 'Reseller' : 'Wholesale'}</span>
+                          ) : null}
                           {order.lines.some(
                             (line) => line.fulfillmentType === 'SUPPLIER_ORDER' && line.fulfillmentStatus !== 'HANDED_TO_CUSTOMER',
                           ) ? (
@@ -521,7 +540,7 @@ export default function OrdersPage() {
                           ) : null}
                           <p className="portal-muted">
                             {order.who} · {order.storeName} · {order.channel.replace('_', ' ')} ·{' '}
-                            {formatDateTime(order.placedAt)}
+                            {formatDateTime(order.placedAt)}{order.createdBy && order.createdBy !== 'system' ? ` · keyed by ${order.createdBy.split('@')[0]}` : ''}
                           </p>
                           <p>
                             {formatMoney(order.total)}

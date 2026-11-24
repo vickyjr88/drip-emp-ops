@@ -33,6 +33,8 @@ type TourContextValue = {
   }) => void;
   /** True once a profile is known; gates the checklist and launchers. */
   hasViewer: boolean;
+  /** Who is signed in, once known: lets the menu hide pages they have no permission for. */
+  viewer: { permissions: string[]; isAdmin: boolean } | null;
   /** Whether the Getting Started panel is showing, and how to toggle it. */
   checklistVisible: boolean;
   setChecklistVisible: (visible: boolean) => void;
@@ -282,6 +284,7 @@ export function TourProvider({
       refreshProgress,
       registerViewer,
       hasViewer: Boolean(viewer),
+      viewer: viewer ? { permissions: Array.isArray(viewer.permissions) ? viewer.permissions : [], isAdmin: Boolean(viewer.isAdmin) } : null,
       checklistVisible,
       setChecklistVisible,
     }),
