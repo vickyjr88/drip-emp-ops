@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { useUnsavedGuard } from '../components/use-unsaved-guard';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
@@ -56,6 +57,7 @@ function skuSuffix(value: string) {
 }
 
 export default function CataloguePage() {
+  const addGuard = useUnsavedGuard();
   const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -352,7 +354,7 @@ export default function CataloguePage() {
           : `${form.name} added.`,
       );
       setForm(BLANK); setPrice(''); setCost(''); setResellerPrice('');
-      setWholesalePrice(''); setImages([]); setAttributeValues([]); setDropShip(false); setShowForm(false);
+      setWholesalePrice(''); setImages([]); setAttributeValues([]); setDropShip(false); setShowForm(false); addGuard.markClean();
       await load(token);
       productsPager.reload();
     } catch (error) {
@@ -497,7 +499,7 @@ export default function CataloguePage() {
                 <p className="portal-muted">
                   Creates one variant per size at the same price. Adjust individual sizes afterwards.
                 </p>
-                <form className="portal-entity-form" onSubmit={onCreate}>
+                <form className="portal-entity-form" onSubmit={onCreate} {...addGuard.formProps}>
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>SKU</span>
@@ -686,7 +688,7 @@ export default function CataloguePage() {
                     <button type="submit" className="portal-primary-btn" disabled={saving}>
                       {saving ? 'Saving...' : 'Add Product'}
                     </button>
-                    <button type="button" className="portal-ghost-btn" onClick={() => setShowForm(false)}>
+                    <button type="button" className="portal-ghost-btn" onClick={() => { setShowForm(false); addGuard.markClean(); }}>
                       Cancel
                     </button>
                   </div>

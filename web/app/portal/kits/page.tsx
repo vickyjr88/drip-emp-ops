@@ -248,8 +248,8 @@ export default function KitsPortalPage() {
                   <div className="portal-action-row" style={{ marginBottom: 10 }}>
                     <button type="button" className="portal-primary-btn" onClick={() => void bulkClubs('activate-with-kits')}>Switch on clubs that have shirts</button>
                     <button type="button" className="portal-ghost-btn" onClick={() => void bulkClubs('deactivate-without-kits')}>Switch off clubs without shirts</button>
-                    <button type="button" className="portal-ghost-btn" onClick={() => { if (window.confirm('Switch off every club?')) void bulkClubs('deactivate-all'); }}>Switch all off</button>
-                    <button type="button" className="portal-ghost-btn" onClick={() => { if (window.confirm('Switch on all clubs, including ones you have no shirts for?')) void bulkClubs('activate-all'); }}>Switch all on</button>
+                    <button type="button" className="portal-ghost-btn" onClick={async () => { if (await dialog.confirm({ title: 'Switch off every club?', message: 'Every club stops appearing in the design center and loses its page until you switch it back on.', confirmLabel: 'Switch all off', danger: true })) void bulkClubs('deactivate-all'); }}>Switch all off</button>
+                    <button type="button" className="portal-ghost-btn" onClick={async () => { if (await dialog.confirm({ title: 'Switch on all clubs?', message: 'This includes clubs you have no shirts for, which will show an empty page.', confirmLabel: 'Switch all on' })) void bulkClubs('activate-all'); }}>Switch all on</button>
                   </div>
                   <div className="kp-filter">
                     <input type="search" placeholder="Search clubs…" value={clubSearch} onChange={(e) => setClubSearch(e.target.value)} aria-label="Search clubs" />

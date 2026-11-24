@@ -14614,3 +14614,22 @@ img {
 .portal-sidebar .pnav .pnav-record small { font: 500 12px 'Manrope', sans-serif; color: #6c7493; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
 .portal-sidebar .pnav .pnav-record:hover, .portal-sidebar .pnav .pnav-record.is-hover, .portal-sidebar .pnav .pnav-link.is-hover { background: #e4e7ef; }
 .pnav-record .ptag { margin-left: 6px; }
+
+/* Several short paragraphs inside a confirm dialog */
+.portal-dialog-lines { display: grid; gap: 10px; }
+.portal-dialog-lines p { margin: 0; }
+
+/* ---------------------------------------------------------------------
+   List rows that adapt to the room the list has (the sidebar takes a varying share of the screen, so the
+   viewport width alone cannot say whether a row fits). Below ~720px a row stacks: text first, then its buttons.
+   --------------------------------------------------------------------- */
+.portal-list-stack { container-type: inline-size; container-name: plist; }
+@container plist (max-width: 720px) {
+  .portal-list-row { grid-template-columns: 1fr; gap: 8px; }
+  .portal-list-row.has-thumb { grid-template-columns: auto 1fr; column-gap: 12px; }
+  .portal-list-row.has-thumb > *:not(.portal-list-thumb) { grid-column: 2; }
+  .portal-list-row span { text-transform: none; letter-spacing: 0; }
+  .portal-list-row .portal-action-row, .portal-list-row .portal-inline-actions, .portal-list-row .portal-list-actions { justify-content: flex-start; }
+  .portal-list-row .portal-inline-btn { min-height: 40px; }
+  .portal-list-meta { display: grid; gap: 2px; }
+}

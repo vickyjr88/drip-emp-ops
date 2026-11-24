@@ -10,6 +10,7 @@
  */
 
 import Link from 'next/link';
+import { useUnsavedGuard } from '../components/use-unsaved-guard';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
@@ -48,6 +49,7 @@ export default function CustomerFormClient({
   const [portalEnabled, setPortalEnabled] = useState(false);
   const [errorMessage, setErrorMessage] = useErrorState();
   const [, setFeedback] = useFeedbackState();
+  const guard = useUnsavedGuard();
 
   useEffect(() => {
     setToken(window.localStorage.getItem(TOKEN_KEY));
@@ -101,6 +103,7 @@ export default function CustomerFormClient({
         await apiRequest('/customers', { method: 'POST', body: JSON.stringify(body) }, token);
         setFeedback(`${body.firstName} added.`);
       }
+      guard.markClean();
       router.push('/portal/customers');
     } catch (error) {
       setErrorMessage(error);
@@ -161,7 +164,7 @@ export default function CustomerFormClient({
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             <article className="portal-card">
-              <form className="portal-entity-form" onSubmit={onSubmit}>
+              <form className="portal-entity-form" onSubmit={onSubmit} {...guard.formProps}>
                 <div className="portal-entity-grid-2">
                   <label>
                     <span>First name</span>

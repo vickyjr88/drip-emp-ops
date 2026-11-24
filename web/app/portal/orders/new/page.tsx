@@ -12,6 +12,7 @@
  */
 
 import Link from 'next/link';
+import { useUnsavedGuard } from '../../components/use-unsaved-guard';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
@@ -252,13 +253,7 @@ export default function NewOrderPage() {
   }, [customer, walkIn, lines.length, inStore, address, pay.on, pay.amount, canPay, total]);
 
   // Leaving with items typed in would lose them.
-  const dirty = lines.length > 0 && !placed;
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  useUnsavedGuard(lines.length > 0 && !placed);
 
   async function place(event: FormEvent) {
     event.preventDefault();

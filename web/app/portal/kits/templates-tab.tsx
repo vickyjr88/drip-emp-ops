@@ -6,6 +6,7 @@
  * each colour, with the print areas marked on the photo.
  */
 
+import { usePortalDialog } from '../components/portal-dialog';
 import { useState } from 'react';
 import { ImagePicker } from '../components/image-picker';
 import { apiRequest } from '../accounting/lib';
@@ -40,6 +41,7 @@ export function TemplatesTab({ token, data, onChanged, setError, setFeedback }: 
   token: string; data: TemplatesData | null; onChanged: () => void;
   setError: (e: unknown) => void; setFeedback: (m: string) => void;
 }) {
+  const dialog = usePortalDialog();
   const [editing, setEditing] = useState<Custom | 'new' | null>(null);
 
   async function hide(key: string, hidden: boolean) {
@@ -49,7 +51,7 @@ export function TemplatesTab({ token, data, onChanged, setError, setFeedback }: 
     try { await apiRequest(`/kits/admin/templates/${t.id}`, { method: 'PATCH', body: JSON.stringify({ isActive: !t.isActive }) }, token); onChanged(); } catch (e) { setError(e); }
   }
   async function remove(t: Custom) {
-    if (!window.confirm(`Delete the template "${t.name}"? This cannot be undone.`)) return;
+    if (!(await dialog.confirm({ title: `Delete the template "${t.name}"?`, message: 'This cannot be undone.', confirmLabel: 'Delete template', danger: true }))) return;
     try { await apiRequest(`/kits/admin/templates/${t.id}`, { method: 'DELETE' }, token); setFeedback('Template deleted.'); onChanged(); } catch (e) { setError(e); }
   }
 

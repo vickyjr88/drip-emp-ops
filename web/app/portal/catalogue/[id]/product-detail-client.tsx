@@ -14,6 +14,7 @@
  */
 
 import Link from 'next/link';
+import { useUnsavedGuard } from '../../components/use-unsaved-guard';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EliteLayout } from '../../../components/elite-layout';
@@ -82,6 +83,7 @@ const num = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? null : Number(value);
 
 export default function ProductDetailClient({ productId }: { productId: string }) {
+  const detailsGuard = useUnsavedGuard();
   const dialog = usePortalDialog();
   const router = useRouter();
 
@@ -186,6 +188,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
         }),
       }, token);
       setFeedback('Product updated.');
+      detailsGuard.markClean();
       await load(token);
     } catch (error) {
       setErrorMessage(error);
@@ -757,7 +760,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
             {/* ---- Details --------------------------------------------- */}
             <article className="portal-card" style={{ marginBottom: 20 }}>
               <h2 style={{ marginTop: 0 }}>Details</h2>
-              <form className="portal-entity-form" onSubmit={saveDetails}>
+              <form className="portal-entity-form" onSubmit={saveDetails} {...detailsGuard.formProps}>
                 <div className="portal-entity-grid-2">
                   <label>
                     <span>Name</span>

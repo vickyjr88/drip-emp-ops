@@ -10,6 +10,7 @@
  */
 
 import Link from 'next/link';
+import { usePortalDialog } from '../../components/portal-dialog';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
@@ -25,6 +26,7 @@ type Preview = { keep: Member; merging: Member[]; adopt: Record<string, string>;
 const nameOf = (m: Member) => `${m.firstName} ${m.lastName}`.trim() || 'No name';
 
 export default function DuplicateCustomersPage() {
+  const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
@@ -75,7 +77,13 @@ export default function DuplicateCustomersPage() {
         preview.adopt.email ? `The kept record takes the email ${preview.adopt.email}.` : '',
         'The other record is removed (a copy of it is kept). This cannot be undone from here.',
       ].filter(Boolean);
-      if (!window.confirm(lines.join('\n\n'))) return;
+      const go = await dialog.confirm({
+        title: `Merge into ${nameOf(preview.keep)}?`,
+        message: <div className="portal-dialog-lines">{lines.map((line, i) => <p key={i}>{line}</p>)}</div>,
+        confirmLabel: 'Merge',
+        danger: true,
+      });
+      if (!go) return;
       const out = await apiRequest<{ merged: number; moved: { orders: number } }>('/customer-duplicates/merge', { method: 'POST', body: JSON.stringify({ keepId: kept.id, mergeIds: ids }) }, token);
       setFeedback(`Merged ${out.merged} record${out.merged === 1 ? '' : 's'} into ${nameOf(kept)}; ${out.moved.orders} order${out.moved.orders === 1 ? '' : 's'} moved.`);
       await loadGroups(token);
@@ -90,7 +98,19 @@ export default function DuplicateCustomersPage() {
     if (!token || !result) return;
     const safe = result.groups.filter((g) => g.safe);
     const extra = safe.reduce((n, g) => n + g.members.length - 1, 0);
-    if (!window.confirm(`Merge ${safe.length} group${safe.length === 1 ? '' : 's'} (${extra} extra record${extra === 1 ? '' : 's'}) into the record shown as kept in each?\n\nEach is the same phone number or email, with nothing that differs. Orders and everything else move to the kept record, and the extra records are removed (a copy of each is kept). This cannot be undone from here.`)) return;
+    const go = await dialog.confirm({
+      title: `Merge ${safe.length} group${safe.length === 1 ? '' : 's'}?`,
+      message: (
+        <div className="portal-dialog-lines">
+          <p>{extra} extra record{extra === 1 ? '' : 's'} will be merged into the record shown as kept in each group.</p>
+          <p>Each is the same phone number or email, with nothing that differs. Orders and everything else move to the kept record, and the extra records are removed (a copy of each is kept).</p>
+          <p><strong>This cannot be undone from here.</strong></p>
+        </div>
+      ),
+      confirmLabel: `Merge ${safe.length} group${safe.length === 1 ? '' : 's'}`,
+      danger: true,
+    });
+    if (!go) return;
     setBusy('all');
     try {
       const out = await apiRequest<{ groupsMerged: number; customersMerged: number; skipped: Array<{ keepId: string; reason: string }> }>('/customer-duplicates/merge-safe', { method: 'POST', body: JSON.stringify({ keepIds: safe.map((g) => g.keepId) }) }, token);

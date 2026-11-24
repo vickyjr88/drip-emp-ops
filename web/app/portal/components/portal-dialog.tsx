@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 type FieldSpec = {
   name: string;
@@ -87,6 +87,21 @@ export function PortalDialogProvider({ children }: { children: ReactNode }) {
     setDialog(null);
     setFieldValues({});
   }
+
+  // Escape answers "no" (or dismisses), the same as clicking outside the box.
+  useEffect(() => {
+    if (!dialog) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (dialog?.kind === 'confirm') dialog.resolve(false);
+      else if (dialog?.kind === 'prompt') dialog.resolve(null);
+      else dialog?.resolve();
+      setDialog(null);
+      setFieldValues({});
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [dialog]);
 
   function onPromptSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

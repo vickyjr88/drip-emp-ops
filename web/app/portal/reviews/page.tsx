@@ -8,6 +8,7 @@
  */
 
 import Link from 'next/link';
+import { usePortalDialog } from '../components/portal-dialog';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { Stars } from '../../components/stars';
@@ -43,6 +44,7 @@ function standing(name: string, v: Visibility): string {
 }
 
 export default function ReviewsPage() {
+  const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
@@ -108,13 +110,19 @@ export default function ReviewsPage() {
   }
 
   async function reject(review: Review) {
-    const reason = window.prompt('Why is it being turned away? (only you will see this, optional)') ;
-    if (reason === null) return;
+    const answer = await dialog.prompt({
+      title: 'Turn this review away?',
+      message: 'It will not be shown on the site.',
+      fields: [{ name: 'reason', label: 'Why? (only you will see this, optional)', type: 'textarea' }],
+      confirmLabel: 'Turn it away',
+    });
+    if (answer === null) return;
+    const reason = answer.reason ?? '';
     await moderate(review, { status: 'REJECTED', rejectionReason: reason }, 'Turned away.');
   }
 
   async function remove(review: Review) {
-    if (!token || !window.confirm('Delete this review for good?')) return;
+    if (!token || !(await dialog.confirm({ title: 'Delete this review for good?', message: 'It is removed from the site and from your records.', confirmLabel: 'Delete review', danger: true }))) return;
     try {
       const out = await apiRequest<{ product: Visibility }>(`/reviews/${review.id}`, { method: 'DELETE' }, token);
       await after(`Deleted. ${standing(review.product.name, out.product)}`);

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import { useUnsavedGuard } from '../components/use-unsaved-guard';
 import { PasswordInput } from '../../components/password-input';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import { useRouter } from 'next/navigation';
@@ -73,6 +74,7 @@ export default function UserFormClient({
   userId?: string;
 }) {
   const router = useRouter();
+  const guard = useUnsavedGuard();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -188,6 +190,7 @@ export default function UserFormClient({
           token,
         );
         setFeedback('User created.');
+        guard.markClean();
         router.push('/portal/users');
       } else if (userId) {
         await apiRequest(
@@ -203,6 +206,7 @@ export default function UserFormClient({
           token,
         );
         setFeedback('User updated.');
+        guard.markClean();
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save user.');
@@ -328,7 +332,7 @@ export default function UserFormClient({
             onLogout={onLogout}
           >
 
-            <form className="portal-stack-grid" onSubmit={onSubmit}>
+            <form className="portal-stack-grid" onSubmit={onSubmit} {...guard.formProps}>
               <article className="portal-card">
                 <div className="portal-card-header-row">
                   <h2 style={{ margin: 0 }}>Profile</h2>
