@@ -11,6 +11,15 @@ Below 760px wide (and 900px for the page frame) the day-to-day screens change sh
 - **Lists** fold their filters behind one Filters button and a row's secondary actions behind More (`components/mobile-bits.tsx`).
 - **Pinned actions**: Take payment on an order, Save on the customer form. Recording a payment and settling a pickup open as a sheet from the bottom.
 
+## The whole admin, not screen by screen
+`components/mobile-enhancer.tsx` runs on every portal page and sets classes only (never adds elements), so a screen gets a phone layout without being rebuilt:
+- every table becomes a card per row, each cell labelled by its column heading (opt out with class `no-stack`);
+- a list toolbar (search plus filters, dates, export) shows the search and a Filters button; a block of filter boxes that is not a toolbar (3+ fields, nothing to save) folds the same way;
+- tab strips (buttons straight under the top bar, or `role="tablist"`) become one scrolling row;
+- long text wraps instead of widening the page; a long form's save button stays in reach (sticky).
+On top of that, screens that earned it were rebuilt: wizards (add product, new order, issue pickup, reseller, staff, watch), folds (product, customer, order, categories, stores, inventory movement, site content, settings channels, social channels, outreach, follow-up, blog, kits), sheets (payment, settle, new offer), and a 2x2 dashboard.
+Not rebuilt (shared kit only): the accounting forms, the payroll deduction-rule form, the kit template editor and the HR leave forms. They are usable, with stacked fields and a sticky save button, but they are long.
+
 ## Turning a pickup into an order
 Open pickup, More, **Turn into order**. The reseller keeps what is still out:
 - an order is created for those pairs at the prices agreed on the pickup (channel `CONSIGNMENT`, price list as on the pickup, unpaid);
@@ -22,6 +31,9 @@ Needs `consignment.update` and `order.create`. API: `POST /consignments/:id/conv
 
 ## Also fixed
 The pickups list and its CSV showed no reseller name (the screen read `customer.name`; the API never sent it). The API now sends it.
+
+## CI
+The deploy checks that every tour anchor named in `tours/catalogue.ts` exists in the UI. A `CollapseCard` renders its `dataTour` prop as `data-tour`, and the check reads both spellings.
 
 ## Tests
 `npm run test:consignment-name` (no database). `npm run test:consignment-convert` needs `KITS_TEST_DATABASE_URL` pointing at a scratch database that has the default chart of accounts.
