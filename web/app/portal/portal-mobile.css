@@ -164,6 +164,11 @@ td.m-only { display: none; }
   .lp-page.is-portal .m-filterbox.is-open { max-height: none; overflow: visible; }
   .lp-page.is-portal .m-filterbox.is-open::before { content: 'Filters \25B4'; }
 
+  /* Tabs drawn as a row of buttons (kits, and others using role="tablist"): one scrolling line. */
+  .lp-page.is-portal [role="tablist"] { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .lp-page.is-portal [role="tablist"]::-webkit-scrollbar { display: none; }
+  .lp-page.is-portal [role="tablist"] > * { flex: none; white-space: nowrap; }
+
   /* A page's own tab strip (buttons straight under the top bar): one scrolling row, not a heap of wrapped buttons. */
   .lp-page.is-portal .portal-workspace-body > .portal-action-row { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
   .lp-page.is-portal .portal-workspace-body > .portal-action-row::-webkit-scrollbar { display: none; }

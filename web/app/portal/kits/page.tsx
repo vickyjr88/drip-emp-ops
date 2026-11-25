@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { ImagePicker } from '../components/image-picker';
 import { TemplatesTab, type TemplatesData } from './templates-tab';
 import { usePortalDialog } from '../components/portal-dialog';
@@ -323,8 +324,7 @@ function KitsTab({ token, kits, clubs, templates, onChanged, patchKit, setError,
 
   return (
     <>
-      <article className="portal-card">
-        <h2 style={{ marginTop: 0 }}>Add a kit</h2>
+      <CollapseCard title="Add a kit">
         <p className="portal-muted">Create the shirt a shopper can buy or personalise. Sizes become normal stock-keeping variants, so stock, orders and reports work as for any product. Leave the club empty for the generic &ldquo;Custom jersey&rdquo; that any club&rsquo;s design is ordered on, or for a plain T-shirt.</p>
         <form onSubmit={create} className="kp-form">
           <label>Name<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Arsenal Home Jersey 2025/26 (Fan Version)" /></label>
@@ -347,7 +347,7 @@ function KitsTab({ token, kits, clubs, templates, onChanged, patchKit, setError,
           <button type="submit" className="portal-primary-btn" disabled={saving || !name || sizes.length === 0}>{saving ? 'Creating…' : 'Create kit'}</button>
         </form>
         <ImagePicker open={picking} token={token} multiple title="Choose kit photos" onClose={() => setPicking(false)} onSelect={(urls) => setImages((cur) => Array.from(new Set([...cur, ...urls])))} usedUrls={images} />
-      </article>
+      </CollapseCard>
 
       <article className="portal-card">
         <h2 style={{ marginTop: 0 }}>Kits</h2>

@@ -15,6 +15,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { ImagePicker } from '../components/image-picker';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { useErrorState, useFeedbackState, useNotifications } from '../components/notifications';
 import { usePortalDialog } from '../components/portal-dialog';
 import {
@@ -230,8 +231,7 @@ export default function BlogPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {canCreate || canUpdate ? (
-              <article className="portal-card">
-                <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Post' : 'New Post'}</h2>
+              <CollapseCard title={editingId ? 'Edit Post' : 'New Post'} forceOpen={Boolean(editingId)}>
                 <p className="portal-muted">
                   Saving here never publishes on its own — use Publish below or on the list once you&rsquo;re happy with it.
                 </p>
@@ -363,7 +363,7 @@ export default function BlogPage() {
                     ) : null}
                   </div>
                 </form>
-              </article>
+              </CollapseCard>
             ) : null}
 
             <article className="portal-card">

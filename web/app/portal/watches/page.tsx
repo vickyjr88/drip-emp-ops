@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { Wizard, WizStep } from '../components/wizard';
 import { ImagePicker } from '../components/image-picker';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import {
@@ -113,20 +114,30 @@ export default function WatchesPortalPage() {
                   Leave &ldquo;choices&rdquo; empty for a watch that comes one way; fill it in only if there is a real choice such as a strap colour.
                 </p>
                 {canCreate ? (
-                  <form onSubmit={create} className="kp-form">
+                  <Wizard titles={['Basics', 'Details', 'Photos']} submitLabel="Add watch" saving={saving} submitDisabled={!name || !price}>
+                  {(wiz) => (
+                  <form noValidate onSubmit={wiz.onSubmit(create)} onInvalidCapture={wiz.onInvalid} className="kp-form">
+                    <WizStep wiz={wiz} index={0}>
                     <label>Name<input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Bagolee Chronograph Black" /></label>
                     <label>Brand<input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Bagolee" /></label>
                     <label>Price (KES)<input required type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} /></label>
                     <label>Buying cost (KES, optional, never shown to customers)<input type="number" min={0} value={cost} onChange={(e) => setCost(e.target.value)} /></label>
+                    </WizStep>
+                    <WizStep wiz={wiz} index={1}>
                     <label>Choices (optional, separated by commas)<input value={options} onChange={(e) => setOptions(e.target.value)} placeholder="Black strap, Brown strap" /></label>
                     <label className="kp-inline"><input type="checkbox" checked={dropShip} onChange={(e) => setDropShip(e.target.checked)} />Sourced from the supplier for each order (leave unticked if you hold stock)</label>
                     <label>Description<textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></label>
+                    </WizStep>
+                    <WizStep wiz={wiz} index={2}>
                     <div className="portal-action-row">
                       <button type="button" className="portal-ghost-btn" onClick={() => setPicking(true)}>Choose photos</button>
                       <span className="portal-muted">{images.length ? `${images.length} chosen` : 'Photos show on the watch page and in the feed.'}</span>
                     </div>
-                    <button type="submit" className="portal-primary-btn" disabled={saving || !name || !price}>{saving ? 'Adding…' : 'Add watch'}</button>
+                    </WizStep>
+                    {wiz.bar}
                   </form>
+                  )}
+                  </Wizard>
                 ) : <p className="portal-muted">You do not have permission to add products.</p>}
                 <ImagePicker open={picking} token={token} multiple title="Choose watch photos" onClose={() => setPicking(false)} onSelect={(urls) => setImages((cur) => Array.from(new Set([...cur, ...urls])))} usedUrls={images} />
               </article>

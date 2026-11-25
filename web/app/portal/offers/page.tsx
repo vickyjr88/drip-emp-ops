@@ -411,7 +411,7 @@ export default function OffersPage() {
 
             {/* ---- Create ------------------------------------------------ */}
             {canCreate && picked.size > 0 ? (
-              <article className="portal-card" style={{ marginTop: 20 }}>
+              <article className="portal-card m-sheet" style={{ marginTop: 20 }}>
                 <h2 style={{ marginTop: 0 }}>
                   New offer · {picked.size} item{picked.size === 1 ? '' : 's'} selected
                 </h2>

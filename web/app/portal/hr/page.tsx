@@ -7,6 +7,7 @@ import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '.
 import { TourLauncher } from '../tours/tour-launcher';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { Wizard, WizStep } from '../components/wizard';
 import { usePortalDialog } from '../components/portal-dialog';
 import {
   AuthProfile,
@@ -487,7 +488,10 @@ export default function HrPage() {
                     </div>
 
                     {showEmployeeForm && canManageEmployees ? (
-                      <form className="portal-entity-form portal-detail-form" onSubmit={onSaveEmployee}>
+                                            <Wizard titles={['Person', 'Pay', 'Contact', 'IDs & bank']} submitLabel={editingId ? 'Save Employee' : 'Add Employee'} saving={mutating} onCancel={() => setShowEmployeeForm(false)}>
+                      {(wiz) => (
+                      <form noValidate className="portal-entity-form portal-detail-form" onSubmit={wiz.onSubmit(onSaveEmployee)} onInvalidCapture={wiz.onInvalid}>
+                        <WizStep wiz={wiz} index={0}>
                         <div className="portal-entity-grid-2">
                           <label>
                             <span>First Name</span>
@@ -541,6 +545,8 @@ export default function HrPage() {
                             />
                           </label>
                         </div>
+                        </WizStep>
+                        <WizStep wiz={wiz} index={1}>
                         <div className="portal-entity-grid-3">
                           <label>
                             <span>Contract</span>
@@ -582,6 +588,8 @@ export default function HrPage() {
                             />
                           </label>
                         </div>
+                        </WizStep>
+                        <WizStep wiz={wiz} index={2}>
                         <div className="portal-entity-grid-3">
                           <label>
                             <span>Phone</span>
@@ -619,6 +627,8 @@ export default function HrPage() {
                             </select>
                           </label>
                         </div>
+                        </WizStep>
+                        <WizStep wiz={wiz} index={3}>
                         <div className="portal-entity-grid-4">
                           <label>
                             <span>National ID</span>
@@ -692,10 +702,11 @@ export default function HrPage() {
                             </select>
                           </label>
                         </div>
-                        <button type="submit" className="portal-primary-btn" disabled={mutating}>
-                          {mutating ? 'Saving...' : editingId ? 'Save Employee' : 'Add Employee'}
-                        </button>
+                        </WizStep>
+                        {wiz.bar}
                       </form>
+                      )}
+                      </Wizard>
                     ) : null}
 
                     <div className="portal-entity-form" style={{ marginBottom: 14 }}>
