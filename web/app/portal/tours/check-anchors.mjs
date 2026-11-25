@@ -28,11 +28,11 @@ function walk(dir) {
 
 const sources = walk(appRoot);
 
-// Anchors declared in the UI as literals: data-tour="x".
+// Anchors declared in the UI as literals: data-tour="x", or dataTour="x" on a CollapseCard, which renders it as data-tour.
 const declared = new Set();
 for (const file of sources) {
   const text = readFileSync(file, 'utf8');
-  for (const m of text.matchAll(/data-tour=["']([^"']+)["']/g)) declared.add(m[1]);
+  for (const m of text.matchAll(/(?:data-tour|dataTour)=["']([^"']+)["']/g)) declared.add(m[1]);
 }
 
 /**
