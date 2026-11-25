@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnApplicationShutdown, Inject, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,6 +17,7 @@ import { InstagramClient } from './channels/instagram-client';
 import { TikTokClient, TikTokMode, authorizeUrl, checkState, signState } from './channels/tiktok-client';
 import { XClient, XCredentials } from './channels/x-client';
 import { renditionFromUrl } from './social-image';
+import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
 
 const TICK_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 3;
@@ -63,17 +64,18 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
     private readonly prisma: PrismaService,
     private readonly storefront: StorefrontService,
     private readonly pages: PageContentService,
+    @Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials,
   ) {}
 
-  private get pageId() { return process.env.FACEBOOK_PAGE_ID || ''; }
-  private get fbToken() { return process.env.FACEBOOK_PAGE_ACCESS_TOKEN || ''; }
+  private get pageId() { return this.creds.get('FACEBOOK_PAGE_ID'); }
+  private get fbToken() { return this.creds.get('FACEBOOK_PAGE_ACCESS_TOKEN'); }
   private get version() { return process.env.WHATSAPP_API_VERSION || 'v21.0'; }
-  private get threadsEnvToken() { return process.env.THREADS_ACCESS_TOKEN || ''; }
+  private get threadsEnvToken() { return this.creds.get('THREADS_ACCESS_TOKEN'); }
 
-  private get igToken() { return process.env.INSTAGRAM_ACCESS_TOKEN || this.fbToken; }
-  private get igAccountId() { return process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || ''; }
+  private get igToken() { return this.creds.get('INSTAGRAM_ACCESS_TOKEN') || this.fbToken; }
+  private get igAccountId() { return this.creds.get('INSTAGRAM_BUSINESS_ACCOUNT_ID'); }
   private get xCreds(): XCredentials | null {
-    const c = { apiKey: process.env.X_API_KEY || '', apiSecret: process.env.X_API_SECRET || '', accessToken: process.env.X_ACCESS_TOKEN || '', accessTokenSecret: process.env.X_ACCESS_TOKEN_SECRET || '' };
+    const c = { apiKey: this.creds.get('X_API_KEY'), apiSecret: this.creds.get('X_API_SECRET'), accessToken: this.creds.get('X_ACCESS_TOKEN'), accessTokenSecret: this.creds.get('X_ACCESS_TOKEN_SECRET') };
     return c.apiKey && c.apiSecret && c.accessToken && c.accessTokenSecret ? c : null;
   }
 
@@ -97,14 +99,19 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
       : null;
   }
   private tiktok() {
-    const clientKey = process.env.TIKTOK_CLIENT_KEY || '';
-    const clientSecret = process.env.TIKTOK_CLIENT_SECRET || '';
+    const clientKey = this.creds.get('TIKTOK_CLIENT_KEY');
+    const clientSecret = this.creds.get('TIKTOK_CLIENT_SECRET');
     return clientKey && clientSecret
       ? new TikTokClient({ clientKey, clientSecret, redirectUri: `${this.publicApi()}/social-posting/connect/tiktok/callback`, waitMs: Number(process.env.TIKTOK_PUBLISH_WAIT_MS || 90_000), pollMs: Number(process.env.TIKTOK_POLL_MS || 3_000) }, this.send)
       : null;
   }
-  private igCache: InstagramClient | null = null;
-  private igShared() { return (this.igCache ??= this.igClient()); }
+  /** One Instagram client (it remembers the account it found), made again when the token or account it was made with is changed in Settings. */
+  private igCache: { signature: string; client: InstagramClient | null } | null = null;
+  private igShared() {
+    const signature = [this.igToken, this.igAccountId, this.pageId].join('|');
+    if (!this.igCache || this.igCache.signature !== signature) this.igCache = { signature, client: this.igClient() };
+    return this.igCache.client;
+  }
 
   /** Whether the server has what the channel needs from its settings. (TikTok also needs a sign-in: see connected().) */
   configured(channel: Channel) {
@@ -113,7 +120,7 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
       case 'THREADS': return Boolean(this.threadsEnvToken);
       case 'INSTAGRAM': return Boolean(this.igToken && (this.igAccountId || this.pageId));
       case 'X': return Boolean(this.xCreds);
-      case 'TIKTOK': return Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET);
+      case 'TIKTOK': return Boolean(this.creds.get('TIKTOK_CLIENT_KEY') && this.creds.get('TIKTOK_CLIENT_SECRET'));
     }
   }
 
@@ -235,8 +242,8 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
     const env = this.threadsEnvToken;
     if (!env) return null;
     const row = await this.prisma.socialCredential.findUnique({ where: { channel: 'THREADS' } });
-    if (row && row.sourceHash === hashOf(env)) return { token: row.accessToken, userId: process.env.THREADS_USER_ID || row.userId };
-    return { token: env, userId: process.env.THREADS_USER_ID || null };
+    if (row && row.sourceHash === hashOf(env)) return { token: row.accessToken, userId: this.creds.get('THREADS_USER_ID') || row.userId };
+    return { token: env, userId: this.creds.get('THREADS_USER_ID') || null };
   }
 
   /** Records the Threads token and the account it belongs to, and renews the token when it is within 20 days of ending. */
@@ -362,7 +369,7 @@ export class SocialPostingService implements OnApplicationBootstrap, OnApplicati
   tiktokConnectUrl(by: string): { url: string } | { error: string } {
     const client = this.tiktok();
     if (!client) return { error: 'TikTok is not set up on the server (TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET).' };
-    return { url: authorizeUrl(process.env.TIKTOK_CLIENT_KEY!, `${this.publicApi()}/social-posting/connect/tiktok/callback`, signState(this.stateSecret(), by)) };
+    return { url: authorizeUrl(this.creds.get('TIKTOK_CLIENT_KEY'), `${this.publicApi()}/social-posting/connect/tiktok/callback`, signState(this.stateSecret(), by)) };
   }
   private stateSecret() { return process.env.JWT_SECRET || 'super-secret-key-change-me'; }
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown, Inject, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PageContentService } from '../page-content/page-content.service';
@@ -9,6 +9,7 @@ import {
   ALREADY_REPLIED_CODES, DEFAULT_PRIVATE_TEXT, DEFAULT_PUBLIC_TEXT, FeedComment, fillTemplate, isReplyToComment,
   isTransientFacebookError, looksLikeSpam,
 } from './facebook-comments';
+import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
 
 const DAY_MS = 86_400_000;
 const TICK_MS = 5 * 60_000;
@@ -36,10 +37,10 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
   private readonly logger = new Logger(FacebookCommentsService.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(private readonly prisma: PrismaService, private readonly pages: PageContentService) {}
+  constructor(private readonly prisma: PrismaService, private readonly pages: PageContentService, @Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials) {}
 
-  private get pageId() { return process.env.FACEBOOK_PAGE_ID || ''; }
-  private get token() { return process.env.FACEBOOK_PAGE_ACCESS_TOKEN || ''; }
+  private get pageId() { return this.creds.get('FACEBOOK_PAGE_ID'); }
+  private get token() { return this.creds.get('FACEBOOK_PAGE_ACCESS_TOKEN'); }
   private get version() { return process.env.WHATSAPP_API_VERSION || 'v21.0'; }
   get configured() { return Boolean(this.pageId && this.token); }
 
@@ -231,7 +232,7 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
     return {
       enabled: facebookRepliesEnabled(),
       configured: this.configured,
-      webhookSecretSet: Boolean(process.env.FACEBOOK_WEBHOOK_SECRET),
+      webhookSecretSet: Boolean(this.creds.get('FACEBOOK_WEBHOOK_SECRET')),
       pageId: this.pageId || null,
       subscribed: subscription.subscribed,
       subscriptionError: subscription.error ?? null,

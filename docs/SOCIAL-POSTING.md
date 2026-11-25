@@ -77,6 +77,9 @@ Taking a Threads post down from the screen uses Threads' delete call; if Threads
 
 ## Instagram, X and TikTok
 
+> **Where the keys go.** Every token and key below is entered in **Portal > Settings** (System), where it is stored encrypted: see docs/CREDENTIALS.md. The
+> `.env` names (`FACEBOOK_PAGE_ACCESS_TOKEN`, `X_API_KEY` ...) are still read for any credential never saved in Settings, and on first start the `.env` values are copied across.
+
 Each has its own switch, its own rotation (a product is not repeated on a channel for 30 days whatever the others posted) and its own caption, shaped to what
 that platform allows. Migration `20261125120000_social_more_channels` adds the switches and TikTok's login fields.
 

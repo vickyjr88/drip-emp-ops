@@ -42,7 +42,8 @@ export type PortalNavKey =
   | 'payroll'
   | 'importers'
   | 'audit'
-  | 'rbac';
+  | 'rbac'
+  | 'settings';
 
 const PAGE_TITLES: Record<PortalNavKey, string> = {
   dashboard: 'Dashboard',
@@ -81,6 +82,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   importers: 'Importers',
   audit: 'Audit Log',
   rbac: 'Roles & permissions',
+  settings: 'Settings',
 };
 
 type PortalShellProps = {

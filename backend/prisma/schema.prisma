@@ -2628,6 +2628,20 @@ model SocialPost {
 /// The login a social channel posts with, when it expires and is renewed by the app itself: a Threads token lasts 60 days and is
 /// refreshed before then. Only the app's backend reads it. sourceHash is the hash of the token set in the server's .env, so
 /// putting a new token there replaces this row's instead of being ignored.
+/// An integration id or secret (a Facebook Page token, the X keys, ...) edited in Portal > Settings. Every value is encrypted
+/// (AES-256-GCM, bound to its name); the key that opens them is CREDENTIALS_ENCRYPTION_KEY, which is never stored here.
+/// A row, even with an empty value, means this table is the source for that name: the server's .env is only used for names with no row.
+model Credential {
+  key       String   @id
+  /// enc:v1:<iv>:<tag>:<ciphertext>
+  value     String
+  /// PORTAL (typed in the portal) or ENV_SEED (copied from the server's .env on first start).
+  source    String   @default("PORTAL")
+  updatedBy String   @default("system")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model SocialCredential {
   channel          String    @id
   accessToken      String

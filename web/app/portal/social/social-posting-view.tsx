@@ -300,7 +300,7 @@ export function SocialPostingView() {
                     At each time below a product that is in stock, has a photo and has not been posted lately goes out: the photo, price, sizes
                     available, how to buy (a link on Facebook, Threads and X; the address and WhatsApp number on Instagram and TikTok, where links cannot be clicked) and the shop&apos;s
                     location. Visits from the links show in Insights by channel, and comments on Facebook posts get the private Messenger reply. Nothing is checked by a
-                    person first, so each channel stays off until you turn it on.
+                    person first, so each channel stays off until you turn it on. The connections themselves (tokens and keys) are in <Link href="/portal/settings">Settings</Link>.
                   </p>
                   {!status.allowed ? <p className="portal-error">Posting is switched off on the server (SOCIAL_POSTING=false), whatever is set here.</p> : null}
 
@@ -318,11 +318,11 @@ export function SocialPostingView() {
                         </div>
                         {!c.configured ? (
                           <p className="portal-error" style={{ margin: '8px 0 0' }}>
-                            {channel === 'FACEBOOK' ? 'The server has no Facebook Page connected (FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN).' : null}
-                            {channel === 'THREADS' ? 'The server has no Threads login (THREADS_ACCESS_TOKEN). See docs/SOCIAL-POSTING.md for how to get one.' : null}
-                            {channel === 'INSTAGRAM' ? 'Instagram posts through the Facebook Page connection, which is not set up yet (FACEBOOK_PAGE_ID and FACEBOOK_PAGE_ACCESS_TOKEN). See docs/SOCIAL-POSTING.md.' : null}
-                            {channel === 'X' ? 'The server has no X keys (X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN and X_ACCESS_TOKEN_SECRET). See docs/SOCIAL-POSTING.md for how to get them.' : null}
-                            {channel === 'TIKTOK' && !tt.clientConfigured ? 'The server has no TikTok app (TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET). See docs/SOCIAL-POSTING.md for how to create one.' : null}
+                            {channel === 'FACEBOOK' ? <>No Facebook Page is connected. Add the Page ID and token in <Link href="/portal/settings">Settings</Link>.</> : null}
+                            {channel === 'THREADS' ? <>There is no Threads login. Add the access token in <Link href="/portal/settings">Settings</Link> (docs/SOCIAL-POSTING.md says how to get one).</> : null}
+                            {channel === 'INSTAGRAM' ? <>Instagram posts through the Facebook Page connection, which is not set up yet. Add it in <Link href="/portal/settings">Settings</Link>.</> : null}
+                            {channel === 'X' ? <>There are no X keys. Add the four keys in <Link href="/portal/settings">Settings</Link> (docs/SOCIAL-POSTING.md says how to get them).</> : null}
+                            {channel === 'TIKTOK' && !tt.clientConfigured ? <>There is no TikTok app yet. Add its client key and secret in <Link href="/portal/settings">Settings</Link> (docs/SOCIAL-POSTING.md says how to create one).</> : null}
                             {channel === 'TIKTOK' && tt.clientConfigured ? 'No TikTok account is connected yet.' : null}
                           </p>
                         ) : null}

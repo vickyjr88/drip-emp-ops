@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
 
 /**
  * X (Twitter) server-side Conversion API.
@@ -18,11 +19,15 @@ import { createHash } from 'crypto';
 @Injectable()
 export class XConversionService {
   private readonly logger = new Logger(XConversionService.name);
-  private readonly pixelId = process.env.X_PIXEL_ID || '';
+  constructor(@Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials) {}
+
+  private get pixelId() {
+    return this.creds.get('X_PIXEL_ID');
+  }
   private readonly base = 'https://ads-api.x.com/12/measurement/conversions';
 
   private get token() {
-    return process.env.X_PIXEL_TOKEN || '';
+    return this.creds.get('X_PIXEL_TOKEN');
   }
 
   get configured() {

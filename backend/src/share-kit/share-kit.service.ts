@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, Inject, Optional } from '@nestjs/common';
 import { PageContentService } from '../page-content/page-content.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from '../storefront/storefront.service';
@@ -7,6 +7,7 @@ import { PostableProduct, isPostable, nairobiParts } from '../social-posting/soc
 import { fetchPhoto, renderStatusImage } from '../social-posting/status-image';
 import { affiliateKitSize, affiliateLink, buildAffiliateCaption, isAffiliate, pickDaily } from './share-kit';
 import { cleanShareEvent } from './share-events';
+import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
 
 const CACHE_MS = 60_000;
 
@@ -26,6 +27,7 @@ export class ShareKitService {
     private readonly storefront: StorefrontService,
     private readonly pages: PageContentService,
     private readonly prisma: PrismaService,
+    @Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials,
   ) {}
 
   private async candidates(): Promise<PostableProduct[]> {
@@ -36,7 +38,7 @@ export class ShareKitService {
   }
 
   private async facts() {
-    return shopFacts(this.pages, process.env.FACEBOOK_PAGE_ID || '', this.logger);
+    return shopFacts(this.pages, this.creds.get('FACEBOOK_PAGE_ID'), this.logger);
   }
 
   /**

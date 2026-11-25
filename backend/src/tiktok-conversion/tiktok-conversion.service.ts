@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
 
 /**
  * TikTok server-side Events API.
@@ -20,11 +21,15 @@ import { createHash } from 'crypto';
 @Injectable()
 export class TikTokConversionService {
   private readonly logger = new Logger(TikTokConversionService.name);
-  private readonly pixelCode = process.env.TIKTOK_PIXEL_ID || process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || '';
+  constructor(@Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials) {}
+
+  private get pixelCode() {
+    return this.creds.get('TIKTOK_PIXEL_ID') || process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || '';
+  }
   private readonly base = 'https://business-api.tiktok.com/open_api/v1.3/event/track/';
 
   private get token() {
-    return process.env.TIKTOK_ACCESS_TOKEN || '';
+    return this.creds.get('TIKTOK_ACCESS_TOKEN');
   }
 
   get configured() {

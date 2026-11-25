@@ -1,10 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Inject, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PageContentService } from '../page-content/page-content.service';
 import { StorefrontService } from '../storefront/storefront.service';
 import { shopFacts } from '../facebook-comments/shop-facts';
 import { PostableProduct, buildStatusCaption, isPostable, nairobiParts, pickProduct } from './social-post';
 import { fetchPhoto, renderStatusImage } from './status-image';
+import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
 
 const CHANNEL = 'STATUS';
 /** A Status disappears after a day, so a product may come round again sooner than on a feed. */
@@ -28,6 +29,7 @@ export class StatusKitService {
     private readonly prisma: PrismaService,
     private readonly storefront: StorefrontService,
     private readonly pages: PageContentService,
+    @Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials,
   ) {}
 
   private async candidates(fresh = false): Promise<PostableProduct[]> {
@@ -45,7 +47,7 @@ export class StatusKitService {
   }
 
   private async context() {
-    const facts = await shopFacts(this.pages, process.env.FACEBOOK_PAGE_ID || '', this.logger);
+    const facts = await shopFacts(this.pages, this.creds.get('FACEBOOK_PAGE_ID'), this.logger);
     return { facts, ctx: { origin: facts.site, whatsapp: facts.whatsapp, location: facts.location } };
   }
 

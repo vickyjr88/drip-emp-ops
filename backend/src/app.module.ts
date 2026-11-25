@@ -66,6 +66,7 @@ import { PageContentModule } from './page-content/page-content.module';
 import { ReminderModule } from './reminders/reminder.module';
 import { DailyReportModule } from './daily-report/daily-report.module';
 import { SocialPostingModule } from './social-posting/social-posting.module';
+import { CredentialsModule } from './credentials/credentials.module';
 import { ShareKitModule } from './share-kit/share-kit.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FacebookCommentsModule } from './facebook-comments/facebook-comments.module';
@@ -138,6 +139,7 @@ import { PdfModule } from './pdf/pdf.module';
     WhatsAppOutreachModule,
     FacebookCommentsModule,
     SocialPostingModule,
+    CredentialsModule,
     ShareKitModule,
     ReviewsModule,
     AccountTransferModule,

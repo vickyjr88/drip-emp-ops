@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Header, HttpCode, Logger, NotFoundException, Param, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Logger, NotFoundException, Param, Post, Query, Req, UnauthorizedException, Inject, Optional } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { timingSafeEqual } from 'crypto';
 import { Public } from '../auth/decorators/public.decorator';
 import { verifySignature } from '../whatsapp-outreach/whatsapp-subscription';
 import { FacebookCommentsService } from './facebook-comments.service';
 import { parseFeedWebhook } from './facebook-comments';
+import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
 
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
@@ -19,10 +20,10 @@ const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(
 export class FacebookWebhookController {
   private readonly logger = new Logger(FacebookWebhookController.name);
 
-  constructor(private readonly comments: FacebookCommentsService) {}
+  constructor(private readonly comments: FacebookCommentsService, @Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials) {}
 
   private assertSecret(given: string) {
-    const secret = process.env.FACEBOOK_WEBHOOK_SECRET || '';
+    const secret = this.creds.get('FACEBOOK_WEBHOOK_SECRET');
     if (!secret || !same(given, secret)) throw new NotFoundException();
   }
 
@@ -41,7 +42,7 @@ export class FacebookWebhookController {
   @Post(':secret')
   async receive(@Param('secret') secret: string, @Body() body: unknown, @Req() request: any) {
     this.assertSecret(secret);
-    const appSecret = process.env.FACEBOOK_APP_SECRET || process.env.WHATSAPP_APP_SECRET || '';
+    const appSecret = this.creds.get('FACEBOOK_APP_SECRET') || process.env.WHATSAPP_APP_SECRET || '';
     if (appSecret && !verifySignature(request.rawBody, request.headers?.['x-hub-signature-256'], appSecret)) throw new UnauthorizedException();
 
     for (const comment of parseFeedWebhook(body)) {

@@ -18,6 +18,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Banknote, BarChart3, BellRing, Boxes, CalendarDays, ClipboardList, FileText, Handshake, Image as ImageIcon, Images, Landmark, LayoutDashboard,
   LayoutGrid, Lightbulb, type LucideIcon, Megaphone, MessageCircle, MessageCircleQuestion, Package, PenLine, Plus, Receipt, ScrollText, Search,
+  Settings,
   Share2, ShieldCheck, Shirt, ShoppingCart, Sparkles, Star, Store, Tag, Upload, UserCog, UserPlus, UsersRound, Wallet, Watch,
 } from 'lucide-react';
 import type { PortalNavKey } from './portal-shell';
@@ -90,6 +91,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'system', label: 'System', icon: ShieldCheck, items: [
+      { key: 'settings', href: '/portal/settings', label: 'Settings', icon: Settings, needs: 'credential.read' },
       { key: 'audit', href: '/portal/audit', label: 'Audit Log', icon: ScrollText, needs: 'audit-log.read' },
       { key: 'rbac', href: '/portal/rbac', label: 'Roles & permissions', icon: ShieldCheck },
     ],
