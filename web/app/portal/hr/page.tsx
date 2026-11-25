@@ -185,7 +185,8 @@ export default function HrPage() {
               ? apiRequest<LeaveBalance[]>(`/leave-balances?year=${year}`, { method: 'GET' }, authToken)
               : Promise.resolve([]),
             hasPermission(nextProfile, 'project.read')
-              ? apiRequest<Project[]>('/projects', { method: 'GET' }, authToken)
+              // Drip has no projects (a leftover from the property system): an admin holds every permission, so the call goes out and 404s. Not an error worth showing.
+              ? apiRequest<Project[]>('/projects', { method: 'GET' }, authToken).catch(() => [] as Project[])
               : Promise.resolve([]),
             hasPermission(nextProfile, 'employee.read')
               ? apiRequest<Stats>('/employees/stats', { method: 'GET' }, authToken)
