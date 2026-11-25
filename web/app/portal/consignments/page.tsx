@@ -159,6 +159,8 @@ export default function ConsignmentsPage() {
 
   const canCreate = hasPermission(profile, 'consignment.create');
   const canUpdate = hasPermission(profile, 'consignment.update');
+  // Turning a pickup into an order creates an order, so it needs the right to do that too.
+  const canConvert = canUpdate && hasPermission(profile, 'order.create');
   const canAddReseller = hasPermission(profile, 'customer.create');
 
   // Only stock on the shop floor at the chosen store can go out.
@@ -305,6 +307,22 @@ export default function ConsignmentsPage() {
       setErrorMessage(error);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onConvert(consignment: Consignment) {
+    if (!token) return;
+    const confirmed = await dialog.confirm({
+      title: 'Turn into an order',
+      message: `The reseller keeps the ${consignment.unitsStillOut} pair(s) still out on ${consignment.reference}. They become an order at the prices agreed on the pickup, and the pickup is closed. Payments already taken on the pickup stay on it; new payments go on the order.`,
+      confirmLabel: 'Create the order',
+    });
+    if (!confirmed) return;
+    try {
+      const made = await apiRequest<{ orderId: string; orderNumber: string }>(`/consignments/${consignment.id}/convert-to-order`, { method: 'POST' }, token);
+      window.location.href = `/portal/orders/${made.orderId}`;
+    } catch (error) {
+      setErrorMessage(error);
     }
   }
 
@@ -744,6 +762,12 @@ export default function ConsignmentsPage() {
                                 })}>
                                 Settle
                               </button>
+                              {canConvert && consignment.unitsStillOut > 0 ? (
+                                <button type="button" className="portal-inline-btn"
+                                  onClick={() => void onConvert(consignment)}>
+                                  Turn into order
+                                </button>
+                              ) : null}
                               <button type="button" className="portal-inline-btn is-danger"
                                 onClick={() => void onWriteOff(consignment)}>
                                 Write Off

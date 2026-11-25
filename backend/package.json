@@ -24,6 +24,7 @@
     "test:funnel": "node --require ts-node/register/transpile-only --test test/funnel.test.ts",
     "test:customer-lookup": "node --require ts-node/register/transpile-only --test --test-concurrency=1 test/customer-lookup.test.ts test/customer-lookup-service.test.ts test/variant-lookup.test.ts test/order-customer.test.ts",
     "test:consignment-name": "node --require ts-node/register/transpile-only --test test/consignment-name.test.ts",
+    "test:consignment-convert": "node --require ts-node/register/transpile-only --test --test-concurrency=1 test/consignment-convert.test.ts",
     "test:receipt": "node --require ts-node/register/transpile-only --test test/receipt.test.ts",
     "test:contact-email": "node --require ts-node/register/transpile-only --test test/contact-email.test.ts",
     "test:mautic-phone": "node --require ts-node/register/transpile-only --test test/mautic-phone.test.ts",

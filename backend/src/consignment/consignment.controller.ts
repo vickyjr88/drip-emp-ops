@@ -51,6 +51,13 @@ export class ConsignmentController {
     return this.service.settle(id, dto, request?.user?.email || 'system');
   }
 
+  // Creates an order, so it needs the right to do that as well as to change a pickup.
+  @Post(':id/convert-to-order')
+  @Permissions(buildPermissionKey('Consignment', 'update'), buildPermissionKey('Order', 'create'))
+  convertToOrder(@Param('id') id: string, @Req() request: any) {
+    return this.service.convertToOrder(id, request?.user?.email || 'system');
+  }
+
   @Patch(':id/write-off')
   @Permissions(buildPermissionKey('Consignment', 'update'))
   writeOff(@Param('id') id: string, @Body() body: { reason: string }, @Req() request: any) {

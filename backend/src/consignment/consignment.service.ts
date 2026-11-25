@@ -335,6 +335,91 @@ export class ConsignmentService {
     });
   }
 
+  /**
+   * The reseller keeps what is still out: those pairs become an order at the prices agreed on the pickup.
+   *
+   * Nothing is counted twice, which is the whole point of doing it here rather than by hand:
+   *  - stock: the pairs leave the consignment bucket as sold (the same movement settle writes). The order takes nothing off the shop floor,
+   *    because the pairs are not on it;
+   *  - cost of goods: booked once, as the order's own cost entry, so marking the order delivered later finds it already there;
+   *  - money owed: lives on the order from now. The pickup's sold value is left alone, so the pickup does not also claim it. What the
+   *    reseller already paid on the pickup stays on the pickup (it was booked as revenue when it came in).
+   * A pickup with nothing left out has nothing to convert; one that is now fully accounted for closes as settled.
+   */
+  async convertToOrder(id: string, actor = 'system') {
+    return this.prisma.$transaction(async (tx) => {
+      const consignment = await tx.consignment.findUnique({
+        where: { id }, include: { lines: { include: { variant: true } }, customer: true },
+      });
+      if (!consignment) throw new NotFoundException(`Consignment ${id} not found`);
+      if (consignment.status !== 'OPEN') {
+        throw new BadRequestException(`${consignment.reference} is already ${consignment.status.toLowerCase()}.`);
+      }
+
+      const kept = consignment.lines
+        .map((line) => ({ line, quantity: line.quantityOut - line.quantitySold - line.quantityReturned }))
+        .filter((entry) => entry.quantity > 0);
+      if (!kept.length) throw new BadRequestException(`Nothing is still out on ${consignment.reference}.`);
+
+      const orderLines = kept.map(({ line, quantity }) => {
+        const price = Number(line.unitPrice);
+        return {
+          variantId: line.variantId,
+          description: `${line.variant.name} (${line.variant.sku})`,
+          quantity,
+          unitPrice: new Prisma.Decimal(price),
+          listPrice: new Prisma.Decimal(price),
+          discount: new Prisma.Decimal(0),
+          lineTotal: new Prisma.Decimal(price * quantity),
+          fulfillmentType: 'STOCK' as const,
+        };
+      });
+      const total = orderLines.reduce((sum, line) => sum + Number(line.lineTotal), 0);
+      const customer = consignment.customer;
+
+      const order = await tx.order.create({
+        data: {
+          orderNumber: await nextReference(tx.order, 'orderNumber', 'DE'),
+          storeId: consignment.storeId,
+          customerId: consignment.customerId,
+          channel: 'CONSIGNMENT',
+          priceTier: consignment.priceTier,
+          customerName: customerDisplayName(customer),
+          customerPhone: customer.phone || undefined,
+          notes: `Converted from pickup ${consignment.reference}: the reseller kept what was still out.`,
+          subtotal: new Prisma.Decimal(total),
+          discount: new Prisma.Decimal(0),
+          shipping: new Prisma.Decimal(0),
+          total: new Prisma.Decimal(total),
+          createdBy: actor,
+          lines: { create: orderLines },
+        },
+        include: { lines: true },
+      });
+
+      for (const { line, quantity } of kept) {
+        await this.moveStock(tx, {
+          variantId: line.variantId, storeId: consignment.storeId, quantity,
+          direction: 'SOLD', reference: consignment.reference, actor,
+        });
+        await tx.consignmentLine.update({ where: { id: line.id }, data: { quantitySold: { increment: quantity } } });
+      }
+      // The pairs have left: their cost goes now, as the order's own entry (see above).
+      await this.posting.postOrderCost(order.id, tx);
+
+      await tx.consignment.update({
+        where: { id },
+        data: {
+          status: ConsignmentStatus.SETTLED,
+          closedAt: new Date(),
+          notes: [consignment.notes, `Converted to order ${order.orderNumber} (${kept.reduce((n, k) => n + k.quantity, 0)} pair(s)).`].filter(Boolean).join('\n'),
+        },
+      });
+
+      return { orderId: order.id, orderNumber: order.orderNumber, total, pairs: kept.reduce((n, k) => n + k.quantity, 0) };
+    });
+  }
+
   async findAll(query: ConsignmentQueryDto) {
     const { skip, take, search, customerId, storeId, status, overdueOnly } = query;
     const where: Prisma.ConsignmentWhereInput = {

@@ -47,7 +47,7 @@ type Order = {
   payments: Array<{ id: string; amount: string | number; method: string; reference?: string | null }>;
 };
 
-const CHANNEL_OPTIONS: Array<[string, string]> = [['IN_STORE', 'In store'], ['WHATSAPP', 'WhatsApp'], ['PHONE', 'Phone call'], ['INSTAGRAM', 'Instagram'], ['TIKTOK', 'TikTok'], ['WEBSITE', 'Website']];
+const CHANNEL_OPTIONS: Array<[string, string]> = [['IN_STORE', 'In store'], ['WHATSAPP', 'WhatsApp'], ['PHONE', 'Phone call'], ['INSTAGRAM', 'Instagram'], ['TIKTOK', 'TikTok'], ['WEBSITE', 'Website'], ['CONSIGNMENT', 'From a pickup']];
 
 const METHODS = ['MPESA', 'CASH', 'CARD', 'BANK_TRANSFER'];
 
