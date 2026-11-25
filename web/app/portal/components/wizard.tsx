@@ -38,11 +38,17 @@ const StepContext = createContext<number>(0);
 const PHONE = '(max-width: 760px)';
 
 export function Wizard({
-  titles, submitLabel, saving, onCancel, cancelLabel = 'Cancel', children,
+  titles, submitLabel, saving, submitDisabled, check, desktopBar = true, onCancel, cancelLabel = 'Cancel', children,
 }: {
   titles: string[];
   submitLabel: string;
   saving?: boolean;
+  /** The last step's button is off until the form can be saved (the form says why elsewhere on that step). */
+  submitDisabled?: boolean;
+  /** Extra rule for moving on: return a sentence to stop at this step, or null to go ahead. */
+  check?: (step: number) => string | null;
+  /** The form's own submit row on a desktop. Turn off when the form already has its own button there. */
+  desktopBar?: boolean;
   onCancel?: () => void;
   cancelLabel?: string;
   children: (wiz: WizardApi) => React.ReactNode;
@@ -50,12 +56,14 @@ export function Wizard({
   const [step, setStep] = useState(0);
   const root = useRef<HTMLDivElement | null>(null);
   const pointed = useRef(false);
+  const [stepError, setStepError] = useState<string | null>(null);
   const count = titles.length;
   const isLast = step === count - 1;
 
   const phone = () => typeof window !== 'undefined' && window.matchMedia(PHONE).matches;
 
   const show = useCallback((index: number) => {
+    setStepError(null);
     setStep(Math.max(0, Math.min(count - 1, index)));
     root.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, [count]);
@@ -71,7 +79,12 @@ export function Wizard({
     return false;
   }, [step]);
 
-  const next = () => { if (stepIsValid()) show(step + 1); };
+  const next = () => {
+    if (!stepIsValid()) return;
+    const stop = check?.(step);
+    if (stop) { setStepError(stop); return; }
+    show(step + 1);
+  };
 
   // Back button on the phone moves a step back rather than leaving the form.
   useEffect(() => { root.current?.setAttribute('data-wiz-current', String(step)); }, [step]);
@@ -98,16 +111,19 @@ export function Wizard({
     },
     bar: (
       <>
-        <div className="wiz-actions">
-          <button type="submit" className="portal-primary-btn" disabled={saving}>{saving ? 'Saving...' : submitLabel}</button>
-          {onCancel ? <button type="button" className="portal-ghost-btn" onClick={onCancel}>{cancelLabel}</button> : null}
-        </div>
+        {desktopBar ? (
+          <div className="wiz-actions">
+            <button type="submit" className="portal-primary-btn" disabled={saving || submitDisabled}>{saving ? 'Saving...' : submitLabel}</button>
+            {onCancel ? <button type="button" className="portal-ghost-btn" onClick={onCancel}>{cancelLabel}</button> : null}
+          </div>
+        ) : null}
+        {stepError ? <p className="wiz-error" role="alert">{stepError}</p> : null}
         <div className="wiz-bar" role="group" aria-label="Steps">
           {step > 0
             ? <button type="button" className="portal-ghost-btn" onClick={() => show(step - 1)}>Back</button>
             : onCancel ? <button type="button" className="portal-ghost-btn" onClick={onCancel}>{cancelLabel}</button> : <span />}
           {isLast
-            ? <button type="submit" className="portal-primary-btn" disabled={saving}>{saving ? 'Saving...' : submitLabel}</button>
+            ? <button type="submit" className="portal-primary-btn" disabled={saving || submitDisabled}>{saving ? 'Saving...' : submitLabel}</button>
             : <button type="button" className="portal-primary-btn" onClick={next}>Next</button>}
         </div>
       </>

@@ -14,6 +14,8 @@ import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { CollapseCard } from '../../components/collapse-card';
+import { RowActions } from '../../components/mobile-bits';
 import { ImageLightbox } from '../../components/image-lightbox';
 import { FollowUp, FollowUpButton, FollowUpPreview } from '../../components/follow-up-button';
 import { useErrorState, useFeedbackState } from '../../components/notifications';
@@ -416,11 +418,15 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
           >
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
-            <div className="portal-action-row" style={{ marginBottom: 16, justifyContent: 'space-between' }}>
-              <Link href="/portal/orders" className="portal-ghost-btn">
+            <div className="portal-action-row m-order-top" style={{ marginBottom: 16, justifyContent: 'space-between' }}>
+              <Link href="/portal/orders" className="portal-ghost-btn m-desktop-only">
                 Back to Orders
               </Link>
-              <div className="portal-action-row">
+              <div className="m-order-chips">
+                <span className="portal-chip">{order.status}</span>
+                {isSourcing ? <span className="portal-chip is-danger">Sourcing</span> : null}
+              </div>
+              <RowActions className="m-order-actions">
                 {hasPermission(profile, 'order.create') ? (
                   <Link href={`/portal/orders/new?again=${order.id}`} className="portal-inline-btn" title="Start a new order with the same customer and items">
                     Order again
@@ -435,9 +441,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                   Print receipt
                 </Link>
                 <FollowUpButton followUp={order.followUp} />
-                <span className="portal-chip">{order.status}</span>
-                {isSourcing ? <span className="portal-chip is-danger">Sourcing</span> : null}
-              </div>
+              </RowActions>
             </div>
             {order.followUp ? (
               <article className="portal-card" style={{ marginBottom: 16 }}>
@@ -466,8 +470,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
             </div>
 
             <div className="portal-entity-grid-2">
-              <article className="portal-card">
-                <h2 style={{ marginTop: 0 }}>Customer</h2>
+              <CollapseCard title="Customer" summary={customerFullName || order.customerName || 'Walk-in'} defaultOpen>
                 <div className="portal-info-list">
                   <div className="portal-info-row">
                     <span>Name</span>
@@ -494,10 +497,9 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                     </div>
                   ) : null}
                 </div>
-              </article>
+              </CollapseCard>
 
-              <article className="portal-card">
-                <h2 style={{ marginTop: 0 }}>Order</h2>
+              <CollapseCard title="Order" summary={`${order.channel.replace('_', ' ')} · ${order.store.code}`}>
                 <div className="portal-info-list">
                   <div className="portal-info-row">
                     <span>Store</span>
@@ -543,21 +545,20 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                     ))}
                   </div>
                 ) : null}
-              </article>
+              </CollapseCard>
             </div>
 
-            <article className="portal-card">
+            <CollapseCard title="Items" summary={`${order.lines.length}`} defaultOpen>
               <div className="portal-card-header-row">
-                <h2 style={{ margin: 0 }}>Items</h2>
                 {canPay && order.balance > 0 ? (
-                  <button type="button" className="portal-primary-btn" onClick={() => { setShowPayment(true); setPayment({ amount: String(order.balance), method: 'MPESA', reference: '' }); }}>
+                  <button type="button" className="portal-primary-btn m-desktop-only" onClick={() => { setShowPayment(true); setPayment({ amount: String(order.balance), method: 'MPESA', reference: '' }); }}>
                     Take Payment
                   </button>
                 ) : null}
               </div>
 
               <div className="portal-table-wrap">
-                <table className="portal-data-table is-doc">
+                <table className="portal-data-table is-doc is-stack">
                   <thead>
                     <tr>
                       <th />
@@ -571,7 +572,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                       return (
                         <Fragment key={line.id}>
                         <tr>
-                          <td>
+                          <td className="m-hide">
                             {imageUrl ? (
                               <div
                                 className="portal-list-thumb is-clickable"
@@ -585,11 +586,11 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                               </div>
                             )}
                           </td>
-                          <td>
+                          <td className="is-title">
                             {line.description}
                             <div className="portal-muted">{line.variant.sku}</div>
                           </td>
-                          <td>
+                          <td data-label="Fulfillment">
                             {line.fulfillmentType === 'SUPPLIER_ORDER' && line.fulfillmentStatus ? (
                               <span className={`portal-chip${line.fulfillmentStatus === 'HANDED_TO_CUSTOMER' ? ' is-muted' : ' is-danger'}`}>
                                 {LINE_STATUS_LABEL[line.fulfillmentStatus]}
@@ -598,7 +599,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                               <span className="portal-chip is-muted">On shelf</span>
                             )}
                           </td>
-                          <td>
+                          <td data-label="Supplier" className={line.supplierInvoice ? '' : 'm-hide'}>
                             {line.supplierInvoice ? (
                               <>
                                 {/* Links to the supplier's account page --
@@ -616,10 +617,10 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                               <span className="portal-muted">—</span>
                             )}
                           </td>
-                          <td>{line.quantity}</td>
-                          <td>{formatMoney(line.unitPrice)}</td>
-                          <td>{formatMoney(line.lineTotal)}</td>
-                          <td>
+                          <td data-label="Qty">{line.quantity}</td>
+                          <td data-label="Unit price">{formatMoney(line.unitPrice)}</td>
+                          <td data-label="Line total">{formatMoney(line.lineTotal)}</td>
+                          <td className="is-actions">
                             {canUpdate && next ? (
                               <button type="button" className="portal-inline-btn" onClick={() => void onAdvanceLineFulfillment(line)}>
                                 Mark {LINE_STATUS_LABEL[next]}
@@ -742,7 +743,7 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                         <td colSpan={2}>{formatMoney(order.shipping)}</td>
                       </tr>
                     ) : null}
-                    <tr>
+                    <tr className="is-total">
                       <td colSpan={6}><strong>Total</strong></td>
                       <td colSpan={2}><strong>{formatMoney(order.total)}</strong></td>
                     </tr>
@@ -755,10 +756,21 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                   account to Cost of Goods Sold so the margin on this sale reads correctly once it is approved.
                 </p>
               ) : null}
-            </article>
+            </CollapseCard>
+
+            {canPay && order.balance > 0 && !showPayment ? (
+              <>
+                <div className="m-bar-space" />
+                <div className="m-bar m-phone-only">
+                  <button type="button" className="portal-primary-btn" onClick={() => { setShowPayment(true); setPayment({ amount: String(order.balance), method: 'MPESA', reference: '' }); }}>
+                    Take payment · {formatMoney(order.balance)}
+                  </button>
+                </div>
+              </>
+            ) : null}
 
             {showPayment && canPay ? (
-              <article className="portal-card">
+              <article className="portal-card m-sheet">
                 <h2 style={{ marginTop: 0 }}>Record Payment</h2>
                 <div className="portal-entity-form">
                   <div className="portal-entity-grid-3">
@@ -790,29 +802,27 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
               </article>
             ) : null}
 
-            <article className="portal-card">
-              <h2 style={{ marginTop: 0 }}>Payments</h2>
+            <CollapseCard title="Payments" summary={order.payments.length ? `${order.payments.length} · ${formatMoney(order.amountPaid)}` : 'none yet'}>
               {order.payments.length === 0 ? (
                 <div className="portal-empty-state">No payments recorded yet.</div>
               ) : (
                 <div className="portal-table-wrap">
-                  <table className="portal-data-table is-doc">
+                  <table className="portal-data-table is-doc is-stack">
                     <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Received By</th><th>Amount</th></tr></thead>
                     <tbody>
                       {order.payments.map((paid) => (
                         <tr key={paid.id}>
-                          <td>{formatDateTime(paid.receivedAt)}</td>
-                          <td>{paid.method}</td>
-                          <td>{paid.reference || '—'}</td>
-                          <td>{paid.receivedBy}</td>
-                          <td>{formatMoney(paid.amount)}</td>
+                          <td className="is-title">{formatMoney(paid.amount)} · {paid.method}</td>
+                          <td data-label="Date">{formatDateTime(paid.receivedAt)}</td>
+                          <td data-label="Reference">{paid.reference || '—'}</td>
+                          <td data-label="Received by">{paid.receivedBy}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
-            </article>
+            </CollapseCard>
           </PortalShell>
         </section>
       </main>

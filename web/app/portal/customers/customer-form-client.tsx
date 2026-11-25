@@ -173,7 +173,7 @@ export default function CustomerFormClient({
 
             <article className="portal-card">
               <form className="portal-entity-form" onSubmit={onSubmit} {...guard.formProps}>
-                <div className="portal-entity-grid-2">
+                <div className="portal-entity-grid-2 is-pairs">
                   <label>
                     <span>First name</span>
                     <input
@@ -195,13 +195,14 @@ export default function CustomerFormClient({
                 </div>
                 <div className="portal-entity-grid-2">
                   <label>
-                    <span>Email <small className="portal-muted">(optional: leave blank for a phone-only customer, add it when you have it)</small></span>
+                    <span>Email (optional)</span>
                     <input
                       type="email"
                       value={form.email}
                       disabled={!canWrite}
                       onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
                     />
+                    <small className="portal-muted">Leave blank for a phone-only customer; add it when you have it.</small>
                   </label>
                   <label>
                     <span>Phone</span>
@@ -241,11 +242,12 @@ export default function CustomerFormClient({
                   </p>
                 ) : null}
 
-                <div className="portal-inline-actions">
+                <div className="m-bar-space" />
+                <div className="portal-inline-actions m-bar">
+                  <Link href="/portal/customers" className="portal-ghost-btn">Cancel</Link>
                   <button type="submit" className="portal-primary-btn" disabled={saving || !canWrite}>
                     {saving ? 'Saving…' : mode === 'edit' ? 'Save Customer' : 'Add Customer'}
                   </button>
-                  <Link href="/portal/customers" className="portal-ghost-btn">Cancel</Link>
                 </div>
               </form>
             </article>

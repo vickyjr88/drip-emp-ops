@@ -5,6 +5,7 @@ import { useErrorState, useFeedbackState } from '../../components/notifications'
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { CollapseCard } from '../../components/collapse-card';
 import { TierTag, type Tier } from '../../components/customer-picker';
 import { realEmail } from '../../../lib/contact-email';
 import { formatDateTime, formatMoney } from '../../accounting/lib';
@@ -353,8 +354,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
 
           <div className="portal-stack-grid">
             <div className="portal-detail-grid">
-              <article className="portal-card">
-                <h2>Contact & Identity</h2>
+              <CollapseCard title="Contact & Identity" summary={customer.phone} defaultOpen>
                 <div className="portal-info-list">
                   <div className="portal-info-row">
                     <span>Email</span>
@@ -380,9 +380,9 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                     onChange={(tier) => void onSetTier(tier)}
                   />
                 </div>
-              </article>
+              </CollapseCard>
 
-              <article className="portal-card">
+              <CollapseCard title="Customer Portal Access" summary={customer.portalEnabled ? 'Active' : 'No access'}>
                 <div
                   style={{
                     display: 'flex',
@@ -393,7 +393,6 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                   }}
                 >
                   <div>
-                    <h2 style={{ margin: 0 }}>Customer Portal Access</h2>
                     <p className="portal-muted" style={{ margin: '4px 0 0' }}>
                       Lets this customer sign in at <code>/account</code> to see their own unit, charges,
                       and payments.
@@ -460,13 +459,12 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                     </button>
                   </div>
                 ) : null}
-              </article>
+              </CollapseCard>
 
             </div>
 
             <div className="portal-section-grid">
-              <article className="portal-card">
-                <h2>Orders</h2>
+              <CollapseCard title="Orders" summary={`${orders.length}`} defaultOpen>
                 <div className="portal-list-stack">
                   {orders.length === 0 ? (
                     <div className="portal-empty-state">
@@ -497,13 +495,12 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                     ))
                   )}
                 </div>
-              </article>
+              </CollapseCard>
 
             </div>
 
-            <article className="portal-card">
+            <CollapseCard title="Documents" summary={`${documents.length}`}>
               <div className="portal-card-header-row">
-                <h2 style={{ margin: 0 }}>Documents</h2>
                 {canUpdateCustomer ? (
                   <Link href={`/portal/customers/${customer.id}/edit`} className="portal-inline-btn">
                     Manage Documents
@@ -539,7 +536,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
                   ))
                 )}
               </div>
-            </article>
+            </CollapseCard>
 
           </div>
           </PortalShell>

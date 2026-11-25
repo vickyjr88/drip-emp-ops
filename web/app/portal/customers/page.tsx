@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { FilterFold } from '../components/mobile-bits';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { useErrorState } from '../components/notifications';
@@ -176,6 +177,7 @@ export default function CustomersPage() {
 
               <div className="list-toolbar">
                 <ServerListSearch pager={customersPager} placeholder="Search name, email, phone…" />
+                <FilterFold label="More">
                 <ListExport
                   rows={exportRows}
                   config={{
@@ -189,6 +191,7 @@ export default function CustomersPage() {
                     ],
                   }}
                 />
+                </FilterFold>
               </div>
 
               <div className="portal-list-stack">

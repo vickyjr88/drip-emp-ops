@@ -15,6 +15,7 @@ import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
+import { FilterFold, RowActions } from '../components/mobile-bits';
 import { ListThumb } from '../components/list-thumb';
 import { FollowUp, FollowUpButton } from '../components/follow-up-button';
 import { usePortalDialog } from '../components/portal-dialog';
@@ -468,6 +469,7 @@ export default function OrdersPage() {
 
               <div className="list-toolbar">
                 <ServerListSearch pager={ordersPager} placeholder="Search order number, name or phone…" />
+                <FilterFold count={[statusFilter, channelFilter, tradeOnly, awaitingSupplierOnly].filter(Boolean).length}>
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="">All statuses</option>
                   {['PENDING', 'PAID', 'PACKED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED'].map((status) => (
@@ -507,6 +509,7 @@ export default function OrdersPage() {
                     ],
                   }}
                 />
+                </FilterFold>
               </div>
 
               <div className="portal-list-stack">
@@ -560,32 +563,37 @@ export default function OrdersPage() {
                             own buttons must still act on the order in place
                             (take a payment, advance status) without also
                             triggering that navigation underneath them. */}
-                        <div className="portal-action-row" onClick={(event) => event.stopPropagation()}>
-                          <Link href={`/portal/orders/${order.id}`} className="portal-inline-btn">
-                            View
-                          </Link>
-                          <FollowUpButton followUp={order.followUp} />
-                          {canPay && order.balance > 0 ? (
-                            <button type="button" className="portal-inline-btn"
-                              onClick={() => setPayment({ orderId: order.id, amount: String(order.balance), method: 'MPESA', reference: '' })}>
-                              Take Payment
-                            </button>
-                          ) : null}
-                          {canUpdate && order.status === 'PAID' ? (
-                            <button type="button" className="portal-inline-btn" onClick={() => void onSetStatus(order, 'PACKED')}>
-                              Mark Packed
-                            </button>
-                          ) : null}
-                          {canUpdate && order.status === 'PACKED' ? (
-                            <button type="button" className="portal-inline-btn" onClick={() => void onSetStatus(order, 'SHIPPED')}>
-                              Mark Shipped
-                            </button>
-                          ) : null}
-                          {canUpdate && order.status === 'SHIPPED' ? (
-                            <button type="button" className="portal-inline-btn" onClick={() => void onSetStatus(order, 'DELIVERED')}>
-                              Mark Delivered
-                            </button>
-                          ) : null}
+                        <div style={{ display: 'contents' }} onClick={(event) => event.stopPropagation()}>
+                          <RowActions
+                            primary={(
+                              <Link href={`/portal/orders/${order.id}`} className="portal-inline-btn">
+                                View
+                              </Link>
+                            )}
+                          >
+                            <FollowUpButton followUp={order.followUp} />
+                            {canPay && order.balance > 0 ? (
+                              <button type="button" className="portal-inline-btn"
+                                onClick={() => setPayment({ orderId: order.id, amount: String(order.balance), method: 'MPESA', reference: '' })}>
+                                Take Payment
+                              </button>
+                            ) : null}
+                            {canUpdate && order.status === 'PAID' ? (
+                              <button type="button" className="portal-inline-btn" onClick={() => void onSetStatus(order, 'PACKED')}>
+                                Mark Packed
+                              </button>
+                            ) : null}
+                            {canUpdate && order.status === 'PACKED' ? (
+                              <button type="button" className="portal-inline-btn" onClick={() => void onSetStatus(order, 'SHIPPED')}>
+                                Mark Shipped
+                              </button>
+                            ) : null}
+                            {canUpdate && order.status === 'SHIPPED' ? (
+                              <button type="button" className="portal-inline-btn" onClick={() => void onSetStatus(order, 'DELIVERED')}>
+                                Mark Delivered
+                              </button>
+                            ) : null}
+                          </RowActions>
                         </div>
                       </div>
                     </div>

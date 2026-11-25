@@ -12,10 +12,12 @@
  */
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useUnsavedGuard } from '../../components/use-unsaved-guard';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { Wizard, WizStep } from '../../components/wizard';
 import { Combobox } from '../../components/combobox';
 import { CustomerPicker, PickedCustomer, Tier, TIER_LABEL, TierTag, splitTyped } from '../../components/customer-picker';
 import { useErrorState } from '../../components/notifications';
@@ -55,6 +57,7 @@ function tierPrice(o: Pick<Option, 'priceKes' | 'resellerPriceKes' | 'wholesaleP
 const num = (text: string) => { const n = Number(text); return Number.isFinite(n) ? n : 0; };
 
 export default function NewOrderPage() {
+  const router = useRouter();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
@@ -355,11 +358,28 @@ export default function NewOrderPage() {
                 </div>
               </article>
             ) : (
-              <form className="pord" onSubmit={place} noValidate>
+              <Wizard
+                titles={['Customer', 'Items', 'Delivery & pay', 'Review']}
+                submitLabel="Place order"
+                saving={saving}
+                submitDisabled={problems.length > 0}
+                desktopBar={false}
+                onCancel={() => router.push('/portal/orders')}
+                check={(step) => {
+                  if (step === 0 && !customer && !walkIn) return 'Choose a customer, or ring up as a walk-in.';
+                  if (step === 1 && !lines.length) return 'Add at least one item.';
+                  if (step === 2 && !inStore && !address.trim()) return 'Add a delivery address, or change how it came in to In store.';
+                  if (step === 2 && pay.on && canPay && num(pay.amount) > total + 0.001) return 'The payment is more than the total.';
+                  return null;
+                }}
+              >
+              {(wiz) => (
+              <form className="pord" onSubmit={wiz.onSubmit(place)} noValidate>
                 <div className="pord-main">
                   {againNote ? <p className="pord-lead">{againNote}</p> : null}
                   {lead ? <p className="pord-lead">Ringing up a cart lead{lead.customerName ? ` from ${lead.customerName}` : ''}. {leadNote}</p> : null}
 
+                  <WizStep wiz={wiz} index={0}>
                   <section className="portal-card pord-section" data-tour="orders.customer">
                     <h2><span className="pord-step">1</span> Who is it for?</h2>
                     {walkIn ? (
@@ -411,6 +431,9 @@ export default function NewOrderPage() {
                     ) : null}
                   </section>
 
+                  </WizStep>
+
+                  <WizStep wiz={wiz} index={1}>
                   <section className="portal-card pord-section" data-tour="orders.items">
                     <h2><span className="pord-step">3</span> What do they want?</h2>
                     <Combobox<Option>
@@ -485,6 +508,9 @@ export default function NewOrderPage() {
                     )}
                   </section>
 
+                  </WizStep>
+
+                  <WizStep wiz={wiz} index={2}>
                   <section className="portal-card pord-section">
                     <h2><span className="pord-step">4</span> {inStore ? 'Anything to note?' : 'Where does it go?'}</h2>
                     {!inStore ? (
@@ -518,8 +544,10 @@ export default function NewOrderPage() {
                       ) : <p className="pcb-hint">The order is saved as unpaid; record payments later from the order.</p>}
                     </section>
                   ) : null}
+                  </WizStep>
                 </div>
 
+                <WizStep wiz={wiz} index={3}>
                 <aside className="pord-side">
                   <div className="portal-card pord-summary" data-tour="orders.summary">
                     <h2>Summary</h2>
@@ -541,7 +569,11 @@ export default function NewOrderPage() {
                     <Link href="/portal/orders" className="portal-ghost-btn pord-cancel">Cancel</Link>
                   </div>
                 </aside>
+                </WizStep>
+                {wiz.bar}
               </form>
+              )}
+              </Wizard>
             )}
           </PortalShell>
         </section>
