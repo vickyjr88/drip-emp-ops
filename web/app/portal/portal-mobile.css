@@ -253,6 +253,13 @@ td.m-only { display: none; }
   .lp-page.is-portal .portal-nav-card-body strong { font-size: 1.25rem; }
   .lp-page.is-portal .portal-nav-card-body span { font-size: 10.5px; letter-spacing: 0.04em; }
   .lp-page.is-portal .portal-stat-grid .portal-stat-card h3 { font-size: 0.95rem; white-space: nowrap; }
+  /* Plain figure tiles (a reseller's numbers): label over value, small enough that an amount stays on one line. */
+  .lp-page.is-portal .portal-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .lp-page.is-portal .portal-stat h3 { font-size: 0.95rem; margin: 0; white-space: nowrap; }
+  .lp-page.is-portal .portal-stat p, .lp-page.is-portal .portal-stat span { font-size: 12px; }
+  .lp-page.is-portal .portal-inline-form { display: flex; gap: 8px; align-items: stretch; }
+  .lp-page.is-portal .portal-inline-form > input, .lp-page.is-portal .portal-inline-form > label { flex: 1 1 auto; min-width: 0; }
+  .lp-page.is-portal .portal-inline-form > button { flex: none; white-space: nowrap; min-width: 64px; }
   .m-desktop-only { display: none !important; }
   .m-phone-only { display: flex; }
   .m-phone-only-block { display: block; }
