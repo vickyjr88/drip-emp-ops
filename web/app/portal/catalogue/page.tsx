@@ -357,6 +357,7 @@ export default function CataloguePage() {
         body: JSON.stringify({
           ...form,
           categoryId: form.categoryId || undefined,
+          description: form.description.trim() || undefined,
           imageUrls: images.length ? images : undefined,
           variants,
         }),
@@ -573,6 +574,12 @@ export default function CataloguePage() {
                         onChange={(event) => setPrice(event.target.value)} />
                     </label>
                   </div>
+
+                  <label>
+                    <span>Description</span>
+                    <textarea rows={3} value={form.description} placeholder="What it is, the material, what makes it worth buying. Shown on the product page."
+                      onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} />
+                  </label>
 
                   <div className="portal-entity-grid-3">
                     <label>
