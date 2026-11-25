@@ -118,6 +118,17 @@ export class CartLeadService {
       },
     });
     void this.mautic.syncCartLead({ email: created.customerEmail, name: created.customerName, phone: created.customerPhone });
+    // A shopper who chose to order through WhatsApp is the warmest lead there is: tell the shop now, with a link to reply.
+    if (dto.source === 'WHATSAPP_ORDER') {
+      void this.ownerNotification.notifyWhatsAppLead({
+        id: created.id,
+        customerName: created.customerName,
+        customerPhone: created.customerPhone,
+        customerEmail: created.customerEmail,
+        lines: dto.lines,
+        total: Number(created.total),
+      });
+    }
     return created;
   }
 
@@ -327,6 +338,7 @@ export class CartLeadService {
     // Only on the first sync for this cart -- later syncs are the same
     // shopper still typing, not a new abandonment to report each time.
     void this.ownerNotification.notifyAbandonedCart({
+      id: created.id,
       customerName: created.customerName,
       customerPhone: created.customerPhone,
       customerEmail: created.customerEmail,

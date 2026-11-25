@@ -38,7 +38,7 @@ async function harness() {
     syncContact: (p: any) => mauticCalls.push(['syncContact', p]),
   };
   const notified: any[] = [];
-  const owner: any = { notifySignup: (c: any) => notified.push(['signup', c.email]), notifyOrderPaid: (o: any) => notified.push(['paid', o]) };
+  const owner: any = { notifySignup: (c: any) => notified.push(['signup', c.email]), notifyOrderPaid: (o: any) => notified.push(['paid', o]), notifyOrderPlaced: () => undefined };
   const stub: any = { record: async () => undefined, postOrderPayment: async () => undefined, accrue: async () => undefined, resolveActiveCampaignId: async () => null, trackPurchase: () => undefined };
   const checkout = new CheckoutService(prisma as any, stub, stub, paystack, owner, stub, stub, stub, stub, mautic, stub);
 

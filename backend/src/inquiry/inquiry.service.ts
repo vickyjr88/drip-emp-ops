@@ -27,6 +27,7 @@ export class InquiryService {
     });
 
     void this.ownerNotification.notifyContactForm({
+      id: inquiry.id,
       name: inquiry.name,
       email: inquiry.email,
       phone: inquiry.phone,

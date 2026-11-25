@@ -336,7 +336,7 @@ async function checkoutHarness() {
   const { CheckoutService } = await import('../src/checkout/checkout.service');
   const paystack: any = { configured: true, initialise: async (o: any) => ({ authorization_url: 'https://pay.test/x', reference: o.reference }) };
   const inventory: any = { record: async () => undefined };
-  const stub: any = { notifySignup: () => undefined, syncSignup: () => undefined };
+  const stub: any = { notifySignup: () => undefined, notifyOrderPlaced: () => undefined, syncSignup: () => undefined };
   const checkout = new CheckoutService(ctx.prisma as any, inventory, stub, paystack, stub, stub, stub, stub, stub, stub, ctx.service);
   await ctx.prisma.store.upsert({ where: { code: 'KTEST' }, update: { isActive: true }, create: { code: 'KTEST', name: 'KTest Store' } });
   const buyer = { firstName: 'Test', lastName: 'Buyer', email: 'ktest-buyer@example.com', phone: '+254712345678' };

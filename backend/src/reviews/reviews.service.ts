@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma, OrderStatus, ReviewStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { greetingName } from '../common/follow-up';
 import { normalizePhoneNumber } from '../common/phone.util';
 import { storefrontOrigin } from '../common/storefront-origin';
+import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import {
   cleanContact, cleanReview, displayNameOf, distribution, enoughToShow, orderNumberOfToken, reviewThresholds, reviewToken, reviewerKeyOf, summarise,
 } from './reviews.rules';
@@ -47,7 +48,7 @@ const asPublic = (r: { id: string; rating: number; title: string | null; body: s
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, @Optional() private readonly owner?: OwnerNotificationService) {}
 
   // --- what the storefront sees ----------------------------------------------------------------------------------------------
 
@@ -90,7 +91,7 @@ export class ReviewsService {
    * A filled-in hidden field is a robot: it is thanked and dropped.
    */
   async submit(slug: string, body: Record<string, unknown>) {
-    const product = await this.prisma.product.findFirst({ where: { slug, isActive: true }, select: { id: true } });
+    const product = await this.prisma.product.findFirst({ where: { slug, isActive: true }, select: { id: true, name: true } });
     if (!product) throw new NotFoundException('Product not found');
     if (typeof body.website === 'string' && body.website.trim()) return { received: true };
 
@@ -100,7 +101,7 @@ export class ReviewsService {
     if (displayNameOf(name) === 'A customer') throw new BadRequestException('Please add your first name.');
 
     try {
-      await this.prisma.productReview.create({
+      const made = await this.prisma.productReview.create({
         data: {
           productId: product.id, ...review,
           displayName: displayNameOf(name),
@@ -109,6 +110,7 @@ export class ReviewsService {
           source: 'product-page',
         },
       });
+      void this.owner?.notifyReview({ id: made.id, product: product.name, rating: review.rating, name: displayNameOf(name), text: review.body });
     } catch (error) {
       if ((error as { code?: string })?.code === 'P2002') throw new BadRequestException('You have already reviewed this pair. Thank you!');
       throw error;
@@ -164,7 +166,7 @@ export class ReviewsService {
     let alreadyReviewed = 0;
     for (const { product, review } of prepared) {
       try {
-        await this.prisma.productReview.create({
+        const made = await this.prisma.productReview.create({
           data: {
             productId: product.id, ...review,
             displayName: displayNameOf(order.customerName),
@@ -176,6 +178,7 @@ export class ReviewsService {
           },
         });
         created += 1;
+        void this.owner?.notifyReview({ id: made.id, product: product.name, rating: review.rating, name: displayNameOf(order.customerName), text: review.body });
       } catch (error) {
         if ((error as { code?: string })?.code !== 'P2002') throw error;
         alreadyReviewed += 1;

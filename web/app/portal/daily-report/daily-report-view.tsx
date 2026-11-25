@@ -40,7 +40,7 @@ const errorText = (e: unknown) => {
 const STATUS_CLASS: Record<string, string> = { SENT: 'portal-chip is-success', FAILED: 'portal-chip is-danger', SKIPPED: 'portal-chip is-muted', PENDING: 'portal-chip', ALREADY_SENT: 'portal-chip is-muted' };
 
 /** One list of recipients: shown as chips with a remove button, plus a box to add another. */
-function RecipientList({ label, hint, values, onChange, placeholder, type, disabled }: {
+export function RecipientList({ label, hint, values, onChange, placeholder, type, disabled }: {
   label: string; hint: string; values: string[]; onChange: (next: string[]) => void; placeholder: string; type: 'email' | 'tel'; disabled: boolean;
 }) {
   const [draft, setDraft] = useState('');

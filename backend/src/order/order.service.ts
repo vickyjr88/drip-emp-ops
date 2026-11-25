@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
@@ -16,6 +16,7 @@ import { buildFollowUp, FollowUp, productPath } from '../common/follow-up';
 import { storefrontOrigin } from '../common/storefront-origin';
 import { buildReceipt, Receipt } from '../common/receipt';
 import { realEmail } from '../common/contact-email';
+import { AlertsService } from '../alerts/alerts.service';
 
 const INCLUDE = {
   store: { select: { id: true, code: true, name: true } },
@@ -125,6 +126,7 @@ export class OrderService {
     private readonly commission: CommissionService,
     private readonly xConversion: XConversionService,
     private readonly tiktokConversion: TikTokConversionService,
+    @Optional() private readonly alerts?: AlertsService,
   ) {}
 
   private async nextOrderNumber(tx: Prisma.TransactionClient) {
@@ -139,7 +141,7 @@ export class OrderService {
    * behind it is unexplainable later.
    */
   async create(dto: CreateOrderDto, actor = 'system') {
-    return this.prisma.$transaction(async (tx) => {
+    const placed = await this.prisma.$transaction(async (tx) => {
       const store = await tx.store.findUnique({ where: { id: dto.storeId } });
       if (!store) throw new NotFoundException(`Store ${dto.storeId} not found`);
 
@@ -247,6 +249,12 @@ export class OrderService {
 
       return order;
     });
+
+    // A sale that takes a size to its reorder level is worth hearing about while there is still time to restock.
+    for (const line of placed.lines) {
+      if (line.fulfillmentType === 'STOCK') void this.alerts?.checkLowStock(line.variantId, dto.storeId);
+    }
+    return placed;
   }
 
   async findAll(query: OrderQueryDto) {

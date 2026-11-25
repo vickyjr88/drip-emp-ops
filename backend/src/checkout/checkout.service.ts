@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Customer, OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -18,6 +18,7 @@ import { priceForTier } from '../common/price-for-tier';
 import { normalizePhoneNumber } from '../common/phone.util';
 import { payerEmail, phoneTail, placeholderEmailFor, realEmail } from '../common/contact-email';
 import { findPhoneOnlyCustomer } from '../common/phone-only-customer';
+import { AlertsService } from '../alerts/alerts.service';
 
 /**
  * Delivery is not charged at checkout.
@@ -71,6 +72,7 @@ export class CheckoutService {
     private readonly tiktokConversion: TikTokConversionService,
     private readonly mautic: MauticService,
     private readonly kits: KitsService,
+    @Optional() private readonly alerts?: AlertsService,
   ) {}
 
   /**
@@ -442,6 +444,19 @@ export class CheckoutService {
     // this order is ever paid. Fire and forget, like every Mautic call.
     if (emailAdded) {
       void this.mautic.syncContact({ email: customer.email, firstName: customer.firstName, lastName: customer.lastName, phone: customer.phone });
+    }
+
+    // The shop's people hear about the order now, not only if and when it is paid: a shopper who stalls at the payment is one to call.
+    void this.ownerNotification.notifyOrderPlaced({
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerEmail: order.customerEmail,
+      total: Number(order.total),
+      items: order.lines.map((l) => `${l.quantity} x ${l.description}`).join(', '),
+    });
+    for (const line of order.lines) {
+      if (line.fulfillmentType === 'STOCK') void this.alerts?.checkLowStock(line.variantId, order.storeId);
     }
 
     // Paystack is called outside the transaction: an external call inside one

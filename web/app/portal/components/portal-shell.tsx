@@ -45,6 +45,7 @@ export type PortalNavKey =
   | 'importers'
   | 'audit'
   | 'rbac'
+  | 'notifications'
   | 'settings';
 
 const PAGE_TITLES: Record<PortalNavKey, string> = {
@@ -84,6 +85,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   importers: 'Importers',
   audit: 'Audit Log',
   rbac: 'Roles & permissions',
+  notifications: 'Notifications',
   settings: 'Settings',
 };
 

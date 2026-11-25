@@ -10,6 +10,7 @@ import {
   isTransientFacebookError, looksLikeSpam,
 } from './facebook-comments';
 import { CredentialsReader, CredentialsService, envCredentials } from '../credentials/credentials.service';
+import { OwnerNotificationService } from '../email-log/owner-notification.service';
 
 const DAY_MS = 86_400_000;
 const TICK_MS = 5 * 60_000;
@@ -37,7 +38,12 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
   private readonly logger = new Logger(FacebookCommentsService.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(private readonly prisma: PrismaService, private readonly pages: PageContentService, @Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pages: PageContentService,
+    @Optional() @Inject(CredentialsService) private readonly creds: CredentialsReader = envCredentials,
+    @Optional() private readonly owner?: OwnerNotificationService,
+  ) {}
 
   private get pageId() { return this.creds.get('FACEBOOK_PAGE_ID'); }
   private get token() { return this.creds.get('FACEBOOK_PAGE_ACCESS_TOKEN'); }
@@ -144,6 +150,8 @@ export class FacebookCommentsService implements OnApplicationBootstrap, OnApplic
       throw error;
     }
 
+    // A comment on the Page, not a reply in a thread: the shop's people hear about it as well as the commenter getting the private reply.
+    if (!isReplyToComment(comment)) void this.owner?.notifyFacebookComment({ commentId: comment.commentId, fromName: comment.fromName, message: comment.message });
     if (isReplyToComment(comment)) return this.skip(row.id, 'A reply to another comment');
     if (!comment.fromId) return this.skip(row.id, 'No commenter id from Facebook');
     if (looksLikeSpam(comment.message)) return this.skip(row.id, 'The comment has a link');

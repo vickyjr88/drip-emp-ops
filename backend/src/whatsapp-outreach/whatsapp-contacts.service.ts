@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsAppService } from '../daily-report/whatsapp.service';
 import { paginate } from '../common/pagination.util';
+import { OwnerNotificationService } from '../email-log/owner-notification.service';
 import {
   InboundMessage, DeliveryStatus, NOTICE_TEXT, RESUBSCRIBED_TEXT, STOPPED_TEXT, SEQUENCE,
   ACCOUNT_LEVEL_ERRORS, classifyKeyword, pickDelivery, sequenceDelaysHours,
@@ -24,7 +25,11 @@ export const autoSubscribeEnabled = () => (process.env.WHATSAPP_AUTO_SUBSCRIBE |
 export class WhatsappContactsService {
   private readonly logger = new Logger(WhatsappContactsService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly whatsapp: WhatsAppService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly whatsapp: WhatsAppService,
+    @Optional() private readonly owner?: OwnerNotificationService,
+  ) {}
 
   /** A reseller, a wholesaler or a supplier: someone who writes to the shop for business, not a shopper to market to. */
   private async isTradeNumber(phone: string): Promise<boolean> {
@@ -51,6 +56,10 @@ export class WhatsappContactsService {
   /** What to do with one message someone sent the shop. */
   async handleMessage(message: InboundMessage) {
     const phone = message.from;
+    // The shop's people hear that a customer wrote, whatever else is done with the message (including STOP).
+    void this.owner?.notifyWhatsAppMessage({
+      id: message.id, from: phone, name: message.name, text: message.text, type: message.type, adHeadline: message.referral?.headline, at: message.timestamp ?? new Date(),
+    });
     const keyword = classifyKeyword(message.text);
     const now = new Date();
     const existing = await this.prisma.whatsappContact.findUnique({ where: { phone } });

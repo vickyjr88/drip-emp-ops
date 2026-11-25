@@ -2769,3 +2769,45 @@ model ShareEvent {
   @@index([createdAt])
   @@index([productSlug])
 }
+
+
+// --- Alerts to the shop's own people ----------------------------------------------------------
+
+/// Who is told about what, and by which channel. One row. With no row the defaults hold: the owner's email and WhatsApp number,
+/// every kind of alert on for both channels.
+model AlertSetting {
+  id                 String   @id @default("singleton")
+  /// The master switch for both channels.
+  enabled            Boolean  @default(true)
+  emailRecipients    String[]
+  whatsappRecipients String[]
+  /// The approved WhatsApp template used when the person has not written to the business in the last 24 hours (default admin_alert).
+  whatsappTemplate   String?
+  /// A guard on volume: no more WhatsApp alerts than this in a Nairobi day. Email is not capped.
+  dailyWhatsAppCap   Int      @default(80)
+  /// { "<kind>": { "email": boolean, "whatsapp": boolean } }. A kind not listed here is on for both.
+  kinds              Json     @default("{}")
+  updatedBy          String   @default("system")
+  updatedAt          DateTime @updatedAt
+}
+
+/// Every alert raised, and what happened to it. dedupeKey (with kind) makes a repeated event (a webhook replay, the same low-stock size twice
+/// in a day) one alert.
+model AdminAlert {
+  id          String   @id @default(uuid())
+  kind        String
+  dedupeKey   String?
+  subject     String
+  /// The details on one line, as the log shows them.
+  summary     String
+  /// A portal path to open, e.g. /portal/inquiries.
+  link        String?
+  /// A wa.me link that opens the customer's chat with a message ready, when there is a customer to reply to.
+  followUpUrl String?
+  /// { email: [{ to, status, error? }], whatsapp: [{ to, status, how?, error? }], skipped?: string }
+  results     Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@unique([kind, dedupeKey])
+  @@index([createdAt])
+}
