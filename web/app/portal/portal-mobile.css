@@ -45,7 +45,7 @@ td.m-only { display: none; }
   }
   .lp-page.is-portal .portal-topbar { min-width: 0; max-width: 100%; box-sizing: border-box; }
   .lp-page.is-portal .portal-topbar-copy { overflow: hidden; }
-  .lp-page.is-portal .portal-workspace-body { min-width: 0; }
+  .lp-page.is-portal .portal-workspace-body { min-width: 0; overflow-wrap: anywhere; }
   .lp-page.is-portal .portal-topbar-heading { flex: 1 1 auto; min-width: 0; gap: 10px; align-items: center; }
   .lp-page.is-portal .portal-topbar-copy { padding: 0; min-width: 0; }
   .lp-page.is-portal .portal-topbar-copy .portal-kicker { display: none; }
@@ -144,6 +144,31 @@ td.m-only { display: none; }
   .m-collapse-bare .m-collapse-chevron, .m-collapse-bare .m-collapse-summary { display: block; }
   .m-collapse.is-closed > .m-collapse-body { display: none; }
 
+  /* ---- A toolbar's extra controls behind a Filters button drawn on the toolbar itself (see components/mobile-enhancer.tsx) ---- */
+  .lp-page.is-portal .list-toolbar.has-filters { position: relative; padding-right: 0; }
+  .lp-page.is-portal .list-toolbar.has-filters::after {
+    content: 'Filters \25BE'; order: 1; flex: none; display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 6px 12px;
+    border: 1px solid #1a1c1c; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; background: #fff;
+  }
+  .lp-page.is-portal .list-toolbar.has-filters.is-open::after { content: 'Filters \25B4'; }
+  .lp-page.is-portal .list-toolbar.has-filters > :not(.list-search) { display: none; order: 2; }
+  .lp-page.is-portal .list-toolbar.has-filters.is-open > :not(.list-search) { display: flex; flex: 1 1 100%; width: 100%; max-width: none; }
+  .lp-page.is-portal .list-toolbar.has-filters.is-open > select, .lp-page.is-portal .list-toolbar.has-filters.is-open > input { display: block; }
+
+  /* ---- A block of filter fields folded to one button (see mobile-enhancer.tsx) ---- */
+  .lp-page.is-portal .m-filterbox { position: relative; max-height: 46px; overflow: hidden; }
+  .lp-page.is-portal .m-filterbox::before {
+    content: 'Filters \25BE'; display: flex; align-items: center; justify-content: center; min-height: 40px; margin-bottom: 8px;
+    border: 1px solid #1a1c1c; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; background: #fff;
+  }
+  .lp-page.is-portal .m-filterbox.is-open { max-height: none; overflow: visible; }
+  .lp-page.is-portal .m-filterbox.is-open::before { content: 'Filters \25B4'; }
+
+  /* A page's own tab strip (buttons straight under the top bar): one scrolling row, not a heap of wrapped buttons. */
+  .lp-page.is-portal .portal-workspace-body > .portal-action-row { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .lp-page.is-portal .portal-workspace-body > .portal-action-row::-webkit-scrollbar { display: none; }
+  .lp-page.is-portal .portal-workspace-body > .portal-action-row > * { flex: none; white-space: nowrap; }
+
   /* ---- Filters behind one button; a row's secondary actions behind More ---- */
   .lp-page.is-portal .list-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .lp-page.is-portal .list-toolbar .list-search { flex: 1 1 140px; min-width: 0; }
@@ -208,6 +233,14 @@ td.m-only { display: none; }
   .lp-page.is-portal .portal-stat-grid .portal-stat-card h3 { margin: 2px 0 0; font-size: 1.05rem; overflow-wrap: anywhere; }
   .lp-page.is-portal .portal-stat-grid .portal-stat-note { display: none; }
   .lp-page.is-portal .portal-workspace-body:has(.wiz) > .portal-stat-grid { display: none; }
+  /* Dashboard: the four counts as a 2x2 of small links, and the money figures small enough to stay on one line. */
+  .lp-page.is-portal .portal-nav-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .lp-page.is-portal .portal-nav-card { padding: 10px 12px; gap: 10px; border-radius: 8px; }
+  .lp-page.is-portal .portal-nav-card-icon { width: 32px; height: 32px; }
+  .lp-page.is-portal .portal-nav-card-icon svg { width: 18px; height: 18px; }
+  .lp-page.is-portal .portal-nav-card-body strong { font-size: 1.25rem; }
+  .lp-page.is-portal .portal-nav-card-body span { font-size: 10.5px; letter-spacing: 0.04em; }
+  .lp-page.is-portal .portal-stat-grid .portal-stat-card h3 { font-size: 0.95rem; white-space: nowrap; }
   .m-desktop-only { display: none !important; }
   .m-phone-only { display: flex; }
   .m-phone-only-block { display: block; }

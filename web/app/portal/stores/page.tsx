@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { useErrorState, useFeedbackState, useNotifications } from '../components/notifications';
 import { usePortalDialog } from '../components/portal-dialog';
 import {
@@ -193,8 +194,7 @@ export default function StoresPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {canCreate || canUpdate ? (
-              <article className="portal-card" data-tour="stores.add">
-                <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Store' : 'Add Store'}</h2>
+              <CollapseCard title={editingId ? 'Edit Store' : 'Add Store'} forceOpen={Boolean(editingId)} dataTour="stores.add">
                 <form className="portal-entity-form" onSubmit={onSubmit}>
                   <div className="portal-entity-grid-2">
                     <label>
@@ -239,7 +239,7 @@ export default function StoresPage() {
                     ) : null}
                   </div>
                 </form>
-              </article>
+              </CollapseCard>
             ) : null}
 
             <article className="portal-card" data-tour="stores.list">

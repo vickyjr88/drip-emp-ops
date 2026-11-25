@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import { useUnsavedGuard } from '../components/use-unsaved-guard';
@@ -214,9 +215,8 @@ export function SettingsView() {
                   const dirty = Object.keys(changes).length > 0;
                   const result = results[group.id];
                   return (
-                    <article key={group.id} className="portal-card" style={{ marginBottom: 20 }}>
+                    <CollapseCard key={group.id} title={group.label} summary={status.label} forceOpen={dirty} style={{ marginBottom: 20 }}>
                       <div className="portal-card-header-row">
-                        <h2 style={{ margin: 0 }}>{group.label}</h2>
                         <span className={status.cls}>{status.label}</span>
                       </div>
                       <p className="portal-muted" style={{ margin: '4px 0 12px' }}>{group.description}</p>
@@ -270,7 +270,7 @@ export function SettingsView() {
                           {dirty ? <button type="button" className="portal-inline-btn" onClick={() => setDrafts((d) => { const next = { ...d }; for (const f of group.fields) delete next[f.key]; return next; })}>Undo</button> : null}
                         </div>
                       ) : null}
-                    </article>
+                    </CollapseCard>
                   );
                 })}
               </>

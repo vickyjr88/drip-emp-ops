@@ -16,6 +16,8 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { Wizard, WizStep } from '../components/wizard';
+import { RowActions } from '../components/mobile-bits';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { usePortalDialog } from '../components/portal-dialog';
@@ -285,7 +287,11 @@ export default function ResellersPage() {
             {showForm && (canCreate || canUpdate) ? (
               <article className="portal-card">
                 <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Reseller' : 'Add Reseller'}</h2>
-                <form className="portal-entity-form" onSubmit={onSubmit}>
+                <Wizard titles={['Who', 'Terms']} submitLabel={editingId ? 'Save Reseller' : 'Add Reseller'} saving={saving}
+                  onCancel={() => { setShowForm(false); setEditingId(null); setForm(BLANK); }}>
+                {(wiz) => (
+                <form noValidate className="portal-entity-form" onSubmit={wiz.onSubmit(onSubmit)} onInvalidCapture={wiz.onInvalid}>
+                  <WizStep wiz={wiz} index={0}>
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>Code</span>
@@ -315,6 +321,9 @@ export default function ResellersPage() {
                         onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))} />
                     </label>
                   </div>
+                  </WizStep>
+
+                  <WizStep wiz={wiz} index={1}>
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>Price tier</span>
@@ -330,16 +339,11 @@ export default function ResellersPage() {
                         onChange={(event) => setForm((prev) => ({ ...prev, creditLimit: event.target.value }))} />
                     </label>
                   </div>
-                  <div className="portal-inline-actions">
-                    <button type="submit" className="portal-primary-btn" disabled={saving}>
-                      {saving ? 'Saving...' : editingId ? 'Save Reseller' : 'Add Reseller'}
-                    </button>
-                    <button type="button" className="portal-ghost-btn"
-                      onClick={() => { setShowForm(false); setEditingId(null); setForm(BLANK); }}>
-                      Cancel
-                    </button>
-                  </div>
+                  </WizStep>
+                  {wiz.bar}
                 </form>
+                )}
+                </Wizard>
               </article>
             ) : null}
 
@@ -396,10 +400,11 @@ export default function ResellersPage() {
                             {reseller.overdue > 0 ? ` · ${reseller.overdue} OVERDUE` : ''}
                           </p>
                         </div>
-                        <div className="portal-action-row">
+                        <RowActions primary={(
                           <Link href={`/portal/resellers/${reseller.id}`} className="portal-inline-btn">
                             View performance
                           </Link>
+                        )}>
                           <Link href={`/portal/consignments?resellerId=${reseller.id}`} className="portal-inline-btn">
                             Pickups
                           </Link>
@@ -434,7 +439,7 @@ export default function ResellersPage() {
                               Delete
                             </button>
                           ) : null}
-                        </div>
+                        </RowActions>
                       </div>
                     </div>
                   ))

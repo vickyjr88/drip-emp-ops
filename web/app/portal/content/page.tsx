@@ -7,6 +7,7 @@ import { ImagePicker } from '../components/image-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import {
   API_BASE_URL,
   AuthProfile,
@@ -435,8 +436,7 @@ export default function SiteContentPage() {
     const document = documents[activeSlug] || {};
 
     return (
-      <article key={section.key} className="portal-card" style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: '0 0 4px' }}>{section.title}</h3>
+      <CollapseCard key={section.key} title={section.title} style={{ marginBottom: 16 }}>
         {section.description ? (
           <p className="portal-muted" style={{ margin: '0 0 12px' }}>
             {section.description}
@@ -528,7 +528,7 @@ export default function SiteContentPage() {
               );
             })()
           : null}
-      </article>
+      </CollapseCard>
     );
   }
 
@@ -643,6 +643,17 @@ export default function SiteContentPage() {
             </article>
 
             {schema.sections.map((section) => renderSection(section))}
+
+            {canEdit && isDirty ? (
+              <>
+                <div className="m-bar-space" />
+                <div className="m-bar m-phone-only">
+                  <button type="button" className="portal-primary-btn" disabled={saving} onClick={() => void onSave()}>
+                    {saving ? 'Publishing...' : 'Publish changes'}
+                  </button>
+                </div>
+              </>
+            ) : null}
 
             <ImagePicker
               open={Boolean(picker)}

@@ -405,13 +405,14 @@ export default function UserFormClient({
                 </div>
               </article>
 
-              <div className="portal-inline-actions">
-                <button type="submit" className="portal-primary-btn" disabled={saving}>
-                  {saving ? 'Saving...' : mode === 'create' ? 'Create User' : 'Save Changes'}
-                </button>
+              <div className="m-bar-space" />
+              <div className="portal-inline-actions m-bar">
                 <Link href="/portal/users" className="portal-ghost-btn">
                   Back to Users
                 </Link>
+                <button type="submit" className="portal-primary-btn" disabled={saving}>
+                  {saving ? 'Saving...' : mode === 'create' ? 'Create User' : 'Save Changes'}
+                </button>
               </div>
             </form>
 

@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest, formatDateTime } from '../accounting/lib';
+import { CollapseCard } from './collapse-card';
 
 export type FollowUpState = 'PENDING' | 'DONE' | 'FAILED' | 'SKIPPED';
 export type LeadFollowUpFields = {
@@ -121,10 +122,10 @@ export function LeadFollowUpPanel({ token, refreshKey }: { token: string; refres
   const status = !summary.enabled ? 'Switched off' : summary.paused || summary.problem ? 'Paused' : summary.window.open ? 'Running' : `Resumes ${formatDateTime(summary.window.opensAt)}`;
 
   return (
-    <article className="portal-card" style={{ marginBottom: 16 }}>
+    <CollapseCard title="Automatic follow-up" summary={status} forceOpen={Boolean(summary.problem || summary.paused)} style={{ marginBottom: 16 }}>
       <div className="portal-card-header-row">
         <div>
-          <h2 style={{ margin: 0 }}>Automatic follow-up <span className={`portal-chip is-dense ${running ? 'is-success' : summary.enabled ? 'is-danger' : 'is-muted'}`} style={{ marginLeft: 8, verticalAlign: 'middle' }}>{status}</span></h2>
+          <span className={`portal-chip is-dense ${running ? 'is-success' : summary.enabled ? 'is-danger' : 'is-muted'}`}>{status}</span>
           <p className="portal-muted" style={{ margin: '4px 0 0' }}>
             About {summary.delayMinutes} minutes after a shopper goes quiet, by email and WhatsApp, between {summary.window.from} and {summary.window.to}, unless they have already opened a WhatsApp conversation. Reaches back {summary.backlogDays} days.
           </p>
@@ -178,7 +179,7 @@ export function LeadFollowUpPanel({ token, refreshKey }: { token: string; refres
           )}
         </div>
       ) : null}
-    </article>
+    </CollapseCard>
   );
 }
 

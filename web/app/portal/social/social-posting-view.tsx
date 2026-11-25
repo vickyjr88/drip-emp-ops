@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { usePortalDialog } from '../components/portal-dialog';
 import { useErrorState, useFeedbackState } from '../components/notifications';
 import { ServerPage } from '../components/server-pager';
@@ -309,9 +310,14 @@ export function SocialPostingView() {
                     const live = c.enabled && c.configured && status.allowed;
                     const tt = status.tiktok;
                     return (
-                      <div key={channel} style={{ borderTop: '1px solid var(--eef-border)', paddingTop: 14, marginTop: 14 }}>
+                      <CollapseCard
+                        key={channel}
+                        bare
+                        title={CHANNEL_LABEL[channel]}
+                        summary={!c.configured ? 'Not connected' : !status.allowed ? 'Off on server' : c.enabled ? 'On' : 'Paused'}
+                        style={{ borderTop: '1px solid var(--eef-border)', paddingTop: 14, marginTop: 14 }}
+                      >
                         <div className="portal-card-header-row">
-                          <strong>{CHANNEL_LABEL[channel]}</strong>
                           <span className={live ? 'portal-chip is-success' : 'portal-chip is-muted'}>
                             {!c.configured ? 'Not connected' : !status.allowed ? 'Switched off on the server' : c.enabled ? 'On' : 'Paused'}
                           </span>
@@ -385,7 +391,7 @@ export function SocialPostingView() {
                             {channel === 'TIKTOK' && tt.configured ? <button type="button" className="portal-inline-btn" onClick={() => void onDisconnectTikTok()}>Disconnect</button> : null}
                           </div>
                         ) : null}
-                      </div>
+                      </CollapseCard>
                     );
                   })}
 

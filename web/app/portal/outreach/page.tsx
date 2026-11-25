@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { usePortalDialog } from '../components/portal-dialog';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { useErrorState, useFeedbackState } from '../components/notifications';
@@ -354,8 +355,7 @@ export default function OutreachPage() {
             </article>
 
             {contactStats ? (
-              <article className="portal-card">
-                <h2 style={{ margin: 0 }}>People who messaged us</h2>
+              <CollapseCard title="People who messaged us">
                 <p className="portal-muted" style={{ margin: '4px 0 12px' }}>
                   Anyone who writes to the shop&apos;s WhatsApp number is told they will receive updates and can reply STOP to opt out, then gets the
                   app, group and rating messages a day or more apart, between 08:00 and 20:00. Resellers, wholesalers and suppliers are recorded but never messaged.
@@ -396,12 +396,11 @@ export default function OutreachPage() {
                     </table>
                   </div>
                 )}
-              </article>
+              </CollapseCard>
             ) : null}
 
             {facebook ? (
-              <article className="portal-card">
-                <h2 style={{ margin: 0 }}>Facebook comments</h2>
+              <CollapseCard title="Facebook comments">
                 <p className="portal-muted" style={{ margin: '4px 0 12px' }}>
                   Everyone who comments on a Page post or ad gets one private message in Messenger (with our WhatsApp link and an invitation to follow the
                   Page) and a short public reply. Facebook only allows this for people who comment, within 7 days; people who only react cannot be messaged.
@@ -439,11 +438,10 @@ export default function OutreachPage() {
                     ))}
                   </div>
                 )}
-              </article>
+              </CollapseCard>
             ) : null}
 
-            <article className="portal-card">
-              <h2 style={{ margin: 0 }}>Recent messages</h2>
+            <CollapseCard title="Recent messages">
               <div className="portal-list-stack" style={{ marginTop: 12 }}>
                 {history.length === 0 ? (
                   <div className="portal-empty-state">Nothing sent yet.</div>
@@ -463,7 +461,7 @@ export default function OutreachPage() {
                   </div>
                 ))}
               </div>
-            </article>
+            </CollapseCard>
           </PortalShell>
         </section>
       </main>

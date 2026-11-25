@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * A card whose body folds away on a phone, so a long screen (an order, a product, a customer) is a list of headings to open one at a time
@@ -8,11 +8,13 @@ import { useState } from 'react';
  * portal-mobile.css). `summary` is the line shown beside the heading while folded, e.g. "3 sizes" or "KES 8,400".
  */
 export function CollapseCard({
-  title, summary, defaultOpen = false, children, className = '', style, dataTour, bare = false,
+  title, summary, defaultOpen = false, forceOpen = false, children, className = '', style, dataTour, bare = false,
 }: {
   title: string;
   summary?: React.ReactNode;
   defaultOpen?: boolean;
+  /** Opens the card (and keeps it open) while true: an edit that was started elsewhere on the screen. */
+  forceOpen?: boolean;
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
@@ -21,6 +23,7 @@ export function CollapseCard({
   bare?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
   return (
     <article className={`${bare ? 'm-collapse-bare' : 'portal-card'} m-collapse${open ? '' : ' is-closed'} ${className}`} style={style} data-tour={dataTour}>
       <button type="button" className="m-collapse-head" aria-expanded={open} onClick={() => setOpen((value) => !value)}>

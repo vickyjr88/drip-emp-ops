@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRegisterTourViewer, useTours } from '../tours/tour-provider';
 import { TourChecklist } from '../tours/checklist';
 import { PortalNav } from './portal-nav';
+import { MobileEnhancer } from './mobile-enhancer';
 import '../portal-mobile.css';
 
 export type PortalNavKey =
@@ -325,6 +326,7 @@ export function PortalShell({
               back -- and the sidebar toggle flipped a flag nothing rendered.
               Every section that uses this shell now gets the panel. */}
           <TourChecklist />
+          <MobileEnhancer />
           {children}
         </div>
       </div>

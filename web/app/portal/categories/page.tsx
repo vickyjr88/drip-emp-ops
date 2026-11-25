@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { useErrorState, useFeedbackState, useNotifications } from '../components/notifications';
 import { usePortalDialog } from '../components/portal-dialog';
 import {
@@ -281,8 +282,7 @@ export default function CategoriesPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {canCreate || canUpdate ? (
-              <article className="portal-card" data-tour="categories.add">
-                <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Category' : 'Add Category'}</h2>
+              <CollapseCard title={editingId ? 'Edit Category' : 'Add Category'} forceOpen={Boolean(editingId)} dataTour="categories.add">
                 <p className="portal-muted">
                   The URL segment is generated from the name, so &ldquo;Running Shoes&rdquo;
                   becomes <code>running-shoes</code>.
@@ -349,7 +349,7 @@ export default function CategoriesPage() {
                     ) : null}
                   </div>
                 </form>
-              </article>
+              </CollapseCard>
             ) : null}
 
             <article className="portal-card" data-tour="categories.list">

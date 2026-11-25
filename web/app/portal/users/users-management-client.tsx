@@ -7,6 +7,7 @@ import { ListExport } from '../components/list-export';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { RowActions } from '../components/mobile-bits';
 import { usePortalDialog } from '../components/portal-dialog';
 
 type AuthRole = {
@@ -317,12 +318,11 @@ export default function UsersManagementClient() {
                             <span className="portal-muted">No roles assigned</span>
                           )}
                         </div>
-                        <div className="portal-action-row">
-                          {canUpdate ? (
-                            <Link href={`/portal/users/${user.id}/edit`} className="portal-inline-btn">
-                              Edit
-                            </Link>
-                          ) : null}
+                        <RowActions primary={canUpdate ? (
+                          <Link href={`/portal/users/${user.id}/edit`} className="portal-inline-btn">
+                            Edit
+                          </Link>
+                        ) : undefined}>
                           {canUpdate ? (
                             <Link href={`/portal/users/${user.id}/edit#password`} className="portal-inline-btn">
                               Reset Password
@@ -338,7 +338,7 @@ export default function UsersManagementClient() {
                               Delete
                             </button>
                           ) : null}
-                        </div>
+                        </RowActions>
                       </div>
                     ))
                   )}

@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { CollapseCard } from '../components/collapse-card';
 import { ListPager, ListSearch, useListControls } from '../components/list-controls';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
@@ -275,8 +276,7 @@ export default function InventoryPage() {
             {errorMessage ? <article className="portal-card portal-error">{errorMessage}</article> : null}
 
             {canRecord ? (
-              <article className="portal-card" data-tour="inventory.record">
-                <h2 style={{ marginTop: 0 }}>Record Movement</h2>
+              <CollapseCard title="Record Movement" summary="receive, adjust, transfer" dataTour="inventory.record">
                 <form className="portal-entity-form" onSubmit={onRecord}>
                   <div className="portal-entity-grid-2">
                     <label>
@@ -384,7 +384,7 @@ export default function InventoryPage() {
                     {saving ? 'Recording...' : 'Record Movement'}
                   </button>
                 </form>
-              </article>
+              </CollapseCard>
             ) : null}
 
             <article className="portal-card" data-tour="inventory.levels">
