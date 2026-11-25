@@ -19,6 +19,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { CollapseCard } from '../../components/collapse-card';
 import { ImagePicker } from '../../components/image-picker';
 import { usePortalDialog } from '../../components/portal-dialog';
 import { OfferQuickAdd, OfferTarget } from '../../components/offer-quick-add';
@@ -118,6 +119,8 @@ export default function ProductDetailClient({ productId }: { productId: string }
   const [restock, setRestock] = useState({ storeId: '', type: 'PURCHASE', reference: '' });
   /** variantId -> quantity typed against that size. */
   const [receiveQty, setReceiveQty] = useState<Record<string, string>>({});
+  // On a phone a size shows its name, stock and receive box; its prices, SKU and status open on request.
+  const [openRow, setOpenRow] = useState<string | null>(null);
   const [receiving, setReceiving] = useState(false);
 
   const [errorMessage, setErrorMessage] = useErrorState();
@@ -498,10 +501,10 @@ export default function ProductDetailClient({ productId }: { productId: string }
             </div>
 
             {/* ---- Sizes: the reason this page exists ------------------- */}
-            <article className="portal-card" style={{ marginBottom: 20 }}>
-              <h2 style={{ marginTop: 0 }}>Sizes</h2>
+            <CollapseCard title="Sizes" summary={`${product.variants.length} size${product.variants.length === 1 ? '' : 's'}`} defaultOpen style={{ marginBottom: 20 }}>
 
               {canRecordStock ? (
+                <CollapseCard bare title="Receiving stock" summary={stores.find((st) => st.id === restock.storeId)?.name}>
                 <div className="portal-restock-bar">
                   <label>
                     <span>Store</span>
@@ -538,10 +541,11 @@ export default function ProductDetailClient({ productId }: { productId: string }
                     In-stock figures are for the chosen store.
                   </p>
                 </div>
+                </CollapseCard>
               ) : null}
 
               <div className="portal-table-wrap">
-                <table className="portal-data-table">
+                <table className="portal-data-table is-stack">
                   <thead>
                     <tr>
                       <th>Size</th><th>SKU</th>
@@ -568,15 +572,15 @@ export default function ProductDetailClient({ productId }: { productId: string }
                         setEdits((prev) => ({ ...prev, [variant.id]: { ...prev[variant.id], [key]: value } }));
 
                       return (
-                        <tr key={variant.id}>
-                          <td>
+                        <tr key={variant.id} className={openRow === variant.id || dirty ? 'is-open' : ''}>
+                          <td className="is-title is-wide">
                             <input className="portal-cell-input" value={field('name')}
                               disabled={!canUpdate}
                               onChange={(event) => change('name', event.target.value)} />
                           </td>
-                          <td><code>{variant.sku}</code></td>
+                          <td className="m-extra" data-label="SKU"><code>{variant.sku}</code></td>
                           {(['priceKes', 'resellerPriceKes', 'wholesalePriceKes', 'costKes'] as const).map((key) => (
-                            <td key={key} className="portal-num">
+                            <td key={key} className="portal-num m-extra" data-label={{ priceKes: 'Retail', resellerPriceKes: 'Reseller', wholesalePriceKes: 'Wholesale', costKes: 'Cost' }[key]}>
                               <input className="portal-cell-input is-num" type="number" min="0"
                                 value={field(key)} disabled={!canUpdate}
                                 placeholder={key === 'priceKes' ? '' : '—'}
@@ -585,10 +589,10 @@ export default function ProductDetailClient({ productId }: { productId: string }
                           ))}
                           {canRecordStock ? (
                             <>
-                              <td className="portal-num">
+                              <td className="portal-num" data-label="In stock">
                                 {stockByVariant.get(variant.id) ?? 0}
                               </td>
-                              <td className="portal-num">
+                              <td className="portal-num" data-label="Receive">
                                 <input
                                   className="portal-cell-input is-num"
                                   type="number"
@@ -605,8 +609,13 @@ export default function ProductDetailClient({ productId }: { productId: string }
                               </td>
                             </>
                           ) : null}
-                          <td>{variant.isActive ? 'On sale' : 'Hidden'}</td>
-                          <td>
+                          <td className="m-only">
+                            <button type="button" className="portal-inline-btn" aria-expanded={openRow === variant.id} onClick={() => setOpenRow(openRow === variant.id ? null : variant.id)}>
+                              {openRow === variant.id ? 'Hide prices & SKU' : 'Prices, SKU & status'}
+                            </button>
+                          </td>
+                          <td className="m-extra" data-label="Status">{variant.isActive ? 'On sale' : 'Hidden'}</td>
+                          <td className="is-actions">
                             <span className="portal-inline-actions">
                               {dirty ? (
                                 <button type="button" className="portal-inline-btn" disabled={saving}
@@ -678,8 +687,8 @@ export default function ProductDetailClient({ productId }: { productId: string }
                   the first. Hiding this rather than letting it write a fake
                   size value someone has no real answer for. */}
               {canUpdate && categoryAttribute ? (
-                <form className="portal-entity-form" style={{ marginTop: 18 }} onSubmit={addSize}>
-                  <h3 style={{ margin: '0 0 10px', fontSize: 15 }}>Add a size</h3>
+                <CollapseCard bare title="Add a size">
+                <form className="portal-entity-form" style={{ marginTop: 6 }} onSubmit={addSize}>
                   {product.variants.length ? (
                     <label style={{ marginBottom: 12 }}>
                       <span>Copy prices from</span>
@@ -754,12 +763,12 @@ export default function ProductDetailClient({ productId }: { productId: string }
                     </button>
                   </div>
                 </form>
+                </CollapseCard>
               ) : null}
-            </article>
+            </CollapseCard>
 
             {/* ---- Details --------------------------------------------- */}
-            <article className="portal-card" style={{ marginBottom: 20 }}>
-              <h2 style={{ marginTop: 0 }}>Details</h2>
+            <CollapseCard title="Details" summary={details.categoryId ? categories.find((c) => c.id === details.categoryId)?.name : 'Uncategorised'} style={{ marginBottom: 20 }}>
               <form className="portal-entity-form" onSubmit={saveDetails} {...detailsGuard.formProps}>
                 <div className="portal-entity-grid-2">
                   <label>
@@ -796,12 +805,11 @@ export default function ProductDetailClient({ productId }: { productId: string }
                   </div>
                 ) : null}
               </form>
-            </article>
+            </CollapseCard>
 
             {/* ---- Images ---------------------------------------------- */}
-            <article className="portal-card">
+            <CollapseCard title="Images" summary={images.length ? `${images.length}` : 'none yet'}>
               <div className="portal-card-head">
-                <h2 style={{ margin: 0 }}>Images</h2>
                 {canUpdate ? (
                   <button type="button" className="portal-inline-btn" onClick={() => setPickerOpen(true)}>
                     Add images
@@ -840,7 +848,7 @@ export default function ProductDetailClient({ productId }: { productId: string }
                   ))}
                 </div>
               )}
-            </article>
+            </CollapseCard>
 
             <ImagePicker
               open={pickerOpen}

@@ -1,0 +1,181 @@
+/*
+ * The portal on a phone.
+ *
+ * The admin screens were laid out for a desk: wide forms, ten-column tables, big uppercase buttons, and the shop's public header, footer and
+ * WhatsApp button wrapped around everything. Here, below the widths named, the chrome steps aside, controls are sized for a thumb rather than
+ * a mouse, long forms become steps (components/wizard.tsx), long screens fold into sections (components/collapse-card.tsx) and wide tables
+ * become a card per row (class "is-stack" with data-label on each cell). A desktop is untouched by any rule in this file.
+ */
+
+/* ---- Wizard: on a desktop it is invisible ------------------------------------------------ */
+.wiz-progress, .wiz-now, .wiz-bar, .wiz-step-title { display: none; }
+.wiz-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+/* ---- Filter fold and row actions: on a desktop they vanish into their children ----------- */
+.m-filter-btn, .m-more-btn { display: none; }
+.m-filter-body, .m-more-panel { display: contents; }
+
+/* ---- Collapsible card: on a desktop it is just a card ------------------------------------ */
+.m-collapse-head { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: default; }
+.m-collapse-head h2 { margin-top: 0; }
+.m-collapse-head h3 { margin: 18px 0 10px; font-size: 15px; }
+td.m-only { display: none; }
+.m-collapse-summary, .m-collapse-chevron { display: none; }
+
+@media (max-width: 900px) {
+  /* The shop's own header, footer and floating buttons are for shoppers, not for whoever is running the shop. */
+  .lp-page.is-portal { --lp-header-h: 0px; }
+  .lp-page.is-portal > .lp-header,
+  .lp-page.is-portal > .lp-footer,
+  .lp-page.is-portal .lp-footer-community,
+  .lp-page.is-portal > .lp-checkout-float,
+  .lp-page.is-portal > .lp-whatsapp-float { display: none !important; }
+
+  /* The Getting started panel is a desk tour; on a phone it only pushes the work down. */
+  .lp-page.is-portal .tour-checklist { display: none; }
+
+  /* One slim bar: menu button, the page's name, and who is signed in. */
+  .lp-page.is-portal .portal-topbar {
+    position: sticky; top: 0; z-index: 30;
+    flex-direction: row; align-items: center; gap: 10px;
+    padding: 8px 12px; min-height: 52px;
+  }
+  .lp-page.is-portal .portal-topbar-heading { flex: 1 1 auto; min-width: 0; gap: 10px; align-items: center; }
+  .lp-page.is-portal .portal-topbar-copy { padding: 0; min-width: 0; }
+  .lp-page.is-portal .portal-topbar-copy .portal-kicker { display: none; }
+  .lp-page.is-portal .portal-page-title { margin: 0; font-size: 1.15rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lp-page.is-portal .portal-page-subtitle { margin: 1px 0 0; font-size: 12px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lp-page.is-portal .portal-topbar-actions { width: auto; flex: none; flex-wrap: nowrap; }
+  .lp-page.is-portal .portal-topbar-refresh { display: none; }
+  .lp-page.is-portal .portal-profile-trigger {
+    width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; justify-content: center; gap: 0;
+  }
+  .lp-page.is-portal .portal-profile-email { font-size: 0; }
+  .lp-page.is-portal .portal-profile-email::first-letter { font-size: 15px; font-weight: 700; text-transform: uppercase; }
+  .lp-page.is-portal .portal-profile-caret { display: none; }
+  .lp-page.is-portal .portal-profile-dropdown { right: 0; left: auto; max-width: calc(100vw - 24px); }
+  .lp-page.is-portal .portal-workspace-body { padding: 12px 12px 28px; gap: 12px; }
+}
+
+@media (max-width: 760px) {
+  /* ---- Controls sized for a thumb, not shouted at it ---- */
+  .lp-page.is-portal .portal-primary-btn,
+  .lp-page.is-portal .portal-ghost-btn {
+    min-height: 44px; padding: 8px 18px; font-size: 14px; letter-spacing: 0.01em; text-transform: none; border-radius: 8px;
+  }
+  .lp-page.is-portal .portal-inline-btn {
+    min-height: 36px; padding: 6px 12px; font-size: 13px; letter-spacing: 0; text-transform: none; border-radius: 8px;
+  }
+  .lp-page.is-portal .portal-card { padding: 14px; border-radius: 10px; }
+  .lp-page.is-portal .portal-card h2 { font-size: 1.15rem; }
+  .lp-page.is-portal .portal-muted { font-size: 12.5px; }
+  /* 16px stops iOS zooming the page when a box is tapped. */
+  .lp-page.is-portal input:not([type="checkbox"]):not([type="radio"]),
+  .lp-page.is-portal select,
+  .lp-page.is-portal textarea { font-size: 16px; min-height: 44px; }
+  .lp-page.is-portal textarea { min-height: 84px; }
+  .lp-page.is-portal .portal-entity-form { gap: 12px; }
+  .lp-page.is-portal .portal-entity-grid-2,
+  .lp-page.is-portal .portal-entity-grid-3 { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .lp-page.is-portal .portal-entity-grid-3.is-pairs,
+  .lp-page.is-portal .portal-entity-grid-2.is-pairs { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .lp-page.is-portal .portal-inline-actions { gap: 8px; }
+  /* A field brought into view must not hide under the top bar or the pinned buttons. */
+  .lp-page.is-portal input, .lp-page.is-portal select, .lp-page.is-portal textarea { scroll-margin-top: 72px; scroll-margin-bottom: 96px; }
+
+  /* ---- Wizard on a phone ---- */
+  .wiz { padding-bottom: 88px; }
+  .wiz-progress { display: flex; gap: 6px; list-style: none; margin: 0 0 6px; padding: 0; }
+  .wiz-progress li { flex: 1 1 0; min-width: 0; }
+  .wiz-progress button { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: center; font: inherit; cursor: default; }
+  .wiz-progress .wiz-dot { display: block; height: 5px; border-radius: 3px; background: #d8dcdb; font-size: 0; }
+  .wiz-progress .is-done .wiz-dot { background: #1a1c1c; }
+  .wiz-progress .is-current .wiz-dot { background: var(--eef-primary, #1a237e); }
+  .wiz-progress .wiz-label { display: none; }
+  .wiz-progress .is-done button { cursor: pointer; }
+  .wiz-now { display: block; margin: 0 0 12px; font-size: 13px; color: #5a5c5c; }
+  .wiz-step { display: none; }
+  .wiz-step.is-current { display: block; }
+  .wiz-step > * + * { margin-top: 12px; }
+  .wiz-actions { display: none; }
+  .wiz-bar {
+    display: flex; gap: 10px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 35;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #d8dcdb;
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  }
+  .wiz-bar > * { flex: 1 1 0; }
+
+  /* While a form is open, the list it belongs to steps out of the way: one thing on screen at a time. */
+  .lp-page.is-portal .portal-workspace-body:has(.wiz) > article:not(:has(.wiz)):not(.portal-error) { display: none; }
+
+  /* ---- Folding sections ---- */
+  .m-collapse { padding: 0; }
+  .m-collapse-head { display: flex; align-items: center; gap: 10px; padding: 14px; min-height: 52px; cursor: pointer; }
+  .m-collapse-head h2 { margin: 0; flex: 1 1 auto; min-width: 0; }
+  .m-collapse-summary { display: block; font-size: 13px; color: #5a5c5c; white-space: nowrap; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+  .m-collapse-chevron { display: block; font-size: 16px; transition: transform 150ms; }
+  .m-collapse:not(.is-closed) > .m-collapse-head > .m-collapse-chevron { transform: rotate(180deg); }
+  .m-collapse-body { padding: 0 14px 14px; }
+  .m-collapse-bare { margin-top: 14px; border-top: 1px solid #e6e8e8; }
+  .m-collapse-bare .m-collapse-head { padding: 12px 0; min-height: 48px; }
+  .m-collapse-bare .m-collapse-head h3 { margin: 0; flex: 1 1 auto; }
+  .m-collapse-bare .m-collapse-body { padding: 0 0 6px; }
+  .m-collapse-bare:not(.is-closed) > .m-collapse-head > .m-collapse-chevron { transform: rotate(180deg); }
+  .m-collapse-bare .m-collapse-chevron, .m-collapse-bare .m-collapse-summary { display: block; }
+  .m-collapse.is-closed > .m-collapse-body { display: none; }
+
+  /* ---- Filters behind one button; a row's secondary actions behind More ---- */
+  .lp-page.is-portal .list-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .lp-page.is-portal .list-toolbar .list-search { flex: 1 1 140px; min-width: 0; }
+  .m-filter-btn { display: inline-flex; flex: none; }
+  .m-filter-body { display: none; flex: 1 1 100%; flex-direction: column; gap: 8px; }
+  .m-filter-body.is-open { display: flex; }
+  .m-filter-body select, .m-filter-body .portal-inline-date, .m-filter-body .portal-inline-date input { width: 100%; max-width: none; }
+  .m-filter-body .portal-inline-date { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; }
+  .lp-page.is-portal .portal-list-row, .lp-page.is-portal .portal-list-row.has-thumb { grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 10px; align-items: start; }
+  .lp-page.is-portal .portal-list-row:not(.has-thumb) { grid-template-columns: minmax(0, 1fr); }
+  .lp-page.is-portal .portal-list-row .portal-action-row { grid-column: 1 / -1; justify-content: flex-start; }
+  .lp-page.is-portal .portal-record { padding: 0; border: 0; background: none; }
+  .lp-page.is-portal .portal-list-stack { gap: 8px; }
+  .m-more-btn { display: inline-flex; }
+  .m-more-panel { display: none; flex: 1 1 100%; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+  .m-more-panel.is-open { display: flex; }
+  .m-row-actions .portal-inline-btn { flex: 0 0 auto; }
+
+  /* ---- Tables become a card per row ---- */
+  .lp-page.is-portal .portal-table-wrap { overflow: visible; }
+  table.is-stack, table.is-stack tbody, table.is-stack tr, table.is-stack td { display: block; width: 100%; box-sizing: border-box; }
+  table.is-stack { min-width: 0 !important; background: none; }
+  .lp-page.is-portal .portal-table-wrap:has(table.is-stack) { border: 0; background: none; margin-top: 8px; }
+  table.is-stack thead { display: none; }
+  table.is-stack tr { display: flex; flex-direction: column; margin: 0 0 10px; padding: 10px 12px; border: 1px solid #d8dcdb; border-radius: 10px; background: #fff; }
+  table.is-stack td { order: 1; }
+  table.is-stack td.is-title { order: 0; }
+  table.is-stack td.m-only { order: 2; }
+  table.is-stack td.m-extra { order: 3; }
+  table.is-stack td.is-actions { order: 4; }
+  table.is-stack td { padding: 5px 0; border: 0; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  table.is-stack td::before { content: attr(data-label); flex: none; font-size: 12px; color: #5a5c5c; }
+  table.is-stack td[data-label=""]::before, table.is-stack td:not([data-label])::before { content: none; }
+  table.is-stack td.is-title { display: block; font-weight: 700; font-size: 15px; padding-bottom: 6px; }
+  table.is-stack td.is-title::before { content: none; }
+  table.is-stack td > input, table.is-stack td > select { width: 55%; max-width: 180px; }
+  table.is-stack td.is-wide > input { width: 100%; max-width: none; }
+  table.is-stack tr:not(.is-open) td.m-extra { display: none; }
+  table.is-stack td.m-only { display: block; }
+  table.is-stack td.m-only > button { width: 100%; }
+  table.is-stack td.is-actions { display: block; }
+  table.is-stack td.is-actions::before { content: none; }
+  table.is-stack td.is-actions .portal-inline-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+  table.is-stack td.is-actions .portal-linkish { min-height: 36px; padding: 6px 14px; border: 1px solid #1a1c1c; border-radius: 8px; background: none; text-decoration: none; font-size: 13px; }
+
+  /* ---- A bar of actions pinned to the bottom of the screen ---- */
+  .m-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; display: flex; gap: 10px; flex-wrap: nowrap;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #d8dcdb;
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+  }
+  .m-bar > * { flex: 1 1 0; text-align: center; }
+  .m-bar-space { height: 76px; }
+}
+@media (min-width: 761px) { .m-bar-space { display: none; } }

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRegisterTourViewer, useTours } from '../tours/tour-provider';
 import { TourChecklist } from '../tours/checklist';
 import { PortalNav } from './portal-nav';
+import '../portal-mobile.css';
 
 export type PortalNavKey =
   | 'dashboard'

@@ -16,7 +16,7 @@ export function EliteLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="lp-page">
+    <div className={`lp-page${active === 'portal' ? ' is-portal' : ''}`}>
       <SiteHeader active={active} />
 
       {children}

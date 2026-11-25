@@ -13,6 +13,8 @@ import { parseStockList } from './stock-list';
 import { useUnsavedGuard } from '../components/use-unsaved-guard';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
+import { Wizard, WizStep } from '../components/wizard';
+import { FilterFold, RowActions } from '../components/mobile-bits';
 import { PortalShell } from '../components/portal-shell';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
@@ -533,7 +535,11 @@ export default function CataloguePage() {
                 <p className="portal-muted">
                   Creates one variant per size at the same price. Adjust individual sizes afterwards.
                 </p>
-                <form className="portal-entity-form" onSubmit={onCreate} {...addGuard.formProps}>
+                <Wizard titles={['Basics', 'Prices', 'Sizes & stock', 'Photos']} submitLabel="Add Product" saving={saving}
+                  onCancel={() => { setShowForm(false); addGuard.markClean(); }}>
+                {(wiz) => (
+                <form noValidate className="portal-entity-form" onSubmit={wiz.onSubmit(onCreate)} onInvalidCapture={wiz.onInvalid} {...addGuard.formProps}>
+                  <WizStep wiz={wiz} index={0}>
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>SKU</span>
@@ -568,11 +574,6 @@ export default function CataloguePage() {
                         ))}
                       </select>
                     </label>
-                    <label>
-                      <span>Retail price (KES)</span>
-                      <input type="number" min="0" value={price} placeholder="3499" required
-                        onChange={(event) => setPrice(event.target.value)} />
-                    </label>
                   </div>
 
                   <label>
@@ -580,8 +581,15 @@ export default function CataloguePage() {
                     <textarea rows={3} value={form.description} placeholder="What it is, the material, what makes it worth buying. Shown on the product page."
                       onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} />
                   </label>
+                  </WizStep>
 
-                  <div className="portal-entity-grid-3">
+                  <WizStep wiz={wiz} index={1}>
+                  <div className="portal-entity-grid-3 is-pairs">
+                    <label>
+                      <span>Retail price (KES)</span>
+                      <input type="number" inputMode="numeric" min="0" value={price} placeholder="3499" required
+                        onChange={(event) => setPrice(event.target.value)} />
+                    </label>
                     <label>
                       <span>Cost (KES)</span>
                       <input type="number" min="0" value={cost} placeholder="2000"
@@ -603,7 +611,9 @@ export default function CataloguePage() {
                       <small className="portal-muted">Bulk. The keenest of the three.</small>
                     </label>
                   </div>
+                  </WizStep>
 
+                  <WizStep wiz={wiz} index={2}>
                   {categoryAttribute ? (
                     <label>
                       <span>{categoryAttribute.label}</span>
@@ -652,7 +662,7 @@ export default function CataloguePage() {
                     </p>
                   ) : (
                     <p className="portal-muted">
-                      Choose a category above to see its size options, or leave it uncategorised to create a single
+                      Choose a category on the first step to see its size options, or leave it uncategorised to create a single
                       variant with no size.
                     </p>
                   )}
@@ -703,6 +713,9 @@ export default function CataloguePage() {
                     <span>Source from supplier per order (never held on the shelf)</span>
                   </label>
 
+                  </WizStep>
+
+                  <WizStep wiz={wiz} index={3}>
                   <label>
                     <span>Images</span>
                     <div className="portal-inline-actions">
@@ -764,16 +777,12 @@ export default function CataloguePage() {
                     usedUrls={images}
                     title="Choose product images"
                   />
+                  </WizStep>
 
-                  <div className="portal-inline-actions">
-                    <button type="submit" className="portal-primary-btn" disabled={saving}>
-                      {saving ? 'Saving...' : 'Add Product'}
-                    </button>
-                    <button type="button" className="portal-ghost-btn" onClick={() => { setShowForm(false); addGuard.markClean(); }}>
-                      Cancel
-                    </button>
-                  </div>
+                  {wiz.bar}
                 </form>
+                )}
+                </Wizard>
               </article>
             ) : null}
 
@@ -794,6 +803,7 @@ export default function CataloguePage() {
 
               <div className="list-toolbar">
                 <ServerListSearch pager={productsPager} placeholder="Search name, SKU or brand…" />
+                <FilterFold count={[categoryFilter, dateFrom, dateTo].filter(Boolean).length}>
                 <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Filter by category">
                   <option value="">All categories</option>
                   {categories.map((category) => (
@@ -830,6 +840,7 @@ export default function CataloguePage() {
                     ],
                   }}
                 />
+                </FilterFold>
               </div>
 
               <div className="portal-list-stack">
@@ -857,7 +868,11 @@ export default function CataloguePage() {
                             {' · added '}{formatDate(product.createdAt)}
                           </p>
                         </div>
-                        <div className="portal-action-row">
+                        <RowActions primary={(
+                          <Link href={`/portal/catalogue/${product.id}`} className="portal-inline-btn">
+                            Manage
+                          </Link>
+                        )}>
                           <button
                             type="button"
                             className="portal-inline-btn"
@@ -865,9 +880,6 @@ export default function CataloguePage() {
                           >
                             {expanded === product.id ? 'Hide Sizes' : 'Sizes'}
                           </button>
-                          <Link href={`/portal/catalogue/${product.id}`} className="portal-inline-btn">
-                            Manage
-                          </Link>
                           {canCreate ? (
                             <button
                               type="button"
@@ -901,7 +913,7 @@ export default function CataloguePage() {
                               Delete
                             </button>
                           ) : null}
-                        </div>
+                        </RowActions>
                       </div>
 
                       {duplicateOf?.id === product.id ? (
