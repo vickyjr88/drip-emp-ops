@@ -22,7 +22,7 @@
 .m-collapse-head h2 { margin-top: 0; }
 .m-collapse-head h3 { margin: 18px 0 10px; font-size: 15px; }
 td.m-only { display: none; }
-.m-phone-only { display: none; }
+.m-phone-only, .m-phone-only-block { display: none; }
 .m-collapse-summary, .m-collapse-chevron { display: none; }
 
 @media (max-width: 900px) {
@@ -201,8 +201,16 @@ td.m-only { display: none; }
   .lp-page.is-portal .portal-info-row:last-child { border-bottom: 0; }
   .lp-page.is-portal .portal-info-row > span { font-size: 12px; flex: none; }
   .lp-page.is-portal .portal-info-row > strong { font-family: inherit; font-size: 14px; font-weight: 600; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+  /* Headline figures: three across, small, and out of the way while a form is open. */
+  .lp-page.is-portal .portal-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .lp-page.is-portal .portal-stat-grid .portal-stat-card { padding: 10px; }
+  .lp-page.is-portal .portal-stat-grid .portal-stat-card p { margin: 0; font-size: 11px; }
+  .lp-page.is-portal .portal-stat-grid .portal-stat-card h3 { margin: 2px 0 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+  .lp-page.is-portal .portal-stat-grid .portal-stat-note { display: none; }
+  .lp-page.is-portal .portal-workspace-body:has(.wiz) > .portal-stat-grid { display: none; }
   .m-desktop-only { display: none !important; }
   .m-phone-only { display: flex; }
+  .m-phone-only-block { display: block; }
   table.is-stack td.m-hide { display: none; }
   table.is-stack tr.is-total { flex-direction: row; justify-content: space-between; }
   table.is-stack tr.is-total td { width: auto; display: block; }
@@ -222,4 +230,4 @@ td.m-only { display: none; }
   .m-bar > * { flex: 1 1 0; text-align: center; }
   .m-bar-space { height: 76px; }
 }
-@media (min-width: 761px) { .m-bar-space { display: none; } .m-phone-only { display: none !important; } }
+@media (min-width: 761px) { .m-bar-space { display: none; } .m-phone-only, .m-phone-only-block { display: none !important; } }

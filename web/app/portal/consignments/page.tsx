@@ -12,6 +12,8 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../components/elite-layout';
 import { PortalShell } from '../components/portal-shell';
+import { Wizard, WizStep } from '../components/wizard';
+import { FilterFold, RowActions } from '../components/mobile-bits';
 import { ServerListPager, ServerListSearch, ServerPage, useServerPager } from '../components/server-pager';
 import { ListExport } from '../components/list-export';
 import { usePortalDialog } from '../components/portal-dialog';
@@ -400,7 +402,21 @@ export default function ConsignmentsPage() {
                 <p className="portal-muted">
                   Goods leave the shop floor but stay owned until sold or returned. Price is fixed now.
                 </p>
-                <form className="portal-entity-form" onSubmit={onIssue}>
+                <Wizard
+                  titles={['Reseller', 'Items', 'Confirm']}
+                  submitLabel="Issue Pickup"
+                  saving={saving}
+                  submitDisabled={draft.length === 0}
+                  onCancel={() => { setShowIssue(false); setDraft([]); }}
+                  check={(step) => {
+                    if (step === 0 && !head.customerId) return 'Choose a reseller.';
+                    if (step === 1 && draft.length === 0) return 'Add at least one item.';
+                    return null;
+                  }}
+                >
+                {(wiz) => (
+                <form noValidate className="portal-entity-form" onSubmit={wiz.onSubmit(onIssue)} onInvalidCapture={wiz.onInvalid}>
+                  <WizStep wiz={wiz} index={0}>
                   <div className="portal-entity-grid-2">
                     <label>
                       <span>Reseller</span>
@@ -468,6 +484,9 @@ export default function ConsignmentsPage() {
                     </label>
                   </div>
 
+                  </WizStep>
+
+                  <WizStep wiz={wiz} index={1}>
                   <div className="portal-entity-grid-3">
                     <label>
                       <span>Item</span>
@@ -532,14 +551,14 @@ export default function ConsignmentsPage() {
 
                   {draft.length > 0 ? (
                     <div className="portal-table-wrap">
-                      <table className="portal-data-table is-doc">
+                      <table className="portal-data-table is-doc is-stack">
                         <thead><tr><th>Item</th><th>Qty</th><th /></tr></thead>
                         <tbody>
                           {draft.map((line) => (
                             <tr key={line.variantId}>
-                              <td>{line.label}</td>
-                              <td>{line.quantity}</td>
-                              <td>
+                              <td className="is-title">{line.label}</td>
+                              <td data-label="Qty">{line.quantity}</td>
+                              <td className="is-actions">
                                 <button type="button" className="portal-inline-btn is-danger"
                                   onClick={() => setDraft((prev) => prev.filter((item) => item.variantId !== line.variantId))}>
                                   Remove
@@ -553,53 +572,54 @@ export default function ConsignmentsPage() {
                   ) : (
                     <div className="portal-empty-state">Nothing added yet.</div>
                   )}
+                  </WizStep>
 
+                  <WizStep wiz={wiz} index={2}>
+                  <p className="portal-muted m-phone-only-block">
+                    {resellers.find((reseller) => reseller.id === head.customerId)?.name || 'No reseller'} · {draft.reduce((n, l) => n + l.quantity, 0)} pair(s) from {stores.find((st) => st.id === head.storeId)?.name || 'the store'}.
+                  </p>
                   <label>
                     <span>Notes</span>
                     <input value={head.notes}
                       onChange={(event) => setHead((prev) => ({ ...prev, notes: event.target.value }))} />
                   </label>
 
-                  <div className="portal-inline-actions">
-                    <button type="submit" className="portal-primary-btn" disabled={saving || draft.length === 0}>
-                      {saving ? 'Issuing...' : 'Issue Pickup'}
-                    </button>
-                    <button type="button" className="portal-ghost-btn"
-                      onClick={() => { setShowIssue(false); setDraft([]); }}>
-                      Cancel
-                    </button>
-                  </div>
+                  </WizStep>
+
+                  {wiz.bar}
                 </form>
+                )}
+                </Wizard>
               </article>
             ) : null}
 
             {settle ? (
-              <article className="portal-card">
+              <article className="portal-card m-sheet">
                 <h2 style={{ marginTop: 0 }}>Settle Pickup</h2>
                 <p className="portal-muted">
                   Enter how many of each sold and how many came back. Anything left stays out.
                 </p>
                 <form className="portal-entity-form" onSubmit={onSettle}>
                   <div className="portal-table-wrap">
-                    <table className="portal-data-table is-doc">
+                    <table className="portal-data-table is-doc is-stack">
                       <thead><tr><th>Item</th><th>Still out</th><th>Sold</th><th>Returned</th></tr></thead>
                       <tbody>
                         {consignmentsPager.items.find((row) => row.id === settle.id)?.lines.map((line) => {
                           const stillOut = line.quantityOut - line.quantitySold - line.quantityReturned;
                           return (
                             <tr key={line.id}>
-                              <td>{line.variant.product.name} — {line.variant.name}</td>
-                              <td>{stillOut}</td>
-                              <td>
-                                <input type="number" min="0" max={stillOut} style={{ width: 70 }}
+                              <td className="is-title">{line.variant.product.name} — {line.variant.name}</td>
+                              <td data-label="Still out">{stillOut}</td>
+                              <td data-label="Sold">
+                                <input type="number" inputMode="numeric" min="0" max={stillOut} style={{ width: 70 }}
                                   value={settle.entries[line.id]?.sold || ''}
                                   onChange={(event) => setSettle((prev) => prev && ({
                                     ...prev,
                                     entries: { ...prev.entries, [line.id]: { ...(prev.entries[line.id] || { sold: '', returned: '' }), sold: event.target.value } },
                                   }))} />
                               </td>
-                              <td>
-                                <input type="number" min="0" max={stillOut} style={{ width: 70 }}
+                              <td data-label="Returned">
+                                <input type="number" inputMode="numeric" min="0" max={stillOut} style={{ width: 70 }}
                                   value={settle.entries[line.id]?.returned || ''}
                                   onChange={(event) => setSettle((prev) => prev && ({
                                     ...prev,
@@ -659,6 +679,7 @@ export default function ConsignmentsPage() {
 
               <div className="list-toolbar">
                 <ServerListSearch pager={consignmentsPager} placeholder="Search reference or reseller…" />
+                <FilterFold count={statusFilter ? 1 : 0}>
                 <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                   <option value="">All statuses</option>
                   {['OPEN', 'SETTLED', 'WRITTEN_OFF'].map((status) => (
@@ -682,6 +703,7 @@ export default function ConsignmentsPage() {
                     ],
                   }}
                 />
+                </FilterFold>
               </div>
 
               <div className="portal-list-stack">
@@ -708,11 +730,12 @@ export default function ConsignmentsPage() {
                           </p>
                         </div>
                         <span>{consignment.status.replace('_', ' ')}</span>
-                        <div className="portal-action-row">
+                        <RowActions primary={(
                           <button type="button" className="portal-inline-btn"
                             onClick={() => setExpanded(expanded === consignment.id ? null : consignment.id)}>
                             {expanded === consignment.id ? 'Hide' : 'Details'}
                           </button>
+                        )}>
                           {canUpdate && consignment.status === 'OPEN' ? (
                             <>
                               <button type="button" className="portal-inline-btn"
@@ -727,28 +750,28 @@ export default function ConsignmentsPage() {
                               </button>
                             </>
                           ) : null}
-                        </div>
+                        </RowActions>
                       </div>
 
                       {expanded === consignment.id ? (
                         <div className="portal-table-wrap">
-                          <table className="portal-data-table is-doc">
+                          <table className="portal-data-table is-doc is-stack">
                             <thead><tr><th>Item</th><th>Out</th><th>Sold</th><th>Returned</th><th>Still out</th><th>Unit</th></tr></thead>
                             <tbody>
                               {consignment.lines.map((line) => (
                                 <tr key={line.id}>
-                                  <td>{line.variant.product.name} — {line.variant.name}</td>
-                                  <td>{line.quantityOut}</td>
-                                  <td>{line.quantitySold}</td>
-                                  <td>{line.quantityReturned}</td>
-                                  <td>{line.quantityOut - line.quantitySold - line.quantityReturned}</td>
-                                  <td>{formatMoney(line.unitPrice)}</td>
+                                  <td className="is-title">{line.variant.product.name} — {line.variant.name}</td>
+                                  <td data-label="Out">{line.quantityOut}</td>
+                                  <td data-label="Sold">{line.quantitySold}</td>
+                                  <td data-label="Returned">{line.quantityReturned}</td>
+                                  <td data-label="Still out">{line.quantityOut - line.quantitySold - line.quantityReturned}</td>
+                                  <td data-label="Unit price">{formatMoney(line.unitPrice)}</td>
                                 </tr>
                               ))}
                               {consignment.payments.map((paid) => (
                                 <tr key={paid.id}>
-                                  <td colSpan={5}>Paid — {paid.method}{paid.reference ? ` (${paid.reference})` : ''}</td>
-                                  <td>{formatMoney(paid.amount)}</td>
+                                  <td className="is-title">Paid — {paid.method}{paid.reference ? ` (${paid.reference})` : ''}</td>
+                                  <td data-label="Amount">{formatMoney(paid.amount)}</td>
                                 </tr>
                               ))}
                             </tbody>

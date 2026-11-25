@@ -434,13 +434,19 @@ export class ConsignmentService {
   }
 
   /** Adds the figures every caller wants: what is still out, and the balance. */
-  private decorate<T extends { status: string; dueDate: Date | null; soldValue: Prisma.Decimal; amountPaid: Prisma.Decimal; lines: Array<{ quantityOut: number; quantitySold: number; quantityReturned: number }> }>(row: T) {
+  private decorate<T extends {
+    status: string; dueDate: Date | null; soldValue: Prisma.Decimal; amountPaid: Prisma.Decimal;
+    customer: { businessName: string | null; firstName: string; lastName: string };
+    lines: Array<{ quantityOut: number; quantitySold: number; quantityReturned: number }>;
+  }>(row: T) {
     const stillOut = row.lines.reduce(
       (sum, line) => sum + (line.quantityOut - line.quantitySold - line.quantityReturned),
       0,
     );
     return {
       ...row,
+      // The screens and the CSV show who has the stock; the customer record only holds the pieces of that name.
+      customer: { ...row.customer, name: customerDisplayName(row.customer) },
       unitsStillOut: stillOut,
       balance: Number(row.soldValue) - Number(row.amountPaid),
       isOverdue: row.status === 'OPEN' && !!row.dueDate && row.dueDate.getTime() < Date.now(),
