@@ -128,6 +128,13 @@ td.m-only { display: none; }
   .lp-page.is-portal .portal-detail-header-actions > * { flex: 1 1 0; text-align: center; }
   .lp-page.is-portal .portal-detail-meta { margin-bottom: 8px; }
 
+  /* A long form's save button stays in reach while its fields scroll past (accounting, staff and other forms not rebuilt as steps). */
+  .lp-page.is-portal form.portal-detail-form > button[type="submit"]:last-child,
+  .lp-page.is-portal form.portal-detail-form > .portal-inline-actions:last-child {
+    position: sticky; bottom: 0; z-index: 5; padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); background: #fff; box-shadow: 0 -8px 8px -8px rgba(0,0,0,.12);
+  }
+  .lp-page.is-portal form.portal-detail-form > button[type="submit"]:last-child { width: 100%; }
+
   /* ---- Folding sections ---- */
   .m-collapse { padding: 0; }
   .m-collapse-head { display: flex; align-items: center; gap: 10px; padding: 14px; min-height: 52px; cursor: pointer; }
