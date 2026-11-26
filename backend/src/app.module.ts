@@ -65,6 +65,7 @@ import { FinancialReportsModule } from './financial-reports/financial-reports.mo
 import { PageContentModule } from './page-content/page-content.module';
 import { ReminderModule } from './reminders/reminder.module';
 import { DailyReportModule } from './daily-report/daily-report.module';
+import { SalesReportModule } from './sales-report/sales-report.module';
 import { SocialPostingModule } from './social-posting/social-posting.module';
 import { CredentialsModule } from './credentials/credentials.module';
 import { ShareKitModule } from './share-kit/share-kit.module';
@@ -136,6 +137,7 @@ import { PdfModule } from './pdf/pdf.module';
     PageContentModule,
     ReminderModule,
     DailyReportModule,
+    SalesReportModule,
     WhatsAppOutreachModule,
     FacebookCommentsModule,
     SocialPostingModule,

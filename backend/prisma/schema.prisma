@@ -1663,6 +1663,8 @@ model Order {
   customerEmail   String?
   shippingAddress String?
   notes           String?
+  /// Why it was cancelled or refunded, as the person who did it put it.
+  closeReason     String?
 
   placedAt    DateTime  @default(now())
   fulfilledAt DateTime?

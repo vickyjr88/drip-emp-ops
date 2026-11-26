@@ -49,7 +49,7 @@ export class OrderController {
   @Patch(':id/status')
   @Permissions(buildPermissionKey('Order', 'update'))
   setStatus(@Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
-    return this.service.setStatus(id, dto.status, dto.notes);
+    return this.service.setStatus(id, dto.status, dto.notes, dto.reason);
   }
 
   @Patch(':id/lines/:lineId/fulfillment')

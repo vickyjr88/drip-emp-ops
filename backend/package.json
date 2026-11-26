@@ -26,6 +26,7 @@
     "test:consignment-name": "node --require ts-node/register/transpile-only --test test/consignment-name.test.ts",
     "test:consignment-convert": "node --require ts-node/register/transpile-only --test --test-concurrency=1 test/consignment-convert.test.ts",
     "test:alerts": "node --require ts-node/register/transpile-only --test --test-concurrency=1 test/alerts-render.test.ts test/alerts.test.ts",
+    "test:sales-report": "node --require ts-node/register/transpile-only --test --test-concurrency=1 test/sales-report-metrics.test.ts test/sales-report.test.ts",
     "test:receipt": "node --require ts-node/register/transpile-only --test test/receipt.test.ts",
     "test:contact-email": "node --require ts-node/register/transpile-only --test test/contact-email.test.ts",
     "test:mautic-phone": "node --require ts-node/register/transpile-only --test test/mautic-phone.test.ts",

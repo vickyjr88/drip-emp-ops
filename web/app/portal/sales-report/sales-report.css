@@ -1,0 +1,102 @@
+/* The sales report. Charts and tables reuse the portal's own styles; these are the period bar, the headline tiles and the grid of breakdowns. */
+.srp-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.srp-seg { display: inline-flex; border: 1px solid #1a1c1c; border-radius: 8px; overflow: hidden; }
+.srp-seg button { border: 0; background: #fff; padding: 8px 14px; font: 700 13px 'Manrope', sans-serif; cursor: pointer; min-height: 40px; }
+.srp-seg button + button { border-left: 1px solid #1a1c1c; }
+.srp-seg button.is-on { background: #1a1c1c; color: #fff; }
+.srp-stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.srp-stepper input[type="date"], .srp-stepper input[type="month"] { min-height: 40px; padding: 6px 10px; border: 1px solid var(--eef-border); background: #fff; font: inherit; }
+.srp-arrow { width: 40px; height: 40px; border: 1px solid #1a1c1c; border-radius: 8px; background: #fff; cursor: pointer; font-size: 18px; line-height: 1; }
+.srp-arrow:disabled { opacity: 0.35; cursor: default; }
+.srp-presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.srp-title { margin: 14px 0 0; font-family: 'Libre Caslon Text', serif; font-size: 1.35rem; }
+.srp-compared { margin: 4px 0 0; }
+.srp-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.srp-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.srp-tile { background: #fff; border: 1px solid var(--eef-border); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; text-align: left; font: inherit; color: inherit; }
+button.srp-tile { cursor: pointer; }
+button.srp-tile:hover, button.srp-tile:focus-visible { border-color: var(--eef-primary); }
+.srp-tile-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #5a5c5c; }
+.srp-tile-value { font-family: 'Libre Caslon Text', serif; font-size: 1.5rem; line-height: 1.15; overflow-wrap: anywhere; }
+.srp-tile-note { font-size: 12px; color: #5a5c5c; }
+.srp-delta { font-size: 12px; font-weight: 700; }
+.srp-delta.is-good { color: #1b7a43; }
+.srp-delta.is-bad { color: #a4161a; }
+.srp-delta.is-flat { color: #5a5c5c; }
+.srp-alerts { display: flex; flex-direction: column; gap: 8px; }
+.srp-alert { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 14px; border: 1px solid #f0d98a; background: #fff8e1; font-size: 14px; }
+.srp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.srp-grid > * { min-width: 0; margin: 0 !important; }
+.srp-table-scroll { overflow-x: auto; }
+.srp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; overflow-wrap: normal; word-break: normal; }
+.srp-periods td:first-child, .srp-periods th:first-child { white-space: nowrap; }
+.srp-table th { text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: #5a5c5c; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--eef-border); }
+.srp-table td { padding: 7px 8px 7px 0; border-bottom: 1px solid #eef0f0; vertical-align: top; }
+.srp-table th.num, .srp-table td.num { text-align: right; padding-right: 0; padding-left: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.srp-table tr.is-total td { font-weight: 700; border-top: 1px solid #1a1c1c; }
+.srp-link { border: 0; background: none; padding: 0; font: inherit; color: var(--eef-primary); text-decoration: underline; cursor: pointer; text-align: left; }
+.srp-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.srp-tabs button { border: 1px solid #1a1c1c; background: #fff; border-radius: 999px; padding: 7px 14px; font: 700 12.5px 'Manrope', sans-serif; cursor: pointer; }
+.srp-tabs button.is-on { background: #1a1c1c; color: #fff; }
+.srp-listbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.srp-listbar input[type="search"] { flex: 1 1 220px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--eef-border); font: inherit; }
+.srp-listbar select { min-height: 40px; padding: 6px 10px; border: 1px solid var(--eef-border); background: #fff; font: inherit; }
+.srp-pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.srp-reason { display: block; font-size: 12px; color: #5a5c5c; margin-top: 4px; }
+.srp-print-only { display: none; }
+
+@media (max-width: 1100px) { .srp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .srp-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .srp-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .srp-tiles { gap: 8px; }
+  .srp-tile { padding: 10px 12px; }
+  .srp-tile-value { font-size: 1.15rem; }
+  .srp-seg { display: flex; width: 100%; }
+  .srp-seg button { flex: 1 1 0; padding: 8px 4px; }
+  .srp-stepper { width: 100%; }
+  .srp-stepper input { flex: 1 1 0; min-width: 0; }
+  .srp-grid { gap: 12px; }
+}
+@media print {
+  .srp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .srp-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .srp-print-only { display: block; }
+  .m-collapse-body { display: block !important; }
+}
+
+/* Revenue bars (sales-bars.tsx): thin bars with rounded tops on one baseline, a 2px gap between them, a quiet grid behind. */
+.srp-chart { margin: 0; }
+.srp-chart-readout { min-height: 22px; font-size: 13px; margin-bottom: 14px; }
+.srp-chart-body { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px; }
+.srp-chart-scale { display: flex; flex-direction: column; justify-content: space-between; height: 180px; font-size: 11px; color: #5a5c5c; text-align: right; }
+.srp-chart-scale span { line-height: 0; }
+.srp-chart-plot { display: flex; align-items: stretch; gap: 2px; height: 180px; border-bottom: 1px solid #8b8f8f; background: linear-gradient(#e6e8e8, #e6e8e8) top / 100% 1px no-repeat, linear-gradient(#e6e8e8, #e6e8e8) center / 100% 1px no-repeat; }
+.srp-bar-col { flex: 1 1 0; min-width: 0; display: flex; align-items: flex-end; justify-content: center; border: 0; padding: 0; background: none; cursor: pointer; }
+.srp-bar-col.is-active, .srp-bar-col:focus-visible { background: rgba(26, 28, 28, 0.05); outline: none; }
+.srp-bar-fill { position: relative; display: block; width: 100%; max-width: 28px; background: var(--chart-cat-1); border-radius: 4px 4px 0 0; }
+.srp-bar-col.is-active .srp-bar-fill { filter: brightness(1.5); }
+.srp-bar-label { position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #1a1c1c; white-space: nowrap; }
+.srp-chart-axis { display: flex; gap: 2px; margin-left: 44px; padding-top: 4px; height: 20px; }
+.srp-chart-axis span { flex: 1 1 0; min-width: 0; position: relative; }
+.srp-chart-axis em { position: absolute; left: 0; font-style: normal; font-size: 11px; color: #5a5c5c; white-space: nowrap; }
+
+/* The order list: the number and the date stay on their own lines. */
+.srp-orders td, .srp-orders th { padding-left: 8px; padding-right: 8px; }
+.srp-orders td:first-child a { white-space: nowrap; }
+.srp-orders td:nth-child(2) { min-width: 104px; }
+.srp-orders td.portal-num { white-space: nowrap; }
+.srp-orders .srp-reason { white-space: normal; }
+
+/* On a phone the period table keeps what is asked for most: the period, sales, revenue and money received. The rest is in the CSV and the tiles. */
+@media (max-width: 760px) {
+  .srp-periods .srp-opt { display: none; }
+  .srp-table { font-size: 12.5px; }
+  .srp-table th { letter-spacing: 0; }
+  .srp-table th.num, .srp-table td.num { padding-left: 6px; }
+  .srp-periods td:first-child { font-size: 12px; }
+}
+/* As cards (phone), the small second line of a cell (a phone number, who keyed it, how it was paid) goes under the value, not beside it. */
+@media (max-width: 760px) {
+  table.srp-orders.is-stack td { flex-wrap: wrap; row-gap: 0; }
+  table.srp-orders.is-stack td .srp-reason { flex: 1 0 100%; text-align: right; margin-top: 2px; }
+}

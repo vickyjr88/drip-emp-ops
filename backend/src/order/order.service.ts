@@ -18,7 +18,8 @@ import { buildReceipt, Receipt } from '../common/receipt';
 import { realEmail } from '../common/contact-email';
 import { AlertsService } from '../alerts/alerts.service';
 
-const INCLUDE = {
+/** What an order is read with wherever it is shown or messaged about. */
+export const ORDER_INCLUDE = {
   store: { select: { id: true, code: true, name: true } },
   customer: { select: { id: true, firstName: true, lastName: true, phone: true, email: true } },
   lines: {
@@ -43,6 +44,7 @@ const INCLUDE = {
   },
   payments: { orderBy: { receivedAt: 'asc' } },
 } satisfies Prisma.OrderInclude;
+const INCLUDE = ORDER_INCLUDE;
 
 /**
  * Which statuses may follow which.
@@ -74,7 +76,7 @@ function lineSize(line: OrderForFollowUp['lines'][number]): string | null {
 }
 
 /** The WhatsApp follow-up for an order: its items with a link to each product, worded for where the order has got to. */
-function orderFollowUp(order: OrderForFollowUp): FollowUp | null {
+export function orderFollowUp(order: OrderForFollowUp): FollowUp | null {
   return buildFollowUp({
     kind: 'ORDER',
     name: order.customerName || (order.customer ? `${order.customer.firstName} ${order.customer.lastName}` : null),
@@ -304,7 +306,7 @@ export class OrderService {
   }
 
   /** Moves an order along, refusing a jump the sequence does not allow. */
-  async setStatus(id: string, status: OrderStatus, notes?: string) {
+  async setStatus(id: string, status: OrderStatus, notes?: string, reason?: string) {
     const order = await this.findOne(id);
     if (order.status === status) return order;
 
@@ -358,6 +360,8 @@ export class OrderService {
         ...(notes ? { notes } : {}),
         ...(status === 'DELIVERED' ? { fulfilledAt: new Date() } : {}),
         ...(status === 'CANCELLED' ? { cancelledAt: new Date() } : {}),
+        // Why it ended this way, for whoever reads the sales report later.
+        ...((status === 'CANCELLED' || status === 'REFUNDED') && reason?.trim() ? { closeReason: reason.trim() } : {}),
       },
       include: INCLUDE,
     });

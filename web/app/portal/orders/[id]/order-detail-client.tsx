@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { EliteLayout } from '../../../components/elite-layout';
 import { PortalShell } from '../../components/portal-shell';
+import { usePortalDialog } from '../../components/portal-dialog';
 import { CollapseCard } from '../../components/collapse-card';
 import { RowActions } from '../../components/mobile-bits';
 import { ImageLightbox } from '../../components/image-lightbox';
@@ -52,7 +53,7 @@ type Order = {
   total: string | number; amountPaid: string | number; balance: number; currency: string;
   customerName?: string | null; customerPhone?: string | null; customerEmail?: string | null;
   shippingAddress?: string | null; notes?: string | null;
-  placedAt: string; fulfilledAt?: string | null; cancelledAt?: string | null; createdBy: string;
+  placedAt: string; fulfilledAt?: string | null; cancelledAt?: string | null; closeReason?: string | null; createdBy: string;
   store: { id: string; code: string; name: string };
   customer?: { id: string; firstName: string; lastName: string; phone?: string | null; email?: string | null } | null;
   lines: OrderLine[];
@@ -87,6 +88,9 @@ const STATUS_NEXT: Record<string, string[]> = {
   REFUNDED: [],
 };
 
+const CANCEL_REASONS = ['Never paid', 'Customer changed their mind', 'Out of stock', 'Wrong size or item', 'Entered by mistake or twice', 'Other'];
+const REFUND_REASONS = ['Returned the item', 'Wrong size or item', 'Faulty item', 'Could not deliver', 'Paid twice', 'Other'];
+
 const LINE_STATUS_LABEL: Record<FulfillmentStatus, string> = {
   AWAITING_SUPPLIER: 'Awaiting supplier',
   ORDERED_FROM_SUPPLIER: 'Ordered from supplier',
@@ -106,6 +110,7 @@ function lineImageUrl(line: OrderLine): string | null {
 }
 
 export default function OrderDetailClient({ orderId }: { orderId: string }) {
+  const dialog = usePortalDialog();
   const [initialized, setInitialized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
@@ -199,8 +204,25 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
 
   async function onSetStatus(status: string) {
     if (!token || !order) return;
+    // Ending an order cannot be undone, so it is asked about, and why is kept for the sales report.
+    let reason: string | undefined;
+    if (status === 'CANCELLED' || status === 'REFUNDED') {
+      const refund = status === 'REFUNDED';
+      const answer = await dialog.prompt({
+        title: refund ? `Refund ${order.orderNumber}?` : `Cancel ${order.orderNumber}?`,
+        message: `Any pairs taken from the shelf go back into stock. This cannot be undone.${Number(order.amountPaid) > 0 ? ' Money has been recorded on this order: return it to the customer if it is due back.' : ''}`,
+        fields: [
+          { name: 'reason', label: 'Why?', type: 'select', required: true, placeholder: 'Choose a reason', options: (refund ? REFUND_REASONS : CANCEL_REASONS).map((r) => ({ value: r, label: r })) },
+          { name: 'detail', label: 'Anything to add? (optional)', type: 'textarea' },
+        ],
+        confirmLabel: refund ? 'Refund the order' : 'Cancel the order',
+        cancelLabel: 'Keep it',
+      });
+      if (!answer) return;
+      reason = [answer.reason, answer.detail?.trim()].filter(Boolean).join(': ').slice(0, 300);
+    }
     try {
-      const updated = await apiRequest<Order>(`/orders/${order.id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }, token);
+      const updated = await apiRequest<Order>(`/orders/${order.id}/status`, { method: 'PATCH', body: JSON.stringify({ status, ...(reason ? { reason } : {}) }) }, token);
       setOrder(updated);
       setFeedback(`${order.orderNumber} is now ${status}.`);
     } catch (error) {
@@ -527,6 +549,12 @@ export default function OrderDetailClient({ orderId }: { orderId: string }) {
                     <div className="portal-info-row">
                       <span>Cancelled</span>
                       <strong>{formatDateTime(order.cancelledAt)}</strong>
+                    </div>
+                  ) : null}
+                  {order.closeReason ? (
+                    <div className="portal-info-row">
+                      <span>{order.status === 'REFUNDED' ? 'Refund reason' : 'Cancel reason'}</span>
+                      <strong>{order.closeReason}</strong>
                     </div>
                   ) : null}
                   {order.notes ? (

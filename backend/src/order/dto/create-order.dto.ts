@@ -2,8 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize, IsArray, IsEmail, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional,
-  IsString, Min, ValidateNested,
-} from 'class-validator';
+  IsString, Min, ValidateNested, MaxLength } from 'class-validator';
 import { OrderLineFulfillmentStatus, OrderLineFulfillmentType, OrderStatus, PriceTier } from '@prisma/client';
 
 export class CreateOrderLineDto {
@@ -117,6 +116,12 @@ export class UpdateOrderStatusDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Why the order is being cancelled or refunded.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string;
 }
 
 export class UpdateOrderLineFulfillmentDto {

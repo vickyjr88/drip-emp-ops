@@ -31,6 +31,7 @@ export type PortalNavKey =
   | 'inquiries'
   | 'reviews'
   | 'accounting'
+  | 'salesReport'
   | 'analytics'
   | 'insights'
   | 'dailyReport'
@@ -71,6 +72,7 @@ const PAGE_TITLES: Record<PortalNavKey, string> = {
   inquiries: 'Inquiries',
   reviews: 'Reviews',
   accounting: 'Accounting',
+  salesReport: 'Sales Report',
   analytics: 'Analytics',
   insights: 'Insights',
   dailyReport: 'Daily Report',

@@ -19,7 +19,7 @@ import {
   Banknote, BarChart3, Bell, BellRing, Boxes, CalendarDays, ClipboardList, FileText, Handshake, Image as ImageIcon, Images, Landmark, LayoutDashboard,
   LayoutGrid, Lightbulb, type LucideIcon, Megaphone, MessageCircle, MessageCircleQuestion, Package, PenLine, Plus, Receipt, ScrollText, Search,
   Settings,
-  Share2, ShieldCheck, Shirt, ShoppingCart, Sparkles, Star, Store, Tag, Upload, UserCog, UserPlus, UsersRound, Wallet, Watch,
+  Share2, ShieldCheck, Shirt, ShoppingCart, Sparkles, Star, Store, Tag, TrendingUp, Upload, UserCog, UserPlus, UsersRound, Wallet, Watch,
 } from 'lucide-react';
 import type { PortalNavKey } from './portal-shell';
 import { useTours } from '../tours/tour-provider';
@@ -76,6 +76,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'reports', label: 'Reports & money', icon: BarChart3, items: [
+      { key: 'salesReport', href: '/portal/sales-report', label: 'Sales Report', icon: TrendingUp, needs: 'order.read' },
       { key: 'analytics', href: '/portal/analytics', label: 'Analytics', icon: BarChart3 },
       { key: 'insights', href: '/portal/insights', label: 'Insights', icon: Lightbulb, needs: 'customer.read' },
       { key: 'dailyReport', href: '/portal/daily-report', label: 'Daily Report', icon: ClipboardList, needs: 'daily-report-setting.read' },

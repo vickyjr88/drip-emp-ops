@@ -56,7 +56,7 @@ function escapeCell(value: string | number | null | undefined): string {
   return text;
 }
 
-function toCsv<T>(rows: T[], columns: Array<ExportColumn<T>>): string {
+export function toCsv<T>(rows: T[], columns: Array<ExportColumn<T>>): string {
   const safeRows = Array.isArray(rows) ? rows : [];
   const header = columns.map((column) => escapeCell(column.header)).join(',');
   const body = safeRows.map((row) =>
@@ -67,7 +67,7 @@ function toCsv<T>(rows: T[], columns: Array<ExportColumn<T>>): string {
   return `\uFEFF${[header, ...body].join('\r\n')}\r\n`;
 }
 
-function download(csv: string, fileName: string) {
+export function downloadCsv(csv: string, fileName: string) {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -145,7 +145,7 @@ export function ListExport<T>({
   function onExport() {
     const stamp = new Date().toISOString().slice(0, 10);
     const range = from || to ? `_${from || 'start'}_to_${to || stamp}` : '';
-    download(toCsv(ranged, config.columns), `${config.fileName}${range}_${stamp}.csv`);
+    downloadCsv(toCsv(ranged, config.columns), `${config.fileName}${range}_${stamp}.csv`);
     setOpen(false);
   }
 
@@ -156,7 +156,7 @@ export function ListExport<T>({
       <button
         type="button"
         className="portal-inline-btn"
-        onClick={() => download(toCsv(rows, config.columns), `${config.fileName}_${new Date().toISOString().slice(0, 10)}.csv`)}
+        onClick={() => downloadCsv(toCsv(rows, config.columns), `${config.fileName}_${new Date().toISOString().slice(0, 10)}.csv`)}
         disabled={disabled || rows.length === 0}
       >
         Export CSV
